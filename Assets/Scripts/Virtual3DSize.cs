@@ -14,6 +14,11 @@ public sealed class Virtual3DSize : MonoBehaviour
     public float FrontY => bodyCollider != null
         ? bodyCollider.bounds.min.y
         : transform.position.y - size.y * 0.5f;
+    public Bounds FootprintBounds => bodyCollider != null
+        ? bodyCollider.bounds
+        : new Bounds(
+            new Vector3(transform.position.x, FrontY + size.y * 0.5f, transform.position.z),
+            new Vector3(size.x, size.y, 0.2f));
 
     public Bounds ProjectedBounds => new(
         spriteRenderer != null ? spriteRenderer.bounds.center : transform.position,
