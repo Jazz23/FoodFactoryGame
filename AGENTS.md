@@ -1,0 +1,3 @@
+﻿- Always use `var` for variables instead of specifying the type.
+- Always use the new InputSystem actions map instead of hard coding any input.
+- Always assume references exist, that means no null checks. Use ! if there are compiler warnings. If the reference could actuall be null as intended behavior, then you can perform null checks.
