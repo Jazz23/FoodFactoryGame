@@ -1,12 +1,17 @@
-using System;
 using FishNet.Object;
 using UnityEngine;
 using UnityEngine.InputSystem;
-using UnityEngine.Jobs;
 
+[RequireComponent(typeof(Rigidbody2D), typeof(CapsuleCollider2D))]
 public class Movement : NetworkBehaviour
 {
     private InputAction _move;
+    private Rigidbody2D _body;
+
+    private void Awake()
+    {
+        _body = GetComponent<Rigidbody2D>();
+    }
 
     public override void OnStartClient()
     {
@@ -16,8 +21,9 @@ public class Movement : NetworkBehaviour
         (_move = InputSystem.actions["Move"]).Enable();
     }
 
-    private void Update()
+    private void FixedUpdate()
     {
-        transform.position += Time.deltaTime * (Vector3)_move.ReadValue<Vector2>();
+        Vector2 movement = _move.ReadValue<Vector2>();
+        _body.MovePosition(_body.position + movement * Time.fixedDeltaTime);
     }
 }
