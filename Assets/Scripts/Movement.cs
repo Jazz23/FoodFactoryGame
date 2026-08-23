@@ -30,7 +30,8 @@ public class Movement : NetworkBehaviour
             return;
         }
 
-        (_move ??= InputSystem.actions["Move"]).Enable();
+        (_move = InputSystem.actions["Move"]).Enable();
+        Camera.main!.transform.SetParent(transform);
     }
 
     public override void OnOwnershipClient(NetworkConnection prevOwner)
