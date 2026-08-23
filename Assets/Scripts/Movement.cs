@@ -7,6 +7,7 @@ using UnityEngine.InputSystem;
 public class Movement : NetworkBehaviour
 {
     [SerializeField, Min(0f)] private float moveSpeed = 4f;
+    [SerializeField, Min(0f)] private float verticalMovementMultiplier = 0.5f;
 
     private InputAction _move;
     private Rigidbody2D _body;
@@ -80,7 +81,9 @@ public class Movement : NetworkBehaviour
             return;
         }
 
-        Vector2 movement = _move.ReadValue<Vector2>();
+        var movement = _move.ReadValue<Vector2>();
+        movement.y *= verticalMovementMultiplier;
+
         if (movement.sqrMagnitude > 1f)
         {
             movement.Normalize();
