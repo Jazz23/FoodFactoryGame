@@ -4,9 +4,9 @@ using UnityEngine.InputSystem;
 [RequireComponent(typeof(Camera))]
 public sealed class CameraZoom : MonoBehaviour
 {
-    [SerializeField, Min(0.01f)] private float zoomSpeed = 10f;
+    [SerializeField, Min(0.01f)] private float zoomSpeed = 100f;
     [SerializeField, Min(0.01f)] private float minOrthographicSize = 2f;
-    [SerializeField, Min(0.01f)] private float maxOrthographicSize = 10f;
+    [SerializeField, Min(0.01f)] private float maxOrthographicSize = 20f;
 
     private Camera _sceneCamera;
     private InputAction _scrollWheel;
