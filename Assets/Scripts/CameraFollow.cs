@@ -19,9 +19,13 @@ public sealed class CameraFollow : MonoBehaviour
             return;
         }
 
-        var position = PlayerSceneTransition.LocalOwner.position + offset;
+        var player = PlayerSceneTransition.LocalOwner;
+        var position = player.transform.position + offset;
         transform.position = position;
-        sceneCamera.orthographicSize = SceneGrid.GetForScene(
-            PlayerSceneTransition.LocalOwner.gameObject.scene).OrthographicSize;
+
+        if (SceneGrid.TryGetForScene(player.gameObject.scene, out var grid))
+        {
+            sceneCamera.orthographicSize = grid.OrthographicSize;
+        }
     }
 }

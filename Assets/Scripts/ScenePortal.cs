@@ -19,7 +19,16 @@ public sealed class ScenePortal : MonoBehaviour
 
     public bool CanUse(Vector2 playerPosition)
     {
-        var grid = SceneGrid.GetForScene(gameObject.scene);
+        if (!SceneGrid.TryGetForScene(gameObject.scene, out var grid))
+        {
+            return false;
+        }
+
+        return CanUse(playerPosition, grid);
+    }
+
+    private bool CanUse(Vector2 playerPosition, SceneGrid grid)
+    {
         var interactionPosition = grid.LogicalToWorld(interactionLogicalPosition);
         return (playerPosition - interactionPosition).sqrMagnitude <= interactionRadius * interactionRadius;
     }
@@ -36,6 +45,11 @@ public sealed class ScenePortal : MonoBehaviour
         var closestDistance = float.PositiveInfinity;
         portal = null!;
 
+        if (!SceneGrid.TryGetForScene(scene, out var grid))
+        {
+            return false;
+        }
+
         foreach (var candidate in portals)
         {
             if (candidate.gameObject.scene != scene || candidate.destination != destination)
@@ -43,10 +57,9 @@ public sealed class ScenePortal : MonoBehaviour
                 continue;
             }
 
-            var grid = SceneGrid.GetForScene(scene);
             var interactionPosition = grid.LogicalToWorld(candidate.interactionLogicalPosition);
             var distance = (playerPosition - interactionPosition).sqrMagnitude;
-            if (distance >= closestDistance || !candidate.CanUse(playerPosition))
+            if (distance >= closestDistance || !candidate.CanUse(playerPosition, grid))
             {
                 continue;
             }
@@ -69,14 +82,18 @@ public sealed class ScenePortal : MonoBehaviour
         var closestDistance = float.PositiveInfinity;
         portal = null!;
 
+        if (!SceneGrid.TryGetForScene(scene, out var grid))
+        {
+            return false;
+        }
+
         foreach (var candidate in portals)
         {
-            if (candidate.gameObject.scene != scene || !candidate.CanUse(playerPosition))
+            if (candidate.gameObject.scene != scene || !candidate.CanUse(playerPosition, grid))
             {
                 continue;
             }
 
-            var grid = SceneGrid.GetForScene(scene);
             var interactionPosition = grid.LogicalToWorld(candidate.interactionLogicalPosition);
             var distance = (playerPosition - interactionPosition).sqrMagnitude;
             if (distance >= closestDistance)

@@ -80,8 +80,14 @@ public class Movement : NetworkBehaviour
             return;
         }
 
+        if (!SceneGrid.TryGetForScene(gameObject.scene, out var grid))
+        {
+            SceneGrid.LogMissingGrid(gameObject.scene, this);
+            return;
+        }
+
         var movement = _move.ReadValue<Vector2>();
-        movement.y *= SceneGrid.GetForScene(gameObject.scene).VerticalMovementMultiplier;
+        movement.y *= grid.VerticalMovementMultiplier;
 
         if (movement.sqrMagnitude > 1f)
         {

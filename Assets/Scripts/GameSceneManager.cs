@@ -131,7 +131,11 @@ public sealed class GameSceneManager : MonoBehaviour
         }
 
         pendingTransition.TargetScene = args.QueueData.SceneLoadData.GetFirstLookupScene();
-        var grid = SceneGrid.GetForScene(pendingTransition.TargetScene);
+        if (!TryGetGrid(pendingTransition.TargetScene, out var grid))
+        {
+            return;
+        }
+
         var targetPosition = grid.LogicalToWorld(pendingTransition.ArrivalLogicalPosition);
         pendingTransition.Player.GetComponent<PlayerSceneTransition>().ServerTeleport(targetPosition);
     }
@@ -155,7 +159,11 @@ public sealed class GameSceneManager : MonoBehaviour
             return;
         }
 
-        var grid = SceneGrid.GetForScene(args.Scene);
+        if (!TryGetGrid(args.Scene, out var grid))
+        {
+            return;
+        }
+
         var targetPosition = grid.LogicalToWorld(pendingTransition.ArrivalLogicalPosition);
         pendingTransition.Player.GetComponent<PlayerSceneTransition>().CompleteTransition(
             pendingTransition.Connection,
@@ -165,7 +173,11 @@ public sealed class GameSceneManager : MonoBehaviour
 
     private void SpawnInitialPlayer(NetworkConnection connection, Scene scene)
     {
-        var grid = SceneGrid.GetForScene(scene);
+        if (!TryGetGrid(scene, out var grid))
+        {
+            return;
+        }
+
         var position = grid.LogicalToWorld(grid.InitialPlayerLogicalPosition);
         var player = networkManager.GetPooledInstantiated(
             playerPrefab,
@@ -181,5 +193,16 @@ public sealed class GameSceneManager : MonoBehaviour
     private string GetSceneName(SceneDestination destination)
     {
         return destination == SceneDestination.World ? worldSceneName : insideSceneName;
+    }
+
+    private bool TryGetGrid(Scene scene, out SceneGrid grid)
+    {
+        if (SceneGrid.TryGetForScene(scene, out grid))
+        {
+            return true;
+        }
+
+        SceneGrid.LogMissingGrid(scene, this);
+        return false;
     }
 }

@@ -13,7 +13,8 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
     private Rigidbody2D body = null!;
     private bool isTransitioning;
 
-    public static Transform LocalOwner = null!;
+    public static PlayerSceneTransition LocalOwner = null!;
+    public bool IsTransitioning => isTransitioning;
 
     private void Awake()
     {
@@ -29,7 +30,7 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
             return;
         }
 
-        LocalOwner = transform;
+        LocalOwner = this;
         interact = InputSystem.actions["Interact"];
         interact.Enable();
         interact.performed += InteractPerformed;
@@ -45,7 +46,7 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         interact.performed -= InteractPerformed;
         interact.Disable();
 
-        if (LocalOwner == transform)
+        if (LocalOwner == this)
         {
             LocalOwner = null!;
         }

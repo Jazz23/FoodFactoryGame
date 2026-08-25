@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -9,6 +10,10 @@ public enum GridProjection
 
 public sealed class SceneGrid : MonoBehaviour
 {
+    private static readonly Dictionary<int, SceneGrid> sceneGrids = new();
+    private static readonly HashSet<int> unresolvedScenes = new();
+    private static readonly HashSet<int> reportedScenes = new();
+
     [SerializeField] private GridProjection projection;
     [SerializeField] private Vector2 logicalOrigin;
     [SerializeField] private Vector2 visualOrigin;
@@ -22,6 +27,44 @@ public sealed class SceneGrid : MonoBehaviour
     public Vector2 InitialPlayerLogicalPosition => initialPlayerLogicalPosition;
     public float VerticalMovementMultiplier => verticalMovementMultiplier;
     public float OrthographicSize => orthographicSize;
+
+    private void OnEnable()
+    {
+        var scene = gameObject.scene;
+        if (!scene.IsValid())
+        {
+            return;
+        }
+
+        if (sceneGrids.TryGetValue(scene.handle, out var grid) && grid != this)
+        {
+            sceneGrids.Remove(scene.handle);
+        }
+        else
+        {
+            sceneGrids[scene.handle] = this;
+        }
+
+        unresolvedScenes.Remove(scene.handle);
+        reportedScenes.Remove(scene.handle);
+    }
+
+    private void OnDisable()
+    {
+        var scene = gameObject.scene;
+        if (!scene.IsValid())
+        {
+            return;
+        }
+
+        if (sceneGrids.TryGetValue(scene.handle, out var grid) && grid == this)
+        {
+            sceneGrids.Remove(scene.handle);
+        }
+
+        unresolvedScenes.Remove(scene.handle);
+        reportedScenes.Remove(scene.handle);
+    }
 
     public Vector2 LogicalToWorld(Vector2 logicalPosition)
     {
@@ -53,20 +96,62 @@ public sealed class SceneGrid : MonoBehaviour
             : worldPosition;
     }
 
-    public static SceneGrid GetForScene(Scene scene)
+    public static bool TryGetForScene(Scene scene, out SceneGrid grid)
     {
-        var grids = FindObjectsByType<SceneGrid>(
-            FindObjectsInactive.Exclude,
-            FindObjectsSortMode.None);
-
-        foreach (var grid in grids)
+        grid = null!;
+        if (!scene.IsValid() || unresolvedScenes.Contains(scene.handle))
         {
-            if (grid.gameObject.scene == scene)
-            {
-                return grid;
-            }
+            return false;
         }
 
-        throw new MissingReferenceException($"No SceneGrid exists in scene '{scene.name}'.");
+        if (sceneGrids.TryGetValue(scene.handle, out var cachedGrid)
+            && cachedGrid.gameObject.scene == scene
+            && cachedGrid.isActiveAndEnabled)
+        {
+            grid = cachedGrid;
+            return true;
+        }
+
+        sceneGrids.Remove(scene.handle);
+        var grids = FindObjectsByType<SceneGrid>(
+            FindObjectsInactive.Include,
+            FindObjectsSortMode.None);
+        var resolvedGrid = grid;
+
+        foreach (var candidate in grids)
+        {
+            if (candidate.gameObject.scene != scene || !candidate.isActiveAndEnabled)
+            {
+                continue;
+            }
+
+            if (resolvedGrid != null)
+            {
+                unresolvedScenes.Add(scene.handle);
+                return false;
+            }
+
+            resolvedGrid = candidate;
+        }
+
+        if (resolvedGrid == null)
+        {
+            unresolvedScenes.Add(scene.handle);
+            return false;
+        }
+
+        sceneGrids[scene.handle] = resolvedGrid;
+        grid = resolvedGrid;
+        return true;
+    }
+
+    public static void LogMissingGrid(Scene scene, Object context)
+    {
+        if (!scene.IsValid() || !reportedScenes.Add(scene.handle))
+        {
+            return;
+        }
+
+        Debug.LogError($"Scene '{scene.name}' needs exactly one enabled SceneGrid.", context);
     }
 }
