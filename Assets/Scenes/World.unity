@@ -299,7 +299,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!81 &519420029
 AudioListener:
   m_ObjectHideFlags: 0
@@ -674,6 +674,7 @@ GameObject:
   m_Component:
   - component: {fileID: 817434188}
   - component: {fileID: 817434187}
+  - component: {fileID: 817434189}
   m_Layer: 0
   m_Name: Grid
   m_TagString: Untagged
@@ -709,6 +710,25 @@ Transform:
   - {fileID: 1771547439}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &817434189
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 817434186}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1f6d7f47d47141aa82ff1c8dc7a72be1, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  projection: 0
+  logicalOrigin: {x: 0, y: 0}
+  visualOrigin: {x: 0, y: 0}
+  cellSize: 1
+  verticalMovementMultiplier: 0.5
+  orthographicSize: 5.5
+  initialPlayerLogicalPosition: {x: -2.5, y: -0.5}
 --- !u!1 &934081228
 GameObject:
   m_ObjectHideFlags: 0
@@ -1560,6 +1580,22 @@ PrefabInstance:
       propertyPath: m_Name
       value: NetworkManager
       objectReference: {fileID: 0}
+    - target: {fileID: 7443408887813606051, guid: 0b650fca685f2eb41a86538aa883e4c1, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7443408887813606050, guid: 0b650fca685f2eb41a86538aa883e4c1, type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 934570884, guid: 0b650fca685f2eb41a86538aa883e4c1, type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7443408887813606060, guid: 0b650fca685f2eb41a86538aa883e4c1, type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 7443408887813606060, guid: 0b650fca685f2eb41a86538aa883e4c1, type: 3}
       propertyPath: _playerPrefab
       value: 
@@ -1612,6 +1648,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1964244397}
+  - component: {fileID: 1964244398}
   m_Layer: 0
   m_Name: Door Proximity
   m_TagString: Untagged
@@ -1634,6 +1671,22 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1012356526}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1964244398
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1964244396}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 571ff59cf4b14f349f3d77a36e0f25a7, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  destination: 1
+  interactionLogicalPosition: {x: 1.7, y: -0.9}
+  arrivalLogicalPosition: {x: 1.5, y: -0.5}
+  interactionRadius: 0.9
 --- !u!1 &2005232108
 GameObject:
   m_ObjectHideFlags: 0

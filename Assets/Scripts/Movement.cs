@@ -7,10 +7,10 @@ using UnityEngine.InputSystem;
 public class Movement : NetworkBehaviour
 {
     [SerializeField, Min(0f)] private float moveSpeed = 4f;
-    [SerializeField, Min(0f)] private float verticalMovementMultiplier = 0.5f;
 
     private InputAction _move;
     private Rigidbody2D _body;
+    private bool _isTransitioning;
 
     private void Awake()
     {
@@ -32,7 +32,6 @@ public class Movement : NetworkBehaviour
         }
 
         (_move = InputSystem.actions["Move"]).Enable();
-        Camera.main!.transform.SetParent(transform);
     }
 
     public override void OnOwnershipClient(NetworkConnection prevOwner)
@@ -76,13 +75,13 @@ public class Movement : NetworkBehaviour
 
     private void FixedUpdate()
     {
-        if (_move == null)
+        if (_move == null || _isTransitioning)
         {
             return;
         }
 
         var movement = _move.ReadValue<Vector2>();
-        movement.y *= verticalMovementMultiplier;
+        movement.y *= SceneGrid.GetForScene(gameObject.scene).VerticalMovementMultiplier;
 
         if (movement.sqrMagnitude > 1f)
         {
@@ -90,5 +89,10 @@ public class Movement : NetworkBehaviour
         }
 
         _body.MovePosition(_body.position + movement * (moveSpeed * Time.fixedDeltaTime));
+    }
+
+    public void SetTransitioning(bool value)
+    {
+        _isTransitioning = value;
     }
 }
