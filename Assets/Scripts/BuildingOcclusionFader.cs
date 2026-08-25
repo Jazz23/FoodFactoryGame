@@ -18,7 +18,7 @@ public sealed class BuildingOcclusionFader : MonoBehaviour
     private SpriteRenderer interiorFloorRenderer;
     private SpriteRenderer doorwayRenderer;
     private SpriteRenderer doorwayOutlineRenderer;
-    private PolygonCollider2D buildingCollider;
+    private PolygonCollider2D occlusionFootprint;
     private BuildingInteriorController interiorController;
     private Camera sceneCamera;
     private Vector2[] buildingSpriteVertices;
@@ -32,7 +32,7 @@ public sealed class BuildingOcclusionFader : MonoBehaviour
         interiorFloorRenderer = transform.Find("Interior Floor")?.GetComponent<SpriteRenderer>();
         doorwayRenderer = transform.Find("Doorway")?.GetComponent<SpriteRenderer>();
         doorwayOutlineRenderer = transform.Find("Doorway Outline")?.GetComponent<SpriteRenderer>();
-        buildingCollider = GetComponent<PolygonCollider2D>();
+        occlusionFootprint = transform.Find("Occlusion Footprint")!.GetComponent<PolygonCollider2D>();
         interiorController = GetComponent<BuildingInteriorController>();
         sceneCamera = Camera.main;
         if (buildingRenderer.sprite != null)
@@ -131,13 +131,7 @@ public sealed class BuildingOcclusionFader : MonoBehaviour
     private bool TryGetRearEdgeY(Bounds playerFootprint, out float rearEdgeY)
     {
         rearEdgeY = float.NegativeInfinity;
-        if (buildingCollider == null || buildingCollider.pathCount == 0)
-        {
-            rearEdgeY = transform.position.y;
-            return true;
-        }
-
-        Bounds buildingBounds = buildingCollider.bounds;
+        var buildingBounds = occlusionFootprint.bounds;
         float overlapMinX = Mathf.Max(playerFootprint.min.x, buildingBounds.min.x);
         float overlapMaxX = Mathf.Min(playerFootprint.max.x, buildingBounds.max.x);
         if (overlapMinX > overlapMaxX)
@@ -162,13 +156,13 @@ public sealed class BuildingOcclusionFader : MonoBehaviour
     private bool TryGetRearEdgeAtX(float worldX, Bounds buildingBounds, out float rearEdgeY)
     {
         float sampleX = Mathf.Clamp(worldX, buildingBounds.min.x + 0.001f, buildingBounds.max.x - 0.001f);
-        Vector2[] path = buildingCollider.GetPath(0);
+        var path = occlusionFootprint.GetPath(0);
         rearEdgeY = float.NegativeInfinity;
 
         for (int index = 0; index < path.Length; index++)
         {
-            Vector2 start = transform.TransformPoint(path[index]);
-            Vector2 end = transform.TransformPoint(path[(index + 1) % path.Length]);
+            var start = occlusionFootprint.transform.TransformPoint(path[index]);
+            var end = occlusionFootprint.transform.TransformPoint(path[(index + 1) % path.Length]);
             if (sampleX < Mathf.Min(start.x, end.x) || sampleX > Mathf.Max(start.x, end.x))
             {
                 continue;
@@ -204,7 +198,7 @@ public sealed class BuildingOcclusionFader : MonoBehaviour
             || buildingSpriteVertices == null
             || buildingSpriteTriangles == null
             || buildingSpriteTriangles.Length < 3
-            || !TryGetScreenRect(player.FootprintBounds, out Rect playerRect))
+            || !TryGetScreenRect(player.ProjectedBounds, out Rect playerRect))
         {
             return false;
         }
