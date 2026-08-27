@@ -990,6 +990,114 @@
                     "isPartOfComposite": false
                 }
             ]
+        },
+        {
+            "name": "Build",
+            "id": "b9c41dd7-5a2d-4a4d-b31d-b4ae729f5387",
+            "actions": [
+                {
+                    "name": "Point",
+                    "type": "Value",
+                    "id": "c5bed825-467a-4ff9-98d6-bff81279dc91",
+                    "expectedControlType": "Vector2",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
+                },
+                {
+                    "name": "Place",
+                    "type": "Button",
+                    "id": "3e64548f-eb22-45d5-bac2-5db28e7182ed",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "Press",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "Demolish",
+                    "type": "Button",
+                    "id": "d7a27607-ca01-4a4b-83d8-d4b3b599296d",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "Press",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "NextBuilding",
+                    "type": "Button",
+                    "id": "f03fe162-917c-417b-8c4f-a9938ac9e5f9",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "Press",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "PreviousBuilding",
+                    "type": "Button",
+                    "id": "85c0227b-0cae-4db2-84f3-da7c48d8cd87",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "Press",
+                    "initialStateCheck": false
+                }
+            ],
+            "bindings": [
+                {
+                    "name": "",
+                    "id": "3baab447-baa3-4bbf-bc08-5c9078b65af9",
+                    "path": "<Pointer>/position",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Point",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "7d69a9d2-ff3d-4841-bc04-e6de586206bc",
+                    "path": "<Mouse>/leftButton",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Keyboard&Mouse",
+                    "action": "Place",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "d124287a-4fc6-41dd-9e79-46f8a7ca5a30",
+                    "path": "<Mouse>/rightButton",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Keyboard&Mouse",
+                    "action": "Demolish",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "a6f27ba9-30db-4728-8a10-7f846a8f2b91",
+                    "path": "<Keyboard>/rightBracket",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Keyboard&Mouse",
+                    "action": "NextBuilding",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "2653b21a-5c29-4ff5-94b0-42e419a4f118",
+                    "path": "<Keyboard>/leftBracket",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Keyboard&Mouse",
+                    "action": "PreviousBuilding",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                }
+            ]
         }
     ],
     "controlSchemes": [

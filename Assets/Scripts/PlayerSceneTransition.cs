@@ -1,3 +1,4 @@
+// Transitions a player through the exact portal they interacted with.
 using FishNet.Component.Transforming;
 using FishNet.Connection;
 using FishNet.Object;
@@ -60,13 +61,16 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         }
 
         SetTransitionState(true);
-        RequestTransitionServerRpc(portal.Destination);
+        RequestTransitionServerRpc(portal.BuildingInstanceId);
     }
 
     [ServerRpc]
-    private void RequestTransitionServerRpc(SceneDestination destination)
+    private void RequestTransitionServerRpc(uint buildingInstanceId)
     {
-        if (!ScenePortal.TryGetClosest(gameObject.scene, transform.position, destination, out var portal))
+        var portalExists = buildingInstanceId == 0
+            ? ScenePortal.TryGetClosest(gameObject.scene, transform.position, out var portal)
+            : ScenePortal.TryGetBuilding(gameObject.scene, transform.position, buildingInstanceId, out portal);
+        if (!portalExists)
         {
             TargetSetTransitionState(Owner, false);
             return;

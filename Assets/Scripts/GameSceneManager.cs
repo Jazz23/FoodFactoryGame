@@ -1,3 +1,4 @@
+// Loads building-specific interior scenes and returns players to their source building.
 using System.Collections.Generic;
 using FishNet.Connection;
 using FishNet.Managing;
@@ -19,6 +20,12 @@ public sealed class GameSceneManager : MonoBehaviour
         public Scene TargetScene;
     }
 
+    private sealed class BuildingReturn
+    {
+        public string SceneName = string.Empty;
+        public Vector2 ArrivalLogicalPosition;
+    }
+
     [SerializeField] private NetworkObject playerPrefab = null!;
     [SerializeField] private string worldSceneName = "World";
     [SerializeField] private string insideSceneName = "Inside";
@@ -26,6 +33,7 @@ public sealed class GameSceneManager : MonoBehaviour
     private readonly HashSet<int> awaitingInitialSpawn = new();
     private readonly Dictionary<int, NetworkObject> players = new();
     private readonly Dictionary<int, PendingTransition> pendingTransitions = new();
+    private readonly Dictionary<int, BuildingReturn> buildingReturns = new();
     private NetworkManager networkManager = null!;
 
     public static GameSceneManager Instance = null!;
@@ -60,12 +68,30 @@ public sealed class GameSceneManager : MonoBehaviour
             return false;
         }
 
-        var lookup = new SceneLookupData(GetSceneName(portal.Destination));
+        var targetSceneName = GetSceneName(portal);
+        var arrivalLogicalPosition = portal.ArrivalLogicalPosition;
+        if (portal.BuildingInstanceId != 0)
+        {
+            buildingReturns[connection.ClientId] = new BuildingReturn
+            {
+                SceneName = player.gameObject.scene.name,
+                ArrivalLogicalPosition = portal.ExteriorArrivalLogicalPosition
+            };
+        }
+        else if (targetSceneName == worldSceneName
+            && buildingReturns.TryGetValue(connection.ClientId, out var buildingReturn))
+        {
+            targetSceneName = buildingReturn.SceneName;
+            arrivalLogicalPosition = buildingReturn.ArrivalLogicalPosition;
+            buildingReturns.Remove(connection.ClientId);
+        }
+
+        var lookup = new SceneLookupData(targetSceneName);
         var pendingTransition = new PendingTransition
         {
             Connection = connection,
             Player = player,
-            ArrivalLogicalPosition = portal.ArrivalLogicalPosition
+            ArrivalLogicalPosition = arrivalLogicalPosition
         };
         var sceneLoadData = new SceneLoadData(new[] { lookup }, new[] { player })
         {
@@ -103,6 +129,7 @@ public sealed class GameSceneManager : MonoBehaviour
         awaitingInitialSpawn.Remove(connection.ClientId);
         players.Remove(connection.ClientId);
         pendingTransitions.Remove(connection.ClientId);
+        buildingReturns.Remove(connection.ClientId);
     }
 
     private void LoadInitialWorld(NetworkConnection connection)
@@ -193,6 +220,13 @@ public sealed class GameSceneManager : MonoBehaviour
     private string GetSceneName(SceneDestination destination)
     {
         return destination == SceneDestination.World ? worldSceneName : insideSceneName;
+    }
+
+    private string GetSceneName(ScenePortal portal)
+    {
+        return string.IsNullOrWhiteSpace(portal.DestinationSceneName)
+            ? GetSceneName(portal.Destination)
+            : portal.DestinationSceneName;
     }
 
     private bool TryGetGrid(Scene scene, out SceneGrid grid)

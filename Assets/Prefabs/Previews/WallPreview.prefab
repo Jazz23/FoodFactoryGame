@@ -10,11 +10,9 @@ GameObject:
   m_Component:
   - component: {fileID: 7253301538297282768}
   - component: {fileID: 7766928490203087695}
-  - component: {fileID: 5740577065062408918}
-  - component: {fileID: 351416370672156416}
-  - component: {fileID: 4700779413323958585}
+  - component: {fileID: 7126435170980985903}
   m_Layer: 0
-  m_Name: Wall
+  m_Name: WallPreview
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -90,36 +88,7 @@ SpriteRenderer:
   m_WasSpriteAssigned: 1
   m_MaskInteraction: 0
   m_SpriteSortPoint: 0
---- !u!114 &5740577065062408918
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 406775526627886229}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 571ff59cf4b14f349f3d77a36e0f25a7, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  destination: 0
-  destinationSceneName: 
-  interactionLogicalPosition: {x: 0, y: 0}
-  arrivalLogicalPosition: {x: 0, y: 0}
-  interactionRadius: 0.9
---- !u!114 &351416370672156416
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 406775526627886229}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 0a0c65ed7ac422b4d94281e5313ef353, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
---- !u!114 &4700779413323958585
+--- !u!114 &7126435170980985903
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}

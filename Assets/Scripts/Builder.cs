@@ -1,247 +1,502 @@
+// Places definition-driven rectangular buildings and replicates their instance records.
 using System.Collections.Generic;
+using FishNet.Connection;
 using FishNet.Object;
 using FishNet.Object.Synchronizing;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.Tilemaps;
 
-public class Builder : NetworkBehaviour
+public sealed class Builder : NetworkBehaviour
 {
-    [SerializeField] private Tilemap ground;
-    [SerializeField] private TileBase grass;
-    [SerializeField] private GameObject wallPrefab;
+    [SerializeField] private Tilemap ground = null!;
+    [SerializeField] private TileBase buildableTile = null!;
+    [SerializeField] private BuildingCatalog catalog = null!;
+    [SerializeField] private string defaultBuildingId = string.Empty;
     [SerializeField, Range(0f, 1f)] private float ghostAlpha = 0.55f;
     [SerializeField] private Color invalidGhostColor = new(1f, 0.35f, 0.35f, 0.65f);
 
-    private readonly SyncHashSet<Vector3Int> _occupiedCells = new();
-    private readonly Dictionary<Vector3Int, GameObject> _placedWalls = new();
+    private readonly SyncDictionary<uint, BuildingInstance> buildings = new();
+    private readonly Dictionary<uint, BuildingView> placedBuildings = new();
+    private readonly Dictionary<uint, PreplacedBuilding> preplacedBuildingsById = new();
+    private readonly BuildingOccupancy occupancy = new();
+    private readonly List<Vector3Int> hoveredFootprint = new();
+    private readonly List<Vector3Int> rebuildFootprint = new();
 
-    private InputAction _point = null!;
-    private InputAction _click = null!;
-    private Camera _sceneCamera = null!;
-    private TilemapCollider2D _groundCollider = null!;
-    private GameObject _ghostWall = null!;
-    private SpriteRenderer _ghostRenderer = null!;
-    private Vector3Int _hoveredCell;
-    private bool _hasHoveredCell;
-    private bool _canPlaceHoveredCell;
+    private InputAction point = null!;
+    private InputAction place = null!;
+    private InputAction demolish = null!;
+    private InputAction nextBuilding = null!;
+    private InputAction previousBuilding = null!;
+    private Camera sceneCamera = null!;
+    private TilemapCollider2D groundCollider = null!;
+    private BuildingDefinition selectedDefinition = null!;
+    private GameObject ghostBuilding = null!;
+    private SpriteRenderer[] ghostRenderers = System.Array.Empty<SpriteRenderer>();
+    private Vector3Int hoveredCell;
+    private bool hasHoveredCell;
+    private bool canPlaceHoveredBuilding;
+    private int selectedDefinitionIndex;
+    private uint nextBuildingId = 1;
+
+    public Tilemap Ground => ground;
+    public TileBase BuildableTile => buildableTile;
+    public BuildingCatalog Catalog => catalog;
 
     private void Awake()
     {
-        _point = InputSystem.actions["Point"];
-        _click = InputSystem.actions["Click"];
-        _sceneCamera = Camera.main!;
-        _groundCollider = ground.GetComponent<TilemapCollider2D>()!;
-        _occupiedCells.OnChange += OccupiedCellsOnChange;
+        point = InputSystem.actions.FindAction("Build/Point", true);
+        place = InputSystem.actions.FindAction("Build/Place", true);
+        demolish = InputSystem.actions.FindAction("Build/Demolish", true);
+        nextBuilding = InputSystem.actions.FindAction("Build/NextBuilding", true);
+        previousBuilding = InputSystem.actions.FindAction("Build/PreviousBuilding", true);
+        sceneCamera = Camera.main!;
+        groundCollider = ground.GetComponent<TilemapCollider2D>()!;
+        CachePreplacedBuildings();
+        buildings.OnChange += BuildingsOnChange;
     }
 
     private void OnDestroy()
     {
-        _occupiedCells.OnChange -= OccupiedCellsOnChange;
+        buildings.OnChange -= BuildingsOnChange;
+    }
+
+    public override void OnStartServer()
+    {
+        RebuildOccupancy();
+        RegisterPreplacedBuildings();
+    }
+
+    public override void OnStopServer()
+    {
+        ClearPlacedBuildings();
+        occupancy.Clear();
     }
 
     public override void OnStartClient()
     {
-        _sceneCamera = Camera.main!;
-        _point.Enable();
-        _click.Enable();
-        _click.performed += OnClickPerformed;
+        sceneCamera = Camera.main!;
+        point.Enable();
+        place.Enable();
+        demolish.Enable();
+        nextBuilding.Enable();
+        previousBuilding.Enable();
+        place.performed += PlacePerformed;
+        demolish.performed += DemolishPerformed;
+        nextBuilding.performed += NextBuildingPerformed;
+        previousBuilding.performed += PreviousBuildingPerformed;
 
-        EnsureGhostWall();
-        RefreshPlacedWalls();
+        SelectBuilding(defaultBuildingId);
+        RebuildOccupancy();
+        RefreshPlacedBuildings();
     }
 
     public override void OnStopClient()
     {
-        _click.performed -= OnClickPerformed;
-        _click.Disable();
-        _point.Disable();
-        _hasHoveredCell = false;
-        _canPlaceHoveredCell = false;
+        place.performed -= PlacePerformed;
+        demolish.performed -= DemolishPerformed;
+        nextBuilding.performed -= NextBuildingPerformed;
+        previousBuilding.performed -= PreviousBuildingPerformed;
+        place.Disable();
+        demolish.Disable();
+        nextBuilding.Disable();
+        previousBuilding.Disable();
+        point.Disable();
+        hasHoveredCell = false;
+        canPlaceHoveredBuilding = false;
 
-        if (_ghostWall != null)
+        if (ghostBuilding is not null)
         {
-            Destroy(_ghostWall);
+            Destroy(ghostBuilding);
+            ghostBuilding = null!;
         }
 
-        ClearPlacedWalls();
+        ClearPlacedBuildings();
     }
 
     private void Update()
     {
-        if (!IsClientInitialized)
+        if (!IsClientInitialized || selectedDefinition is null)
         {
             return;
         }
 
         UpdateHoveredCell();
-        UpdateGhostWall();
+        UpdateGhostBuilding();
     }
 
-    private void OnClickPerformed(InputAction.CallbackContext _)
+    public bool SelectBuilding(string definitionId)
     {
-        if (!_hasHoveredCell || !_canPlaceHoveredCell)
+        if (!catalog.TryGetDefinition(definitionId, out var definition))
+        {
+            return false;
+        }
+
+        selectedDefinition = definition;
+        selectedDefinitionIndex = catalog.GetIndex(definitionId);
+        RecreateGhostBuilding();
+        return true;
+    }
+
+    private void NextBuildingPerformed(InputAction.CallbackContext _)
+    {
+        if (catalog.Count == 0)
         {
             return;
         }
 
-        PlaceWallServerRpc(_hoveredCell);
+        selectedDefinitionIndex = (selectedDefinitionIndex + 1) % catalog.Count;
+        SelectBuilding(catalog.GetDefinition(selectedDefinitionIndex).Id);
+    }
+
+    private void PreviousBuildingPerformed(InputAction.CallbackContext _)
+    {
+        if (catalog.Count == 0)
+        {
+            return;
+        }
+
+        selectedDefinitionIndex = (selectedDefinitionIndex - 1 + catalog.Count) % catalog.Count;
+        SelectBuilding(catalog.GetDefinition(selectedDefinitionIndex).Id);
+    }
+
+    private void PlacePerformed(InputAction.CallbackContext _)
+    {
+        if (!hasHoveredCell || !canPlaceHoveredBuilding)
+        {
+            return;
+        }
+
+        PlaceBuildingServerRpc(selectedDefinition.Id, hoveredCell);
+    }
+
+    private void DemolishPerformed(InputAction.CallbackContext _)
+    {
+        if (!hasHoveredCell || !occupancy.TryGetBuildingId(hoveredCell, out var buildingId))
+        {
+            return;
+        }
+
+        DemolishBuildingServerRpc(buildingId);
     }
 
     [ServerRpc(RequireOwnership = false)]
-    private void PlaceWallServerRpc(Vector3Int cell)
+    private void PlaceBuildingServerRpc(string definitionId, Vector3Int anchorCell, NetworkConnection sender = null)
     {
-        TryPlaceWall(cell);
+        TryPlaceBuilding(definitionId, anchorCell, sender.ClientId);
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void DemolishBuildingServerRpc(uint buildingId, NetworkConnection sender = null)
+    {
+        if (!buildings.TryGetValue(buildingId, out var building)
+            || building.OwnerClientId != sender.ClientId)
+        {
+            return;
+        }
+
+        occupancy.Release(buildingId);
+        buildings.Remove(buildingId);
     }
 
     private void UpdateHoveredCell()
     {
-        var screenPosition = _point.ReadValue<Vector2>();
-        var ray = _sceneCamera.ScreenPointToRay(screenPosition);
+        var screenPosition = point.ReadValue<Vector2>();
+        var ray = sceneCamera.ScreenPointToRay(screenPosition);
         var hits = Physics2D.GetRayIntersectionAll(ray, Mathf.Infinity);
 
-        _hasHoveredCell = false;
-        _canPlaceHoveredCell = false;
+        hasHoveredCell = false;
+        canPlaceHoveredBuilding = false;
 
-        for (var i = 0; i < hits.Length; i++)
+        foreach (var hit in hits)
         {
-            var hit = hits[i];
-            if (hit.collider != _groundCollider)
+            if (hit.collider != groundCollider)
             {
                 continue;
             }
 
             var cell = ground.WorldToCell(hit.point);
-            if (!IsBuildableCell(cell))
+            hoveredCell = cell;
+            hasHoveredCell = true;
+            BuildingFootprint.GetCells(cell, selectedDefinition.FootprintSize, hoveredFootprint);
+            canPlaceHoveredBuilding = IsBuildableFootprint(hoveredFootprint)
+                && occupancy.CanReserve(uint.MaxValue, hoveredFootprint);
+            return;
+        }
+    }
+
+    private bool IsBuildableFootprint(IReadOnlyList<Vector3Int> footprint)
+    {
+        if (footprint.Count == 0)
+        {
+            return false;
+        }
+
+        foreach (var cell in footprint)
+        {
+            if (ground.GetTile(cell) != buildableTile)
             {
-                return;
+                return false;
             }
-
-            _hoveredCell = cell;
-            _hasHoveredCell = true;
-            _canPlaceHoveredCell = !_occupiedCells.Contains(cell);
-            return;
         }
+
+        return true;
     }
 
-    private bool IsBuildableCell(Vector3Int cell)
+    private void TryPlaceBuilding(string definitionId, Vector3Int anchorCell, int ownerClientId)
     {
-        return ground.GetTile(cell) == grass;
-    }
-
-    private void TryPlaceWall(Vector3Int cell)
-    {
-        if (!IsBuildableCell(cell) || _occupiedCells.Contains(cell))
+        if (!catalog.TryGetDefinition(definitionId, out var definition))
         {
             return;
         }
 
-        _occupiedCells.Add(cell);
+        BuildingFootprint.GetCells(anchorCell, definition.FootprintSize, hoveredFootprint);
+        if (!IsBuildableFootprint(hoveredFootprint))
+        {
+            return;
+        }
+
+        var building = new BuildingInstance(
+            nextBuildingId,
+            definition.Id,
+            anchorCell,
+            definition.FootprintSize,
+            ownerClientId);
+        if (!occupancy.TryReserve(building.Id, hoveredFootprint))
+        {
+            return;
+        }
+
+        buildings.Add(building.Id, building);
+        nextBuildingId++;
     }
 
-    private void UpdateGhostWall()
+    private void UpdateGhostBuilding()
     {
-        if (_ghostWall == null)
+        if (ghostBuilding is null)
         {
             return;
         }
 
-        if (!_hasHoveredCell)
+        if (!hasHoveredCell)
         {
-            _ghostWall.SetActive(false);
+            ghostBuilding.SetActive(false);
             return;
         }
 
-        var worldPosition = ground.GetCellCenterWorld(_hoveredCell);
+        var visualAnchorCell = BuildingFootprint.GetVisualAnchorCell(
+            hoveredCell,
+            selectedDefinition.VisualAnchorCellOffset);
+        var worldPosition = ground.CellToWorld(visualAnchorCell);
         worldPosition.z = 0f;
-
-        _ghostWall.transform.position = worldPosition;
-        _ghostWall.SetActive(true);
-        _ghostRenderer.color = _canPlaceHoveredCell
+        ghostBuilding.transform.position = worldPosition;
+        ghostBuilding.SetActive(true);
+        SetGhostColor(canPlaceHoveredBuilding
             ? new Color(1f, 1f, 1f, ghostAlpha)
-            : invalidGhostColor;
+            : invalidGhostColor);
     }
 
-    private void EnsureGhostWall()
+    private void RecreateGhostBuilding()
     {
-        if (_ghostWall != null)
+        if (ghostBuilding is not null)
         {
-            return;
+            Destroy(ghostBuilding);
+            ghostBuilding = null!;
         }
 
-        _ghostWall = Instantiate(wallPrefab, transform);
-        _ghostWall.name = $"{wallPrefab.name} Ghost";
-        _ghostRenderer = _ghostWall.GetComponent<SpriteRenderer>()!;
-        _ghostRenderer.sortingOrder += 1;
-        _ghostRenderer.color = new Color(1f, 1f, 1f, ghostAlpha);
-        _ghostWall.SetActive(false);
+        ghostBuilding = Instantiate(selectedDefinition.PreviewPrefab, transform);
+        ghostBuilding.name = $"{selectedDefinition.Prefab.name} Ghost";
+        ghostRenderers = ghostBuilding.GetComponentsInChildren<SpriteRenderer>();
+
+        foreach (var renderer in ghostRenderers)
+        {
+            renderer.sortingOrder++;
+        }
+
+        ghostBuilding.SetActive(false);
     }
 
-    private void OccupiedCellsOnChange(SyncHashSetOperation operation, Vector3Int cell, bool _)
+    private void SetGhostColor(Color color)
     {
-        if (!IsClientInitialized)
+        foreach (var renderer in ghostRenderers)
         {
-            return;
+            renderer.color = color;
         }
+    }
+
+    private void BuildingsOnChange(
+        SyncDictionaryOperation operation,
+        uint buildingId,
+        BuildingInstance building,
+        bool _)
+    {
+        RebuildOccupancy();
 
         switch (operation)
         {
-            case SyncHashSetOperation.Add:
-                CreatePlacedWall(cell);
+            case SyncDictionaryOperation.Add:
+            case SyncDictionaryOperation.Set:
+                CreatePlacedBuilding(building);
                 break;
-            case SyncHashSetOperation.Remove:
-                RemovePlacedWall(cell);
+            case SyncDictionaryOperation.Remove:
+                RemovePlacedBuilding(buildingId);
                 break;
-            case SyncHashSetOperation.Clear:
-                ClearPlacedWalls();
+            case SyncDictionaryOperation.Clear:
+                ClearPlacedBuildings();
                 break;
         }
     }
 
-    private void RefreshPlacedWalls()
+    private void RebuildOccupancy()
     {
-        ClearPlacedWalls();
+        occupancy.Clear();
+        nextBuildingId = 1;
 
-        foreach (var cell in _occupiedCells.Collection)
+        foreach (var pair in buildings.Collection)
         {
-            CreatePlacedWall(cell);
+            var building = pair.Value;
+            if (!catalog.TryGetDefinition(building.DefinitionId, out var definition))
+            {
+                continue;
+            }
+
+            var size = BuildingFootprint.GetEffectiveSize(
+                building.Size,
+                definition.FootprintSize);
+            BuildingFootprint.GetCells(building.AnchorCell, size, rebuildFootprint);
+            if (!occupancy.TryReserve(building.Id, rebuildFootprint))
+            {
+                Debug.LogError($"Building '{building.Id}' overlaps another building.", this);
+            }
+
+            if (building.Id >= nextBuildingId)
+            {
+                nextBuildingId = building.Id + 1;
+            }
         }
     }
 
-    private void CreatePlacedWall(Vector3Int cell)
+    private void RegisterPreplacedBuildings()
     {
-        if (_placedWalls.ContainsKey(cell))
+        foreach (var preplacedBuilding in preplacedBuildingsById.Values)
+        {
+            if (buildings.ContainsKey(preplacedBuilding.InstanceId))
+            {
+                continue;
+            }
+
+            BuildingFootprint.GetCells(
+                preplacedBuilding.AnchorCell,
+                preplacedBuilding.Size,
+                rebuildFootprint);
+            if (!occupancy.TryReserve(preplacedBuilding.InstanceId, rebuildFootprint))
+            {
+                Debug.LogError(
+                    $"Preplaced building '{preplacedBuilding.name}' overlaps another building.",
+                    preplacedBuilding);
+                continue;
+            }
+
+            var building = new BuildingInstance(
+                preplacedBuilding.InstanceId,
+                preplacedBuilding.Definition.Id,
+                preplacedBuilding.AnchorCell,
+                preplacedBuilding.Size,
+                -1);
+            buildings.Add(building.Id, building);
+            if (building.Id >= nextBuildingId)
+            {
+                nextBuildingId = building.Id + 1;
+            }
+            preplacedBuilding.Configure(ground);
+        }
+    }
+
+    private void CachePreplacedBuildings()
+    {
+        var preplacedBuildings = FindObjectsByType<PreplacedBuilding>(
+            FindObjectsInactive.Exclude,
+            FindObjectsSortMode.None);
+        foreach (var preplacedBuilding in preplacedBuildings)
+        {
+            if (preplacedBuilding.gameObject.scene != ground.gameObject.scene)
+            {
+                continue;
+            }
+
+            preplacedBuildingsById[preplacedBuilding.InstanceId] = preplacedBuilding;
+        }
+    }
+
+    private void RefreshPlacedBuildings()
+    {
+        ClearPlacedBuildings();
+
+        foreach (var pair in buildings.Collection)
+        {
+            CreatePlacedBuilding(pair.Value);
+        }
+    }
+
+    private void CreatePlacedBuilding(BuildingInstance building)
+    {
+        if (!catalog.TryGetDefinition(building.DefinitionId, out var definition))
+        {
+            Debug.LogError($"Building definition '{building.DefinitionId}' is missing.", this);
+            return;
+        }
+
+        if (preplacedBuildingsById.TryGetValue(building.Id, out var preplacedBuilding))
+        {
+            preplacedBuilding.Configure(ground);
+            placedBuildings[building.Id] = preplacedBuilding.View;
+            return;
+        }
+
+        if (placedBuildings.TryGetValue(building.Id, out var existingBuilding)
+            && existingBuilding is not null
+            && existingBuilding)
+        {
+            existingBuilding.Configure(building, definition, ground);
+            return;
+        }
+
+        var buildingObject = Instantiate(definition.Prefab, transform);
+
+        buildingObject.name = $"{definition.Prefab.name} ({building.AnchorCell.x}, {building.AnchorCell.y})";
+        var buildingView = buildingObject.GetComponent<BuildingView>();
+        buildingView.Configure(building, definition, ground);
+        placedBuildings.Add(building.Id, buildingView);
+    }
+
+    private void RemovePlacedBuilding(uint buildingId)
+    {
+        if (!placedBuildings.TryGetValue(buildingId, out var building))
         {
             return;
         }
 
-        var wall = Instantiate(wallPrefab, transform);
-        var worldPosition = ground.GetCellCenterWorld(cell);
-        worldPosition.z = 0f;
-
-        wall.name = $"{wallPrefab.name} ({cell.x}, {cell.y})";
-        wall.transform.position = worldPosition;
-        _placedWalls[cell] = wall;
-    }
-
-    private void RemovePlacedWall(Vector3Int cell)
-    {
-        if (!_placedWalls.TryGetValue(cell, out var wall))
+        placedBuildings.Remove(buildingId);
+        if (building is null || !building || building.TryGetComponent<PreplacedBuilding>(out _))
         {
             return;
         }
 
-        _placedWalls.Remove(cell);
-        Destroy(wall);
+        Destroy(building.gameObject);
     }
 
-    private void ClearPlacedWalls()
+    private void ClearPlacedBuildings()
     {
-        foreach (var wall in _placedWalls.Values)
+        foreach (var building in placedBuildings.Values)
         {
-            Destroy(wall);
+            if (building is null || !building || building.TryGetComponent<PreplacedBuilding>(out _))
+            {
+                continue;
+            }
+
+            Destroy(building.gameObject);
         }
 
-        _placedWalls.Clear();
+        placedBuildings.Clear();
     }
 }

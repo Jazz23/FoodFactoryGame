@@ -1,3 +1,4 @@
+// Keeps building visuals sorted and faded correctly when players move in front of or behind them.
 using System.Collections.Generic;
 using FishNet.Object;
 using UnityEngine;
@@ -5,6 +6,7 @@ using UnityEngine;
 [RequireComponent(typeof(SpriteRenderer))]
 public sealed class BuildingOcclusionFader : MonoBehaviour
 {
+    private static readonly int ColorPropertyId = Shader.PropertyToID("_Color");
     private static readonly Vector3 ThinDoorwayOutlineScale = new(0.94f, 0.94f, 1f);
 
     [SerializeField, Range(0.05f, 1f)] private float occludedAlpha = 0.22f;
@@ -13,49 +15,59 @@ public sealed class BuildingOcclusionFader : MonoBehaviour
     [SerializeField] private int buildingSortingOrder = 10;
 
     private readonly List<Virtual3DSize> players = new();
-    private SpriteRenderer buildingRenderer;
-    private SpriteRenderer doorRenderer;
-    private SpriteRenderer interiorFloorRenderer;
-    private SpriteRenderer doorwayRenderer;
-    private SpriteRenderer doorwayOutlineRenderer;
-    private PolygonCollider2D occlusionFootprint;
-    private BuildingInteriorController interiorController;
-    private Camera sceneCamera;
-    private Vector2[] buildingSpriteVertices;
-    private ushort[] buildingSpriteTriangles;
+    private readonly List<SpriteRenderer> buildingSpriteRenderers = new();
+    private readonly List<MeshRenderer> buildingMeshRenderers = new();
+    private readonly List<LineRenderer> buildingLineRenderers = new();
+    private readonly Dictionary<MeshRenderer, float> meshAlphaByRenderer = new();
+    private MaterialPropertyBlock propertyBlock = null!;
+
+    private SpriteRenderer buildingRenderer = null!;
+    private SpriteRenderer doorRenderer = null!;
+    private SpriteRenderer interiorFloorRenderer = null!;
+    private SpriteRenderer doorwayRenderer = null!;
+    private SpriteRenderer doorwayOutlineRenderer = null!;
+    private PolygonCollider2D occlusionFootprint = null!;
+    private BuildingInteriorController interiorController = null!;
+    private int rearPlayerSortingOrder;
+    private int frontPlayerSortingOrder;
     private float nextPlayerRefreshTime;
 
     private void Awake()
     {
-        buildingRenderer = GetComponent<SpriteRenderer>();
-        doorRenderer = transform.Find("Door")?.GetComponent<SpriteRenderer>();
-        interiorFloorRenderer = transform.Find("Interior Floor")?.GetComponent<SpriteRenderer>();
-        doorwayRenderer = transform.Find("Doorway")?.GetComponent<SpriteRenderer>();
-        doorwayOutlineRenderer = transform.Find("Doorway Outline")?.GetComponent<SpriteRenderer>();
-        occlusionFootprint = transform.Find("Occlusion Footprint")!.GetComponent<PolygonCollider2D>();
-        interiorController = GetComponent<BuildingInteriorController>();
-        sceneCamera = Camera.main;
-        if (buildingRenderer.sprite != null)
-        {
-            buildingSpriteVertices = buildingRenderer.sprite.vertices;
-            buildingSpriteTriangles = buildingRenderer.sprite.triangles;
-        }
+        RefreshVisuals();
+        RefreshPlayers();
+    }
 
-        buildingRenderer.sortingOrder = buildingSortingOrder;
-        if (doorwayOutlineRenderer != null)
+    private void OnEnable()
+    {
+        RefreshVisuals();
+    }
+
+    public void RefreshVisuals()
+    {
+        buildingRenderer = GetComponent<SpriteRenderer>();
+        doorRenderer = GetChildSpriteRenderer("Door");
+        interiorFloorRenderer = GetChildSpriteRenderer("Interior Floor");
+        doorwayRenderer = GetChildSpriteRenderer("Doorway");
+        doorwayOutlineRenderer = GetChildSpriteRenderer("Doorway Outline");
+        occlusionFootprint = GetComponent<PolygonCollider2D>();
+        interiorController = GetComponent<BuildingInteriorController>();
+
+        CacheBuildingRenderers();
+        RefreshSortingRange();
+
+        if (doorwayOutlineRenderer)
         {
             doorwayOutlineRenderer.sortingOrder = buildingSortingOrder;
             doorwayOutlineRenderer.transform.localScale = ThinDoorwayOutlineScale;
 
-            Color outlineColor = doorwayOutlineRenderer.color;
+            var outlineColor = doorwayOutlineRenderer.color;
             outlineColor.r = 0f;
             outlineColor.g = 0f;
             outlineColor.b = 0f;
             outlineColor.a = 0f;
             doorwayOutlineRenderer.color = outlineColor;
         }
-
-        RefreshPlayers();
     }
 
     private void Update()
@@ -65,29 +77,32 @@ public sealed class BuildingOcclusionFader : MonoBehaviour
             RefreshPlayers();
         }
 
-        bool localPlayerIsOccluded = false;
-        bool localPlayerIsInside = false;
-
-        foreach (Virtual3DSize player in players)
+        if (!occlusionFootprint)
         {
-            if (player == null)
+            RefreshVisuals();
+        }
+
+        var localPlayerIsOccluded = false;
+        var localPlayerIsInside = false;
+
+        foreach (var player in players)
+        {
+            if (player is null || !player)
             {
                 continue;
             }
 
-            SpriteRenderer playerRenderer = player.GetComponent<SpriteRenderer>();
-            bool isInside = interiorController != null && interiorController.IsInside(player);
-            bool isBehind = false;
-            if (interiorController != null
-                && !isInside
-                && TryGetRearEdgeY(player.FootprintBounds, out float rearEdgeY))
+            var playerRenderer = player.GetComponent<SpriteRenderer>();
+            var isInside = interiorController && interiorController.IsInside(player);
+            var isBehind = false;
+            if (!isInside && TryGetRearEdgeY(player.FootprintBounds, out var rearEdgeY))
             {
                 isBehind = player.FrontY > rearEdgeY + rearThresholdOffset;
             }
 
             playerRenderer.sortingOrder = isBehind || isInside
-                ? buildingSortingOrder - 1
-                : buildingSortingOrder + 1;
+                ? rearPlayerSortingOrder
+                : frontPlayerSortingOrder;
 
             if (!AffectsLocalOpacity(player))
             {
@@ -95,56 +110,142 @@ public sealed class BuildingOcclusionFader : MonoBehaviour
             }
 
             localPlayerIsInside |= isInside;
-            localPlayerIsOccluded |= isBehind && OverlapsBuildingSprite(player);
+            localPlayerIsOccluded |= isBehind && OverlapsVisibleBuilding(player);
         }
 
-        FadeRenderer(interiorFloorRenderer, localPlayerIsInside ? 1f : 0f);
-
-        Color color = buildingRenderer.color;
-        float targetAlpha = localPlayerIsInside
+        var targetAlpha = localPlayerIsInside
             ? 0f
             : localPlayerIsOccluded ? occludedAlpha : 1f;
-        color.a = Mathf.MoveTowards(color.a, targetAlpha, fadeSpeed * Time.deltaTime);
-        buildingRenderer.color = color;
-
-        if (doorRenderer != null)
-        {
-            Color doorColor = doorRenderer.color;
-            float doorTargetAlpha = localPlayerIsInside ? 0f : targetAlpha;
-            doorColor.a = Mathf.MoveTowards(
-                doorColor.a,
-                doorTargetAlpha,
-                fadeSpeed * Time.deltaTime);
-            doorRenderer.color = doorColor;
-        }
-
-        FadeRenderer(doorwayRenderer, localPlayerIsInside ? 0f : targetAlpha);
-        FadeRenderer(doorwayOutlineRenderer, localPlayerIsInside ? 1f : 0f);
+        FadeBuildingRenderers(targetAlpha);
+        FadeSpriteRenderer(interiorFloorRenderer, localPlayerIsInside ? 1f : 0f);
+        FadeSpriteRenderer(doorwayOutlineRenderer, localPlayerIsInside ? 1f : 0f);
     }
 
     private static bool AffectsLocalOpacity(Virtual3DSize player)
     {
-        return player != null
-            && (!player.TryGetComponent<NetworkObject>(out NetworkObject networkObject) || networkObject.IsOwner);
+        return player is not null
+            && player
+            && (!player.TryGetComponent<NetworkObject>(out var networkObject) || networkObject.IsOwner);
+    }
+
+    private SpriteRenderer GetChildSpriteRenderer(string childName)
+    {
+        var child = transform.Find(childName);
+        return child ? child.GetComponent<SpriteRenderer>() : null!;
+    }
+
+    private void CacheBuildingRenderers()
+    {
+        buildingSpriteRenderers.Clear();
+        buildingMeshRenderers.Clear();
+        buildingLineRenderers.Clear();
+
+        AddBuildingSpriteRenderer(buildingRenderer);
+        AddBuildingSpriteRenderer(doorRenderer);
+        AddBuildingSpriteRenderer(doorwayRenderer);
+
+        var generatedRoot = transform.Find("Modular Generated");
+        if (!generatedRoot)
+        {
+            return;
+        }
+
+        foreach (var spriteRenderer in generatedRoot.GetComponentsInChildren<SpriteRenderer>(true))
+        {
+            AddBuildingSpriteRenderer(spriteRenderer);
+        }
+
+        foreach (var meshRenderer in generatedRoot.GetComponentsInChildren<MeshRenderer>(true))
+        {
+            if (meshRenderer.enabled)
+            {
+                buildingMeshRenderers.Add(meshRenderer);
+            }
+        }
+
+        foreach (var lineRenderer in generatedRoot.GetComponentsInChildren<LineRenderer>(true))
+        {
+            if (lineRenderer.enabled)
+            {
+                buildingLineRenderers.Add(lineRenderer);
+            }
+        }
+    }
+
+    private void AddBuildingSpriteRenderer(SpriteRenderer spriteRenderer)
+    {
+        if (spriteRenderer && spriteRenderer.enabled)
+        {
+            buildingSpriteRenderers.Add(spriteRenderer);
+        }
+    }
+
+    private void RefreshSortingRange()
+    {
+        var minimumSortingOrder = buildingSortingOrder;
+        var maximumSortingOrder = buildingSortingOrder;
+
+        foreach (var spriteRenderer in buildingSpriteRenderers)
+        {
+            minimumSortingOrder = Mathf.Min(minimumSortingOrder, spriteRenderer.sortingOrder);
+            maximumSortingOrder = Mathf.Max(maximumSortingOrder, spriteRenderer.sortingOrder);
+        }
+
+        foreach (var meshRenderer in buildingMeshRenderers)
+        {
+            minimumSortingOrder = Mathf.Min(minimumSortingOrder, meshRenderer.sortingOrder);
+            maximumSortingOrder = Mathf.Max(maximumSortingOrder, meshRenderer.sortingOrder);
+        }
+
+        foreach (var lineRenderer in buildingLineRenderers)
+        {
+            minimumSortingOrder = Mathf.Min(minimumSortingOrder, lineRenderer.sortingOrder);
+            maximumSortingOrder = Mathf.Max(maximumSortingOrder, lineRenderer.sortingOrder);
+        }
+
+        rearPlayerSortingOrder = minimumSortingOrder - 1;
+        frontPlayerSortingOrder = maximumSortingOrder + 1;
+    }
+
+    private bool OverlapsVisibleBuilding(Virtual3DSize player)
+    {
+        var playerBounds = player.ProjectedBounds;
+        foreach (var meshRenderer in buildingMeshRenderers)
+        {
+            if (IntersectsXY(playerBounds, meshRenderer.bounds))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IntersectsXY(Bounds first, Bounds second)
+    {
+        return first.min.x <= second.max.x
+            && first.max.x >= second.min.x
+            && first.min.y <= second.max.y
+            && first.max.y >= second.min.y;
     }
 
     private bool TryGetRearEdgeY(Bounds playerFootprint, out float rearEdgeY)
     {
         rearEdgeY = float.NegativeInfinity;
         var buildingBounds = occlusionFootprint.bounds;
-        float overlapMinX = Mathf.Max(playerFootprint.min.x, buildingBounds.min.x);
-        float overlapMaxX = Mathf.Min(playerFootprint.max.x, buildingBounds.max.x);
+        var overlapMinX = Mathf.Max(playerFootprint.min.x, buildingBounds.min.x);
+        var overlapMaxX = Mathf.Min(playerFootprint.max.x, buildingBounds.max.x);
         if (overlapMinX > overlapMaxX)
         {
             return false;
         }
 
-        if (!TryGetRearEdgeAtX(overlapMinX, buildingBounds, out float minRearEdge))
+        if (!TryGetRearEdgeAtX(overlapMinX, buildingBounds, out var minRearEdge))
         {
             return false;
         }
 
-        if (!TryGetRearEdgeAtX(overlapMaxX, buildingBounds, out float maxRearEdge))
+        if (!TryGetRearEdgeAtX(overlapMaxX, buildingBounds, out var maxRearEdge))
         {
             return false;
         }
@@ -155,11 +256,11 @@ public sealed class BuildingOcclusionFader : MonoBehaviour
 
     private bool TryGetRearEdgeAtX(float worldX, Bounds buildingBounds, out float rearEdgeY)
     {
-        float sampleX = Mathf.Clamp(worldX, buildingBounds.min.x + 0.001f, buildingBounds.max.x - 0.001f);
+        var sampleX = Mathf.Clamp(worldX, buildingBounds.min.x + 0.001f, buildingBounds.max.x - 0.001f);
         var path = occlusionFootprint.GetPath(0);
         rearEdgeY = float.NegativeInfinity;
 
-        for (int index = 0; index < path.Length; index++)
+        for (var index = 0; index < path.Length; index++)
         {
             var start = occlusionFootprint.transform.TransformPoint(path[index]);
             var end = occlusionFootprint.transform.TransformPoint(path[(index + 1) % path.Length]);
@@ -168,14 +269,14 @@ public sealed class BuildingOcclusionFader : MonoBehaviour
                 continue;
             }
 
-            float deltaX = end.x - start.x;
+            var deltaX = end.x - start.x;
             if (Mathf.Abs(deltaX) < Mathf.Epsilon)
             {
                 rearEdgeY = Mathf.Max(rearEdgeY, start.y, end.y);
                 continue;
             }
 
-            float interpolation = (sampleX - start.x) / deltaX;
+            var interpolation = (sampleX - start.x) / deltaX;
             rearEdgeY = Mathf.Max(rearEdgeY, Mathf.Lerp(start.y, end.y, interpolation));
         }
 
@@ -187,174 +288,81 @@ public sealed class BuildingOcclusionFader : MonoBehaviour
         return true;
     }
 
-    private bool OverlapsBuildingSprite(Virtual3DSize player)
+    private void FadeBuildingRenderers(float targetAlpha)
     {
-        if (sceneCamera == null)
+        foreach (var spriteRenderer in buildingSpriteRenderers)
         {
-            sceneCamera = Camera.main;
+            FadeSpriteRenderer(spriteRenderer, targetAlpha);
         }
 
-        if (sceneCamera == null
-            || buildingSpriteVertices == null
-            || buildingSpriteTriangles == null
-            || buildingSpriteTriangles.Length < 3
-            || !TryGetScreenRect(player.ProjectedBounds, out Rect playerRect))
+        foreach (var meshRenderer in buildingMeshRenderers)
         {
-            return false;
+            FadeMeshRenderer(meshRenderer, targetAlpha);
         }
 
-        for (int index = 0; index < buildingSpriteTriangles.Length; index += 3)
+        foreach (var lineRenderer in buildingLineRenderers)
         {
-            Vector2 first = WorldToScreenPoint(buildingSpriteVertices[buildingSpriteTriangles[index]]);
-            Vector2 second = WorldToScreenPoint(buildingSpriteVertices[buildingSpriteTriangles[index + 1]]);
-            Vector2 third = WorldToScreenPoint(buildingSpriteVertices[buildingSpriteTriangles[index + 2]]);
-
-            if (TriangleIntersectsRect(first, second, third, playerRect))
-            {
-                return true;
-            }
+            FadeLineRenderer(lineRenderer, targetAlpha);
         }
-
-        return false;
     }
 
-    private Vector2 WorldToScreenPoint(Vector2 localPoint)
+    private void FadeSpriteRenderer(SpriteRenderer spriteRenderer, float targetAlpha)
     {
-        return sceneCamera.WorldToScreenPoint(transform.TransformPoint(localPoint));
-    }
-
-    private bool TryGetScreenRect(Bounds bounds, out Rect screenRect)
-    {
-        Vector2 first = sceneCamera.WorldToScreenPoint(new Vector3(
-            bounds.min.x,
-            bounds.min.y,
-            bounds.center.z));
-        Vector2 second = sceneCamera.WorldToScreenPoint(new Vector3(
-            bounds.max.x,
-            bounds.min.y,
-            bounds.center.z));
-        Vector2 third = sceneCamera.WorldToScreenPoint(new Vector3(
-            bounds.max.x,
-            bounds.max.y,
-            bounds.center.z));
-        Vector2 fourth = sceneCamera.WorldToScreenPoint(new Vector3(
-            bounds.min.x,
-            bounds.max.y,
-            bounds.center.z));
-
-        float minX = Mathf.Min(first.x, second.x, third.x, fourth.x);
-        float maxX = Mathf.Max(first.x, second.x, third.x, fourth.x);
-        float minY = Mathf.Min(first.y, second.y, third.y, fourth.y);
-        float maxY = Mathf.Max(first.y, second.y, third.y, fourth.y);
-        screenRect = Rect.MinMaxRect(minX, minY, maxX, maxY);
-        return screenRect.width > 0f && screenRect.height > 0f;
-    }
-
-    private static bool TriangleIntersectsRect(Vector2 first, Vector2 second, Vector2 third, Rect rectangle)
-    {
-        Rect triangleBounds = Rect.MinMaxRect(
-            Mathf.Min(first.x, second.x, third.x),
-            Mathf.Min(first.y, second.y, third.y),
-            Mathf.Max(first.x, second.x, third.x),
-            Mathf.Max(first.y, second.y, third.y));
-        if (!triangleBounds.Overlaps(rectangle, true))
-        {
-            return false;
-        }
-
-        if (rectangle.Contains(first)
-            || rectangle.Contains(second)
-            || rectangle.Contains(third))
-        {
-            return true;
-        }
-
-        Vector2 bottomLeft = new(rectangle.xMin, rectangle.yMin);
-        Vector2 bottomRight = new(rectangle.xMax, rectangle.yMin);
-        Vector2 topRight = new(rectangle.xMax, rectangle.yMax);
-        Vector2 topLeft = new(rectangle.xMin, rectangle.yMax);
-
-        if (PointInTriangle(bottomLeft, first, second, third)
-            || PointInTriangle(bottomRight, first, second, third)
-            || PointInTriangle(topRight, first, second, third)
-            || PointInTriangle(topLeft, first, second, third))
-        {
-            return true;
-        }
-
-        return SegmentIntersectsRect(first, second, rectangle)
-            || SegmentIntersectsRect(second, third, rectangle)
-            || SegmentIntersectsRect(third, first, rectangle);
-    }
-
-    private static bool PointInTriangle(Vector2 point, Vector2 first, Vector2 second, Vector2 third)
-    {
-        float firstSign = Cross(second - first, point - first);
-        float secondSign = Cross(third - second, point - second);
-        float thirdSign = Cross(first - third, point - third);
-        const float tolerance = 0.0001f;
-
-        bool hasNegative = firstSign < -tolerance || secondSign < -tolerance || thirdSign < -tolerance;
-        bool hasPositive = firstSign > tolerance || secondSign > tolerance || thirdSign > tolerance;
-        return !(hasNegative && hasPositive);
-    }
-
-    private static bool SegmentIntersectsRect(Vector2 start, Vector2 end, Rect rectangle)
-    {
-        Vector2 bottomLeft = new(rectangle.xMin, rectangle.yMin);
-        Vector2 bottomRight = new(rectangle.xMax, rectangle.yMin);
-        Vector2 topRight = new(rectangle.xMax, rectangle.yMax);
-        Vector2 topLeft = new(rectangle.xMin, rectangle.yMax);
-
-        return SegmentsIntersect(start, end, bottomLeft, bottomRight)
-            || SegmentsIntersect(start, end, bottomRight, topRight)
-            || SegmentsIntersect(start, end, topRight, topLeft)
-            || SegmentsIntersect(start, end, topLeft, bottomLeft);
-    }
-
-    private static bool SegmentsIntersect(Vector2 firstStart, Vector2 firstEnd, Vector2 secondStart, Vector2 secondEnd)
-    {
-        const float tolerance = 0.0001f;
-        float first = Cross(firstEnd - firstStart, secondStart - firstStart);
-        float second = Cross(firstEnd - firstStart, secondEnd - firstStart);
-        float third = Cross(secondEnd - secondStart, firstStart - secondStart);
-        float fourth = Cross(secondEnd - secondStart, firstEnd - secondStart);
-
-        return OppositeSignsOrZero(first, second, tolerance)
-            && OppositeSignsOrZero(third, fourth, tolerance);
-    }
-
-    private static bool OppositeSignsOrZero(float first, float second, float tolerance)
-    {
-        return (first <= tolerance && second >= -tolerance)
-            || (first >= -tolerance && second <= tolerance);
-    }
-
-    private static float Cross(Vector2 first, Vector2 second)
-    {
-        return first.x * second.y - first.y * second.x;
-    }
-
-    private void FadeRenderer(SpriteRenderer renderer, float targetAlpha)
-    {
-        if (renderer == null)
+        if (!spriteRenderer)
         {
             return;
         }
 
-        Color color = renderer.color;
+        var color = spriteRenderer.color;
         color.a = Mathf.MoveTowards(color.a, targetAlpha, fadeSpeed * Time.deltaTime);
-        renderer.color = color;
+        spriteRenderer.color = color;
+    }
+
+    private void FadeMeshRenderer(MeshRenderer meshRenderer, float targetAlpha)
+    {
+        if (!meshRenderer)
+        {
+            return;
+        }
+
+        propertyBlock ??= new MaterialPropertyBlock();
+
+        if (!meshAlphaByRenderer.TryGetValue(meshRenderer, out var alpha))
+        {
+            alpha = 1f;
+        }
+
+        alpha = Mathf.MoveTowards(alpha, targetAlpha, fadeSpeed * Time.deltaTime);
+        meshAlphaByRenderer[meshRenderer] = alpha;
+
+        meshRenderer.GetPropertyBlock(propertyBlock);
+        propertyBlock.SetColor(ColorPropertyId, new Color(1f, 1f, 1f, alpha));
+        meshRenderer.SetPropertyBlock(propertyBlock);
+    }
+
+    private void FadeLineRenderer(LineRenderer lineRenderer, float targetAlpha)
+    {
+        if (!lineRenderer)
+        {
+            return;
+        }
+
+        var startColor = lineRenderer.startColor;
+        var endColor = lineRenderer.endColor;
+        startColor.a = Mathf.MoveTowards(startColor.a, targetAlpha, fadeSpeed * Time.deltaTime);
+        endColor.a = Mathf.MoveTowards(endColor.a, targetAlpha, fadeSpeed * Time.deltaTime);
+        lineRenderer.startColor = startColor;
+        lineRenderer.endColor = endColor;
     }
 
     private void RefreshPlayers()
     {
         players.Clear();
-        Virtual3DSize[] characters = FindObjectsByType<Virtual3DSize>(
+        var characters = FindObjectsByType<Virtual3DSize>(
             FindObjectsInactive.Exclude,
             FindObjectsSortMode.None);
 
-        foreach (Virtual3DSize character in characters)
+        foreach (var character in characters)
         {
             players.Add(character);
         }
