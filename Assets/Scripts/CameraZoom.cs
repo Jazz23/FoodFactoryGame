@@ -1,3 +1,4 @@
+// Adjusts the local camera zoom without responding to inventory UI scroll input.
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -29,6 +30,11 @@ public sealed class CameraZoom : MonoBehaviour
 
     private void Update()
     {
+        if (PlayerInventory.LocalOwner is not null && PlayerInventory.LocalOwner.IsOpen)
+        {
+            return;
+        }
+
         var scroll = _scrollWheel.ReadValue<Vector2>().y;
         if (Mathf.Approximately(scroll, 0f))
         {

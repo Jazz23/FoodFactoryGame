@@ -1,5 +1,5 @@
 ﻿- Always use `var` for variables instead of specifying the type.
 - Always use the new InputSystem actions map instead of hard coding any input.
 - Always assume references exist, that means no null checks. Use ! if there are compiler warnings. If the reference could actuall be null as intended behavior, then you can perform null checks.
-- Add a comment at the top of each file that describes the purpose of the file.
+- Add a comment at the top of each file that describes the purpose of the file. Do not comment every little thing, only very important stuff should receive large abstract comments.
 - Use null pattern matching instead of != null, such as `player is not null`

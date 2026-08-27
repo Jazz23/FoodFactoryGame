@@ -17,6 +17,7 @@ GameObject:
   - component: {fileID: 7826029626880817274}
   - component: {fileID: 8034260352912711009}
   - component: {fileID: 4268245842914826721}
+  - component: {fileID: -3357010297339903751}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -290,8 +291,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c8ef29d1feda98342904e88df191d275, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   size: {x: 0.36, y: 0.36, z: 1}
   synchronizeWithCollider: 1
 --- !u!114 &4268245842914826721
@@ -309,3 +310,18 @@ MonoBehaviour:
   _componentIndexCache: 2
   _addedNetworkObject: {fileID: 5761831483980123327}
   _networkObjectCache: {fileID: 5761831483980123327}
+--- !u!114 &-3357010297339903751
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2482538414256053144}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8dfeef4607d624d44b4495ddae8b3048, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _componentIndexCache: 255
+  _addedNetworkObject: {fileID: 5761831483980123327}
+  _networkObjectCache: {fileID: 0}
