@@ -15,6 +15,8 @@ GameObject:
   - component: {fileID: 1703508883963247041}
   - component: {fileID: 8973065516749255970}
   - component: {fileID: 1154636103048611798}
+  - component: {fileID: 7131305252080683073}
+  - component: {fileID: 4397968128678716958}
   m_Layer: 0
   m_Name: PlayerTest
   m_TagString: Untagged
@@ -78,9 +80,9 @@ SpriteRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
-  m_SortingLayerID: 0
-  m_SortingLayer: 0
-  m_SortingOrder: 1
+  m_SortingLayerID: 1815865389
+  m_SortingLayer: 2
+  m_SortingOrder: 0
   m_Sprite: {fileID: 21300000, guid: 089df08f5fa1b7245b1df07f8a8ad624, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
@@ -126,9 +128,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e8cac635f24954048aad3a6ff9110beb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _componentIndexCache: 255
+  _componentIndexCache: 0
   _addedNetworkObject: {fileID: 1703508883963247041}
-  _networkObjectCache: {fileID: 0}
+  _networkObjectCache: {fileID: 1703508883963247041}
   IgnoredParameters: []
   _animator: {fileID: 2638999387661824257}
   _synchronizeWhenDisabled: 0
@@ -166,22 +168,26 @@ MonoBehaviour:
   _spectatorInterpolation: 2
   _enableTeleport: 0
   _teleportThreshold: 1
-  <PrefabId>k__BackingField: 65535
+  <PrefabId>k__BackingField: 0
   <SpawnableCollectionId>k__BackingField: 0
   <AssetPathHash>k__BackingField: 789524489219247526
   SceneId: 0
   SerializedTransformProperties:
-    Position: {x: 0, y: 0, z: 0}
-    Rotation: {x: 0, y: 0, z: 0, w: 0}
-    Scale: {x: 0, y: 0, z: 0}
-    IsValid: 0
+    Position: {x: 1, y: 0, z: 0}
+    Rotation: {x: 0, y: 0, z: 0, w: 1}
+    Scale: {x: 1, y: 1, z: 1}
+    IsValid: 1
   <IsNested>k__BackingField: 0
   WasActiveDuringEdit: 0
   WasActiveDuringEdit_Set1: 1
   <ComponentIndex>k__BackingField: 0
   <PredictedSpawn>k__BackingField: {fileID: 0}
   <PredictedOwner>k__BackingField: {fileID: 0}
-  NetworkBehaviours: []
+  NetworkBehaviours:
+  - {fileID: 8650597198905239143}
+  - {fileID: 8973065516749255970}
+  - {fileID: 1154636103048611798}
+  - {fileID: 7131305252080683073}
   InitializedParentNetworkBehaviour: {fileID: 0}
   InitializedNestedNetworkObjects: []
   RuntimeParentNetworkBehaviour: {fileID: 0}
@@ -192,7 +198,7 @@ MonoBehaviour:
   _initializeOrder: 0
   _preventDespawnOnDisconnect: 0
   _defaultDespawnType: 0
-  _initializedTimestamp: 0
+  _initializedTimestamp: -8584136670982053336
 --- !u!114 &8973065516749255970
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -205,9 +211,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a2836e36774ca1c4bbbee976e17b649c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _componentIndexCache: 255
+  _componentIndexCache: 1
   _addedNetworkObject: {fileID: 1703508883963247041}
-  _networkObjectCache: {fileID: 0}
+  _networkObjectCache: {fileID: 1703508883963247041}
   _componentConfiguration: 0
   _synchronizeParent: 0
   _packing:
@@ -251,7 +257,41 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b01c86107c6348e0a0894bf5f12267b1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _componentIndexCache: 2
+  _addedNetworkObject: {fileID: 1703508883963247041}
+  _networkObjectCache: {fileID: 1703508883963247041}
+  speed: 5
+--- !u!114 &7131305252080683073
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 987305832976726159}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 384375ca4764434cb72dce098613c403, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _componentIndexCache: 3
+  _addedNetworkObject: {fileID: 1703508883963247041}
+  _networkObjectCache: {fileID: 1703508883963247041}
+  testPrefab: {fileID: 987359489525298888, guid: b6858bc0ef9920f44bf5f53c624e31bd, type: 3}
+--- !u!114 &4397968128678716958
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 987305832976726159}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6f2cabcc749d3584c90fb32ad338830c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
   _componentIndexCache: 255
   _addedNetworkObject: {fileID: 1703508883963247041}
   _networkObjectCache: {fileID: 0}
-  speed: 5
+  zoomSpeed: 100
+  minOrthographicSize: 2
+  maxOrthographicSize: 20
