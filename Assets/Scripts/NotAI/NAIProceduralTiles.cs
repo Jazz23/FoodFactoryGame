@@ -34,6 +34,7 @@ namespace Generation
                 {
                     var tilePos = new Vector3Int(x, y, 0);
                     if (tileMap.HasTile(tilePos)) continue;
+                    
                     var noiseValue = noise.snoise(new float2(x + seed, y + seed));
                     var tileIndex = Mathf.Abs((int)(noiseValue * tiles.Length)) % tiles.Length;
                     tileMap.SetTile(tilePos, tiles[tileIndex]);
