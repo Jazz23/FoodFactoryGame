@@ -18,5 +18,6 @@ MonoBehaviour:
   footprintSize: {x: 1, y: 1}
   visualAnchorCellOffset: {x: 0, y: 0}
   entranceCellOffset: {x: 0, y: 0}
-  interiorSceneName: WallInterior
-  interiorArrivalLogicalPosition: {x: 3, y: 0.5}
+  interiorSceneName:
+  interiorArrivalLogicalPosition: {x: 0, y: 0}
+  placementKind: 1

@@ -12,20 +12,24 @@ public sealed class BuildingPlacementWindow : EditorWindow
     private static readonly Color InvalidPreviewColor = new(1f, 0.25f, 0.25f, 0.7f);
 
     private readonly List<Vector3Int> footprintCells = new();
-    private readonly HashSet<Vector3Int> occupiedCells = new();
+    private readonly List<GridEdge> reservationEdges = new();
+    private readonly List<Vector3Int> existingCells = new();
+    private readonly List<GridEdge> existingEdges = new();
+    private readonly BuildingOccupancy occupancy = new();
 
     private Tilemap ground = null!;
     private BuildingCatalog catalog = null!;
     private Builder builder = null!;
     private BuildingDefinition selectedDefinition = null!;
     private GameObject previewObject = null!;
-    private ModularBuildingView previewView = null!;
+    private BuildingVisualView previewView = null!;
     private BuildingDefinition previewDefinition = null!;
     private Vector3Int firstCorner;
     private Vector3Int hoveredCell;
     private Vector3Int previewAnchor;
     private Vector2Int previewSize;
     private int selectedDefinitionIndex;
+    private GridEdgeDirection selectedDirection;
     private bool hasFirstCorner;
     private bool hasHoveredCell;
     private bool previewConfigured;
@@ -109,13 +113,20 @@ public sealed class BuildingPlacementWindow : EditorWindow
         }
         else
         {
-            var instruction = hasFirstCorner
-                ? "Click the opposing corner to place the building."
-                : "Click the first corner, then the opposing corner.";
+            var instruction = selectedDefinition.PlacementKind == BuildingPlacementKind.WallSegment
+                ? "Press R to rotate, then click to place one wall edge."
+                : hasFirstCorner
+                    ? "Click the opposing corner to place the building."
+                    : "Click the first corner, then the opposing corner.";
             EditorGUILayout.HelpBox(instruction, MessageType.Info);
             EditorGUILayout.LabelField(
                 "Selected",
                 $"{selectedDefinition.name} ({selectedDefinition.Id})");
+
+            if (selectedDefinition.PlacementKind == BuildingPlacementKind.WallSegment)
+            {
+                EditorGUILayout.LabelField("Direction", selectedDirection.ToString());
+            }
 
             if (hasFirstCorner)
             {
@@ -183,6 +194,18 @@ public sealed class BuildingPlacementWindow : EditorWindow
             return;
         }
 
+        if (currentEvent.type == EventType.KeyDown
+            && currentEvent.keyCode == KeyCode.R
+            && selectedDefinition.PlacementKind == BuildingPlacementKind.WallSegment)
+        {
+            selectedDirection = GridEdge.RotateClockwise(selectedDirection);
+            previewConfigured = false;
+            currentEvent.Use();
+            sceneView.Repaint();
+            Repaint();
+            return;
+        }
+
         if (TryGetCell(currentEvent.mousePosition, out var cell))
         {
             if (!hasHoveredCell || hoveredCell != cell)
@@ -221,6 +244,18 @@ public sealed class BuildingPlacementWindow : EditorWindow
     private void HandlePlacementClick(Vector3Int cell)
     {
         statusMessage = string.Empty;
+        if (selectedDefinition.PlacementKind == BuildingPlacementKind.WallSegment)
+        {
+            if (!TryValidatePlacement(cell, Vector2Int.one, selectedDirection, out var wallReason))
+            {
+                statusMessage = wallReason;
+                return;
+            }
+
+            CreatePlacement(cell, Vector2Int.one, selectedDirection);
+            return;
+        }
+
         if (!hasFirstCorner)
         {
             firstCorner = cell;
@@ -231,35 +266,56 @@ public sealed class BuildingPlacementWindow : EditorWindow
 
         var anchorCell = BuildingFootprint.GetLowerLeftAnchorCell(firstCorner, cell);
         var size = BuildingFootprint.GetInclusiveSize(firstCorner, cell);
-        if (!TryValidatePlacement(anchorCell, size, out var reason))
+        if (!TryValidatePlacement(anchorCell, size, GridEdgeDirection.South, out var reason))
         {
             statusMessage = reason;
             return;
         }
 
-        CreatePlacement(anchorCell, size);
+        CreatePlacement(anchorCell, size, GridEdgeDirection.South);
         ResetPlacement();
     }
 
     private void DrawPreview()
     {
-        var anchorCell = hasFirstCorner
+        var isWallSegment = selectedDefinition.PlacementKind == BuildingPlacementKind.WallSegment;
+        var anchorCell = !isWallSegment && hasFirstCorner
             ? BuildingFootprint.GetLowerLeftAnchorCell(firstCorner, hoveredCell)
             : hoveredCell;
-        var size = hasFirstCorner
+        var size = !isWallSegment && hasFirstCorner
             ? BuildingFootprint.GetInclusiveSize(firstCorner, hoveredCell)
             : Vector2Int.one;
-        var valid = TryValidatePlacement(anchorCell, size, out var reason);
+        var direction = isWallSegment ? selectedDirection : GridEdgeDirection.South;
+        var valid = TryValidatePlacement(anchorCell, size, direction, out var reason);
         statusMessage = valid ? string.Empty : reason;
 
-        var boundaryPoints = GetBoundaryWorldPoints(anchorCell, size);
         var color = valid ? ValidPreviewColor : InvalidPreviewColor;
-        Handles.color = new Color(color.r, color.g, color.b, 0.2f);
-        Handles.DrawAAConvexPolygon(boundaryPoints[0], boundaryPoints[1], boundaryPoints[2], boundaryPoints[3]);
-        Handles.color = color;
-        Handles.DrawAAPolyLine(4f, boundaryPoints);
+        var boundaryPoints = GetBoundaryWorldPoints(anchorCell, size);
+        if (isWallSegment)
+        {
+            var edge = GridEdge.FromCellSide(anchorCell, direction);
+            Handles.color = color;
+            Handles.DrawAAPolyLine(
+                6f,
+                ground.CellToWorld(edge.Corner),
+                ground.CellToWorld(edge.EndCorner));
+            Handles.Label(
+                (ground.CellToWorld(edge.Corner) + ground.CellToWorld(edge.EndCorner)) * 0.5f,
+                $"{direction} {edge}");
+        }
+        else
+        {
+            Handles.color = new Color(color.r, color.g, color.b, 0.2f);
+            Handles.DrawAAConvexPolygon(
+                boundaryPoints[0],
+                boundaryPoints[1],
+                boundaryPoints[2],
+                boundaryPoints[3]);
+            Handles.color = color;
+            Handles.DrawAAPolyLine(4f, boundaryPoints);
+        }
 
-        if (hasFirstCorner)
+        if (!isWallSegment && hasFirstCorner)
         {
             var firstPoint = ground.CellToWorld(firstCorner);
             firstPoint.z -= 0.02f;
@@ -271,12 +327,20 @@ public sealed class BuildingPlacementWindow : EditorWindow
                 EventType.Repaint);
         }
 
-        var labelPosition = (boundaryPoints[0] + boundaryPoints[1] + boundaryPoints[2] + boundaryPoints[3]) * 0.25f;
-        Handles.Label(labelPosition, $"{size.x} x {size.y}");
-        UpdatePreview(anchorCell, size, valid);
+        if (!isWallSegment)
+        {
+            var labelPosition = (boundaryPoints[0] + boundaryPoints[1] + boundaryPoints[2] + boundaryPoints[3]) * 0.25f;
+            Handles.Label(labelPosition, $"{size.x} x {size.y}");
+        }
+
+        UpdatePreview(anchorCell, size, direction, valid);
     }
 
-    private void UpdatePreview(Vector3Int anchorCell, Vector2Int size, bool valid)
+    private void UpdatePreview(
+        Vector3Int anchorCell,
+        Vector2Int size,
+        GridEdgeDirection direction,
+        bool valid)
     {
         EnsurePreview();
         if (previewObject is null || !previewObject || previewView is null || !previewView)
@@ -284,31 +348,30 @@ public sealed class BuildingPlacementWindow : EditorWindow
             return;
         }
 
-        if (!previewConfigured || previewAnchor != anchorCell || previewSize != size)
+        if (!previewConfigured
+            || previewAnchor != anchorCell
+            || previewSize != size
+            || selectedDirection != direction)
         {
-            var visualAnchorCell = BuildingFootprint.GetVisualAnchorCell(
-                anchorCell,
-                selectedDefinition.VisualAnchorCellOffset);
-            var position = ground.CellToWorld(visualAnchorCell);
-            position.z = -0.05f;
-            previewObject.transform.position = position;
-            previewView.Configure(
+            var instance = new BuildingInstance(
+                uint.MaxValue,
+                selectedDefinition.Id,
                 anchorCell,
                 size,
+                -1,
+                direction);
+            previewView.Configure(
+                instance,
+                selectedDefinition,
                 ground,
-                selectedDefinition.EntranceCellOffset,
-                selectedDefinition.HasInterior);
+                BuildingVisualMode.Preview);
             previewAnchor = anchorCell;
             previewSize = size;
             previewConfigured = true;
         }
 
         var color = valid ? ValidPreviewColor : InvalidPreviewColor;
-        foreach (var renderer in previewObject.GetComponentsInChildren<SpriteRenderer>(true))
-        {
-            renderer.color = color;
-        }
-
+        previewView.SetPresentation(color, 1);
         previewObject.SetActive(true);
     }
 
@@ -330,11 +393,7 @@ public sealed class BuildingPlacementWindow : EditorWindow
         ClearPreview();
         previewObject = (GameObject)PrefabUtility.InstantiatePrefab(selectedDefinition.PreviewPrefab);
         previewObject.hideFlags = HideFlags.HideAndDontSave;
-        previewView = previewObject.GetComponent<ModularBuildingView>();
-        if (previewView is null || !previewView)
-        {
-            previewView = previewObject.AddComponent<ModularBuildingView>();
-        }
+        previewView = previewObject.GetComponent<BuildingVisualView>();
 
         previewDefinition = selectedDefinition;
         previewConfigured = false;
@@ -353,7 +412,10 @@ public sealed class BuildingPlacementWindow : EditorWindow
         previewConfigured = false;
     }
 
-    private void CreatePlacement(Vector3Int anchorCell, Vector2Int size)
+    private void CreatePlacement(
+        Vector3Int anchorCell,
+        Vector2Int size,
+        GridEdgeDirection direction)
     {
         var instanceId = GetNextInstanceId();
         if (instanceId == 0)
@@ -386,7 +448,8 @@ public sealed class BuildingPlacementWindow : EditorWindow
             selectedDefinition,
             anchorCell,
             size,
-            instanceId);
+            instanceId,
+            direction);
 
         var buildingView = placedObject.GetComponent<BuildingView>();
         Undo.RecordObject(placedObject.transform, "Position building");
@@ -396,7 +459,8 @@ public sealed class BuildingPlacementWindow : EditorWindow
                 selectedDefinition.Id,
                 anchorCell,
                 size,
-                -1),
+                -1,
+                direction),
             selectedDefinition,
             ground);
 
@@ -407,12 +471,15 @@ public sealed class BuildingPlacementWindow : EditorWindow
         EditorSceneManager.MarkSceneDirty(ground.gameObject.scene);
         Undo.CollapseUndoOperations(undoGroup);
         Selection.activeGameObject = placedObject;
-        statusMessage = $"Placed {selectedDefinition.name} at {anchorCell.x},{anchorCell.y} ({size.x} x {size.y}).";
+        statusMessage = selectedDefinition.PlacementKind == BuildingPlacementKind.WallSegment
+            ? $"Placed {selectedDefinition.name} {direction} at {anchorCell.x},{anchorCell.y}."
+            : $"Placed {selectedDefinition.name} at {anchorCell.x},{anchorCell.y} ({size.x} x {size.y}).";
     }
 
     private bool TryValidatePlacement(
         Vector3Int anchorCell,
         Vector2Int size,
+        GridEdgeDirection direction,
         out string reason)
     {
         reason = string.Empty;
@@ -431,21 +498,39 @@ public sealed class BuildingPlacementWindow : EditorWindow
             return false;
         }
 
-        BuildingFootprint.GetCells(anchorCell, size, footprintCells);
+        var candidate = new BuildingInstance(
+            uint.MaxValue,
+            selectedDefinition.Id,
+            anchorCell,
+            size,
+            -1,
+            direction);
+        BuildingPlacementRules.GetReservation(
+            candidate,
+            selectedDefinition,
+            footprintCells,
+            reservationEdges);
         var buildableTile = builder is not null && builder ? builder.BuildableTile : null;
-        foreach (var cell in footprintCells)
+        if (buildableTile is not null && buildableTile)
         {
-            var tile = ground.GetTile(cell);
-            if (buildableTile is not null && buildableTile
-                ? tile != buildableTile
-                : tile is null || !tile)
+            if (!BuildingPlacementRules.IsBuildable(
+                    candidate,
+                    selectedDefinition,
+                    ground,
+                    buildableTile,
+                    footprintCells))
             {
-                reason = $"Cell ({cell.x}, {cell.y}) is not buildable.";
+                reason = "The selected placement is not next to buildable ground.";
                 return false;
             }
         }
+        else if (!HasAnyGround(candidate, selectedDefinition))
+        {
+            reason = "The selected placement is not on the ground tilemap.";
+            return false;
+        }
 
-        occupiedCells.Clear();
+        occupancy.Clear();
         var preplacedBuildings = FindObjectsByType<PreplacedBuilding>(
             FindObjectsInactive.Include,
             FindObjectsSortMode.None);
@@ -456,26 +541,63 @@ public sealed class BuildingPlacementWindow : EditorWindow
                 continue;
             }
 
-            BuildingFootprint.GetCells(
+            var existing = new BuildingInstance(
+                preplacedBuilding.InstanceId,
+                preplacedBuilding.Definition.Id,
                 preplacedBuilding.AnchorCell,
                 preplacedBuilding.Size,
-                footprintCells);
-            foreach (var cell in footprintCells)
+                -1,
+                preplacedBuilding.Direction);
+            BuildingPlacementRules.GetReservation(
+                existing,
+                preplacedBuilding.Definition,
+                existingCells,
+                existingEdges);
+            if (!occupancy.TryReserve(
+                    preplacedBuilding.InstanceId,
+                    existingCells,
+                    existingEdges))
             {
-                occupiedCells.Add(cell);
-            }
-        }
-
-        foreach (var cell in BuildingPlacementWindow.EnumerateCells(anchorCell, size))
-        {
-            if (occupiedCells.Contains(cell))
-            {
-                reason = $"Cell ({cell.x}, {cell.y}) overlaps an existing building.";
+                reason = $"Existing placement '{preplacedBuilding.name}' has conflicting occupancy.";
                 return false;
             }
         }
 
+        BuildingPlacementRules.GetReservation(
+            candidate,
+            selectedDefinition,
+            footprintCells,
+            reservationEdges);
+        if (!occupancy.CanReserve(uint.MaxValue, footprintCells, reservationEdges))
+        {
+            reason = "The selected cells or wall edge overlap an existing building.";
+            return false;
+        }
+
         return true;
+    }
+
+    private bool HasAnyGround(
+        BuildingInstance instance,
+        BuildingDefinition definition)
+    {
+        if (definition.PlacementKind == BuildingPlacementKind.WallSegment)
+        {
+            var edge = BuildingPlacementRules.GetWallEdge(instance);
+            return ground.GetTile(edge.FirstAdjacentCell) is not null
+                || ground.GetTile(edge.SecondAdjacentCell) is not null;
+        }
+
+        BuildingFootprint.GetCells(instance.AnchorCell, instance.Size, footprintCells);
+        foreach (var cell in footprintCells)
+        {
+            if (ground.GetTile(cell) is null)
+            {
+                return false;
+            }
+        }
+
+        return footprintCells.Count > 0;
     }
 
     private uint GetNextInstanceId()
@@ -541,14 +663,4 @@ public sealed class BuildingPlacementWindow : EditorWindow
         previewConfigured = false;
     }
 
-    private static IEnumerable<Vector3Int> EnumerateCells(Vector3Int anchorCell, Vector2Int size)
-    {
-        for (var y = 0; y < size.y; y++)
-        {
-            for (var x = 0; x < size.x; x++)
-            {
-                yield return anchorCell + new Vector3Int(x, y);
-            }
-        }
-    }
 }

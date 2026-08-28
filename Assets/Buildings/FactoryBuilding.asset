@@ -20,3 +20,4 @@ MonoBehaviour:
   entranceCellOffset: {x: 3, y: -2}
   interiorSceneName: FactoryInterior
   interiorArrivalLogicalPosition: {x: 3, y: 0.5}
+  placementKind: 0

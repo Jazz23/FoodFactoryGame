@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using FishNet.Object;
 using UnityEngine;
 
-[RequireComponent(typeof(SpriteRenderer))]
 public sealed class BuildingOcclusionFader : MonoBehaviour
 {
     private static readonly int ColorPropertyId = Shader.PropertyToID("_Color");
@@ -139,33 +138,32 @@ public sealed class BuildingOcclusionFader : MonoBehaviour
         buildingSpriteRenderers.Clear();
         buildingMeshRenderers.Clear();
         buildingLineRenderers.Clear();
+        meshAlphaByRenderer.Clear();
 
         AddBuildingSpriteRenderer(buildingRenderer);
         AddBuildingSpriteRenderer(doorRenderer);
         AddBuildingSpriteRenderer(doorwayRenderer);
 
-        var generatedRoot = transform.Find("Modular Generated");
-        if (!generatedRoot)
+        if (!TryGetComponent<BuildingVisualView>(out var visualView)
+            || visualView.ModularView is null
+            || !visualView.ModularView)
         {
             return;
         }
 
-        foreach (var spriteRenderer in generatedRoot.GetComponentsInChildren<SpriteRenderer>(true))
+        foreach (var renderer in visualView.ModularView.GeneratedRenderers)
         {
-            AddBuildingSpriteRenderer(spriteRenderer);
-        }
+            if (renderer is SpriteRenderer spriteRenderer)
+            {
+                AddBuildingSpriteRenderer(spriteRenderer);
+            }
 
-        foreach (var meshRenderer in generatedRoot.GetComponentsInChildren<MeshRenderer>(true))
-        {
-            if (meshRenderer.enabled)
+            if (renderer is MeshRenderer meshRenderer && meshRenderer.enabled)
             {
                 buildingMeshRenderers.Add(meshRenderer);
             }
-        }
 
-        foreach (var lineRenderer in generatedRoot.GetComponentsInChildren<LineRenderer>(true))
-        {
-            if (lineRenderer.enabled)
+            if (renderer is LineRenderer lineRenderer && lineRenderer.enabled)
             {
                 buildingLineRenderers.Add(lineRenderer);
             }

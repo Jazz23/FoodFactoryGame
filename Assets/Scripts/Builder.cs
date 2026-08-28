@@ -15,27 +15,37 @@ public sealed class Builder : NetworkBehaviour
     [SerializeField] private string defaultBuildingId = string.Empty;
     [SerializeField, Range(0f, 1f)] private float ghostAlpha = 0.55f;
     [SerializeField] private Color invalidGhostColor = new(1f, 0.35f, 0.35f, 0.65f);
+    [SerializeField, Min(0.05f)] private float demolitionEdgeSelectionDistance = 0.35f;
 
     private readonly SyncDictionary<uint, BuildingInstance> buildings = new();
     private readonly Dictionary<uint, BuildingView> placedBuildings = new();
     private readonly Dictionary<uint, PreplacedBuilding> preplacedBuildingsById = new();
     private readonly BuildingOccupancy occupancy = new();
     private readonly List<Vector3Int> hoveredFootprint = new();
+    private readonly List<GridEdge> hoveredEdges = new();
     private readonly List<Vector3Int> rebuildFootprint = new();
+    private readonly List<GridEdge> rebuildEdges = new();
+    private readonly List<GridEdge> demolitionEdges = new();
 
     private InputAction point = null!;
     private InputAction place = null!;
     private InputAction demolish = null!;
     private InputAction nextBuilding = null!;
     private InputAction previousBuilding = null!;
+    private InputAction rotate = null!;
     private Camera sceneCamera = null!;
     private TilemapCollider2D groundCollider = null!;
     private BuildingDefinition selectedDefinition = null!;
     private GameObject ghostBuilding = null!;
-    private SpriteRenderer[] ghostRenderers = System.Array.Empty<SpriteRenderer>();
+    private BuildingVisualView ghostVisual = null!;
     private Vector3Int hoveredCell;
+    private Vector3 hoveredWorldPosition;
+    private Vector3Int configuredGhostCell;
+    private GridEdgeDirection configuredGhostDirection;
+    private GridEdgeDirection selectedDirection;
     private bool hasHoveredCell;
     private bool canPlaceHoveredBuilding;
+    private bool ghostConfigured;
     private int selectedDefinitionIndex;
     private uint nextBuildingId = 1;
 
@@ -50,6 +60,7 @@ public sealed class Builder : NetworkBehaviour
         demolish = InputSystem.actions.FindAction("Build/Demolish", true);
         nextBuilding = InputSystem.actions.FindAction("Build/NextBuilding", true);
         previousBuilding = InputSystem.actions.FindAction("Build/PreviousBuilding", true);
+        rotate = InputSystem.actions.FindAction("Build/Rotate", true);
         sceneCamera = Camera.main!;
         groundCollider = ground.GetComponent<TilemapCollider2D>()!;
         CachePreplacedBuildings();
@@ -81,10 +92,12 @@ public sealed class Builder : NetworkBehaviour
         demolish.Enable();
         nextBuilding.Enable();
         previousBuilding.Enable();
+        rotate.Enable();
         place.performed += PlacePerformed;
         demolish.performed += DemolishPerformed;
         nextBuilding.performed += NextBuildingPerformed;
         previousBuilding.performed += PreviousBuildingPerformed;
+        rotate.performed += RotatePerformed;
 
         SelectBuilding(defaultBuildingId);
         RebuildOccupancy();
@@ -97,10 +110,12 @@ public sealed class Builder : NetworkBehaviour
         demolish.performed -= DemolishPerformed;
         nextBuilding.performed -= NextBuildingPerformed;
         previousBuilding.performed -= PreviousBuildingPerformed;
+        rotate.performed -= RotatePerformed;
         place.Disable();
         demolish.Disable();
         nextBuilding.Disable();
         previousBuilding.Disable();
+        rotate.Disable();
         point.Disable();
         hasHoveredCell = false;
         canPlaceHoveredBuilding = false;
@@ -134,6 +149,7 @@ public sealed class Builder : NetworkBehaviour
 
         selectedDefinition = definition;
         selectedDefinitionIndex = catalog.GetIndex(definitionId);
+        selectedDirection = GridEdgeDirection.South;
         RecreateGhostBuilding();
         return true;
     }
@@ -160,6 +176,21 @@ public sealed class Builder : NetworkBehaviour
         SelectBuilding(catalog.GetDefinition(selectedDefinitionIndex).Id);
     }
 
+    private void RotatePerformed(InputAction.CallbackContext _)
+    {
+        if (selectedDefinition.PlacementKind != BuildingPlacementKind.WallSegment)
+        {
+            return;
+        }
+
+        selectedDirection = GridEdge.RotateClockwise(selectedDirection);
+        ghostConfigured = false;
+        if (hasHoveredCell)
+        {
+            RefreshHoveredPlacement();
+        }
+    }
+
     private void PlacePerformed(InputAction.CallbackContext _)
     {
         if (!hasHoveredCell || !canPlaceHoveredBuilding)
@@ -167,12 +198,12 @@ public sealed class Builder : NetworkBehaviour
             return;
         }
 
-        PlaceBuildingServerRpc(selectedDefinition.Id, hoveredCell);
+        PlaceBuildingServerRpc(selectedDefinition.Id, hoveredCell, selectedDirection);
     }
 
     private void DemolishPerformed(InputAction.CallbackContext _)
     {
-        if (!hasHoveredCell || !occupancy.TryGetBuildingId(hoveredCell, out var buildingId))
+        if (!hasHoveredCell || !TryGetDemolitionBuildingId(out var buildingId))
         {
             return;
         }
@@ -181,9 +212,13 @@ public sealed class Builder : NetworkBehaviour
     }
 
     [ServerRpc(RequireOwnership = false)]
-    private void PlaceBuildingServerRpc(string definitionId, Vector3Int anchorCell, NetworkConnection sender = null)
+    private void PlaceBuildingServerRpc(
+        string definitionId,
+        Vector3Int anchorCell,
+        GridEdgeDirection direction,
+        NetworkConnection sender = null)
     {
-        TryPlaceBuilding(definitionId, anchorCell, sender.ClientId);
+        TryPlaceBuilding(definitionId, anchorCell, direction, sender.ClientId);
     }
 
     [ServerRpc(RequireOwnership = false)]
@@ -217,43 +252,104 @@ public sealed class Builder : NetworkBehaviour
 
             var cell = ground.WorldToCell(hit.point);
             hoveredCell = cell;
+            hoveredWorldPosition = hit.point;
             hasHoveredCell = true;
-            BuildingFootprint.GetCells(cell, selectedDefinition.FootprintSize, hoveredFootprint);
-            canPlaceHoveredBuilding = IsBuildableFootprint(hoveredFootprint)
-                && occupancy.CanReserve(uint.MaxValue, hoveredFootprint);
+            RefreshHoveredPlacement();
             return;
         }
     }
 
-    private bool IsBuildableFootprint(IReadOnlyList<Vector3Int> footprint)
+    private void RefreshHoveredPlacement()
     {
-        if (footprint.Count == 0)
-        {
-            return false;
-        }
-
-        foreach (var cell in footprint)
-        {
-            if (ground.GetTile(cell) != buildableTile)
-            {
-                return false;
-            }
-        }
-
-        return true;
+        var candidate = new BuildingInstance(
+            uint.MaxValue,
+            selectedDefinition.Id,
+            hoveredCell,
+            selectedDefinition.FootprintSize,
+            -1,
+            selectedDirection);
+        BuildingPlacementRules.GetReservation(
+            candidate,
+            selectedDefinition,
+            hoveredFootprint,
+            hoveredEdges);
+        canPlaceHoveredBuilding = BuildingPlacementRules.IsBuildable(
+                candidate,
+                selectedDefinition,
+                ground,
+                buildableTile,
+                hoveredFootprint)
+            && occupancy.CanReserve(uint.MaxValue, hoveredFootprint, hoveredEdges);
     }
 
-    private void TryPlaceBuilding(string definitionId, Vector3Int anchorCell, int ownerClientId)
+    private bool TryGetDemolitionBuildingId(out uint buildingId)
+    {
+        GridEdge.GetCellEdges(hoveredCell, demolitionEdges);
+        var closestDistance = float.PositiveInfinity;
+        var closestBuildingId = 0u;
+
+        foreach (var edge in demolitionEdges)
+        {
+            if (!occupancy.TryGetBuildingId(edge, out var edgeBuildingId))
+            {
+                continue;
+            }
+
+            var start = ground.CellToWorld(edge.Corner);
+            var end = ground.CellToWorld(edge.EndCorner);
+            var distance = DistanceToSegment(hoveredWorldPosition, start, end);
+            if (distance >= closestDistance)
+            {
+                continue;
+            }
+
+            closestDistance = distance;
+            closestBuildingId = edgeBuildingId;
+        }
+
+        if (closestBuildingId != 0
+            && closestDistance <= demolitionEdgeSelectionDistance)
+        {
+            buildingId = closestBuildingId;
+            return true;
+        }
+
+        return occupancy.TryGetBuildingId(hoveredCell, out buildingId);
+    }
+
+    private static float DistanceToSegment(Vector2 point, Vector2 start, Vector2 end)
+    {
+        var delta = end - start;
+        var lengthSquared = delta.sqrMagnitude;
+        if (lengthSquared <= Mathf.Epsilon)
+        {
+            return Vector2.Distance(point, start);
+        }
+
+        var interpolation = Mathf.Clamp01(Vector2.Dot(point - start, delta) / lengthSquared);
+        return Vector2.Distance(point, start + delta * interpolation);
+    }
+
+    private void TryPlaceBuilding(
+        string definitionId,
+        Vector3Int anchorCell,
+        GridEdgeDirection direction,
+        int ownerClientId)
     {
         if (!catalog.TryGetDefinition(definitionId, out var definition))
         {
             return;
         }
 
-        BuildingFootprint.GetCells(anchorCell, definition.FootprintSize, hoveredFootprint);
-        if (!IsBuildableFootprint(hoveredFootprint))
+        if (definition.PlacementKind == BuildingPlacementKind.WallSegment
+            && !System.Enum.IsDefined(typeof(GridEdgeDirection), direction))
         {
             return;
+        }
+
+        if (definition.PlacementKind != BuildingPlacementKind.WallSegment)
+        {
+            direction = GridEdgeDirection.South;
         }
 
         var building = new BuildingInstance(
@@ -261,8 +357,20 @@ public sealed class Builder : NetworkBehaviour
             definition.Id,
             anchorCell,
             definition.FootprintSize,
-            ownerClientId);
-        if (!occupancy.TryReserve(building.Id, hoveredFootprint))
+            ownerClientId,
+            direction);
+        BuildingPlacementRules.GetReservation(
+            building,
+            definition,
+            hoveredFootprint,
+            hoveredEdges);
+        if (!BuildingPlacementRules.IsBuildable(
+                building,
+                definition,
+                ground,
+                buildableTile,
+                hoveredFootprint)
+            || !occupancy.TryReserve(building.Id, hoveredFootprint, hoveredEdges))
         {
             return;
         }
@@ -284,16 +392,32 @@ public sealed class Builder : NetworkBehaviour
             return;
         }
 
-        var visualAnchorCell = BuildingFootprint.GetVisualAnchorCell(
-            hoveredCell,
-            selectedDefinition.VisualAnchorCellOffset);
-        var worldPosition = ground.CellToWorld(visualAnchorCell);
-        worldPosition.z = 0f;
-        ghostBuilding.transform.position = worldPosition;
+        if (!ghostConfigured
+            || configuredGhostCell != hoveredCell
+            || configuredGhostDirection != selectedDirection)
+        {
+            var instance = new BuildingInstance(
+                uint.MaxValue,
+                selectedDefinition.Id,
+                hoveredCell,
+                selectedDefinition.FootprintSize,
+                -1,
+                selectedDirection);
+            ghostVisual.Configure(
+                instance,
+                selectedDefinition,
+                ground,
+                BuildingVisualMode.Preview);
+            configuredGhostCell = hoveredCell;
+            configuredGhostDirection = selectedDirection;
+            ghostConfigured = true;
+        }
+
         ghostBuilding.SetActive(true);
-        SetGhostColor(canPlaceHoveredBuilding
+        ghostVisual.SetPresentation(canPlaceHoveredBuilding
             ? new Color(1f, 1f, 1f, ghostAlpha)
-            : invalidGhostColor);
+            : invalidGhostColor,
+            1);
     }
 
     private void RecreateGhostBuilding()
@@ -306,22 +430,9 @@ public sealed class Builder : NetworkBehaviour
 
         ghostBuilding = Instantiate(selectedDefinition.PreviewPrefab, transform);
         ghostBuilding.name = $"{selectedDefinition.Prefab.name} Ghost";
-        ghostRenderers = ghostBuilding.GetComponentsInChildren<SpriteRenderer>();
-
-        foreach (var renderer in ghostRenderers)
-        {
-            renderer.sortingOrder++;
-        }
-
+        ghostVisual = ghostBuilding.GetComponent<BuildingVisualView>();
+        ghostConfigured = false;
         ghostBuilding.SetActive(false);
-    }
-
-    private void SetGhostColor(Color color)
-    {
-        foreach (var renderer in ghostRenderers)
-        {
-            renderer.color = color;
-        }
     }
 
     private void BuildingsOnChange(
@@ -360,11 +471,12 @@ public sealed class Builder : NetworkBehaviour
                 continue;
             }
 
-            var size = BuildingFootprint.GetEffectiveSize(
-                building.Size,
-                definition.FootprintSize);
-            BuildingFootprint.GetCells(building.AnchorCell, size, rebuildFootprint);
-            if (!occupancy.TryReserve(building.Id, rebuildFootprint))
+            BuildingPlacementRules.GetReservation(
+                building,
+                definition,
+                rebuildFootprint,
+                rebuildEdges);
+            if (!occupancy.TryReserve(building.Id, rebuildFootprint, rebuildEdges))
             {
                 Debug.LogError($"Building '{building.Id}' overlaps another building.", this);
             }
@@ -385,11 +497,22 @@ public sealed class Builder : NetworkBehaviour
                 continue;
             }
 
-            BuildingFootprint.GetCells(
+            var building = new BuildingInstance(
+                preplacedBuilding.InstanceId,
+                preplacedBuilding.Definition.Id,
                 preplacedBuilding.AnchorCell,
                 preplacedBuilding.Size,
-                rebuildFootprint);
-            if (!occupancy.TryReserve(preplacedBuilding.InstanceId, rebuildFootprint))
+                -1,
+                preplacedBuilding.Direction);
+            BuildingPlacementRules.GetReservation(
+                building,
+                preplacedBuilding.Definition,
+                rebuildFootprint,
+                rebuildEdges);
+            if (!occupancy.TryReserve(
+                    preplacedBuilding.InstanceId,
+                    rebuildFootprint,
+                    rebuildEdges))
             {
                 Debug.LogError(
                     $"Preplaced building '{preplacedBuilding.name}' overlaps another building.",
@@ -397,18 +520,12 @@ public sealed class Builder : NetworkBehaviour
                 continue;
             }
 
-            var building = new BuildingInstance(
-                preplacedBuilding.InstanceId,
-                preplacedBuilding.Definition.Id,
-                preplacedBuilding.AnchorCell,
-                preplacedBuilding.Size,
-                -1);
             buildings.Add(building.Id, building);
             if (building.Id >= nextBuildingId)
             {
                 nextBuildingId = building.Id + 1;
             }
-            preplacedBuilding.Configure(ground);
+            preplacedBuilding.Configure(building, ground);
         }
     }
 
@@ -448,7 +565,7 @@ public sealed class Builder : NetworkBehaviour
 
         if (preplacedBuildingsById.TryGetValue(building.Id, out var preplacedBuilding))
         {
-            preplacedBuilding.Configure(ground);
+            preplacedBuilding.Configure(building, ground);
             placedBuildings[building.Id] = preplacedBuilding.View;
             return;
         }

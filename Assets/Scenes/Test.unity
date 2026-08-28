@@ -365,7 +365,7 @@ MonoBehaviour:
   ground: {fileID: 1908477125}
   buildableTile: {fileID: 11400000, guid: be72e3871f46ec54690dfeaed9d38f36, type: 2}
   catalog: {fileID: 11400000, guid: 16e5e04177b8c1d4e9df3cee1fbdf2dd, type: 2}
-  defaultBuildingId: '"wall"'
+  defaultBuildingId: wall
   ghostAlpha: 0.55
   invalidGhostColor: {r: 1, g: 0.35, b: 0.35, a: 0.65}
 --- !u!4 &124565186
