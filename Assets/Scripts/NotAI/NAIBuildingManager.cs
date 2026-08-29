@@ -15,17 +15,22 @@ namespace NotAI
         private InputAction _buildAction;
         private readonly SyncVar<bool> _isBuilding =
             new(new SyncTypeSettings(WritePermission.ClientUnsynchronized, ReadPermission.ExcludeOwner));
-        private GameObject _ghost;
+     
         private Grid _grid;
         private Camera _camera;
+        
+        private GameObject _ghost;
+        public void SetGhost(GameObject go) => _ghost = go;
 
         private void Awake()
         {
             enabled = false;
-            _grid = GameObject.Find("Grid").GetComponent<Grid>();
-            _camera = Camera.main!;
-            _ghost = Instantiate(testPrefab);
-            _ghost.SetActive(false);
+        }
+
+        public override void OnStartServer()
+        {
+            var no = Instantiate(testPrefab).GetComponent<NetworkObject>();
+            ServerManager.Spawn(no, Owner);
         }
 
         public override void OnStartClient()
@@ -34,6 +39,8 @@ namespace NotAI
             
             if (!IsOwner) return;
 
+            _camera = Camera.main!;
+            _grid = GameObject.Find("Grid").GetComponent<Grid>();
             _buildAction = InputSystem.actions["Build"];
             _buildAction.Enable();
             _buildAction.performed += OnBuildButton;
@@ -54,7 +61,7 @@ namespace NotAI
         private void OnIsBuildingChanged(bool prev, bool next, bool asServer)
         {
             _ghost.SetActive(next);
-            enabled = next;
+            enabled = IsOwner && next;
         }
 
         private void Update()
