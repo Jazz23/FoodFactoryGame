@@ -11,7 +11,6 @@ namespace NotAI
 
         public override void OnStartClient()
         {
-            if (!IsOwner) return;
             Owner.GetPlayerComponent<NAIBuildingManager>().SetGhost(gameObject);
         }
     }

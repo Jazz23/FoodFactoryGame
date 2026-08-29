@@ -1,4 +1,5 @@
 ﻿using FishNet.Object;
+using GameKit.Dependencies.Utilities;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -24,10 +25,17 @@ namespace DefaultNamespace
 
             enabled = true;
             (_move = InputSystem.actions["Move"]).Enable();
-            Camera.main!.transform.SetParent(transform);
+            var cam = Camera.main!;
+            cam.transform.SetParent(transform);
+            cam.transform.SetPosition(false,
+                new Vector3(transform.position.x, transform.position.y, cam.transform.position.z));
         }
 
-        public override void OnStopClient() => _move?.Disable();
+        public override void OnStopClient()
+        {
+            _move?.Disable();
+            Camera.main!.transform.SetParent(null);
+        }
 
         private void Update()
         {
