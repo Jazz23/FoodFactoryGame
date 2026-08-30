@@ -76,8 +76,8 @@ SpriteRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
-  m_SortingLayerID: -475758273
-  m_SortingLayer: 1
+  m_SortingLayerID: 1815865389
+  m_SortingLayer: 2
   m_SortingOrder: 0
   m_Sprite: {fileID: 21300000, guid: 4d38b2164f0924545b82f1e99e8489ee, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 0.5019608}
@@ -166,7 +166,7 @@ MonoBehaviour:
   _spectatorInterpolation: 2
   _enableTeleport: 0
   _teleportThreshold: 1
-  <PrefabId>k__BackingField: 5
+  <PrefabId>k__BackingField: 6
   <SpawnableCollectionId>k__BackingField: 0
   <AssetPathHash>k__BackingField: 5911418201599018824
   SceneId: 0
@@ -183,6 +183,7 @@ MonoBehaviour:
   <PredictedOwner>k__BackingField: {fileID: 0}
   NetworkBehaviours:
   - {fileID: 7550143573117753753}
+  - {fileID: -6805443373687759192}
   InitializedParentNetworkBehaviour: {fileID: 0}
   InitializedNestedNetworkObjects: []
   RuntimeParentNetworkBehaviour: {fileID: 0}
@@ -193,7 +194,7 @@ MonoBehaviour:
   _initializeOrder: 0
   _preventDespawnOnDisconnect: 0
   _defaultDespawnType: 0
-  _initializedTimestamp: -8584135825134018903
+  _initializedTimestamp: -8584134955198349614
 --- !u!114 &-6805443373687759192
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -206,6 +207,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4190876ea0314770ad977d388e17b2b6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _componentIndexCache: 255
+  _componentIndexCache: 1
   _addedNetworkObject: {fileID: -3089481280312225530}
-  _networkObjectCache: {fileID: 0}
+  _networkObjectCache: {fileID: -3089481280312225530}
+  buildingId: 0

@@ -91,8 +91,7 @@ namespace NotAI
         // Called immediately on the client and later on the server after spawn validation
         public void Build()
         {
-            var occupiedCells = GetGhostOccupiedCells();
-            NAIStateManager.Buildables.AddRange(occupiedCells.ToDictionary(cell => cell, cell => _selectedBuildingIndex.Value));
+            GetGhostOccupiedCells().ForEach(cell => NAIStateManager.Buildables[cell] = _selectedBuildingIndex.Value);
         }
 
         public bool CanBuildHere()
