@@ -25,8 +25,8 @@ public sealed class DirectionalWallSegmentRenderer : MonoBehaviour
     public bool IsDegenerate => isDegenerate;
     public Vector3 WorldStart => transform.TransformPoint(localStart);
     public Vector3 WorldEnd => transform.TransformPoint(localEnd);
-    public Bounds WorldBounds => meshRenderer.bounds;
-    public int SortingOrder => meshRenderer.sortingOrder;
+    public Bounds WorldBounds => GetMeshRenderer().bounds;
+    public int SortingOrder => GetMeshRenderer().sortingOrder;
 
     private void Awake()
     {
@@ -108,11 +108,12 @@ public sealed class DirectionalWallSegmentRenderer : MonoBehaviour
 
     public void SetPresentation(Color colorMultiplier, int sortingOrderOffset)
     {
-        meshRenderer.sortingOrder = baseSortingOrder + sortingOrderOffset;
+        var renderer = GetMeshRenderer();
+        renderer.sortingOrder = baseSortingOrder + sortingOrderOffset;
         var propertyBlock = new MaterialPropertyBlock();
-        meshRenderer.GetPropertyBlock(propertyBlock);
+        renderer.GetPropertyBlock(propertyBlock);
         propertyBlock.SetColor(ColorPropertyId, colorMultiplier);
-        meshRenderer.SetPropertyBlock(propertyBlock);
+        renderer.SetPropertyBlock(propertyBlock);
     }
 
     private Vector3[] GetVertices(Vector3 start, Vector3 end)
@@ -165,6 +166,16 @@ public sealed class DirectionalWallSegmentRenderer : MonoBehaviour
     {
         meshRenderer = GetComponent<MeshRenderer>();
         mesh = GetComponent<MeshFilter>().sharedMesh;
+    }
+
+    private MeshRenderer GetMeshRenderer()
+    {
+        if (meshRenderer is null || !meshRenderer)
+        {
+            meshRenderer = GetComponent<MeshRenderer>();
+        }
+
+        return meshRenderer;
     }
 
     private void ReleaseMesh()
