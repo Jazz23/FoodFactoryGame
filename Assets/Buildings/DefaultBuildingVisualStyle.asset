@@ -26,7 +26,6 @@ MonoBehaviour:
   roofHeight: 1.75
   roofLipHeight: 0.18
   outlineWidth: 0.045
-  wallColliderRadius: 0.06
   floorSortingOrder: 0
   wallSortingOrder: 10
   roofSortingOrder: 30
