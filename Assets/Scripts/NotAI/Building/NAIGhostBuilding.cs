@@ -1,6 +1,7 @@
 ﻿using DefaultNamespace;
 using FishNet.Connection;
 using FishNet.Object;
+using FishNet.Serializing;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -14,14 +15,13 @@ namespace NotAI
         private Camera _camera;
         private NAIBuildingManager _buildingManager;
         private SpriteRenderer _spriteRenderer;
-        
+
         public override void OnStartNetwork() => gameObject.SetActive(false);
 
         public override void OnStartClient()
         {
             _buildingManager = Owner.GetPlayerComponent<NAIBuildingManager>();
-            _buildingManager.SetGhost(gameObject);
-            
+            _buildingManager.SetGhost(this);
             _spriteRenderer = GetComponent<SpriteRenderer>();
 
             if (!IsOwner) return;

@@ -2,6 +2,7 @@
 using System.Linq;
 using FishNet.Object;
 using FishNet.Object.Synchronizing;
+using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -9,23 +10,27 @@ namespace NotAI
 {
     public class NAIBuildingManager : NetworkBehaviour
     {
-        private static Dictionary<Vector2, GameObject> _buildings = new();
-        
         public GameObject ghostPrefab;
+        public List<GameObject> buildingPrefabs;
 
         private InputAction _buildAction;
         private InputAction _confirmBuildAction;
+        
         private readonly SyncVar<bool> _isBuilding =
             new(new SyncTypeSettings(WritePermission.ClientUnsynchronized, ReadPermission.ExcludeOwner));
         
-        private GameObject _ghost;
+        // The index of buildingPrefabs
+        private readonly SyncVar<int> _selectedBuildingIndex =
+            new(new SyncTypeSettings(WritePermission.ClientUnsynchronized, ReadPermission.ExcludeOwner));
+        
+        private NAIGhostBuilding _ghost;
         private SpriteRenderer _ghostRenderer;
         private Grid _grid;
 
-        public void SetGhost(GameObject go)
+        public void SetGhost(NAIGhostBuilding ghost)
         {
-            _ghost = go;
-            _ghostRenderer = go.GetComponent<SpriteRenderer>();
+            _ghost = ghost;
+            _ghostRenderer = ghost.GetComponent<SpriteRenderer>();
         }
 
         private void Awake() => _grid = GameObject.Find("Grid").GetComponent<Grid>();
@@ -65,24 +70,35 @@ namespace NotAI
         [ServerRpc(RunLocally = true)]
         private void ToggleBuildGhost() => _isBuilding.Value = !_isBuilding.Value;
 
-        private void OnIsBuildingChanged(bool prev, bool next, bool asServer) => _ghost.SetActive(next);
+        private void OnIsBuildingChanged(bool prev, bool next, bool asServer) => _ghost.gameObject.SetActive(next);
         
         [Client]
         private void OnConfirmBuildButton(InputAction.CallbackContext ctx)
         {
             if (!_isBuilding.Value || !CanBuildHere()) return;
-            GetGhostOccupiedCells().ForEach(cell => _buildings[cell] = _ghost);
+            SpawnBuilding();
         }
 
-        public void BuildGhost()
+        [Client]
+        private void SpawnBuilding()
         {
-            
+            var building = Instantiate(buildingPrefabs[_selectedBuildingIndex.Value], _ghost.transform.position, Quaternion.identity);
+            building.GetComponent<NAIBuildingPredictiveSpawn>().SetBuildingManager(this);
+            ServerManager.Spawn(building);
+            Build(); // Instantly build on the client
+        }
+        
+        // Called immediately on the client and later on the server after spawn validation
+        public void Build()
+        {
+            var occupiedCells = GetGhostOccupiedCells();
+            NAIStateManager.Buildables.AddRange(occupiedCells.ToDictionary(cell => cell, cell => _selectedBuildingIndex.Value));
         }
 
         public bool CanBuildHere()
         {
             var occupiedCells = GetGhostOccupiedCells();
-            return occupiedCells.All(cell => !_buildings.ContainsKey(cell));
+            return occupiedCells.All(cell => !NAIStateManager.Buildables.ContainsKey(cell));
         }
 
         // Get the world pos cells that the ghost building occupies based on its position and size.

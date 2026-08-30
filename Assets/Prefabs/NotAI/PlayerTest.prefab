@@ -296,3 +296,5 @@ MonoBehaviour:
   _addedNetworkObject: {fileID: 1703508883963247041}
   _networkObjectCache: {fileID: 0}
   ghostPrefab: {fileID: 987359489525298888, guid: b6858bc0ef9920f44bf5f53c624e31bd, type: 3}
+  buildingPrefabs:
+  - {fileID: 4926852788526257740, guid: 4d7d2bd0c11da2244a910b1df274a3fd, type: 3}
