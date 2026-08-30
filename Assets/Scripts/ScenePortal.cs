@@ -17,6 +17,7 @@ public sealed class ScenePortal : MonoBehaviour
     [SerializeField, Min(0.1f)] private float interactionRadius = 0.9f;
 
     private uint buildingInstanceId;
+    private Vector2Int buildingSize;
     private bool usesWorldInteractionPosition;
     private Vector2 worldInteractionPosition;
     private Vector2 exteriorArrivalLogicalPosition;
@@ -26,15 +27,18 @@ public sealed class ScenePortal : MonoBehaviour
     public Vector2 ArrivalLogicalPosition => arrivalLogicalPosition;
     public Vector2 ExteriorArrivalLogicalPosition => exteriorArrivalLogicalPosition;
     public uint BuildingInstanceId => buildingInstanceId;
+    public Vector2Int BuildingSize => buildingSize;
 
     public void ConfigureBuilding(
         uint instanceId,
+        Vector2Int size,
         Vector2 interactionWorldPosition,
         string interiorScene,
         Vector2 interiorArrivalLogicalPosition,
         Vector2 exteriorArrivalPosition)
     {
         buildingInstanceId = instanceId;
+        buildingSize = size;
         usesWorldInteractionPosition = true;
         worldInteractionPosition = interactionWorldPosition;
         destinationSceneName = interiorScene;

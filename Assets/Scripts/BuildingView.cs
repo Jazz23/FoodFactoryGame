@@ -33,6 +33,7 @@ public sealed class BuildingView : MonoBehaviour
 
         portal = GetComponent<ScenePortal>();
 
+        var size = BuildingFootprint.GetEffectiveSize(instance.Size, definition.FootprintSize);
         var entranceCell = instance.AnchorCell + new Vector3Int(
             definition.EntranceCellOffset.x,
             definition.EntranceCellOffset.y);
@@ -46,6 +47,7 @@ public sealed class BuildingView : MonoBehaviour
         portal.enabled = true;
         portal.ConfigureBuilding(
             instance.Id,
+            size,
             entranceWorldPosition,
             definition.InteriorSceneName,
             definition.InteriorArrivalLogicalPosition,

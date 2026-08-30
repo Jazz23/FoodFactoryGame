@@ -17,6 +17,7 @@ public sealed class GameSceneManager : MonoBehaviour
         public NetworkConnection Connection = null!;
         public NetworkObject Player = null!;
         public Vector2 ArrivalLogicalPosition;
+        public Vector2Int BuildingSize;
         public Scene TargetScene;
     }
 
@@ -70,8 +71,10 @@ public sealed class GameSceneManager : MonoBehaviour
 
         var targetSceneName = GetSceneName(portal);
         var arrivalLogicalPosition = portal.ArrivalLogicalPosition;
+        var buildingSize = Vector2Int.zero;
         if (portal.BuildingInstanceId != 0)
         {
+            buildingSize = portal.BuildingSize;
             buildingReturns[connection.ClientId] = new BuildingReturn
             {
                 SceneName = player.gameObject.scene.name,
@@ -91,7 +94,8 @@ public sealed class GameSceneManager : MonoBehaviour
         {
             Connection = connection,
             Player = player,
-            ArrivalLogicalPosition = arrivalLogicalPosition
+            ArrivalLogicalPosition = arrivalLogicalPosition,
+            BuildingSize = buildingSize
         };
         var sceneLoadData = new SceneLoadData(new[] { lookup }, new[] { player })
         {
@@ -158,6 +162,7 @@ public sealed class GameSceneManager : MonoBehaviour
         }
 
         pendingTransition.TargetScene = args.QueueData.SceneLoadData.GetFirstLookupScene();
+        IndoorGrid.TryConfigureForScene(pendingTransition.TargetScene, pendingTransition.BuildingSize);
         if (!TryGetGrid(pendingTransition.TargetScene, out var grid))
         {
             return;
@@ -194,7 +199,8 @@ public sealed class GameSceneManager : MonoBehaviour
         var targetPosition = grid.LogicalToWorld(pendingTransition.ArrivalLogicalPosition);
         pendingTransition.Player.GetComponent<PlayerSceneTransition>().CompleteTransition(
             pendingTransition.Connection,
-            targetPosition);
+            targetPosition,
+            pendingTransition.BuildingSize);
         pendingTransitions.Remove(args.Connection.ClientId);
     }
 
