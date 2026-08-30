@@ -1,35 +1,38 @@
-﻿using System;
-using DefaultNamespace;
+﻿using System.Collections.Generic;
+using System.Linq;
 using FishNet.Object;
 using FishNet.Object.Synchronizing;
 using UnityEngine;
 using UnityEngine.InputSystem;
-using UnityEngine.Tilemaps;
 
 namespace NotAI
 {
     public class NAIBuildingManager : NetworkBehaviour
     {
-        public GameObject testPrefab;
+        private static Dictionary<Vector2, GameObject> _buildings = new();
+        
+        public GameObject ghostPrefab;
 
         private InputAction _buildAction;
+        private InputAction _confirmBuildAction;
         private readonly SyncVar<bool> _isBuilding =
             new(new SyncTypeSettings(WritePermission.ClientUnsynchronized, ReadPermission.ExcludeOwner));
-     
-        private Grid _grid;
-        private Camera _camera;
         
         private GameObject _ghost;
-        public void SetGhost(GameObject go) => _ghost = go;
+        private SpriteRenderer _ghostRenderer;
+        private Grid _grid;
 
-        private void Awake()
+        public void SetGhost(GameObject go)
         {
-            enabled = false;
+            _ghost = go;
+            _ghostRenderer = go.GetComponent<SpriteRenderer>();
         }
 
+        private void Awake() => _grid = GameObject.Find("Grid").GetComponent<Grid>();
+        
         public override void OnStartServer()
         {
-            var no = Instantiate(testPrefab).GetComponent<NetworkObject>();
+            var no = Instantiate(ghostPrefab).GetComponent<NetworkObject>();
             ServerManager.Spawn(no, Owner);
         }
 
@@ -39,11 +42,13 @@ namespace NotAI
             
             if (!IsOwner) return;
 
-            _camera = Camera.main!;
-            _grid = GameObject.Find("Grid").GetComponent<Grid>();
             _buildAction = InputSystem.actions["Build"];
             _buildAction.Enable();
             _buildAction.performed += OnBuildButton;
+            
+            _confirmBuildAction = InputSystem.actions["ConfirmBuild"];
+            _confirmBuildAction.Enable();
+            _confirmBuildAction.performed += OnConfirmBuildButton;
         }
 
         public override void OnStopClient()
@@ -51,6 +56,8 @@ namespace NotAI
             if (!IsOwner) return;
             _buildAction.Disable();
             _buildAction.performed -= OnBuildButton;
+            _confirmBuildAction.Disable();
+            _confirmBuildAction.performed -= OnConfirmBuildButton;
         }
 
         private void OnBuildButton(InputAction.CallbackContext ctx) => ToggleBuildGhost();
@@ -58,20 +65,46 @@ namespace NotAI
         [ServerRpc(RunLocally = true)]
         private void ToggleBuildGhost() => _isBuilding.Value = !_isBuilding.Value;
 
-        private void OnIsBuildingChanged(bool prev, bool next, bool asServer)
+        private void OnIsBuildingChanged(bool prev, bool next, bool asServer) => _ghost.SetActive(next);
+        
+        [Client]
+        private void OnConfirmBuildButton(InputAction.CallbackContext ctx)
         {
-            _ghost.SetActive(next);
-            enabled = IsOwner && next;
+            if (!_isBuilding.Value || !CanBuildHere()) return;
+            GetGhostOccupiedCells().ForEach(cell => _buildings[cell] = _ghost);
         }
 
-        private void Update()
+        public void BuildGhost()
         {
-            // Raycast from the mouse onto the grid so we can move the ghost building to follow the mouse.
-            // Use Input System v2 to get the mouse position.
-            var mousePos = Mouse.current.position.ReadValue();
-            var worldPos = _camera.ScreenToWorldPoint(mousePos);
-            var cellPos = _grid.WorldToCell(worldPos);
-            _ghost.transform.position = _grid.GetCellCenterWorld(cellPos);
+            
+        }
+
+        public bool CanBuildHere()
+        {
+            var occupiedCells = GetGhostOccupiedCells();
+            return occupiedCells.All(cell => !_buildings.ContainsKey(cell));
+        }
+
+        // Get the world pos cells that the ghost building occupies based on its position and size.
+        private List<Vector2> GetGhostOccupiedCells()
+        {
+            var cellSize = _grid.cellSize;
+            var ghostPos = _ghost.transform.position;
+            var ghostSize = _ghostRenderer.bounds.size;
+            
+            var cellsX = Mathf.CeilToInt(ghostSize.x / cellSize.x);
+            var cellsY = Mathf.CeilToInt(ghostSize.y / cellSize.y);
+
+            var occupiedCells = new List<Vector2>();
+            for (var x = 0; x < cellsX; x++)
+            {
+                for (var y = 0; y < cellsY; y++)
+                {
+                    occupiedCells.Add(new Vector2(ghostPos.x + x * cellSize.x, ghostPos.y + y * cellSize.y));
+                }
+            }
+            
+            return occupiedCells;
         }
     }
 }

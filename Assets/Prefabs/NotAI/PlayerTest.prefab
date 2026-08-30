@@ -295,4 +295,4 @@ MonoBehaviour:
   _componentIndexCache: 255
   _addedNetworkObject: {fileID: 1703508883963247041}
   _networkObjectCache: {fileID: 0}
-  testPrefab: {fileID: 987359489525298888, guid: b6858bc0ef9920f44bf5f53c624e31bd, type: 3}
+  ghostPrefab: {fileID: 987359489525298888, guid: b6858bc0ef9920f44bf5f53c624e31bd, type: 3}

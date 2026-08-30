@@ -34,7 +34,8 @@ namespace DefaultNamespace
         public override void OnStopClient()
         {
             _move?.Disable();
-            Camera.main!.transform.SetParent(null);
+            // Unity destroys camera before player, so we need to check if it exists before trying to unparent it
+            Camera.main?.transform.SetParent(null);
         }
 
         private void Update()
