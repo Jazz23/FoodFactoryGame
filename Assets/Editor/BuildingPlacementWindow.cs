@@ -30,6 +30,8 @@ public sealed class BuildingPlacementWindow : EditorWindow
     private Vector2Int previewSize;
     private int selectedDefinitionIndex;
     private GridEdgeDirection selectedDirection;
+    private WallCellShape selectedWallShape;
+    private WallCellShape previewWallShape;
     private bool hasFirstCorner;
     private bool hasHoveredCell;
     private bool previewConfigured;
@@ -97,6 +99,8 @@ public sealed class BuildingPlacementWindow : EditorWindow
             {
                 selectedDefinitionIndex = newDefinitionIndex;
                 selectedDefinition = catalog.GetDefinition(selectedDefinitionIndex);
+                selectedWallShape = WallCellShape.Horizontal;
+                selectedDirection = GridEdgeDirection.South;
                 previewConfigured = false;
                 ClearPreview();
                 SceneView.RepaintAll();
@@ -114,7 +118,7 @@ public sealed class BuildingPlacementWindow : EditorWindow
         else
         {
             var instruction = selectedDefinition.PlacementKind == BuildingPlacementKind.WallSegment
-                ? "Press R to rotate, then click to place one wall edge."
+                ? "Choose a centered wall shape, then click to place one wall cell."
                 : hasFirstCorner
                     ? "Click the opposing corner to place the building."
                     : "Click the first corner, then the opposing corner.";
@@ -125,7 +129,11 @@ public sealed class BuildingPlacementWindow : EditorWindow
 
             if (selectedDefinition.PlacementKind == BuildingPlacementKind.WallSegment)
             {
-                EditorGUILayout.LabelField("Direction", selectedDirection.ToString());
+                EditorGUILayout.LabelField("Shape", selectedWallShape.ToString());
+                if (GUILayout.Button("Next Wall Shape"))
+                {
+                    SelectNextWallShape();
+                }
             }
 
             if (hasFirstCorner)
@@ -194,18 +202,6 @@ public sealed class BuildingPlacementWindow : EditorWindow
             return;
         }
 
-        if (currentEvent.type == EventType.KeyDown
-            && currentEvent.keyCode == KeyCode.R
-            && selectedDefinition.PlacementKind == BuildingPlacementKind.WallSegment)
-        {
-            selectedDirection = GridEdge.RotateClockwise(selectedDirection);
-            previewConfigured = false;
-            currentEvent.Use();
-            sceneView.Repaint();
-            Repaint();
-            return;
-        }
-
         if (TryGetCell(currentEvent.mousePosition, out var cell))
         {
             if (!hasHoveredCell || hoveredCell != cell)
@@ -246,13 +242,18 @@ public sealed class BuildingPlacementWindow : EditorWindow
         statusMessage = string.Empty;
         if (selectedDefinition.PlacementKind == BuildingPlacementKind.WallSegment)
         {
-            if (!TryValidatePlacement(cell, Vector2Int.one, selectedDirection, out var wallReason))
+            if (!TryValidatePlacement(
+                    cell,
+                    Vector2Int.one,
+                    selectedDirection,
+                    selectedWallShape,
+                    out var wallReason))
             {
                 statusMessage = wallReason;
                 return;
             }
 
-            CreatePlacement(cell, Vector2Int.one, selectedDirection);
+            CreatePlacement(cell, Vector2Int.one, selectedDirection, selectedWallShape);
             return;
         }
 
@@ -266,13 +267,22 @@ public sealed class BuildingPlacementWindow : EditorWindow
 
         var anchorCell = BuildingFootprint.GetLowerLeftAnchorCell(firstCorner, cell);
         var size = BuildingFootprint.GetInclusiveSize(firstCorner, cell);
-        if (!TryValidatePlacement(anchorCell, size, GridEdgeDirection.South, out var reason))
+        if (!TryValidatePlacement(
+                anchorCell,
+                size,
+                GridEdgeDirection.South,
+                WallCellShape.Horizontal,
+                out var reason))
         {
             statusMessage = reason;
             return;
         }
 
-        CreatePlacement(anchorCell, size, GridEdgeDirection.South);
+        CreatePlacement(
+            anchorCell,
+            size,
+            GridEdgeDirection.South,
+            WallCellShape.Horizontal);
         ResetPlacement();
     }
 
@@ -286,22 +296,32 @@ public sealed class BuildingPlacementWindow : EditorWindow
             ? BuildingFootprint.GetInclusiveSize(firstCorner, hoveredCell)
             : Vector2Int.one;
         var direction = isWallSegment ? selectedDirection : GridEdgeDirection.South;
-        var valid = TryValidatePlacement(anchorCell, size, direction, out var reason);
+        var wallShape = isWallSegment ? selectedWallShape : WallCellShape.Horizontal;
+        var valid = TryValidatePlacement(
+            anchorCell,
+            size,
+            direction,
+            wallShape,
+            out var reason);
         statusMessage = valid ? string.Empty : reason;
 
         var color = valid ? ValidPreviewColor : InvalidPreviewColor;
         var boundaryPoints = GetBoundaryWorldPoints(anchorCell, size);
         if (isWallSegment)
         {
-            var edge = GridEdge.FromCellSide(anchorCell, direction);
+            var cellBoundary = GetBoundaryWorldPoints(anchorCell, Vector2Int.one);
+            var footprint = CloseLoop(WallCellGeometry.GetWorldFootprint(
+                wallShape,
+                anchorCell,
+                ground,
+                ground.transform.position.z - 0.02f));
+            Handles.color = new Color(color.r, color.g, color.b, 0.35f);
+            Handles.DrawAAPolyLine(2f, cellBoundary);
             Handles.color = color;
-            Handles.DrawAAPolyLine(
-                6f,
-                ground.CellToWorld(edge.Corner),
-                ground.CellToWorld(edge.EndCorner));
+            Handles.DrawAAPolyLine(5f, footprint);
             Handles.Label(
-                (ground.CellToWorld(edge.Corner) + ground.CellToWorld(edge.EndCorner)) * 0.5f,
-                $"{direction} {edge}");
+                ground.GetCellCenterWorld(anchorCell),
+                $"{wallShape} ({WallCellGeometry.ThicknessInCells:0.##} cell thick)");
         }
         else
         {
@@ -333,13 +353,14 @@ public sealed class BuildingPlacementWindow : EditorWindow
             Handles.Label(labelPosition, $"{size.x} x {size.y}");
         }
 
-        UpdatePreview(anchorCell, size, direction, valid);
+        UpdatePreview(anchorCell, size, direction, wallShape, valid);
     }
 
     private void UpdatePreview(
         Vector3Int anchorCell,
         Vector2Int size,
         GridEdgeDirection direction,
+        WallCellShape wallShape,
         bool valid)
     {
         EnsurePreview();
@@ -351,7 +372,7 @@ public sealed class BuildingPlacementWindow : EditorWindow
         if (!previewConfigured
             || previewAnchor != anchorCell
             || previewSize != size
-            || selectedDirection != direction)
+            || previewWallShape != wallShape)
         {
             var instance = new BuildingInstance(
                 uint.MaxValue,
@@ -359,7 +380,8 @@ public sealed class BuildingPlacementWindow : EditorWindow
                 anchorCell,
                 size,
                 -1,
-                direction);
+                direction,
+                wallShape);
             previewView.Configure(
                 instance,
                 selectedDefinition,
@@ -367,6 +389,7 @@ public sealed class BuildingPlacementWindow : EditorWindow
                 BuildingVisualMode.Preview);
             previewAnchor = anchorCell;
             previewSize = size;
+            previewWallShape = wallShape;
             previewConfigured = true;
         }
 
@@ -415,7 +438,8 @@ public sealed class BuildingPlacementWindow : EditorWindow
     private void CreatePlacement(
         Vector3Int anchorCell,
         Vector2Int size,
-        GridEdgeDirection direction)
+        GridEdgeDirection direction,
+        WallCellShape wallShape)
     {
         var instanceId = GetNextInstanceId();
         if (instanceId == 0)
@@ -449,7 +473,8 @@ public sealed class BuildingPlacementWindow : EditorWindow
             anchorCell,
             size,
             instanceId,
-            direction);
+            direction,
+            wallShape);
 
         var buildingView = placedObject.GetComponent<BuildingView>();
         Undo.RecordObject(placedObject.transform, "Position building");
@@ -460,7 +485,8 @@ public sealed class BuildingPlacementWindow : EditorWindow
                 anchorCell,
                 size,
                 -1,
-                direction),
+                direction,
+                wallShape),
             selectedDefinition,
             ground);
 
@@ -472,7 +498,7 @@ public sealed class BuildingPlacementWindow : EditorWindow
         Undo.CollapseUndoOperations(undoGroup);
         Selection.activeGameObject = placedObject;
         statusMessage = selectedDefinition.PlacementKind == BuildingPlacementKind.WallSegment
-            ? $"Placed {selectedDefinition.name} {direction} at {anchorCell.x},{anchorCell.y}."
+            ? $"Placed {selectedDefinition.name} {wallShape} at {anchorCell.x},{anchorCell.y}."
             : $"Placed {selectedDefinition.name} at {anchorCell.x},{anchorCell.y} ({size.x} x {size.y}).";
     }
 
@@ -480,6 +506,7 @@ public sealed class BuildingPlacementWindow : EditorWindow
         Vector3Int anchorCell,
         Vector2Int size,
         GridEdgeDirection direction,
+        WallCellShape wallShape,
         out string reason)
     {
         reason = string.Empty;
@@ -504,7 +531,8 @@ public sealed class BuildingPlacementWindow : EditorWindow
             anchorCell,
             size,
             -1,
-            direction);
+            direction,
+            wallShape);
         BuildingPlacementRules.GetReservation(
             candidate,
             selectedDefinition,
@@ -520,7 +548,7 @@ public sealed class BuildingPlacementWindow : EditorWindow
                     buildableTile,
                     footprintCells))
             {
-                reason = "The selected placement is not next to buildable ground.";
+                reason = "The selected placement is not on buildable ground.";
                 return false;
             }
         }
@@ -547,7 +575,8 @@ public sealed class BuildingPlacementWindow : EditorWindow
                 preplacedBuilding.AnchorCell,
                 preplacedBuilding.Size,
                 -1,
-                preplacedBuilding.Direction);
+                preplacedBuilding.Direction,
+                preplacedBuilding.WallShape);
             BuildingPlacementRules.GetReservation(
                 existing,
                 preplacedBuilding.Definition,
@@ -570,7 +599,7 @@ public sealed class BuildingPlacementWindow : EditorWindow
             reservationEdges);
         if (!occupancy.CanReserve(uint.MaxValue, footprintCells, reservationEdges))
         {
-            reason = "The selected cells or wall edge overlap an existing building.";
+            reason = "The selected cells overlap an existing building.";
             return false;
         }
 
@@ -583,9 +612,7 @@ public sealed class BuildingPlacementWindow : EditorWindow
     {
         if (definition.PlacementKind == BuildingPlacementKind.WallSegment)
         {
-            var edge = BuildingPlacementRules.GetWallEdge(instance);
-            return ground.GetTile(edge.FirstAdjacentCell) is not null
-                || ground.GetTile(edge.SecondAdjacentCell) is not null;
+            return ground.GetTile(instance.AnchorCell) is not null;
         }
 
         BuildingFootprint.GetCells(instance.AnchorCell, instance.Size, footprintCells);
@@ -632,6 +659,18 @@ public sealed class BuildingPlacementWindow : EditorWindow
         return points;
     }
 
+    private static Vector3[] CloseLoop(IReadOnlyList<Vector3> points)
+    {
+        var closedPoints = new Vector3[points.Count + 1];
+        for (var index = 0; index < points.Count; index++)
+        {
+            closedPoints[index] = points[index];
+        }
+
+        closedPoints[^1] = points[0];
+        return closedPoints;
+    }
+
     private bool TryGetCell(Vector2 guiPosition, out Vector3Int cell)
     {
         var ray = HandleUtility.GUIPointToWorldRay(guiPosition);
@@ -661,6 +700,14 @@ public sealed class BuildingPlacementWindow : EditorWindow
         hasFirstCorner = false;
         statusMessage = string.Empty;
         previewConfigured = false;
+    }
+
+    private void SelectNextWallShape()
+    {
+        selectedWallShape = WallCellGeometry.GetNextPlacementShape(selectedWallShape);
+        selectedDirection = WallCellGeometry.GetPrimaryDirection(selectedWallShape);
+        previewConfigured = false;
+        SceneView.RepaintAll();
     }
 
 }

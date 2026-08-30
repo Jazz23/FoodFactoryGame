@@ -1,5 +1,4 @@
 // Calculates authoritative cell and edge reservations for every building placement kind.
-using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
@@ -17,23 +16,13 @@ public static class BuildingPlacementRules
 
         if (definition.PlacementKind == BuildingPlacementKind.WallSegment)
         {
-            edges.Add(GetWallEdge(instance));
+            cells.Add(instance.AnchorCell);
             return;
         }
 
         var size = BuildingFootprint.GetEffectiveSize(instance.Size, definition.FootprintSize);
         BuildingFootprint.GetCells(instance.AnchorCell, size, cells);
         GetPerimeterEdges(instance.AnchorCell, size, edges);
-    }
-
-    public static GridEdge GetWallEdge(BuildingInstance instance)
-    {
-        if (!Enum.IsDefined(typeof(GridEdgeDirection), instance.Direction))
-        {
-            throw new ArgumentOutOfRangeException(nameof(instance.Direction));
-        }
-
-        return GridEdge.FromCellSide(instance.AnchorCell, instance.Direction);
     }
 
     public static void GetPerimeterEdges(
@@ -77,9 +66,7 @@ public static class BuildingPlacementRules
     {
         if (definition.PlacementKind == BuildingPlacementKind.WallSegment)
         {
-            var edge = GetWallEdge(instance);
-            return ground.GetTile(edge.FirstAdjacentCell) == buildableTile
-                || ground.GetTile(edge.SecondAdjacentCell) == buildableTile;
+            return ground.GetTile(instance.AnchorCell) == buildableTile;
         }
 
         var size = BuildingFootprint.GetEffectiveSize(instance.Size, definition.FootprintSize);

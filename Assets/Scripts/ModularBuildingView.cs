@@ -69,16 +69,16 @@ public sealed class ModularBuildingView : MonoBehaviour
         {
             var southCell = anchorCell + new Vector3Int(x, 0);
             var northCell = anchorCell + new Vector3Int(x, size.y - 1);
-            CreateWallSegment(southCell, GridEdgeDirection.South, ground);
-            CreateWallSegment(northCell, GridEdgeDirection.North, ground);
+            CreateWallSegment(southCell, GridEdgeDirection.South, ground, mode);
+            CreateWallSegment(northCell, GridEdgeDirection.North, ground, mode);
         }
 
         for (var y = 0; y < size.y; y++)
         {
             var westCell = anchorCell + new Vector3Int(0, y);
             var eastCell = anchorCell + new Vector3Int(size.x - 1, y);
-            CreateWallSegment(westCell, GridEdgeDirection.West, ground);
-            CreateWallSegment(eastCell, GridEdgeDirection.East, ground);
+            CreateWallSegment(westCell, GridEdgeDirection.West, ground, mode);
+            CreateWallSegment(eastCell, GridEdgeDirection.East, ground, mode);
         }
 
         if (includeEntrance)
@@ -99,11 +99,6 @@ public sealed class ModularBuildingView : MonoBehaviour
                 entrancePosition,
                 style.EntranceColor,
                 style.EntranceSortingOrder + 1);
-        }
-
-        if (mode == BuildingVisualMode.Runtime)
-        {
-            CreateBoundaryCollider(anchorCell, size, ground);
         }
 
         CreatePerimeterOutline(anchorCell, size, ground);
@@ -229,18 +224,6 @@ public sealed class ModularBuildingView : MonoBehaviour
         collider.enabled = true;
     }
 
-    private void CreateBoundaryCollider(
-        Vector3Int anchorCell,
-        Vector2Int size,
-        Tilemap ground)
-    {
-        var collisionObject = new GameObject("Boundary Collision");
-        collisionObject.transform.SetParent(generatedRoot, false);
-        var collider = collisionObject.AddComponent<EdgeCollider2D>();
-        collider.edgeRadius = style.WallColliderRadius;
-        collider.points = GetBoundaryPoints(anchorCell, size, ground);
-    }
-
     private void CreatePerimeterOutline(
         Vector3Int anchorCell,
         Vector2Int size,
@@ -278,20 +261,27 @@ public sealed class ModularBuildingView : MonoBehaviour
     private void CreateWallSegment(
         Vector3Int cell,
         GridEdgeDirection direction,
-        Tilemap ground)
+        Tilemap ground,
+        BuildingVisualMode mode)
     {
         var edge = GridEdge.FromCellSide(cell, direction);
         var moduleObject = new GameObject(
             $"Wall {direction} {edge.Corner.x},{edge.Corner.y}");
         moduleObject.transform.SetParent(generatedRoot, false);
         var renderer = moduleObject.AddComponent<DirectionalWallSegmentRenderer>();
+        var origin = GetCellCornerWorld(ground, edge.Corner);
+        var thicknessWorld = edge.Axis == GridEdgeAxis.Horizontal
+            ? GetCellCornerWorld(ground, edge.Corner + Vector3Int.up) - origin
+            : GetCellCornerWorld(ground, edge.Corner + Vector3Int.right) - origin;
+        thicknessWorld *= WallCellGeometry.ThicknessInCells;
         renderer.Configure(
             direction,
             edge,
-            GetCellCornerWorld(ground, edge.Corner),
+            origin,
             GetCellCornerWorld(ground, edge.EndCorner),
+            thicknessWorld,
             style,
-            false);
+            mode == BuildingVisualMode.Runtime);
     }
 
     private void CreateRoofModule(

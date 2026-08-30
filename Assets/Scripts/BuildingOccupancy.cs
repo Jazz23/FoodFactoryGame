@@ -1,4 +1,4 @@
-// Maintains authoritative atomic reservations for building cells and canonical wall edges.
+// Maintains independent atomic reservations for building cells and perimeter edges.
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -60,24 +60,6 @@ public sealed class BuildingOccupancy
         foreach (var edge in edges)
         {
             if (!uniqueEdges.Add(edge) || buildingIdsByEdge.ContainsKey(edge))
-            {
-                return false;
-            }
-
-            var firstCellIsOccupied = uniqueCells.Contains(edge.FirstAdjacentCell)
-                || buildingIdsByCell.ContainsKey(edge.FirstAdjacentCell);
-            var secondCellIsOccupied = uniqueCells.Contains(edge.SecondAdjacentCell)
-                || buildingIdsByCell.ContainsKey(edge.SecondAdjacentCell);
-            if (firstCellIsOccupied && secondCellIsOccupied)
-            {
-                return false;
-            }
-        }
-
-        foreach (var edge in buildingIdsByEdge.Keys)
-        {
-            if (uniqueCells.Contains(edge.FirstAdjacentCell)
-                && uniqueCells.Contains(edge.SecondAdjacentCell))
             {
                 return false;
             }

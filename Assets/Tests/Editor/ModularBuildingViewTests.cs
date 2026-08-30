@@ -29,16 +29,16 @@ public sealed class ModularBuildingViewTests
                 new Vector2Int(3, 2),
                 ground,
                 Vector2Int.zero,
-                false);
+                true);
 
             var generatedRoot = buildingObject.transform.Find("Modular Generated");
             var meshFilters = generatedRoot.GetComponentsInChildren<MeshFilter>(true);
             var lineRenderers = generatedRoot.GetComponentsInChildren<LineRenderer>(true);
             var wallSegments = generatedRoot.GetComponentsInChildren<DirectionalWallSegmentRenderer>(true);
-            var boundaryCollider = generatedRoot.Find("Boundary Collision").GetComponent<EdgeCollider2D>();
+            var wallColliders = generatedRoot.GetComponentsInChildren<PolygonCollider2D>(true);
             var interiorCollider = buildingObject.GetComponent<PolygonCollider2D>();
 
-            Assert.That(generatedRoot.childCount, Is.EqualTo(24));
+            Assert.That(generatedRoot.childCount, Is.EqualTo(25));
             Assert.That(meshFilters, Has.Length.EqualTo(16));
             Assert.That(lineRenderers, Has.Length.EqualTo(1));
             Assert.That(wallSegments, Has.Length.EqualTo(10));
@@ -62,9 +62,27 @@ public sealed class ModularBuildingViewTests
                     wallSegments,
                     segment => segment.Direction == GridEdgeDirection.East),
                 Has.Length.EqualTo(2));
-            Assert.That(boundaryCollider.points, Has.Length.EqualTo(5));
+            Assert.That(wallColliders, Has.Length.EqualTo(10));
+            Assert.That(generatedRoot.GetComponentsInChildren<EdgeCollider2D>(true), Is.Empty);
+            Assert.That(generatedRoot.Find("Entrance"), Is.Not.Null);
+            Assert.That(generatedRoot.Find("Entrance Outline"), Is.Not.Null);
             Assert.That(interiorCollider.isTrigger, Is.True);
             Assert.That(interiorCollider.GetPath(0), Has.Length.EqualTo(5));
+
+            foreach (var wallSegment in wallSegments)
+            {
+                var wallCollider = wallSegment.GetComponent<PolygonCollider2D>();
+                var worldFootprint = wallSegment.GetWorldFootprint();
+                var colliderPath = wallCollider.GetPath(0);
+                Assert.That(wallSegment.ThicknessInCells, Is.EqualTo(0.5f));
+                Assert.That(wallCollider.enabled, Is.True);
+                Assert.That(colliderPath, Has.Length.EqualTo(worldFootprint.Length));
+                for (var index = 0; index < worldFootprint.Length; index++)
+                {
+                    var expected = wallCollider.transform.InverseTransformPoint(worldFootprint[index]);
+                    Assert.That(Vector2.Distance(colliderPath[index], expected), Is.LessThan(0.0001f));
+                }
+            }
 
             foreach (var meshFilter in meshFilters)
             {

@@ -41,8 +41,9 @@ public sealed class Builder : NetworkBehaviour
     private Vector3Int hoveredCell;
     private Vector3 hoveredWorldPosition;
     private Vector3Int configuredGhostCell;
-    private GridEdgeDirection configuredGhostDirection;
     private GridEdgeDirection selectedDirection;
+    private WallCellShape configuredGhostWallShape;
+    private WallCellShape selectedWallShape;
     private bool hasHoveredCell;
     private bool canPlaceHoveredBuilding;
     private bool ghostConfigured;
@@ -149,6 +150,7 @@ public sealed class Builder : NetworkBehaviour
 
         selectedDefinition = definition;
         selectedDefinitionIndex = catalog.GetIndex(definitionId);
+        selectedWallShape = WallCellShape.Horizontal;
         selectedDirection = GridEdgeDirection.South;
         RecreateGhostBuilding();
         return true;
@@ -183,7 +185,8 @@ public sealed class Builder : NetworkBehaviour
             return;
         }
 
-        selectedDirection = GridEdge.RotateClockwise(selectedDirection);
+        selectedWallShape = WallCellGeometry.GetNextPlacementShape(selectedWallShape);
+        selectedDirection = WallCellGeometry.GetPrimaryDirection(selectedWallShape);
         ghostConfigured = false;
         if (hasHoveredCell)
         {
@@ -198,7 +201,7 @@ public sealed class Builder : NetworkBehaviour
             return;
         }
 
-        PlaceBuildingServerRpc(selectedDefinition.Id, hoveredCell, selectedDirection);
+        PlaceBuildingServerRpc(selectedDefinition.Id, hoveredCell, selectedWallShape);
     }
 
     private void DemolishPerformed(InputAction.CallbackContext _)
@@ -215,10 +218,10 @@ public sealed class Builder : NetworkBehaviour
     private void PlaceBuildingServerRpc(
         string definitionId,
         Vector3Int anchorCell,
-        GridEdgeDirection direction,
+        WallCellShape wallShape,
         NetworkConnection sender = null)
     {
-        TryPlaceBuilding(definitionId, anchorCell, direction, sender.ClientId);
+        TryPlaceBuilding(definitionId, anchorCell, wallShape, sender.ClientId);
     }
 
     [ServerRpc(RequireOwnership = false)]
@@ -267,7 +270,8 @@ public sealed class Builder : NetworkBehaviour
             hoveredCell,
             selectedDefinition.FootprintSize,
             -1,
-            selectedDirection);
+            selectedDirection,
+            selectedWallShape);
         BuildingPlacementRules.GetReservation(
             candidate,
             selectedDefinition,
@@ -284,6 +288,11 @@ public sealed class Builder : NetworkBehaviour
 
     private bool TryGetDemolitionBuildingId(out uint buildingId)
     {
+        if (occupancy.TryGetBuildingId(hoveredCell, out buildingId))
+        {
+            return true;
+        }
+
         GridEdge.GetCellEdges(hoveredCell, demolitionEdges);
         var closestDistance = float.PositiveInfinity;
         var closestBuildingId = 0u;
@@ -314,7 +323,8 @@ public sealed class Builder : NetworkBehaviour
             return true;
         }
 
-        return occupancy.TryGetBuildingId(hoveredCell, out buildingId);
+        buildingId = 0;
+        return false;
     }
 
     private static float DistanceToSegment(Vector2 point, Vector2 start, Vector2 end)
@@ -333,7 +343,7 @@ public sealed class Builder : NetworkBehaviour
     private void TryPlaceBuilding(
         string definitionId,
         Vector3Int anchorCell,
-        GridEdgeDirection direction,
+        WallCellShape wallShape,
         int ownerClientId)
     {
         if (!catalog.TryGetDefinition(definitionId, out var definition))
@@ -342,15 +352,17 @@ public sealed class Builder : NetworkBehaviour
         }
 
         if (definition.PlacementKind == BuildingPlacementKind.WallSegment
-            && !System.Enum.IsDefined(typeof(GridEdgeDirection), direction))
+            && !WallCellGeometry.IsValid(wallShape))
         {
             return;
         }
 
-        if (definition.PlacementKind != BuildingPlacementKind.WallSegment)
-        {
-            direction = GridEdgeDirection.South;
-        }
+        var direction = definition.PlacementKind == BuildingPlacementKind.WallSegment
+            ? WallCellGeometry.GetPrimaryDirection(wallShape)
+            : GridEdgeDirection.South;
+        wallShape = definition.PlacementKind == BuildingPlacementKind.WallSegment
+            ? wallShape
+            : WallCellShape.Horizontal;
 
         var building = new BuildingInstance(
             nextBuildingId,
@@ -358,7 +370,8 @@ public sealed class Builder : NetworkBehaviour
             anchorCell,
             definition.FootprintSize,
             ownerClientId,
-            direction);
+            direction,
+            wallShape);
         BuildingPlacementRules.GetReservation(
             building,
             definition,
@@ -394,7 +407,7 @@ public sealed class Builder : NetworkBehaviour
 
         if (!ghostConfigured
             || configuredGhostCell != hoveredCell
-            || configuredGhostDirection != selectedDirection)
+            || configuredGhostWallShape != selectedWallShape)
         {
             var instance = new BuildingInstance(
                 uint.MaxValue,
@@ -402,14 +415,15 @@ public sealed class Builder : NetworkBehaviour
                 hoveredCell,
                 selectedDefinition.FootprintSize,
                 -1,
-                selectedDirection);
+                selectedDirection,
+                selectedWallShape);
             ghostVisual.Configure(
                 instance,
                 selectedDefinition,
                 ground,
                 BuildingVisualMode.Preview);
             configuredGhostCell = hoveredCell;
-            configuredGhostDirection = selectedDirection;
+            configuredGhostWallShape = selectedWallShape;
             ghostConfigured = true;
         }
 
@@ -503,7 +517,8 @@ public sealed class Builder : NetworkBehaviour
                 preplacedBuilding.AnchorCell,
                 preplacedBuilding.Size,
                 -1,
-                preplacedBuilding.Direction);
+                preplacedBuilding.Direction,
+                preplacedBuilding.WallShape);
             BuildingPlacementRules.GetReservation(
                 building,
                 preplacedBuilding.Definition,

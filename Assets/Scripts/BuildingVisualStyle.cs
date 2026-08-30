@@ -18,7 +18,6 @@ public sealed class BuildingVisualStyle : ScriptableObject
     [SerializeField, Min(0f)] private float roofHeight = 1.75f;
     [SerializeField, Range(0f, 0.5f)] private float roofLipHeight = 0.18f;
     [SerializeField, Min(0.005f)] private float outlineWidth = 0.045f;
-    [SerializeField, Min(0f)] private float wallColliderRadius = 0.06f;
     [SerializeField] private int floorSortingOrder;
     [SerializeField] private int wallSortingOrder = 10;
     [SerializeField] private int roofSortingOrder = 30;
@@ -39,7 +38,6 @@ public sealed class BuildingVisualStyle : ScriptableObject
     public float RoofHeight => roofHeight;
     public float RoofLipHeight => Mathf.Min(roofLipHeight, wallHeight);
     public float OutlineWidth => outlineWidth;
-    public float WallColliderRadius => wallColliderRadius;
     public int FloorSortingOrder => floorSortingOrder;
     public int RoofSortingOrder => roofSortingOrder;
     public int OutlineSortingOrder => outlineSortingOrder;
@@ -58,5 +56,10 @@ public sealed class BuildingVisualStyle : ScriptableObject
         return direction is GridEdgeDirection.South or GridEdgeDirection.East
             ? roofSortingOrder + coordinateOrder + 1
             : wallSortingOrder + coordinateOrder;
+    }
+
+    public int GetWallCellSortingOrder(Vector3Int cell)
+    {
+        return roofSortingOrder + cell.x + cell.y + 1;
     }
 }

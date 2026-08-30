@@ -1,4 +1,4 @@
-// Verifies standalone directional walls share runtime and preview geometry without preview physics.
+// Verifies centered wall cells share exact runtime, preview, and collision geometry.
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
@@ -6,8 +6,13 @@ using UnityEngine.Tilemaps;
 
 public sealed class DirectionalWallSegmentTests
 {
-    [Test]
-    public void PreviewAndRuntimeUseTheSameDirectionalMesh()
+    [TestCase(WallCellShape.Horizontal)]
+    [TestCase(WallCellShape.Vertical)]
+    [TestCase(WallCellShape.CornerNorthEast)]
+    [TestCase(WallCellShape.CornerSouthEast)]
+    [TestCase(WallCellShape.CornerSouthWest)]
+    [TestCase(WallCellShape.CornerNorthWest)]
+    public void PreviewAndRuntimeUseTheSameCenteredMesh(WallCellShape shape)
     {
         var gridObject = new GameObject("Grid");
         var grid = gridObject.AddComponent<Grid>();
@@ -33,7 +38,8 @@ public sealed class DirectionalWallSegmentTests
                 new Vector3Int(3, -2),
                 Vector2Int.one,
                 1,
-                GridEdgeDirection.East);
+                WallCellGeometry.GetPrimaryDirection(shape),
+                shape);
             runtimeObject.GetComponent<BuildingVisualView>().Configure(
                 instance,
                 definition,
@@ -45,20 +51,32 @@ public sealed class DirectionalWallSegmentTests
                 ground,
                 BuildingVisualMode.Preview);
 
-            var runtimeSegment = runtimeObject.GetComponentInChildren<DirectionalWallSegmentRenderer>();
-            var previewSegment = previewObject.GetComponentInChildren<DirectionalWallSegmentRenderer>();
+            var runtimeSegment = runtimeObject.GetComponentInChildren<CenteredWallSegmentRenderer>();
+            var previewSegment = previewObject.GetComponentInChildren<CenteredWallSegmentRenderer>();
             var runtimeMesh = runtimeSegment.GetComponent<MeshFilter>().sharedMesh;
             var previewMesh = previewSegment.GetComponent<MeshFilter>().sharedMesh;
+            var collider = runtimeSegment.GetComponent<PolygonCollider2D>();
+            var worldFootprint = runtimeSegment.GetWorldFootprint();
 
-            Assert.That(runtimeSegment.Direction, Is.EqualTo(GridEdgeDirection.East));
-            Assert.That(runtimeSegment.Edge, Is.EqualTo(previewSegment.Edge));
+            Assert.That(runtimeSegment.Shape, Is.EqualTo(shape));
             Assert.That(runtimeMesh.vertices, Is.EqualTo(previewMesh.vertices));
             Assert.That(runtimeMesh.triangles, Is.EqualTo(previewMesh.triangles));
+            Assert.That(runtimeMesh.triangles, Is.Not.Empty);
             Assert.That(runtimeSegment.IsDegenerate, Is.False);
-            Assert.That(runtimeSegment.GetComponent<EdgeCollider2D>().enabled, Is.True);
-            Assert.That(previewSegment.GetComponent<EdgeCollider2D>(), Is.Null);
+            Assert.That(
+                Vector3.Distance(runtimeSegment.WorldCenter, ground.GetCellCenterWorld(instance.AnchorCell)),
+                Is.LessThan(0.0001f));
+            Assert.That(collider.enabled, Is.True);
+            Assert.That(collider.GetPath(0), Has.Length.EqualTo(worldFootprint.Length));
+            for (var index = 0; index < worldFootprint.Length; index++)
+            {
+                var expected = collider.transform.InverseTransformPoint(worldFootprint[index]);
+                Assert.That(Vector2.Distance(collider.GetPath(0)[index], expected), Is.LessThan(0.0001f));
+            }
+
+            Assert.That(previewSegment.GetComponent<Collider2D>(), Is.Null);
             Assert.That(runtimeObject.GetComponent<ScenePortal>(), Is.Null);
-            Assert.That(runtimeObject.GetComponent<PolygonCollider2D>(), Is.Null);
+            Assert.That(runtimeSegment.GetComponent<EdgeCollider2D>(), Is.Null);
         }
         finally
         {
@@ -66,5 +84,29 @@ public sealed class DirectionalWallSegmentTests
             Object.DestroyImmediate(previewObject);
             Object.DestroyImmediate(gridObject);
         }
+    }
+
+    [Test]
+    public void StraightWallFootprintsAreExactlyHalfACellThick()
+    {
+        var horizontal = WallCellGeometry.GetLogicalFootprint(WallCellShape.Horizontal);
+        var vertical = WallCellGeometry.GetLogicalFootprint(WallCellShape.Vertical);
+
+        Assert.That(GetRange(horizontal, false), Is.EqualTo(0.5f).Within(0.0001f));
+        Assert.That(GetRange(vertical, true), Is.EqualTo(0.5f).Within(0.0001f));
+    }
+
+    private static float GetRange(Vector2[] points, bool useX)
+    {
+        var minimum = float.PositiveInfinity;
+        var maximum = float.NegativeInfinity;
+        foreach (var point in points)
+        {
+            var value = useX ? point.x : point.y;
+            minimum = Mathf.Min(minimum, value);
+            maximum = Mathf.Max(maximum, value);
+        }
+
+        return maximum - minimum;
     }
 }

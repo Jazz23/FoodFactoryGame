@@ -10,6 +10,7 @@ public sealed class PreplacedBuilding : MonoBehaviour
     [SerializeField] private Vector2Int size;
     [SerializeField, Min(1)] private uint instanceId = 1;
     [SerializeField] private GridEdgeDirection direction;
+    [SerializeField] private WallCellShape wallShape;
 
     private BuildingView view = null!;
 
@@ -18,6 +19,7 @@ public sealed class PreplacedBuilding : MonoBehaviour
     public Vector2Int Size => BuildingFootprint.GetEffectiveSize(size, definition.FootprintSize);
     public uint InstanceId => instanceId;
     public GridEdgeDirection Direction => direction;
+    public WallCellShape WallShape => wallShape;
     public BuildingView View => view;
 
     private void Awake()
@@ -29,7 +31,14 @@ public sealed class PreplacedBuilding : MonoBehaviour
     {
         view = GetComponent<BuildingView>();
         Configure(
-            new BuildingInstance(instanceId, definition.Id, anchorCell, Size, -1, direction),
+            new BuildingInstance(
+                instanceId,
+                definition.Id,
+                anchorCell,
+                Size,
+                -1,
+                direction,
+                wallShape),
             ground);
     }
 
@@ -44,12 +53,14 @@ public sealed class PreplacedBuilding : MonoBehaviour
         Vector3Int newAnchorCell,
         Vector2Int newSize,
         uint newInstanceId,
-        GridEdgeDirection newDirection = GridEdgeDirection.South)
+        GridEdgeDirection newDirection = GridEdgeDirection.South,
+        WallCellShape newWallShape = WallCellShape.Horizontal)
     {
         definition = newDefinition;
         anchorCell = newAnchorCell;
         size = newSize;
         instanceId = newInstanceId;
         direction = newDirection;
+        wallShape = newWallShape;
     }
 }

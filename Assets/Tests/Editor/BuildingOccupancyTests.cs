@@ -102,23 +102,26 @@ public sealed class BuildingOccupancyTests
     }
 
     [Test]
-    public void WallCannotRunThroughTwoOccupiedCells()
+    public void CellAndPerimeterEdgeAdjacencyIsPlacementOrderIndependent()
     {
-        var occupancy = new BuildingOccupancy();
-        var cells = new[] { Vector3Int.zero, Vector3Int.up };
-        var internalEdge = GridEdge.FromCellSide(Vector3Int.zero, GridEdgeDirection.North);
-        occupancy.TryReserve(1, cells);
+        var wallCell = new[] { Vector3Int.up };
+        var areaCell = new[] { Vector3Int.zero };
+        var perimeterEdge = new[]
+        {
+            GridEdge.FromCellSide(Vector3Int.zero, GridEdgeDirection.North)
+        };
+        var wallFirst = new BuildingOccupancy();
+        var areaFirst = new BuildingOccupancy();
 
-        var reserved = occupancy.TryReserve(
-            2,
-            System.Array.Empty<Vector3Int>(),
-            new[] { internalEdge });
+        Assert.That(wallFirst.TryReserve(1, wallCell), Is.True);
+        Assert.That(wallFirst.TryReserve(2, areaCell, perimeterEdge), Is.True);
 
-        Assert.That(reserved, Is.False);
+        Assert.That(areaFirst.TryReserve(1, areaCell, perimeterEdge), Is.True);
+        Assert.That(areaFirst.TryReserve(2, wallCell), Is.True);
     }
 
     [Test]
-    public void AreaPerimeterEdgePreventsDuplicateStandaloneWall()
+    public void AreaPerimeterEdgePreventsDuplicateEdgeReservation()
     {
         var occupancy = new BuildingOccupancy();
         var cells = new List<Vector3Int>();

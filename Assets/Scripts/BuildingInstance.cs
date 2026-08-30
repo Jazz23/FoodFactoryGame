@@ -1,4 +1,4 @@
-// Stores the replicated identity and grid anchor for one placed building.
+// Stores the replicated identity, grid anchor, and wall shape for one placed building.
 using System;
 using FishNet.CodeGenerating;
 using UnityEngine;
@@ -13,6 +13,7 @@ public struct BuildingInstance : IEquatable<BuildingInstance>
     public Vector2Int Size;
     public int OwnerClientId;
     public GridEdgeDirection Direction;
+    public WallCellShape WallShape;
 
     public BuildingInstance(
         uint id,
@@ -20,7 +21,8 @@ public struct BuildingInstance : IEquatable<BuildingInstance>
         Vector3Int anchorCell,
         Vector2Int size,
         int ownerClientId,
-        GridEdgeDirection direction = GridEdgeDirection.South)
+        GridEdgeDirection direction = GridEdgeDirection.South,
+        WallCellShape wallShape = WallCellShape.Horizontal)
     {
         Id = id;
         DefinitionId = definitionId;
@@ -28,6 +30,7 @@ public struct BuildingInstance : IEquatable<BuildingInstance>
         Size = size;
         OwnerClientId = ownerClientId;
         Direction = direction;
+        WallShape = wallShape;
     }
 
     public bool Equals(BuildingInstance other)
@@ -37,7 +40,8 @@ public struct BuildingInstance : IEquatable<BuildingInstance>
             && AnchorCell == other.AnchorCell
             && Size == other.Size
             && OwnerClientId == other.OwnerClientId
-            && Direction == other.Direction;
+            && Direction == other.Direction
+            && WallShape == other.WallShape;
     }
 
     public override bool Equals(object value)
@@ -47,6 +51,13 @@ public struct BuildingInstance : IEquatable<BuildingInstance>
 
     public override int GetHashCode()
     {
-        return HashCode.Combine(Id, DefinitionId, AnchorCell, Size, OwnerClientId, Direction);
+        return HashCode.Combine(
+            Id,
+            DefinitionId,
+            AnchorCell,
+            Size,
+            OwnerClientId,
+            Direction,
+            WallShape);
     }
 }

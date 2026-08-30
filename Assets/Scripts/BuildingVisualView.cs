@@ -34,7 +34,9 @@ public sealed class BuildingVisualView : MonoBehaviour
         var visualAnchorCell = BuildingFootprint.GetVisualAnchorCell(
             instance.AnchorCell,
             definition.VisualAnchorCellOffset);
-        var position = ground.CellToWorld(visualAnchorCell);
+        var position = placementKind == BuildingPlacementKind.WallSegment
+            ? ground.GetCellCenterWorld(instance.AnchorCell)
+            : ground.CellToWorld(visualAnchorCell);
         position.z = mode == BuildingVisualMode.Preview ? -0.05f : 0f;
         transform.position = position;
 
