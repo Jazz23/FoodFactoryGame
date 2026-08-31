@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 443319430997665874}
   - component: {fileID: 4232784032675461052}
   - component: {fileID: -7204600619255075890}
+  - component: {fileID: 6906248858492082468}
   m_Layer: 0
   m_Name: PizzaOven
   m_TagString: Untagged
@@ -78,7 +79,7 @@ SpriteRenderer:
   m_SortingLayerID: -475758273
   m_SortingLayer: 1
   m_SortingOrder: 0
-  m_Sprite: {fileID: 21300000, guid: 4d38b2164f0924545b82f1e99e8489ee, type: 3}
+  m_Sprite: {fileID: -4956439845069989912, guid: b8a0ba66b53129043a6cfbe229a21efb, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
@@ -164,3 +165,25 @@ MonoBehaviour:
   _networkObjectCache: {fileID: 4232784032675461052}
   _allowSpawning: 1
   _allowDespawning: 1
+--- !u!95 &6906248858492082468
+Animator:
+  serializedVersion: 7
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4926852788526257740}
+  m_Enabled: 1
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 9100000, guid: 45ee55ac75d89234ba3f34003d8f41a0, type: 2}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_AnimatePhysics: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 0
+  m_WriteDefaultValuesOnDisable: 0

@@ -86,24 +86,6 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
-                },
-                {
-                    "name": "Build",
-                    "type": "Button",
-                    "id": "ce2681ae-4d32-451d-b287-d15e36ac5487",
-                    "expectedControlType": "",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": false
-                },
-                {
-                    "name": "ConfirmBuild",
-                    "type": "Button",
-                    "id": "4d18a9e9-f236-4781-a694-1abcfc91030e",
-                    "expectedControlType": "",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -489,28 +471,6 @@
                     "processors": "",
                     "groups": "Keyboard&Mouse",
                     "action": "Crouch",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
-                    "id": "b90329b1-7735-424c-a93e-fe9ebc15a05a",
-                    "path": "<Keyboard>/q",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": ";Keyboard&Mouse",
-                    "action": "Build",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
-                    "id": "f8a505b4-d8e3-4b17-9534-59e3d11f4cf1",
-                    "path": "<Mouse>/leftButton",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "",
-                    "action": "ConfirmBuild",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }
@@ -1046,6 +1006,15 @@
                     "initialStateCheck": true
                 },
                 {
+                    "name": "Build",
+                    "type": "Button",
+                    "id": "ce2681ae-4d32-451d-b287-d15e36ac5487",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
                     "name": "Place",
                     "type": "Button",
                     "id": "3e64548f-eb22-45d5-bac2-5db28e7182ed",
@@ -1100,6 +1069,17 @@
                     "processors": "",
                     "groups": "",
                     "action": "Point",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "b90329b1-7735-424c-a93e-fe9ebc15a05a",
+                    "path": "<Keyboard>/q",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Keyboard&Mouse",
+                    "action": "Build",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },
