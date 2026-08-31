@@ -187,8 +187,8 @@ MonoBehaviour:
   - {fileID: 8650597198905239143}
   - {fileID: 8973065516749255970}
   - {fileID: 1154636103048611798}
-  - {fileID: 0}
   - {fileID: 4397968128678716958}
+  - {fileID: 1876819271919310721}
   InitializedParentNetworkBehaviour: {fileID: 0}
   InitializedNestedNetworkObjects: []
   RuntimeParentNetworkBehaviour: {fileID: 0}
@@ -199,7 +199,7 @@ MonoBehaviour:
   _initializeOrder: 0
   _preventDespawnOnDisconnect: 0
   _defaultDespawnType: 0
-  _initializedTimestamp: -8584135816789245595
+  _initializedTimestamp: -8584134147513726952
 --- !u!114 &8973065516749255970
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -274,7 +274,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6f2cabcc749d3584c90fb32ad338830c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _componentIndexCache: 4
+  _componentIndexCache: 3
   _addedNetworkObject: {fileID: 1703508883963247041}
   _networkObjectCache: {fileID: 1703508883963247041}
   zoomSpeed: 100
@@ -292,9 +292,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 384375ca4764434cb72dce098613c403, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _componentIndexCache: 255
+  _componentIndexCache: 4
   _addedNetworkObject: {fileID: 1703508883963247041}
-  _networkObjectCache: {fileID: 0}
+  _networkObjectCache: {fileID: 1703508883963247041}
   ghostPrefab: {fileID: 987359489525298888, guid: b6858bc0ef9920f44bf5f53c624e31bd, type: 3}
   buildingPrefabs:
+  - {fileID: 6194095082720127700, guid: d036836a08f4ec148aacd2b5544220db, type: 3}
   - {fileID: 4926852788526257740, guid: 4d7d2bd0c11da2244a910b1df274a3fd, type: 3}

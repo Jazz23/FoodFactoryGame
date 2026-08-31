@@ -26,7 +26,6 @@ namespace NotAI
             _buildingId = reader.ReadInt32();
         }
 
-        [Server]
         public override bool OnTrySpawnServer(NetworkConnection spawner, NetworkConnection owner = null)
         {
             var size = GetComponent<UnityEngine.SpriteRenderer>().bounds.size;

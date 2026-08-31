@@ -18,6 +18,7 @@ namespace NotAI
 
         private InputAction _buildAction;
         private InputAction _placeAction;
+        private InputAction _rotateAction;
         
         private readonly SyncVar<bool> _isBuilding =
             new(new SyncTypeSettings(WritePermission.ClientUnsynchronized, ReadPermission.ExcludeOwner));
@@ -62,6 +63,10 @@ namespace NotAI
             _placeAction = InputSystem.actions["Build/Place"];
             _placeAction.Enable();
             _placeAction.performed += OnPlaceButton;
+            
+            _rotateAction = InputSystem.actions["Build/Rotate"];
+            _rotateAction.Enable();
+            _rotateAction.performed += OnRotateButton;
         }
 
         public override void OnStopClient()
@@ -71,6 +76,8 @@ namespace NotAI
             _buildAction.performed -= OnBuildButton;
             _placeAction.Disable();
             _placeAction.performed -= OnPlaceButton;
+            _rotateAction.Disable();
+            _rotateAction.performed -= OnRotateButton;
         }
 
         [Client]
@@ -103,7 +110,7 @@ namespace NotAI
         [Client]
         private void SpawnBuilding()
         {
-            var building = Instantiate(buildingPrefabs[SelectedBuildingId.Value], _ghost.transform.position, Quaternion.identity)
+            var building = Instantiate(buildingPrefabs[SelectedBuildingId.Value], _ghost.transform.position, _ghost.transform.rotation)
                 .GetComponent<NAIBuildingPredictiveSpawn>();
             building.SetBuildingManager(this);
             building.SetBuildingId(SelectedBuildingId.Value);
@@ -117,6 +124,13 @@ namespace NotAI
         public bool CanBuildGhostHere()
         {
             return CanBuildHere(_ghost.transform.position, _ghostRenderer.bounds.size);
+        }
+
+        [Client]
+        private void OnRotateButton(InputAction.CallbackContext ctx)
+        {
+            if (!_isBuilding.Value) return;
+            _ghost.transform.Rotate(0, 0, 90);
         }
         
         // Uses the spawned building on the server, where the client-only ghost does not exist.
@@ -134,6 +148,10 @@ namespace NotAI
         // Get the world pos cells that the ghost building occupies based on its position and size.
         private List<Vector2> GetOccupiedCells(Vector3 position, Vector2 size)
         {
+            // Use only 3 decimal places to avoid floating point errors when comparing positions.
+            size.x = Mathf.RoundToInt(size.x * 1000f) / 1000f;
+            size.y = Mathf.RoundToInt(size.y * 1000f) / 1000f;
+            
             var cellSize = _grid.cellSize;
             
             var cellsX = Mathf.CeilToInt(size.x / cellSize.x);

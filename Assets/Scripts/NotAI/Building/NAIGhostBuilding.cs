@@ -53,5 +53,10 @@ namespace NotAI
             var cellPos = _grid.WorldToCell(worldPos);
             transform.position = _grid.GetCellCenterWorld(cellPos);
         }
+
+        public void Rotate()
+        {
+            
+        }
     }
 }
