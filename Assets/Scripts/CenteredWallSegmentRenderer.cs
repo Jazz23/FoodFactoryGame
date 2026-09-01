@@ -17,6 +17,7 @@ public sealed class CenteredWallSegmentRenderer : MonoBehaviour
     [SerializeField] private Vector3[] localFootprint = System.Array.Empty<Vector3>();
     [SerializeField] private Vector3[] localCellBoundary = System.Array.Empty<Vector3>();
     [SerializeField] private int baseSortingOrder;
+    [SerializeField] private WallConnectionMask connections;
 
     private Mesh mesh = null!;
     private MeshRenderer meshRenderer = null!;
@@ -30,6 +31,7 @@ public sealed class CenteredWallSegmentRenderer : MonoBehaviour
     public Vector3 WorldCenter => transform.TransformPoint(localCenter);
     public Bounds WorldBounds => GetMeshRenderer().bounds;
     public int SortingOrder => GetMeshRenderer().sortingOrder;
+    public WallConnectionMask Connections => connections;
 
     private void Awake()
     {
@@ -45,11 +47,13 @@ public sealed class CenteredWallSegmentRenderer : MonoBehaviour
         WallCellShape shape,
         Vector3Int anchorCell,
         Tilemap ground,
+        WallConnectionMask connections,
         BuildingVisualStyle style,
         bool includeCollider)
     {
         this.shape = shape;
         this.anchorCell = anchorCell;
+        this.connections = connections;
         wallHeight = style.WallHeight;
         lipBottomHeight = style.WallHeight - style.RoofLipHeight;
 
@@ -72,7 +76,12 @@ public sealed class CenteredWallSegmentRenderer : MonoBehaviour
         var colors = new List<Color>();
         var logicalFootprint = WallCellGeometry.GetLogicalFootprint(shape);
         AddSideFaces(vertices, triangles, colors, logicalFootprint, style);
-        AddTopFace(vertices, triangles, colors, style.RoofColor);
+        AddTopFace(
+            vertices,
+            triangles,
+            colors,
+            GetJoinedTopFootprint(logicalFootprint),
+            style.RoofColor);
 
         ReleaseMesh();
         mesh = new Mesh
@@ -129,6 +138,13 @@ public sealed class CenteredWallSegmentRenderer : MonoBehaviour
             var nextIndex = (index + 1) % localFootprint.Length;
             var start = localFootprint[index];
             var end = localFootprint[nextIndex];
+            if (IsConnectedBoundary(
+                    logicalFootprint[index],
+                    logicalFootprint[nextIndex]))
+            {
+                continue;
+            }
+
             var wallColor = GetEdgeColor(
                 logicalFootprint[index],
                 logicalFootprint[nextIndex],
@@ -154,21 +170,39 @@ public sealed class CenteredWallSegmentRenderer : MonoBehaviour
         }
     }
 
+    private bool IsConnectedBoundary(Vector2 start, Vector2 end)
+    {
+        var direction = Mathf.Approximately(start.y, 0f) && Mathf.Approximately(end.y, 0f)
+            ? GridEdgeDirection.South
+            : Mathf.Approximately(start.x, 1f) && Mathf.Approximately(end.x, 1f)
+                ? GridEdgeDirection.East
+                : Mathf.Approximately(start.y, 1f) && Mathf.Approximately(end.y, 1f)
+                    ? GridEdgeDirection.North
+                    : GridEdgeDirection.West;
+        var isCellBoundary = Mathf.Approximately(start.y, 0f) && Mathf.Approximately(end.y, 0f)
+            || Mathf.Approximately(start.x, 1f) && Mathf.Approximately(end.x, 1f)
+            || Mathf.Approximately(start.y, 1f) && Mathf.Approximately(end.y, 1f)
+            || Mathf.Approximately(start.x, 0f) && Mathf.Approximately(end.x, 0f);
+        return isCellBoundary
+            && (connections & WallCellGeometry.ToConnection(direction)) != 0;
+    }
+
     private void AddTopFace(
         List<Vector3> vertices,
         List<int> triangles,
         List<Color> colors,
+        IReadOnlyList<Vector3> footprint,
         Color color)
     {
         var vertexOffset = vertices.Count;
-        foreach (var point in localFootprint)
+        foreach (var point in footprint)
         {
             vertices.Add(point + Vector3.up * wallHeight);
             colors.Add(color);
         }
 
-        var remaining = new List<int>(localFootprint.Length);
-        for (var index = 0; index < localFootprint.Length; index++)
+        var remaining = new List<int>(footprint.Count);
+        for (var index = 0; index < footprint.Count; index++)
         {
             remaining.Add(index);
         }
@@ -181,7 +215,7 @@ public sealed class CenteredWallSegmentRenderer : MonoBehaviour
                 var previous = remaining[(index - 1 + remaining.Count) % remaining.Count];
                 var current = remaining[index];
                 var next = remaining[(index + 1) % remaining.Count];
-                if (!IsEar(previous, current, next, remaining))
+                if (!IsEar(footprint, previous, current, next, remaining))
                 {
                     continue;
                 }
@@ -204,11 +238,56 @@ public sealed class CenteredWallSegmentRenderer : MonoBehaviour
         }
     }
 
-    private bool IsEar(int previous, int current, int next, IReadOnlyList<int> remaining)
+    private Vector3[] GetJoinedTopFootprint(IReadOnlyList<Vector2> logicalFootprint)
     {
-        var a = localFootprint[previous];
-        var b = localFootprint[current];
-        var c = localFootprint[next];
+        var footprint = new Vector3[localFootprint.Length];
+        var right = localCellBoundary[1] - localCellBoundary[0];
+        var up = localCellBoundary[3] - localCellBoundary[0];
+        var overlap = WallCellGeometry.ThicknessInCells * 0.5f;
+        for (var index = 0; index < footprint.Length; index++)
+        {
+            var point = localFootprint[index];
+            var logicalPoint = logicalFootprint[index];
+            if ((connections & WallConnectionMask.South) != 0
+                && Mathf.Approximately(logicalPoint.y, 0f))
+            {
+                point -= up * overlap;
+            }
+
+            if ((connections & WallConnectionMask.East) != 0
+                && Mathf.Approximately(logicalPoint.x, 1f))
+            {
+                point += right * overlap;
+            }
+
+            if ((connections & WallConnectionMask.North) != 0
+                && Mathf.Approximately(logicalPoint.y, 1f))
+            {
+                point += up * overlap;
+            }
+
+            if ((connections & WallConnectionMask.West) != 0
+                && Mathf.Approximately(logicalPoint.x, 0f))
+            {
+                point -= right * overlap;
+            }
+
+            footprint[index] = point;
+        }
+
+        return footprint;
+    }
+
+    private static bool IsEar(
+        IReadOnlyList<Vector3> footprint,
+        int previous,
+        int current,
+        int next,
+        IReadOnlyList<int> remaining)
+    {
+        var a = footprint[previous];
+        var b = footprint[current];
+        var c = footprint[next];
         if (Cross(a, b, c) <= 0.0001f)
         {
             return false;
@@ -221,7 +300,7 @@ public sealed class CenteredWallSegmentRenderer : MonoBehaviour
                 continue;
             }
 
-            if (IsPointInTriangle(localFootprint[candidate], a, b, c))
+            if (IsPointInTriangle(footprint[candidate], a, b, c))
             {
                 return false;
             }

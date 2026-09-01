@@ -421,7 +421,8 @@ public sealed class Builder : NetworkBehaviour
                 instance,
                 selectedDefinition,
                 ground,
-                BuildingVisualMode.Preview);
+                BuildingVisualMode.Preview,
+                GetWallConnections(instance));
             configuredGhostCell = hoveredCell;
             configuredGhostWallShape = selectedWallShape;
             ghostConfigured = true;
@@ -470,6 +471,8 @@ public sealed class Builder : NetworkBehaviour
                 ClearPlacedBuildings();
                 break;
         }
+
+        RefreshWallVisuals();
     }
 
     private void RebuildOccupancy()
@@ -540,8 +543,10 @@ public sealed class Builder : NetworkBehaviour
             {
                 nextBuildingId = building.Id + 1;
             }
-            preplacedBuilding.Configure(building, ground);
+            preplacedBuilding.Configure(building, ground, GetWallConnections(building));
         }
+
+        RefreshWallVisuals();
     }
 
     private void CachePreplacedBuildings()
@@ -568,6 +573,8 @@ public sealed class Builder : NetworkBehaviour
         {
             CreatePlacedBuilding(pair.Value);
         }
+
+        RefreshWallVisuals();
     }
 
     private void CreatePlacedBuilding(BuildingInstance building)
@@ -580,7 +587,7 @@ public sealed class Builder : NetworkBehaviour
 
         if (preplacedBuildingsById.TryGetValue(building.Id, out var preplacedBuilding))
         {
-            preplacedBuilding.Configure(building, ground);
+            preplacedBuilding.Configure(building, ground, GetWallConnections(building));
             placedBuildings[building.Id] = preplacedBuilding.View;
             return;
         }
@@ -589,7 +596,11 @@ public sealed class Builder : NetworkBehaviour
             && existingBuilding is not null
             && existingBuilding)
         {
-            existingBuilding.Configure(building, definition, ground);
+            existingBuilding.Configure(
+                building,
+                definition,
+                ground,
+                GetWallConnections(building));
             return;
         }
 
@@ -597,8 +608,58 @@ public sealed class Builder : NetworkBehaviour
 
         buildingObject.name = $"{definition.Prefab.name} ({building.AnchorCell.x}, {building.AnchorCell.y})";
         var buildingView = buildingObject.GetComponent<BuildingView>();
-        buildingView.Configure(building, definition, ground);
+        buildingView.Configure(
+            building,
+            definition,
+            ground,
+            GetWallConnections(building));
         placedBuildings.Add(building.Id, buildingView);
+    }
+
+    private WallConnectionMask GetWallConnections(BuildingInstance building)
+    {
+        if (!catalog.TryGetDefinition(building.DefinitionId, out var definition)
+            || definition.PlacementKind != BuildingPlacementKind.WallSegment)
+        {
+            return WallConnectionMask.None;
+        }
+
+        return WallCellGeometry.GetJoinedConnections(
+            building.WallShape,
+            building.AnchorCell,
+            GetWallShapeAtCell);
+    }
+
+    private WallCellShape? GetWallShapeAtCell(Vector3Int cell)
+    {
+        if (!occupancy.TryGetBuildingId(cell, out var buildingId)
+            || !buildings.TryGetValue(buildingId, out var building)
+            || !catalog.TryGetDefinition(building.DefinitionId, out var definition)
+            || definition.PlacementKind != BuildingPlacementKind.WallSegment)
+        {
+            return null;
+        }
+
+        return building.WallShape;
+    }
+
+    private void RefreshWallVisuals()
+    {
+        foreach (var pair in placedBuildings)
+        {
+            if (!buildings.TryGetValue(pair.Key, out var building)
+                || !catalog.TryGetDefinition(building.DefinitionId, out var definition)
+                || definition.PlacementKind != BuildingPlacementKind.WallSegment)
+            {
+                continue;
+            }
+
+            pair.Value.Configure(
+                building,
+                definition,
+                ground,
+                GetWallConnections(building));
+        }
     }
 
     private void RemovePlacedBuilding(uint buildingId)

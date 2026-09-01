@@ -1,6 +1,7 @@
 // Generates area-building floors, roofs, directional perimeter walls, entrances, and collision.
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering;
 using UnityEngine.Tilemaps;
 
 public sealed class ModularBuildingView : MonoBehaviour
@@ -10,7 +11,6 @@ public sealed class ModularBuildingView : MonoBehaviour
 
     [SerializeField] private BuildingVisualStyle style = null!;
 
-    private readonly List<Vector3Int> footprintCells = new();
     private readonly List<Renderer> generatedRenderers = new();
     private readonly Dictionary<Renderer, int> baseSortingOrders = new();
     private readonly Dictionary<SpriteRenderer, Color> baseSpriteColors = new();
@@ -48,59 +48,49 @@ public sealed class ModularBuildingView : MonoBehaviour
             ConfigureInteriorCollider(anchorCell, size, ground);
         }
 
-        BuildingFootprint.GetCells(anchorCell, size, footprintCells);
-        foreach (var cell in footprintCells)
-        {
-            var floorPosition = GetCellCenterWorld(ground, cell);
-            CreateSpriteModule(
-                $"Floor {cell.x},{cell.y}",
-                style.FloorSprite,
-                floorPosition,
-                style.FloorColor,
-                style.FloorSortingOrder);
-            CreateRoofModule(
-                $"Roof {cell.x},{cell.y}",
-                cell,
+        ConfigureSorting(anchorCell, size);
+        CreateSurfaceModule(
+            "Floor",
+            GetSurfaceVertices(anchorCell, size, ground, 0f, 0f),
+            style.FloorColor,
+            style.FloorSortingOrder);
+        CreateSurfaceModule(
+            "Roof",
+            GetSurfaceVertices(
+                anchorCell,
+                size,
                 ground,
-                style.RoofSortingOrder + cell.x + cell.y);
-        }
+                WallCellGeometry.ThicknessInCells * 0.5f,
+                style.RoofHeight),
+            style.RoofColor,
+            style.RoofSortingOrder);
 
-        for (var x = 0; x < size.x; x++)
-        {
-            var southCell = anchorCell + new Vector3Int(x, 0);
-            var northCell = anchorCell + new Vector3Int(x, size.y - 1);
-            CreateWallSegment(southCell, GridEdgeDirection.South, ground, mode);
-            CreateWallSegment(northCell, GridEdgeDirection.North, ground, mode);
-        }
-
-        for (var y = 0; y < size.y; y++)
-        {
-            var westCell = anchorCell + new Vector3Int(0, y);
-            var eastCell = anchorCell + new Vector3Int(size.x - 1, y);
-            CreateWallSegment(westCell, GridEdgeDirection.West, ground, mode);
-            CreateWallSegment(eastCell, GridEdgeDirection.East, ground, mode);
-        }
+        var entranceEdge = includeEntrance
+            ? BuildingFootprint.GetSouthEntranceEdge(anchorCell, size, entranceCellOffset)
+            : default;
+        CreatePerimeterWalls(anchorCell, size, ground, entranceEdge, includeEntrance, mode);
 
         if (includeEntrance)
         {
-            var entranceCell = anchorCell + new Vector3Int(
-                entranceCellOffset.x,
-                entranceCellOffset.y);
-            var entrancePosition = GetCellCenterWorld(ground, entranceCell);
+            var entrancePosition = BuildingFootprint.GetEdgeCenterWorld(entranceEdge, ground);
+            entrancePosition.z = transform.position.z;
             CreateSpriteModule(
                 "Entrance",
                 style.EntranceSprite,
                 entrancePosition,
                 style.EntranceColor,
-                style.EntranceSortingOrder);
+                style.EntranceSortingOrder,
+                style.EntranceHeight);
             CreateSpriteModule(
                 "Entrance Outline",
                 style.EntranceOutlineSprite,
                 entrancePosition,
                 style.EntranceColor,
-                style.EntranceSortingOrder + 1);
+                style.EntranceSortingOrder + 1,
+                style.EntranceHeight);
         }
 
+        CreateRoofAccent(anchorCell, size, ground);
         CreatePerimeterOutline(anchorCell, size, ground);
         CacheGeneratedVisuals();
         SetPresentation(Color.white, 0);
@@ -258,60 +248,141 @@ public sealed class ModularBuildingView : MonoBehaviour
         }
     }
 
-    private void CreateWallSegment(
-        Vector3Int cell,
-        GridEdgeDirection direction,
+    private void ConfigureSorting(Vector3Int anchorCell, Vector2Int size)
+    {
+        if (!generatedRoot.TryGetComponent<SortingGroup>(out var sortingGroup))
+        {
+            sortingGroup = generatedRoot.gameObject.AddComponent<SortingGroup>();
+        }
+
+        sortingGroup.sortingOrder = style.GetBuildingSortingOrder(anchorCell, size);
+    }
+
+    private void CreatePerimeterWalls(
+        Vector3Int anchorCell,
+        Vector2Int size,
         Tilemap ground,
+        GridEdge entranceEdge,
+        bool includeEntrance,
         BuildingVisualMode mode)
     {
-        var edge = GridEdge.FromCellSide(cell, direction);
+        var southWest = anchorCell;
+        var southEast = anchorCell + new Vector3Int(size.x, 0);
+        var northWest = anchorCell + new Vector3Int(0, size.y);
+        var northEast = anchorCell + new Vector3Int(size.x, size.y);
+
+        if (includeEntrance)
+        {
+            if (entranceEdge.Corner != southWest)
+            {
+                CreateWallRun(
+                    GridEdgeDirection.South,
+                    southWest,
+                    entranceEdge.Corner,
+                    ground,
+                    true,
+                    true,
+                    mode);
+            }
+
+            if (entranceEdge.EndCorner != southEast)
+            {
+                CreateWallRun(
+                    GridEdgeDirection.South,
+                    entranceEdge.EndCorner,
+                    southEast,
+                    ground,
+                    true,
+                    true,
+                    mode);
+            }
+        }
+        else
+        {
+            CreateWallRun(
+                GridEdgeDirection.South,
+                southWest,
+                southEast,
+                ground,
+                true,
+                true,
+                mode);
+        }
+
+        CreateWallRun(
+            GridEdgeDirection.North,
+            northWest,
+            northEast,
+            ground,
+            true,
+            true,
+            mode);
+        CreateWallRun(
+            GridEdgeDirection.West,
+            southWest,
+            northWest,
+            ground,
+            false,
+            false,
+            mode);
+        CreateWallRun(
+            GridEdgeDirection.East,
+            southEast,
+            northEast,
+            ground,
+            false,
+            false,
+            mode);
+    }
+
+    private void CreateWallRun(
+        GridEdgeDirection direction,
+        Vector3Int startCorner,
+        Vector3Int endCorner,
+        Tilemap ground,
+        bool includeStartCap,
+        bool includeEndCap,
+        BuildingVisualMode mode)
+    {
+        var axis = direction is GridEdgeDirection.South or GridEdgeDirection.North
+            ? GridEdgeAxis.Horizontal
+            : GridEdgeAxis.Vertical;
+        var edge = new GridEdge(startCorner, axis);
         var moduleObject = new GameObject(
-            $"Wall {direction} {edge.Corner.x},{edge.Corner.y}");
+            $"Wall {direction} {startCorner.x},{startCorner.y}-{endCorner.x},{endCorner.y}");
         moduleObject.transform.SetParent(generatedRoot, false);
         var renderer = moduleObject.AddComponent<DirectionalWallSegmentRenderer>();
-        var origin = GetCellCornerWorld(ground, edge.Corner);
+        var origin = GetCellCornerWorld(ground, startCorner);
         var thicknessWorld = edge.Axis == GridEdgeAxis.Horizontal
-            ? GetCellCornerWorld(ground, edge.Corner + Vector3Int.up) - origin
-            : GetCellCornerWorld(ground, edge.Corner + Vector3Int.right) - origin;
+            ? GetCellCornerWorld(ground, startCorner + Vector3Int.up) - origin
+            : GetCellCornerWorld(ground, startCorner + Vector3Int.right) - origin;
         thicknessWorld *= WallCellGeometry.ThicknessInCells;
         renderer.Configure(
             direction,
             edge,
             origin,
-            GetCellCornerWorld(ground, edge.EndCorner),
+            GetCellCornerWorld(ground, endCorner),
             thicknessWorld,
+            includeStartCap,
+            includeEndCap,
             style,
             mode == BuildingVisualMode.Runtime);
     }
 
-    private void CreateRoofModule(
+    private void CreateSurfaceModule(
         string moduleName,
-        Vector3Int cell,
-        Tilemap ground,
+        Vector3[] vertices,
+        Color color,
         int sortingOrder)
     {
         var moduleObject = new GameObject(moduleName);
         moduleObject.transform.SetParent(generatedRoot, false);
-        var corners = new[]
-        {
-            GetCellCornerWorld(ground, cell),
-            GetCellCornerWorld(ground, cell + new Vector3Int(1, 0)),
-            GetCellCornerWorld(ground, cell + new Vector3Int(1, 1)),
-            GetCellCornerWorld(ground, cell + new Vector3Int(0, 1))
-        };
-        var vertices = new Vector3[corners.Length];
-        for (var index = 0; index < corners.Length; index++)
-        {
-            var point = transform.InverseTransformPoint(corners[index]);
-            vertices[index] = point + Vector3.up * style.RoofHeight;
-        }
-
         var mesh = new Mesh
         {
             name = moduleName,
             vertices = vertices,
             triangles = new[] { 0, 1, 2, 0, 2, 3 },
-            colors = new[] { style.RoofColor, style.RoofColor, style.RoofColor, style.RoofColor }
+            colors = new[] { color, color, color, color }
         };
         mesh.RecalculateBounds();
         mesh.RecalculateNormals();
@@ -330,7 +401,8 @@ public sealed class ModularBuildingView : MonoBehaviour
         Sprite sprite,
         Vector3 worldPosition,
         Color color,
-        int sortingOrder)
+        int sortingOrder,
+        float targetHeight)
     {
         var moduleObject = new GameObject(moduleName);
         moduleObject.transform.SetParent(generatedRoot, false);
@@ -339,6 +411,70 @@ public sealed class ModularBuildingView : MonoBehaviour
         renderer.sprite = sprite;
         renderer.color = color;
         renderer.sortingOrder = sortingOrder;
+        moduleObject.transform.localScale = Vector3.one * (targetHeight / GetVisibleSpriteHeight(sprite));
+    }
+
+    private static float GetVisibleSpriteHeight(Sprite sprite)
+    {
+        var minimum = float.PositiveInfinity;
+        var maximum = float.NegativeInfinity;
+        foreach (var vertex in sprite.vertices)
+        {
+            minimum = Mathf.Min(minimum, vertex.y);
+            maximum = Mathf.Max(maximum, vertex.y);
+        }
+
+        return maximum - minimum;
+    }
+
+    private void CreateRoofAccent(Vector3Int anchorCell, Vector2Int size, Tilemap ground)
+    {
+        const float accentInset = 0.45f;
+        var vertices = GetSurfaceVertices(
+            anchorCell,
+            size,
+            ground,
+            accentInset,
+            style.RoofHeight);
+        var moduleObject = new GameObject("Roof Accent");
+        moduleObject.transform.SetParent(generatedRoot, false);
+        var line = moduleObject.AddComponent<LineRenderer>();
+        line.sharedMaterial = style.ModuleMaterial;
+        line.startColor = style.RoofAccentColor;
+        line.endColor = style.RoofAccentColor;
+        line.startWidth = style.OutlineWidth * 0.75f;
+        line.endWidth = style.OutlineWidth * 0.75f;
+        line.positionCount = vertices.Length;
+        line.loop = true;
+        line.useWorldSpace = false;
+        line.sortingOrder = style.RoofSortingOrder + 1;
+        line.SetPositions(vertices);
+    }
+
+    private Vector3[] GetSurfaceVertices(
+        Vector3Int anchorCell,
+        Vector2Int size,
+        Tilemap ground,
+        float inset,
+        float height)
+    {
+        var origin = GetCellCornerWorld(ground, anchorCell);
+        var right = GetCellCornerWorld(ground, anchorCell + Vector3Int.right) - origin;
+        var up = GetCellCornerWorld(ground, anchorCell + Vector3Int.up) - origin;
+        var corners = new[]
+        {
+            origin + right * inset + up * inset,
+            origin + right * (size.x - inset) + up * inset,
+            origin + right * (size.x - inset) + up * (size.y - inset),
+            origin + right * inset + up * (size.y - inset)
+        };
+        var vertices = new Vector3[corners.Length];
+        for (var index = 0; index < corners.Length; index++)
+        {
+            vertices[index] = transform.InverseTransformPoint(corners[index]) + Vector3.up * height;
+        }
+
+        return vertices;
     }
 
     private void CacheGeneratedVisuals()
@@ -359,13 +495,6 @@ public sealed class ModularBuildingView : MonoBehaviour
                 baseLineEndColors[lineRenderer] = lineRenderer.endColor;
             }
         }
-    }
-
-    private Vector3 GetCellCenterWorld(Tilemap ground, Vector3Int cell)
-    {
-        var position = ground.GetCellCenterWorld(cell);
-        position.z = transform.position.z;
-        return position;
     }
 
     private Vector3 GetCellCornerWorld(Tilemap ground, Vector3Int cell)

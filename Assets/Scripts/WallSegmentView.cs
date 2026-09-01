@@ -16,6 +16,7 @@ public sealed class WallSegmentView : MonoBehaviour
     public void Configure(
         BuildingInstance instance,
         Tilemap ground,
+        WallConnectionMask connections,
         BuildingVisualMode mode)
     {
         var generatedTransform = transform.Find(GeneratedObjectName);
@@ -42,6 +43,7 @@ public sealed class WallSegmentView : MonoBehaviour
             instance.WallShape,
             instance.AnchorCell,
             ground,
+            connections,
             style,
             mode == BuildingVisualMode.Runtime);
     }

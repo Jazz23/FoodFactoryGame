@@ -15,11 +15,20 @@ public sealed class BuildingView : MonoBehaviour
         visualView = GetComponent<BuildingVisualView>();
     }
 
-    public void Configure(BuildingInstance instance, BuildingDefinition definition, Tilemap ground)
+    public void Configure(
+        BuildingInstance instance,
+        BuildingDefinition definition,
+        Tilemap ground,
+        WallConnectionMask wallConnections)
     {
         InstanceId = instance.Id;
         visualView = GetComponent<BuildingVisualView>();
-        visualView.Configure(instance, definition, ground, BuildingVisualMode.Runtime);
+        visualView.Configure(
+            instance,
+            definition,
+            ground,
+            BuildingVisualMode.Runtime,
+            wallConnections);
 
         if (!definition.HasInterior)
         {
@@ -34,10 +43,11 @@ public sealed class BuildingView : MonoBehaviour
         portal = GetComponent<ScenePortal>();
 
         var size = BuildingFootprint.GetEffectiveSize(instance.Size, definition.FootprintSize);
-        var entranceCell = instance.AnchorCell + new Vector3Int(
-            definition.EntranceCellOffset.x,
-            definition.EntranceCellOffset.y);
-        var entranceWorldPosition = ground.GetCellCenterWorld(entranceCell);
+        var entranceEdge = BuildingFootprint.GetSouthEntranceEdge(
+            instance.AnchorCell,
+            size,
+            definition.EntranceCellOffset);
+        var entranceWorldPosition = BuildingFootprint.GetEdgeCenterWorld(entranceEdge, ground);
         if (!SceneGrid.TryGetForScene(gameObject.scene, out var grid))
         {
             SceneGrid.LogMissingGrid(gameObject.scene, this);

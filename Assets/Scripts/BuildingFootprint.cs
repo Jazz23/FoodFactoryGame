@@ -1,6 +1,7 @@
-// Enumerates rectangular grid footprints from a stable lower-left anchor cell.
+// Enumerates rectangular grid footprints and their stable entrance geometry.
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Tilemaps;
 
 public static class BuildingFootprint
 {
@@ -80,5 +81,21 @@ public static class BuildingFootprint
         return anchorCell + new Vector3Int(
             visualAnchorCellOffset.x,
             visualAnchorCellOffset.y);
+    }
+
+    public static GridEdge GetSouthEntranceEdge(
+        Vector3Int anchorCell,
+        Vector2Int size,
+        Vector2Int entranceCellOffset)
+    {
+        var entranceX = Mathf.Clamp(entranceCellOffset.x, 0, size.x - 1);
+        return GridEdge.FromCellSide(
+            anchorCell + new Vector3Int(entranceX, 0),
+            GridEdgeDirection.South);
+    }
+
+    public static Vector3 GetEdgeCenterWorld(GridEdge edge, Tilemap ground)
+    {
+        return (ground.CellToWorld(edge.Corner) + ground.CellToWorld(edge.EndCorner)) * 0.5f;
     }
 }

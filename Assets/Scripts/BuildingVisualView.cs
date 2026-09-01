@@ -26,7 +26,8 @@ public sealed class BuildingVisualView : MonoBehaviour
         BuildingInstance instance,
         BuildingDefinition definition,
         Tilemap ground,
-        BuildingVisualMode mode)
+        BuildingVisualMode mode,
+        WallConnectionMask wallConnections)
     {
         this.instance = instance;
         this.definition = definition;
@@ -43,7 +44,7 @@ public sealed class BuildingVisualView : MonoBehaviour
         if (placementKind == BuildingPlacementKind.WallSegment)
         {
             wallSegmentView = GetComponent<WallSegmentView>();
-            wallSegmentView.Configure(instance, ground, mode);
+            wallSegmentView.Configure(instance, ground, wallConnections, mode);
             return;
         }
 

@@ -16,15 +16,17 @@ MonoBehaviour:
   entranceSprite: {fileID: 5652096005450713881, guid: 8d8d540aba468e54e83f2489d527065a, type: 2}
   entranceOutlineSprite: {fileID: -6303975622813776702, guid: 08030380a2b3a0e4483c9b553248fe25, type: 2}
   moduleMaterial: {fileID: 2100000, guid: a340e5cbecb618244b4b69a613d39293, type: 2}
-  floorColor: {r: 0.3, g: 0.38, b: 0.28, a: 1}
-  roofColor: {r: 0.035, g: 0.05, b: 0.075, a: 1}
+  floorColor: {r: 0.31, g: 0.33, b: 0.35, a: 1}
+  roofColor: {r: 0.09, g: 0.12, b: 0.16, a: 1}
   wallColor: {r: 0.45, g: 0.52, b: 0.58, a: 1}
   wallSideColor: {r: 0.28, g: 0.35, b: 0.41, a: 1}
+  roofAccentColor: {r: 0.16, g: 0.21, b: 0.26, a: 1}
   outlineColor: {r: 0.015, g: 0.02, b: 0.025, a: 1}
   entranceColor: {r: 1, g: 1, b: 1, a: 1}
   wallHeight: 1.75
   roofHeight: 1.75
   roofLipHeight: 0.18
+  entranceHeightRatio: 0.9
   outlineWidth: 0.045
   floorSortingOrder: 0
   wallSortingOrder: 10

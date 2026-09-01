@@ -12,11 +12,13 @@ public sealed class BuildingVisualStyle : ScriptableObject
     [SerializeField] private Color roofColor = new(0.035f, 0.05f, 0.075f, 1f);
     [SerializeField] private Color wallColor = new(0.45f, 0.52f, 0.58f, 1f);
     [SerializeField] private Color wallSideColor = new(0.28f, 0.35f, 0.41f, 1f);
+    [SerializeField] private Color roofAccentColor = new(0.16f, 0.21f, 0.26f, 1f);
     [SerializeField] private Color outlineColor = new(0.015f, 0.02f, 0.025f, 1f);
     [SerializeField] private Color entranceColor = Color.white;
     [SerializeField, Min(0f)] private float wallHeight = 1.75f;
     [SerializeField, Min(0f)] private float roofHeight = 1.75f;
     [SerializeField, Range(0f, 0.5f)] private float roofLipHeight = 0.18f;
+    [SerializeField, Range(0.1f, 1f)] private float entranceHeightRatio = 0.9f;
     [SerializeField, Min(0.005f)] private float outlineWidth = 0.045f;
     [SerializeField] private int floorSortingOrder;
     [SerializeField] private int wallSortingOrder = 10;
@@ -32,11 +34,13 @@ public sealed class BuildingVisualStyle : ScriptableObject
     public Color RoofColor => roofColor;
     public Color WallColor => wallColor;
     public Color WallSideColor => wallSideColor;
+    public Color RoofAccentColor => roofAccentColor;
     public Color OutlineColor => outlineColor;
     public Color EntranceColor => entranceColor;
     public float WallHeight => wallHeight;
     public float RoofHeight => roofHeight;
     public float RoofLipHeight => Mathf.Min(roofLipHeight, wallHeight);
+    public float EntranceHeight => wallHeight * entranceHeightRatio;
     public float OutlineWidth => outlineWidth;
     public int FloorSortingOrder => floorSortingOrder;
     public int RoofSortingOrder => roofSortingOrder;
@@ -52,14 +56,18 @@ public sealed class BuildingVisualStyle : ScriptableObject
 
     public int GetWallSortingOrder(GridEdgeDirection direction, GridEdge edge)
     {
-        var coordinateOrder = edge.Corner.x + edge.Corner.y;
         return direction is GridEdgeDirection.South or GridEdgeDirection.East
-            ? roofSortingOrder + coordinateOrder + 1
-            : wallSortingOrder + coordinateOrder;
+            ? roofSortingOrder + 2
+            : wallSortingOrder;
     }
 
     public int GetWallCellSortingOrder(Vector3Int cell)
     {
-        return roofSortingOrder + cell.x + cell.y + 1;
+        return wallSortingOrder;
+    }
+
+    public int GetBuildingSortingOrder(Vector3Int anchorCell, Vector2Int size)
+    {
+        return anchorCell.x + anchorCell.y + size.x + size.y;
     }
 }

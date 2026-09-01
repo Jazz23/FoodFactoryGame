@@ -17,7 +17,7 @@ MonoBehaviour:
   previewPrefab: {fileID: 7656064483999947672, guid: 785b3ceb7d3f30a43aedd529de238791, type: 3}
   footprintSize: {x: 6, y: 6}
   visualAnchorCellOffset: {x: 3, y: -1}
-  entranceCellOffset: {x: 3, y: -2}
+  entranceCellOffset: {x: 3, y: 0}
   interiorSceneName: FactoryInterior
   interiorArrivalLogicalPosition: {x: 3, y: 0.5}
   placementKind: 0

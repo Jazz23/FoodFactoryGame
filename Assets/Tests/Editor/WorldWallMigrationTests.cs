@@ -71,7 +71,10 @@ public sealed class WorldWallMigrationTests
                 .Where(building => building.Definition.PlacementKind == BuildingPlacementKind.CellArea)
                 .SelectMany(building => building.GetComponentsInChildren<DirectionalWallSegmentRenderer>(true))
                 .ToArray();
-            Assert.That(modularWalls, Has.Length.EqualTo(40));
+            var expectedModularWallRuns = buildings
+                .Where(building => building.Definition.PlacementKind == BuildingPlacementKind.CellArea)
+                .Sum(GetExpectedWallRunCount);
+            Assert.That(modularWalls, Has.Length.EqualTo(expectedModularWallRuns));
             Assert.That(
                 modularWalls.All(wall => wall.GetComponent<PolygonCollider2D>().enabled),
                 Is.True);
@@ -83,5 +86,32 @@ public sealed class WorldWallMigrationTests
                 EditorSceneManager.CloseScene(scene, true);
             }
         }
+    }
+
+    private static int GetExpectedWallRunCount(PreplacedBuilding building)
+    {
+        if (!building.Definition.HasInterior)
+        {
+            return 4;
+        }
+
+        var entrance = BuildingFootprint.GetSouthEntranceEdge(
+            building.AnchorCell,
+            building.Size,
+            building.Definition.EntranceCellOffset);
+        var southWest = building.AnchorCell;
+        var southEast = building.AnchorCell + new Vector3Int(building.Size.x, 0);
+        var southRuns = 0;
+        if (entrance.Corner != southWest)
+        {
+            southRuns++;
+        }
+
+        if (entrance.EndCorner != southEast)
+        {
+            southRuns++;
+        }
+
+        return 3 + southRuns;
     }
 }

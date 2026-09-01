@@ -27,7 +27,7 @@ public sealed class PreplacedBuilding : MonoBehaviour
         view = GetComponent<BuildingView>();
     }
 
-    public void Configure(Tilemap ground)
+    public void Configure(Tilemap ground, WallConnectionMask wallConnections)
     {
         view = GetComponent<BuildingView>();
         Configure(
@@ -39,13 +39,17 @@ public sealed class PreplacedBuilding : MonoBehaviour
                 -1,
                 direction,
                 wallShape),
-            ground);
+            ground,
+            wallConnections);
     }
 
-    public void Configure(BuildingInstance instance, Tilemap ground)
+    public void Configure(
+        BuildingInstance instance,
+        Tilemap ground,
+        WallConnectionMask wallConnections)
     {
         view = GetComponent<BuildingView>();
-        view.Configure(instance, definition, ground);
+        view.Configure(instance, definition, ground, wallConnections);
     }
 
     public void SetPlacementData(

@@ -16,6 +16,8 @@ public sealed class DirectionalWallSegmentRenderer : MonoBehaviour
     [SerializeField] private Vector3 localEnd;
     [SerializeField] private Vector3[] localFootprint = System.Array.Empty<Vector3>();
     [SerializeField] private int baseSortingOrder;
+    [SerializeField] private bool hasStartCap;
+    [SerializeField] private bool hasEndCap;
 
     private Mesh mesh = null!;
     private MeshRenderer meshRenderer = null!;
@@ -30,6 +32,8 @@ public sealed class DirectionalWallSegmentRenderer : MonoBehaviour
     public Bounds WorldBounds => GetMeshRenderer().bounds;
     public int SortingOrder => GetMeshRenderer().sortingOrder;
     public float ThicknessInCells => WallCellGeometry.ThicknessInCells;
+    public bool HasStartCap => hasStartCap;
+    public bool HasEndCap => hasEndCap;
 
     private void Awake()
     {
@@ -47,6 +51,8 @@ public sealed class DirectionalWallSegmentRenderer : MonoBehaviour
         Vector3 startWorld,
         Vector3 endWorld,
         Vector3 thicknessWorld,
+        bool includeStartCap,
+        bool includeEndCap,
         BuildingVisualStyle style,
         bool includeCollider)
     {
@@ -56,6 +62,8 @@ public sealed class DirectionalWallSegmentRenderer : MonoBehaviour
         lipBottomHeight = style.WallHeight - style.RoofLipHeight;
         localStart = transform.InverseTransformPoint(startWorld);
         localEnd = transform.InverseTransformPoint(endWorld);
+        hasStartCap = includeStartCap;
+        hasEndCap = includeEndCap;
         var halfThickness = transform.InverseTransformVector(thicknessWorld) * 0.5f;
         localFootprint = new[]
         {
@@ -127,6 +135,13 @@ public sealed class DirectionalWallSegmentRenderer : MonoBehaviour
             var nextIndex = (index + 1) % localFootprint.Length;
             var start = localFootprint[index];
             var end = localFootprint[nextIndex];
+            var midpoint = (start + end) * 0.5f;
+            if (!hasStartCap && Vector3.Distance(midpoint, localStart) <= 0.0001f
+                || !hasEndCap && Vector3.Distance(midpoint, localEnd) <= 0.0001f)
+            {
+                continue;
+            }
+
             AddQuad(
                 vertices,
                 triangles,

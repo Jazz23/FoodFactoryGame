@@ -44,12 +44,14 @@ public sealed class DirectionalWallSegmentTests
                 instance,
                 definition,
                 ground,
-                BuildingVisualMode.Runtime);
+                BuildingVisualMode.Runtime,
+                WallConnectionMask.None);
             previewObject.GetComponent<BuildingVisualView>().Configure(
                 instance,
                 definition,
                 ground,
-                BuildingVisualMode.Preview);
+                BuildingVisualMode.Preview,
+                WallConnectionMask.None);
 
             var runtimeSegment = runtimeObject.GetComponentInChildren<CenteredWallSegmentRenderer>();
             var previewSegment = previewObject.GetComponentInChildren<CenteredWallSegmentRenderer>();
@@ -94,6 +96,82 @@ public sealed class DirectionalWallSegmentTests
 
         Assert.That(GetRange(horizontal, false), Is.EqualTo(0.5f).Within(0.0001f));
         Assert.That(GetRange(vertical, true), Is.EqualTo(0.5f).Within(0.0001f));
+    }
+
+    [Test]
+    public void JoinedConnectionsRemoveOnlyInternalCapFaces()
+    {
+        var gridObject = new GameObject("Grid");
+        var grid = gridObject.AddComponent<Grid>();
+        grid.cellSize = new Vector3(2f, 1f, 0f);
+        grid.cellLayout = GridLayout.CellLayout.Isometric;
+        var tilemapObject = new GameObject("Ground");
+        tilemapObject.transform.SetParent(gridObject.transform, false);
+        var ground = tilemapObject.AddComponent<Tilemap>();
+        var definition = AssetDatabase.LoadAssetAtPath<BuildingDefinition>(
+            "Assets/Buildings/WallBuilding.asset");
+        var runtimePrefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+            "Assets/Prefabs/Wall.prefab");
+        var cappedObject = Object.Instantiate(runtimePrefab);
+        var joinedObject = Object.Instantiate(runtimePrefab);
+
+        try
+        {
+            var instance = new BuildingInstance(
+                7,
+                definition.Id,
+                Vector3Int.zero,
+                Vector2Int.one,
+                1,
+                GridEdgeDirection.South,
+                WallCellShape.Horizontal);
+            cappedObject.GetComponent<BuildingVisualView>().Configure(
+                instance,
+                definition,
+                ground,
+                BuildingVisualMode.Runtime,
+                WallConnectionMask.None);
+            joinedObject.GetComponent<BuildingVisualView>().Configure(
+                instance,
+                definition,
+                ground,
+                BuildingVisualMode.Runtime,
+                WallConnectionMask.East | WallConnectionMask.West);
+
+            var capped = cappedObject.GetComponentInChildren<CenteredWallSegmentRenderer>();
+            var joined = joinedObject.GetComponentInChildren<CenteredWallSegmentRenderer>();
+            Assert.That(joined.Connections, Is.EqualTo(WallConnectionMask.East | WallConnectionMask.West));
+            Assert.That(
+                capped.GetComponent<MeshFilter>().sharedMesh.triangles.Length
+                    - joined.GetComponent<MeshFilter>().sharedMesh.triangles.Length,
+                Is.EqualTo(24));
+            Assert.That(
+                joined.GetComponent<PolygonCollider2D>().GetPath(0),
+                Is.EqualTo(capped.GetComponent<PolygonCollider2D>().GetPath(0)));
+        }
+        finally
+        {
+            Object.DestroyImmediate(cappedObject);
+            Object.DestroyImmediate(joinedObject);
+            Object.DestroyImmediate(gridObject);
+        }
+    }
+
+    [Test]
+    public void JoinedConnectionsRequireCompatibleNeighborEnds()
+    {
+        var shapes = new System.Collections.Generic.Dictionary<Vector3Int, WallCellShape>
+        {
+            [Vector3Int.left] = WallCellShape.Horizontal,
+            [Vector3Int.right] = WallCellShape.Horizontal,
+            [Vector3Int.up] = WallCellShape.Horizontal
+        };
+        var connections = WallCellGeometry.GetJoinedConnections(
+            WallCellShape.Horizontal,
+            Vector3Int.zero,
+            cell => shapes.TryGetValue(cell, out var shape) ? shape : null);
+
+        Assert.That(connections, Is.EqualTo(WallConnectionMask.East | WallConnectionMask.West));
     }
 
     private static float GetRange(Vector2[] points, bool useX)

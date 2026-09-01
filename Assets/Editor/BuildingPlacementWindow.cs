@@ -16,6 +16,7 @@ public sealed class BuildingPlacementWindow : EditorWindow
     private readonly List<Vector3Int> existingCells = new();
     private readonly List<GridEdge> existingEdges = new();
     private readonly BuildingOccupancy occupancy = new();
+    private readonly Dictionary<Vector3Int, WallCellShape> wallShapesByCell = new();
 
     private Tilemap ground = null!;
     private BuildingCatalog catalog = null!;
@@ -41,6 +42,50 @@ public sealed class BuildingPlacementWindow : EditorWindow
     private static void Open()
     {
         GetWindow<BuildingPlacementWindow>("Building Placement");
+    }
+
+    [MenuItem("Food Factory/Rebuild Building Visuals")]
+    private static void RebuildBuildingVisuals()
+    {
+        var scene = SceneManager.GetActiveScene();
+        var sceneBuilder = FindFirstObjectByType<Builder>();
+        if (sceneBuilder is null || sceneBuilder.gameObject.scene != scene)
+        {
+            Debug.LogError("The active scene does not contain a Builder.");
+            return;
+        }
+
+        var preplacedBuildings = FindObjectsByType<PreplacedBuilding>(
+            FindObjectsInactive.Include,
+            FindObjectsSortMode.None);
+        var wallShapes = new Dictionary<Vector3Int, WallCellShape>();
+        foreach (var preplacedBuilding in preplacedBuildings)
+        {
+            if (preplacedBuilding.gameObject.scene == scene
+                && preplacedBuilding.Definition.PlacementKind == BuildingPlacementKind.WallSegment)
+            {
+                wallShapes[preplacedBuilding.AnchorCell] = preplacedBuilding.WallShape;
+            }
+        }
+
+        foreach (var preplacedBuilding in preplacedBuildings)
+        {
+            if (preplacedBuilding.gameObject.scene != scene)
+            {
+                continue;
+            }
+
+            var instance = CreateInstance(preplacedBuilding);
+            preplacedBuilding.Configure(
+                instance,
+                sceneBuilder.Ground,
+                GetWallConnections(instance, wallShapes));
+            EditorUtility.SetDirty(preplacedBuilding);
+            EditorUtility.SetDirty(preplacedBuilding.View);
+        }
+
+        EditorSceneManager.MarkSceneDirty(scene);
+        SceneView.RepaintAll();
     }
 
     private void OnEnable()
@@ -374,6 +419,7 @@ public sealed class BuildingPlacementWindow : EditorWindow
             || previewSize != size
             || previewWallShape != wallShape)
         {
+            RefreshWallShapeMap();
             var instance = new BuildingInstance(
                 uint.MaxValue,
                 selectedDefinition.Id,
@@ -386,7 +432,8 @@ public sealed class BuildingPlacementWindow : EditorWindow
                 instance,
                 selectedDefinition,
                 ground,
-                BuildingVisualMode.Preview);
+                BuildingVisualMode.Preview,
+                GetWallConnections(instance, wallShapesByCell));
             previewAnchor = anchorCell;
             previewSize = size;
             previewWallShape = wallShape;
@@ -476,19 +523,31 @@ public sealed class BuildingPlacementWindow : EditorWindow
             direction,
             wallShape);
 
+        var instance = new BuildingInstance(
+            instanceId,
+            selectedDefinition.Id,
+            anchorCell,
+            size,
+            -1,
+            direction,
+            wallShape);
+        RefreshWallShapeMap();
+        if (selectedDefinition.PlacementKind == BuildingPlacementKind.WallSegment)
+        {
+            wallShapesByCell[anchorCell] = wallShape;
+        }
         var buildingView = placedObject.GetComponent<BuildingView>();
         Undo.RecordObject(placedObject.transform, "Position building");
         buildingView.Configure(
-            new BuildingInstance(
-                instanceId,
-                selectedDefinition.Id,
-                anchorCell,
-                size,
-                -1,
-                direction,
-                wallShape),
+            instance,
             selectedDefinition,
-            ground);
+            ground,
+            GetWallConnections(instance, wallShapesByCell));
+
+        if (selectedDefinition.PlacementKind == BuildingPlacementKind.WallSegment)
+        {
+            RefreshPlacedWallVisuals();
+        }
 
         EditorUtility.SetDirty(preplacedBuilding);
         EditorUtility.SetDirty(buildingView);
@@ -646,6 +705,68 @@ public sealed class BuildingPlacementWindow : EditorWindow
         }
 
         return nextId;
+    }
+
+    private void RefreshWallShapeMap()
+    {
+        wallShapesByCell.Clear();
+        var preplacedBuildings = FindObjectsByType<PreplacedBuilding>(
+            FindObjectsInactive.Include,
+            FindObjectsSortMode.None);
+        foreach (var preplacedBuilding in preplacedBuildings)
+        {
+            if (preplacedBuilding.gameObject.scene == ground.gameObject.scene
+                && preplacedBuilding.Definition.PlacementKind == BuildingPlacementKind.WallSegment)
+            {
+                wallShapesByCell[preplacedBuilding.AnchorCell] = preplacedBuilding.WallShape;
+            }
+        }
+    }
+
+    private void RefreshPlacedWallVisuals()
+    {
+        RefreshWallShapeMap();
+        var preplacedBuildings = FindObjectsByType<PreplacedBuilding>(
+            FindObjectsInactive.Include,
+            FindObjectsSortMode.None);
+        foreach (var preplacedBuilding in preplacedBuildings)
+        {
+            if (preplacedBuilding.gameObject.scene != ground.gameObject.scene
+                || preplacedBuilding.Definition.PlacementKind != BuildingPlacementKind.WallSegment)
+            {
+                continue;
+            }
+
+            var instance = CreateInstance(preplacedBuilding);
+            preplacedBuilding.Configure(
+                instance,
+                ground,
+                GetWallConnections(instance, wallShapesByCell));
+            EditorUtility.SetDirty(preplacedBuilding);
+            EditorUtility.SetDirty(preplacedBuilding.View);
+        }
+    }
+
+    private static BuildingInstance CreateInstance(PreplacedBuilding preplacedBuilding)
+    {
+        return new BuildingInstance(
+            preplacedBuilding.InstanceId,
+            preplacedBuilding.Definition.Id,
+            preplacedBuilding.AnchorCell,
+            preplacedBuilding.Size,
+            -1,
+            preplacedBuilding.Direction,
+            preplacedBuilding.WallShape);
+    }
+
+    private static WallConnectionMask GetWallConnections(
+        BuildingInstance instance,
+        IReadOnlyDictionary<Vector3Int, WallCellShape> wallShapes)
+    {
+        return WallCellGeometry.GetJoinedConnections(
+            instance.WallShape,
+            instance.AnchorCell,
+            cell => wallShapes.TryGetValue(cell, out var shape) ? shape : null);
     }
 
     private Vector3[] GetBoundaryWorldPoints(Vector3Int anchorCell, Vector2Int size)
