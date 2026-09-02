@@ -8,12 +8,12 @@ public sealed class GridRoof : MonoBehaviour
 {
     [SerializeField] private Vector2 logicalMin;
     [SerializeField] private Vector2 logicalMax = Vector2.one;
-    [SerializeField, Min(0f)] private float topHeight = 2f;
+    [SerializeField, Min(0f)] private float topHeight = 2.1f;
     [SerializeField, Min(0f)] private float thickness = 0.1f;
     [SerializeField] private Color topColor = new(0.035f, 0.05f, 0.075f, 1f);
     [SerializeField] private Color sideColor = new(0.16f, 0.21f, 0.26f, 1f);
     [SerializeField] private Material material = null!;
-    [SerializeField] private int sortingOrder = 40;
+    [SerializeField] private int sortingOrder = 1000;
 
     private Mesh mesh = null!;
     private bool rebuildRequested;
@@ -23,15 +23,18 @@ public sealed class GridRoof : MonoBehaviour
     public Vector2 LogicalMax => logicalMax;
     public float TopHeight => topHeight;
     public float Thickness => thickness;
+    public int SortingOrder => sortingOrder;
 
     private void OnEnable()
     {
+        GetComponent<MeshRenderer>().enabled = false;
         rebuildRequested = true;
         RebuildIfRequired();
     }
 
     private void OnValidate()
     {
+        GetComponent<MeshRenderer>().enabled = false;
         rebuildRequested = true;
     }
 
@@ -56,6 +59,8 @@ public sealed class GridRoof : MonoBehaviour
 
     private void Rebuild()
     {
+        var renderer = GetComponent<MeshRenderer>();
+        renderer.enabled = false;
         if (!TryGetGrid(out var grid))
         {
             return;
@@ -83,12 +88,12 @@ public sealed class GridRoof : MonoBehaviour
         var triangles = new List<int>();
         var colors = new List<Color>();
         var bottomHeight = Mathf.Max(0f, topHeight - thickness);
+        var sideVertices = new List<Vector3>();
+        var sideTriangles = new List<int>();
+        var sideColors = new List<Color>();
         for (var index = 0; index < footprint.Length; index++)
         {
             var nextIndex = (index + 1) % footprint.Length;
-            var sideVertices = new List<Vector3>();
-            var sideTriangles = new List<int>();
-            var sideColors = new List<Color>();
             AddQuad(
                 sideVertices,
                 sideTriangles,
@@ -107,8 +112,8 @@ public sealed class GridRoof : MonoBehaviour
                 footprint[nextIndex] + Vector3.up * topHeight,
                 footprint[index] + Vector3.up * topHeight,
                 sideColor);
-            CreateSurface($"Side {index}", sideVertices, sideTriangles, sideColors, sortingOrder - 1);
         }
+        CreateSurface("Sides", sideVertices, sideTriangles, sideColors, sortingOrder - 1);
 
         var topVertices = new List<Vector3>();
         var topTriangles = new List<int>();
@@ -140,9 +145,7 @@ public sealed class GridRoof : MonoBehaviour
 
         var filter = GetComponent<MeshFilter>();
         filter.sharedMesh = mesh;
-        var renderer = GetComponent<MeshRenderer>();
         renderer.sharedMaterial = material;
-        renderer.enabled = false;
         renderer.sortingOrder = sortingOrder;
         generatedSurfaceCount = transform.childCount;
     }

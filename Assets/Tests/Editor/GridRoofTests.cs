@@ -44,6 +44,17 @@ public sealed class GridRoofTests
         Assert.That(roof.GetComponent<Collider>(), Is.Null);
     }
 
+    [Test]
+    public void RoofUsesOneCombinedSideSurfaceAndOneTopSurface()
+    {
+        var roof = CreateRoof(new Vector2(-0.75f, -0.75f), new Vector2(1.75f, 1.75f), 2f, 0.1f);
+
+        Assert.That(roof.transform.childCount, Is.EqualTo(2));
+        Assert.That(roof.GetComponent<MeshRenderer>().enabled, Is.False);
+        Assert.That(roof.transform.GetChild(0).name, Does.EndWith(" Sides"));
+        Assert.That(roof.transform.GetChild(1).name, Does.EndWith(" Top"));
+    }
+
     private static void AssertVector(Vector3 actual, Vector3 expected)
     {
         Assert.That(actual.x, Is.EqualTo(expected.x).Within(0.0001f));

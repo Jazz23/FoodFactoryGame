@@ -36,7 +36,7 @@ public sealed class GridWall : MonoBehaviour
     private const float HalfCell = 0.5f;
     private const float SurfaceSortingScale = 10f;
     private const int WallTopSortingOffset = 6;
-    private const int WallBaseSortingOrder = 20;
+    private const int WallBaseSortingOrder = 1000;
 
     private static readonly Color WallLightColor = new(0.45f, 0.52f, 0.58f, 1f);
     private static readonly Color WallShadowColor = new(0.28f, 0.35f, 0.41f, 1f);
