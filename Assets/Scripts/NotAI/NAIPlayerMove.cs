@@ -1,10 +1,12 @@
-﻿using FishNet.Object;
+﻿// Moves the owning player through Rigidbody2D physics while keeping animation state in sync.
+using FishNet.Object;
 using GameKit.Dependencies.Utilities;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
 namespace DefaultNamespace
 {
+    [RequireComponent(typeof(Rigidbody2D))]
     public class NAIPlayerMove : NetworkBehaviour
     {
         public int speed;
@@ -12,10 +14,12 @@ namespace DefaultNamespace
         private static readonly int IsMoving = Animator.StringToHash("IsMoving");
         private InputAction _move;
         private Animator _animator;
+        private Rigidbody2D _body;
 
         private void Awake()
         {
             _animator = GetComponent<Animator>();
+            _body = GetComponent<Rigidbody2D>();
             enabled = false; // Disable this script for everybody by default, re-enable for local player
         }
         
@@ -40,16 +44,20 @@ namespace DefaultNamespace
 
         private void Update()
         {
+        }
+
+        private void FixedUpdate()
+        {
             var moveInput = _move.ReadValue<Vector2>();
             if (moveInput == Vector2.zero)
             {
                 _animator.SetBool(IsMoving, false);
+                _body.linearVelocity = Vector2.zero;
                 return;
             }
             
             _animator.SetBool(IsMoving, true);
-            var moveDirection = new Vector3(moveInput.x, moveInput.y, 0f).normalized;
-            transform.position += moveDirection * (Time.deltaTime * speed);
+            _body.linearVelocity = moveInput.normalized * speed;
         }
     }
 }
