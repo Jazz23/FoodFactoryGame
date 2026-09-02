@@ -42,22 +42,46 @@ namespace DefaultNamespace
             Camera.main?.transform.SetParent(null);
         }
 
-        private void Update()
-        {
-        }
-
         private void FixedUpdate()
         {
             var moveInput = _move.ReadValue<Vector2>();
+
             if (moveInput == Vector2.zero)
             {
-                _animator.SetBool(IsMoving, false);
+                _animator.Play("idle");
                 _body.linearVelocity = Vector2.zero;
                 return;
             }
-            
-            _animator.SetBool(IsMoving, true);
+
+            var direction = Mathf.RoundToInt(
+                Mathf.Atan2(moveInput.x, moveInput.y) * Mathf.Rad2Deg / 90f
+            ) % 4;
+
+            if (direction < 0)
+                direction += 4;
+
+            SetAnimation(direction);
+
             _body.linearVelocity = moveInput.normalized * speed;
+        }
+
+        private void SetAnimation(int direction)
+        {
+            switch (direction)
+            {
+                case 0:
+                    _animator.Play("north");
+                    break;
+                case 1:
+                    _animator.Play("east");
+                    break;
+                case 2:
+                    _animator.Play("south");
+                    break;
+                case 3:
+                    _animator.Play("west");
+                    break;
+            }
         }
     }
 }
