@@ -1,3 +1,4 @@
+// Converts continuous logical positions to world positions for each scene's grid projection.
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -27,6 +28,16 @@ public sealed class SceneGrid : MonoBehaviour
     public Vector2 InitialPlayerLogicalPosition => initialPlayerLogicalPosition;
     public float VerticalMovementMultiplier => verticalMovementMultiplier;
     public float OrthographicSize => orthographicSize;
+
+    public static Vector2 CellCenterLogical(Vector2Int cell)
+    {
+        return (Vector2)cell + new Vector2(0.5f, 0.5f);
+    }
+
+    public Vector2 CellCenterWorld(Vector2Int cell)
+    {
+        return LogicalToWorld(CellCenterLogical(cell));
+    }
 
     private void OnEnable()
     {
