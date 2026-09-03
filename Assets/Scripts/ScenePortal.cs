@@ -24,6 +24,7 @@ public sealed class ScenePortal : MonoBehaviour
 
     public SceneDestination Destination => destination;
     public string DestinationSceneName => destinationSceneName;
+    public Vector2 InteractionLogicalPosition => interactionLogicalPosition;
     public Vector2 ArrivalLogicalPosition => arrivalLogicalPosition;
     public Vector2 ExteriorArrivalLogicalPosition => exteriorArrivalLogicalPosition;
     public uint BuildingInstanceId => buildingInstanceId;
@@ -37,6 +38,7 @@ public sealed class ScenePortal : MonoBehaviour
         Vector2 interiorArrivalLogicalPosition,
         Vector2 exteriorArrivalPosition)
     {
+        destination = SceneDestination.Inside;
         buildingInstanceId = instanceId;
         buildingSize = size;
         usesWorldInteractionPosition = true;
@@ -44,6 +46,20 @@ public sealed class ScenePortal : MonoBehaviour
         destinationSceneName = interiorScene;
         arrivalLogicalPosition = interiorArrivalLogicalPosition;
         exteriorArrivalLogicalPosition = exteriorArrivalPosition;
+    }
+
+    public void ConfigureInterior(Vector2 interiorLogicalPosition)
+    {
+        destination = SceneDestination.World;
+        destinationSceneName = string.Empty;
+        interactionLogicalPosition = interiorLogicalPosition;
+        arrivalLogicalPosition = interiorLogicalPosition;
+        buildingInstanceId = 0;
+        buildingSize = Vector2Int.zero;
+        usesWorldInteractionPosition = false;
+        worldInteractionPosition = default;
+        exteriorArrivalLogicalPosition = default;
+        enabled = true;
     }
 
     public bool CanUse(Vector2 playerPosition)

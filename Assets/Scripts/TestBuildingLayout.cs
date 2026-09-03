@@ -10,11 +10,13 @@ public sealed class TestBuildingLayout : MonoBehaviour
 
     [SerializeField] private Vector3Int anchorCell;
     [SerializeField] private Vector2Int size;
+    [SerializeField, Min(1)] private uint buildingInstanceId;
     [SerializeField] private string doorWallId = string.Empty;
     [SerializeField, Range(0f, 1f)] private float doorOffset = 0.5f;
 
     public Vector3Int AnchorCell => anchorCell;
     public Vector2Int Size => size;
+    public uint BuildingInstanceId => buildingInstanceId;
     public bool HasDoor => !string.IsNullOrEmpty(doorWallId);
     public string DoorWallId => doorWallId;
     public float DoorOffset => doorOffset;
@@ -23,6 +25,11 @@ public sealed class TestBuildingLayout : MonoBehaviour
     {
         anchorCell = newAnchorCell;
         size = newSize;
+    }
+
+    public void SetBuildingInstanceId(uint newBuildingInstanceId)
+    {
+        buildingInstanceId = newBuildingInstanceId;
     }
 
     public void GetExteriorWallSpans(List<TestBuildingCreator.ExteriorWallSpan> spans)

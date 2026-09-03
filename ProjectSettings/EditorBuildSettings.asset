@@ -26,6 +26,9 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/OutsideTest.unity
     guid: a1e9e43398920d1439d899d192f4e4b8
+  - enabled: 1
+    path: Assets/Scenes/insidefactory.unity
+    guid: 49c333d61069a8f4ea2180d2edc5442e
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 2bcd2660ca9b64942af0de543d8d7100, type: 3}
   m_UseUCBPForAssetBundles: 0

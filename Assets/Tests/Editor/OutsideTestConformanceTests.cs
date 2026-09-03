@@ -62,11 +62,18 @@ public sealed class OutsideTestConformanceTests
                 Assert.That(collision, Is.Not.Null);
                 Assert.That(doors, Is.Not.Null);
                 Assert.That(presentation, Is.Not.Null);
+                Assert.That(layout.BuildingInstanceId, Is.Not.EqualTo(0u));
                 var walls = visuals.GetComponentsInChildren<GridWall>(true);
                 var colliders = collision.GetComponentsInChildren<PolygonCollider2D>(true);
                 Assert.That(walls, Has.Length.EqualTo(expectedPlacements.Count));
                 Assert.That(colliders, Has.Length.EqualTo(walls.Length));
                 Assert.That(doors.childCount, Is.EqualTo(layout.HasDoor ? 1 : 0));
+                Assert.That(
+                    layout.GetComponentsInChildren<OutsideTestFactoryDoor>(true),
+                    Has.Length.EqualTo(layout.HasDoor ? 1 : 0));
+                Assert.That(
+                    layout.GetComponentsInChildren<ScenePortal>(true),
+                    Has.Length.EqualTo(layout.HasDoor ? 1 : 0));
 
                 if (layout.HasDoor)
                 {
@@ -139,6 +146,53 @@ public sealed class OutsideTestConformanceTests
             Assert.That(
                 serializedManager.FindProperty("worldSceneName").stringValue,
                 Is.EqualTo("OutsideTest"));
+        }
+        finally
+        {
+            if (openedForTest)
+            {
+                EditorSceneManager.CloseScene(scene, true);
+            }
+        }
+    }
+
+    [Test]
+    public void InsideFactoryUsesAnOrthogonalRuntimeSizedGridAndAuthoredExit()
+    {
+        var path = "Assets/Scenes/insidefactory.unity";
+        var scene = SceneManager.GetSceneByPath(path);
+        var openedForTest = !scene.isLoaded;
+        if (openedForTest)
+        {
+            scene = EditorSceneManager.OpenScene(path, OpenSceneMode.Additive);
+        }
+
+        try
+        {
+            var roots = scene.GetRootGameObjects();
+            var grids = roots
+                .SelectMany(root => root.GetComponentsInChildren<SceneGrid>(true))
+                .Where(grid => grid.isActiveAndEnabled)
+                .ToArray();
+            var indoorGrids = roots
+                .SelectMany(root => root.GetComponentsInChildren<IndoorGrid>(true))
+                .Where(grid => grid.isActiveAndEnabled)
+                .ToArray();
+            var controllers = roots
+                .SelectMany(root => root.GetComponentsInChildren<InsideFactoryController>(true))
+                .ToArray();
+            var portals = roots
+                .SelectMany(root => root.GetComponentsInChildren<ScenePortal>(true))
+                .ToArray();
+
+            Assert.That(grids, Has.Length.EqualTo(1));
+            Assert.That(grids[0].Projection, Is.EqualTo(GridProjection.Orthogonal));
+            Assert.That(grids[0].VerticalMovementMultiplier, Is.EqualTo(1f));
+            Assert.That(indoorGrids, Has.Length.EqualTo(1));
+            Assert.That(indoorGrids[0].Size, Is.EqualTo(new Vector2Int(6, 6)));
+            Assert.That(controllers, Has.Length.EqualTo(1));
+            Assert.That(portals, Has.Length.EqualTo(1));
+            Assert.That(portals[0].GetComponent<SpriteRenderer>(), Is.Null);
         }
         finally
         {

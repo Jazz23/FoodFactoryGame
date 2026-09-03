@@ -199,6 +199,76 @@ public sealed class TestBuildingCreatorTests
     }
 
     [Test]
+    public void SouthDoorMapsToTheBottomInteriorEdgeAtTheSameWallPosition()
+    {
+        var layoutObject = new GameObject("South Layout");
+        try
+        {
+            var layout = layoutObject.AddComponent<TestBuildingLayout>();
+            layout.Configure(new Vector3Int(-1, 5), new Vector2Int(5, 4));
+            var spans = new List<TestBuildingCreator.ExteriorWallSpan>();
+            layout.GetExteriorWallSpans(spans);
+            var wall = spans.Find(span => span.Direction == GridEdgeDirection.South
+                && !span.IsCorner
+                && span.Cell == new Vector2Int(1, 5));
+            layout.SetDoor(wall, 0.25f);
+
+            Assert.That(
+                TestBuildingInteriorMapping.TryGetMapping(
+                    layout,
+                    wall,
+                    out var exteriorDoor,
+                    out var exteriorArrival,
+                    out var interiorArrival,
+                    out var normalizedPosition),
+                Is.True);
+            Assert.That(exteriorDoor, Is.EqualTo(new Vector2(1.25f, 5.5f)));
+            Assert.That(normalizedPosition, Is.EqualTo(0.4375f).Within(0.0001f));
+            Assert.That(interiorArrival, Is.EqualTo(new Vector2(2.25f, 0.5f)));
+            Assert.That(exteriorArrival, Is.EqualTo(new Vector2(1.25f, 4.75f)));
+        }
+        finally
+        {
+            Object.DestroyImmediate(layoutObject);
+        }
+    }
+
+    [Test]
+    public void WestDoorMapsToTheLeftInteriorEdgeAtTheSameWallPosition()
+    {
+        var layoutObject = new GameObject("West Layout");
+        try
+        {
+            var layout = layoutObject.AddComponent<TestBuildingLayout>();
+            layout.Configure(new Vector3Int(5, -2), new Vector2Int(3, 5));
+            var spans = new List<TestBuildingCreator.ExteriorWallSpan>();
+            layout.GetExteriorWallSpans(spans);
+            var wall = spans.Find(span => span.Direction == GridEdgeDirection.West
+                && !span.IsCorner
+                && span.Cell == new Vector2Int(5, 0));
+            layout.SetDoor(wall, 0.75f);
+
+            Assert.That(
+                TestBuildingInteriorMapping.TryGetMapping(
+                    layout,
+                    wall,
+                    out var exteriorDoor,
+                    out var exteriorArrival,
+                    out var interiorArrival,
+                    out var normalizedPosition),
+                Is.True);
+            Assert.That(exteriorDoor, Is.EqualTo(new Vector2(5.5f, 0.75f)));
+            Assert.That(normalizedPosition, Is.EqualTo(0.5625f).Within(0.0001f));
+            Assert.That(interiorArrival, Is.EqualTo(new Vector2(0.5f, 2.75f)));
+            Assert.That(exteriorArrival, Is.EqualTo(new Vector2(4.75f, 0.75f)));
+        }
+        finally
+        {
+            Object.DestroyImmediate(layoutObject);
+        }
+    }
+
+    [Test]
     public void EditorBuildingsRequireAtLeastTwoCellsInEachDimension()
     {
         Assert.That(TestBuildingCreator.IsSupportedSize(new Vector2Int(2, 2)), Is.True);

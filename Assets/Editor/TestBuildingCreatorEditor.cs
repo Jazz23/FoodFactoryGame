@@ -34,6 +34,7 @@ public sealed class TestBuildingCreatorEditor : Editor
         }
 
         MigrateLegacySettings();
+        EnsureBuildingInstanceIds();
         RefreshGeneratedBuildingWalls();
         RefreshGeneratedRoofs();
         SceneView.RepaintAll();
@@ -63,7 +64,8 @@ public sealed class TestBuildingCreatorEditor : Editor
 
         EditorGUILayout.HelpBox(
             "Select the creator, then click two opposite ground cells in Scene View. "
-            + "Each completed selection creates walls, a roof, collision, and no door.",
+            + "Each completed selection creates walls, a roof, collision, and no door. "
+            + "Use Place Door in Scene View to add an interior entrance.",
             MessageType.Info);
 
         if (hasFirstCorner)
@@ -505,6 +507,8 @@ public sealed class TestBuildingCreatorEditor : Editor
 
         var undoGroup = Undo.GetCurrentGroup();
         Undo.SetCurrentGroupName("Create test building");
+        EnsureBuildingInstanceIds();
+        var buildingInstanceId = Creator.GetNextBuildingInstanceId();
         var buildingObject = new GameObject(
             $"Test Building ({anchor.x}, {anchor.y}) {size.x}x{size.y}");
         buildingObject.transform.SetParent(Creator.GeneratedBuildings, false);
@@ -512,6 +516,7 @@ public sealed class TestBuildingCreatorEditor : Editor
 
         var layout = Undo.AddComponent<TestBuildingLayout>(buildingObject);
         layout.Configure(anchor, size);
+        layout.SetBuildingInstanceId(buildingInstanceId);
         EditorUtility.SetDirty(layout);
 
         var generatedVisuals = CreateGeneratedRoot(
@@ -742,11 +747,17 @@ public sealed class TestBuildingCreatorEditor : Editor
 
         var doorRenderer = visualDoors.GetChild(0).GetComponent<SpriteRenderer>();
         var depthSurface = visualDoors.GetChild(0).GetComponent<DepthOcclusionSurface>();
+        var portal = visualDoors.GetChild(0).GetComponent<ScenePortal>();
+        var factoryDoor = visualDoors.GetChild(0).GetComponent<OutsideTestFactoryDoor>();
         return doorRenderer is null
             || !doorRenderer
             || depthSurface is null
             || !depthSurface
             || !depthSurface.IsConfigured
+            || portal is null
+            || !portal
+            || factoryDoor is null
+            || !factoryDoor
             || doorRenderer.flipX != Creator.VisualStyle.ShouldFlipEntranceX(wall.Direction);
     }
 
@@ -844,6 +855,9 @@ public sealed class TestBuildingCreatorEditor : Editor
             new Vector3(worldPosition.x, worldPosition.y, layout.transform.position.z),
             wall.LogicalStart,
             wall.LogicalEnd);
+
+        Undo.AddComponent<ScenePortal>(doorObject);
+        Undo.AddComponent<OutsideTestFactoryDoor>(doorObject);
     }
 
     private static int GetDoorSortingOrder(TestBuildingCreator.ExteriorWallSpan wall)
@@ -915,6 +929,46 @@ public sealed class TestBuildingCreatorEditor : Editor
         statusMessage = "Cleared generated test buildings.";
         Repaint();
         SceneView.RepaintAll();
+    }
+
+    private void EnsureBuildingInstanceIds()
+    {
+        if (Creator.GeneratedBuildings is null || !Creator.GeneratedBuildings)
+        {
+            return;
+        }
+
+        var usedIds = new HashSet<uint>();
+        var nextId = 1u;
+        var changed = false;
+        foreach (var layout in Creator.GeneratedBuildings.GetComponentsInChildren<TestBuildingLayout>(true))
+        {
+            if (layout.BuildingInstanceId != 0 && usedIds.Add(layout.BuildingInstanceId))
+            {
+                if (layout.BuildingInstanceId >= nextId)
+                {
+                    nextId = layout.BuildingInstanceId + 1u;
+                }
+
+                continue;
+            }
+
+            while (usedIds.Contains(nextId))
+            {
+                nextId++;
+            }
+
+            layout.SetBuildingInstanceId(nextId);
+            usedIds.Add(nextId);
+            nextId++;
+            EditorUtility.SetDirty(layout);
+            changed = true;
+        }
+
+        if (changed)
+        {
+            EditorSceneManager.MarkSceneDirty(Creator.gameObject.scene);
+        }
     }
 
     private void RefreshGeneratedRoofs()

@@ -63,4 +63,36 @@ public sealed class InteriorSizingTests
             Object.DestroyImmediate(gridObject);
         }
     }
+
+    [Test]
+    public void InsideFactoryControllerUsesTheEnteredDoorPositionForItsExit()
+    {
+        var gridObject = new GameObject("Inside Factory Grid");
+        var exitObject = new GameObject("Exit Portal");
+        try
+        {
+            var sceneGrid = gridObject.AddComponent<SceneGrid>();
+            var serializedGrid = new SerializedObject(sceneGrid);
+            serializedGrid.FindProperty("projection").enumValueIndex = (int)GridProjection.Orthogonal;
+            serializedGrid.ApplyModifiedPropertiesWithoutUndo();
+
+            gridObject.AddComponent<EdgeCollider2D>();
+            gridObject.AddComponent<IndoorGrid>();
+            var exitPortal = exitObject.AddComponent<ScenePortal>();
+            var controller = gridObject.AddComponent<InsideFactoryController>();
+            var serializedController = new SerializedObject(controller);
+            serializedController.FindProperty("exitPortal").objectReferenceValue = exitPortal;
+            serializedController.ApplyModifiedPropertiesWithoutUndo();
+
+            controller.Configure(new Vector2Int(5, 4), new Vector2(2.25f, 0.5f));
+
+            Assert.That(exitPortal.InteractionLogicalPosition, Is.EqualTo(new Vector2(2.25f, 0.5f)));
+            Assert.That(exitPortal.BuildingInstanceId, Is.EqualTo(0u));
+        }
+        finally
+        {
+            Object.DestroyImmediate(gridObject);
+            Object.DestroyImmediate(exitObject);
+        }
+    }
 }

@@ -88,9 +88,13 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         transform.SetPositionAndRotation(position, Quaternion.identity);
     }
 
-    public void CompleteTransition(NetworkConnection connection, Vector3 position, Vector2Int buildingSize)
+    public void CompleteTransition(
+        NetworkConnection connection,
+        Vector3 position,
+        Vector2Int buildingSize,
+        Vector2 arrivalLogicalPosition)
     {
-        TargetTeleport(connection, position, buildingSize);
+        TargetTeleport(connection, position, buildingSize, arrivalLogicalPosition);
     }
 
     [TargetRpc]
@@ -100,9 +104,20 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
     }
 
     [TargetRpc]
-    private void TargetTeleport(NetworkConnection connection, Vector3 position, Vector2Int buildingSize)
+    private void TargetTeleport(
+        NetworkConnection connection,
+        Vector3 position,
+        Vector2Int buildingSize,
+        Vector2 arrivalLogicalPosition)
     {
-        IndoorGrid.TryConfigureForScene(gameObject.scene, buildingSize);
+        if (!InsideFactoryController.TryConfigureForScene(
+                gameObject.scene,
+                buildingSize,
+                arrivalLogicalPosition))
+        {
+            IndoorGrid.TryConfigureForScene(gameObject.scene, buildingSize);
+        }
+
         body.position = position;
         transform.SetPositionAndRotation(position, Quaternion.identity);
         networkTransform.Teleport();

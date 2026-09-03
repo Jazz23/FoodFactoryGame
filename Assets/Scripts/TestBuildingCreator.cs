@@ -73,6 +73,26 @@ public sealed class TestBuildingCreator : MonoBehaviour
     public BuildingVisualStyle VisualStyle => visualStyle;
     public float DoorCornerExclusionDistance => doorCornerExclusionDistance;
 
+    public uint GetNextBuildingInstanceId()
+    {
+        var usedIds = new HashSet<uint>();
+        foreach (var layout in generatedBuildings.GetComponentsInChildren<TestBuildingLayout>(true))
+        {
+            if (layout.BuildingInstanceId != 0)
+            {
+                usedIds.Add(layout.BuildingInstanceId);
+            }
+        }
+
+        var nextId = 1u;
+        while (usedIds.Contains(nextId))
+        {
+            nextId++;
+        }
+
+        return nextId;
+    }
+
     public static Vector3Int GetAnchorCell(Vector3Int firstCorner, Vector3Int secondCorner)
     {
         return BuildingFootprint.GetLowerLeftAnchorCell(firstCorner, secondCorner);

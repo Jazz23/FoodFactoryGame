@@ -162,7 +162,10 @@ public sealed class GameSceneManager : MonoBehaviour
         }
 
         pendingTransition.TargetScene = args.QueueData.SceneLoadData.GetFirstLookupScene();
-        IndoorGrid.TryConfigureForScene(pendingTransition.TargetScene, pendingTransition.BuildingSize);
+        ConfigureInterior(
+            pendingTransition.TargetScene,
+            pendingTransition.BuildingSize,
+            pendingTransition.ArrivalLogicalPosition);
         if (!TryGetGrid(pendingTransition.TargetScene, out var grid))
         {
             return;
@@ -200,7 +203,8 @@ public sealed class GameSceneManager : MonoBehaviour
         pendingTransition.Player.GetComponent<PlayerSceneTransition>().CompleteTransition(
             pendingTransition.Connection,
             targetPosition,
-            pendingTransition.BuildingSize);
+            pendingTransition.BuildingSize,
+            pendingTransition.ArrivalLogicalPosition);
         pendingTransitions.Remove(args.Connection.ClientId);
     }
 
@@ -233,6 +237,22 @@ public sealed class GameSceneManager : MonoBehaviour
         return string.IsNullOrWhiteSpace(portal.DestinationSceneName)
             ? GetSceneName(portal.Destination)
             : portal.DestinationSceneName;
+    }
+
+    private void ConfigureInterior(
+        Scene scene,
+        Vector2Int buildingSize,
+        Vector2 arrivalLogicalPosition)
+    {
+        if (InsideFactoryController.TryConfigureForScene(
+                scene,
+                buildingSize,
+                arrivalLogicalPosition))
+        {
+            return;
+        }
+
+        IndoorGrid.TryConfigureForScene(scene, buildingSize);
     }
 
     private bool TryGetGrid(Scene scene, out SceneGrid grid)
