@@ -189,6 +189,9 @@ public sealed class OutsideTestConformanceTests
             var controllers = roots
                 .SelectMany(root => root.GetComponentsInChildren<InsideFactoryController>(true))
                 .ToArray();
+            var visualControllers = roots
+                .SelectMany(root => root.GetComponentsInChildren<InsideFactoryVisuals>(true))
+                .ToArray();
             var portals = roots
                 .SelectMany(root => root.GetComponentsInChildren<ScenePortal>(true))
                 .ToArray();
@@ -199,6 +202,11 @@ public sealed class OutsideTestConformanceTests
             Assert.That(indoorGrids, Has.Length.EqualTo(1));
             Assert.That(indoorGrids[0].Size, Is.EqualTo(new Vector2Int(6, 6)));
             Assert.That(controllers, Has.Length.EqualTo(1));
+            Assert.That(visualControllers, Has.Length.EqualTo(1));
+            var visualFields = new SerializedObject(visualControllers[0]);
+            Assert.That(visualFields.FindProperty("floorTile").objectReferenceValue, Is.Not.Null);
+            Assert.That(visualFields.FindProperty("doorSprite").objectReferenceValue, Is.Not.Null);
+            Assert.That(visualFields.FindProperty("material").objectReferenceValue, Is.Not.Null);
             Assert.That(portals, Has.Length.EqualTo(1));
             Assert.That(portals[0].GetComponent<SpriteRenderer>(), Is.Null);
         }

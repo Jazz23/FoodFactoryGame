@@ -22,6 +22,7 @@ public sealed class ScenePortal : MonoBehaviour
     private Vector2 worldInteractionPosition;
     private Vector2 exteriorArrivalLogicalPosition;
     private bool hasExteriorArrivalLogicalPosition;
+    private GridEdgeDirection interiorDoorDirection = GridEdgeDirection.South;
 
     public SceneDestination Destination => destination;
     public string DestinationSceneName => destinationSceneName;
@@ -29,6 +30,7 @@ public sealed class ScenePortal : MonoBehaviour
     public Vector2 ArrivalLogicalPosition => arrivalLogicalPosition;
     public Vector2 ExteriorArrivalLogicalPosition => exteriorArrivalLogicalPosition;
     public bool HasExteriorArrivalLogicalPosition => hasExteriorArrivalLogicalPosition;
+    public GridEdgeDirection InteriorDoorDirection => interiorDoorDirection;
     public uint BuildingInstanceId => buildingInstanceId;
     public Vector2Int BuildingSize => buildingSize;
 
@@ -38,7 +40,8 @@ public sealed class ScenePortal : MonoBehaviour
         Vector2 interactionWorldPosition,
         string interiorScene,
         Vector2 interiorArrivalLogicalPosition,
-        Vector2 exteriorArrivalPosition)
+        Vector2 exteriorArrivalPosition,
+        GridEdgeDirection interiorDoorDirection = GridEdgeDirection.South)
     {
         destination = SceneDestination.Inside;
         buildingInstanceId = instanceId;
@@ -49,24 +52,49 @@ public sealed class ScenePortal : MonoBehaviour
         arrivalLogicalPosition = interiorArrivalLogicalPosition;
         exteriorArrivalLogicalPosition = exteriorArrivalPosition;
         hasExteriorArrivalLogicalPosition = true;
+        this.interiorDoorDirection = interiorDoorDirection;
     }
 
     public void ConfigureInterior(Vector2 interiorLogicalPosition)
     {
-        ConfigureInterior(interiorLogicalPosition, default, false);
+        ConfigureInterior(interiorLogicalPosition, default, false, GridEdgeDirection.South);
+    }
+
+    public void ConfigureInterior(
+        Vector2 interiorLogicalPosition,
+        GridEdgeDirection interiorDoorDirection)
+    {
+        ConfigureInterior(interiorLogicalPosition, default, false, interiorDoorDirection);
     }
 
     public void ConfigureInterior(
         Vector2 interiorLogicalPosition,
         Vector2 exteriorArrivalPosition)
     {
-        ConfigureInterior(interiorLogicalPosition, exteriorArrivalPosition, true);
+        ConfigureInterior(
+            interiorLogicalPosition,
+            exteriorArrivalPosition,
+            true,
+            GridEdgeDirection.South);
+    }
+
+    public void ConfigureInterior(
+        Vector2 interiorLogicalPosition,
+        Vector2 exteriorArrivalPosition,
+        GridEdgeDirection interiorDoorDirection)
+    {
+        ConfigureInterior(
+            interiorLogicalPosition,
+            exteriorArrivalPosition,
+            true,
+            interiorDoorDirection);
     }
 
     private void ConfigureInterior(
         Vector2 interiorLogicalPosition,
         Vector2 exteriorArrivalPosition,
-        bool hasExteriorArrival)
+        bool hasExteriorArrival,
+        GridEdgeDirection interiorDoorDirection)
     {
         destination = SceneDestination.World;
         destinationSceneName = string.Empty;
@@ -78,6 +106,7 @@ public sealed class ScenePortal : MonoBehaviour
         worldInteractionPosition = default;
         exteriorArrivalLogicalPosition = exteriorArrivalPosition;
         hasExteriorArrivalLogicalPosition = hasExteriorArrival;
+        this.interiorDoorDirection = interiorDoorDirection;
         enabled = true;
     }
 

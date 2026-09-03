@@ -94,7 +94,8 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         Vector2Int buildingSize,
         Vector2 arrivalLogicalPosition,
         Vector2[] interiorExitLogicalPositions,
-        Vector2[] exteriorArrivalLogicalPositions)
+        Vector2[] exteriorArrivalLogicalPositions,
+        GridEdgeDirection[] interiorExitDirections)
     {
         TargetTeleport(
             connection,
@@ -102,7 +103,8 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
             buildingSize,
             arrivalLogicalPosition,
             interiorExitLogicalPositions,
-            exteriorArrivalLogicalPositions);
+            exteriorArrivalLogicalPositions,
+            interiorExitDirections);
     }
 
     [TargetRpc]
@@ -118,14 +120,16 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         Vector2Int buildingSize,
         Vector2 arrivalLogicalPosition,
         Vector2[] interiorExitLogicalPositions,
-        Vector2[] exteriorArrivalLogicalPositions)
+        Vector2[] exteriorArrivalLogicalPositions,
+        GridEdgeDirection[] interiorExitDirections)
     {
         if (!InsideFactoryController.TryConfigureForScene(
                 gameObject.scene,
                 buildingSize,
                 arrivalLogicalPosition,
                 interiorExitLogicalPositions,
-                exteriorArrivalLogicalPositions))
+                exteriorArrivalLogicalPositions,
+                interiorExitDirections))
         {
             IndoorGrid.TryConfigureForScene(gameObject.scene, buildingSize);
         }

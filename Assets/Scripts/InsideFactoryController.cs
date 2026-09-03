@@ -29,7 +29,8 @@ public sealed class InsideFactoryController : MonoBehaviour
             buildingSize,
             arrivalLogicalPosition,
             new[] { arrivalLogicalPosition },
-            new Vector2[0]);
+            new Vector2[0],
+            new GridEdgeDirection[0]);
     }
 
     public static bool TryConfigureForScene(
@@ -38,6 +39,23 @@ public sealed class InsideFactoryController : MonoBehaviour
         Vector2 arrivalLogicalPosition,
         Vector2[] interiorExitLogicalPositions,
         Vector2[] exteriorArrivalLogicalPositions)
+    {
+        return TryConfigureForScene(
+            scene,
+            buildingSize,
+            arrivalLogicalPosition,
+            interiorExitLogicalPositions,
+            exteriorArrivalLogicalPositions,
+            new GridEdgeDirection[0]);
+    }
+
+    public static bool TryConfigureForScene(
+        Scene scene,
+        Vector2Int buildingSize,
+        Vector2 arrivalLogicalPosition,
+        Vector2[] interiorExitLogicalPositions,
+        Vector2[] exteriorArrivalLogicalPositions,
+        GridEdgeDirection[] interiorExitDirections)
     {
         if (!BuildingFootprint.IsValid(buildingSize))
         {
@@ -58,7 +76,8 @@ public sealed class InsideFactoryController : MonoBehaviour
                 buildingSize,
                 arrivalLogicalPosition,
                 interiorExitLogicalPositions,
-                exteriorArrivalLogicalPositions);
+                exteriorArrivalLogicalPositions,
+                interiorExitDirections);
             return true;
         }
 
@@ -71,7 +90,8 @@ public sealed class InsideFactoryController : MonoBehaviour
             buildingSize,
             arrivalLogicalPosition,
             new[] { arrivalLogicalPosition },
-            new Vector2[0]);
+            new Vector2[0],
+            new GridEdgeDirection[0]);
     }
 
     public void Configure(
@@ -79,6 +99,21 @@ public sealed class InsideFactoryController : MonoBehaviour
         Vector2 arrivalLogicalPosition,
         IReadOnlyList<Vector2> interiorExitLogicalPositions,
         IReadOnlyList<Vector2> exteriorArrivalLogicalPositions)
+    {
+        Configure(
+            buildingSize,
+            arrivalLogicalPosition,
+            interiorExitLogicalPositions,
+            exteriorArrivalLogicalPositions,
+            new GridEdgeDirection[0]);
+    }
+
+    public void Configure(
+        Vector2Int buildingSize,
+        Vector2 arrivalLogicalPosition,
+        IReadOnlyList<Vector2> interiorExitLogicalPositions,
+        IReadOnlyList<Vector2> exteriorArrivalLogicalPositions,
+        IReadOnlyList<GridEdgeDirection> interiorExitDirections)
     {
         if (!BuildingFootprint.IsValid(buildingSize))
         {
@@ -91,13 +126,18 @@ public sealed class InsideFactoryController : MonoBehaviour
         var exitPositions = interiorExitLogicalPositions.Count > 0
             ? interiorExitLogicalPositions
             : new[] { arrivalLogicalPosition };
-        ConfigureExitPortals(exitPositions, exteriorArrivalLogicalPositions);
+        ConfigureExitPortals(
+            exitPositions,
+            exteriorArrivalLogicalPositions,
+            interiorExitDirections);
     }
 
     private void ConfigureExitPortals(
         IReadOnlyList<Vector2> interiorExitLogicalPositions,
-        IReadOnlyList<Vector2> exteriorArrivalLogicalPositions)
+        IReadOnlyList<Vector2> exteriorArrivalLogicalPositions,
+        IReadOnlyList<GridEdgeDirection> interiorExitDirections)
     {
+        var exitDirections = new GridEdgeDirection[interiorExitLogicalPositions.Count];
         for (var index = 0; index < interiorExitLogicalPositions.Count; index++)
         {
             var portal = GetExitPortal(index);
@@ -107,15 +147,20 @@ public sealed class InsideFactoryController : MonoBehaviour
             }
 
             var interiorPosition = interiorExitLogicalPositions[index];
+            var direction = index < interiorExitDirections.Count
+                ? interiorExitDirections[index]
+                : GridEdgeDirection.South;
+            exitDirections[index] = direction;
             if (index < exteriorArrivalLogicalPositions.Count)
             {
                 portal.ConfigureInterior(
                     interiorPosition,
-                    exteriorArrivalLogicalPositions[index]);
+                    exteriorArrivalLogicalPositions[index],
+                    direction);
             }
             else
             {
-                portal.ConfigureInterior(interiorPosition);
+                portal.ConfigureInterior(interiorPosition, direction);
             }
 
             var worldPosition = grid.LogicalToWorld(interiorPosition);
@@ -124,6 +169,14 @@ public sealed class InsideFactoryController : MonoBehaviour
                 worldPosition.x,
                 worldPosition.y,
                 position.z);
+        }
+
+        if (TryGetComponent<InsideFactoryVisuals>(out var visuals))
+        {
+            visuals.Configure(
+                indoorGrid.Size,
+                interiorExitLogicalPositions,
+                exitDirections);
         }
 
         for (var index = interiorExitLogicalPositions.Count - 1;

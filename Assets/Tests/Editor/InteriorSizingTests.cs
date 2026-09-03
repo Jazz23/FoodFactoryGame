@@ -19,10 +19,12 @@ public sealed class InteriorSizingTests
                 Vector2.one,
                 "FactoryInterior",
                 new Vector2(2f, 0.5f),
-                new Vector2(3f, 1f));
+                new Vector2(3f, 1f),
+                GridEdgeDirection.West);
 
             Assert.That(portal.BuildingInstanceId, Is.EqualTo(7u));
             Assert.That(portal.BuildingSize, Is.EqualTo(new Vector2Int(4, 5)));
+            Assert.That(portal.InteriorDoorDirection, Is.EqualTo(GridEdgeDirection.West));
         }
         finally
         {
@@ -126,11 +128,17 @@ public sealed class InteriorSizingTests
                 new Vector2(2.25f, -0.25f),
                 new Vector2(-0.25f, 2.75f)
             };
+            var interiorDirections = new[]
+            {
+                GridEdgeDirection.South,
+                GridEdgeDirection.West
+            };
             controller.Configure(
                 new Vector2Int(5, 4),
                 interiorPositions[0],
                 interiorPositions,
-                exteriorPositions);
+                exteriorPositions,
+                interiorDirections);
 
             var additionalExit = gridObject.transform.Find("Exit Portal 1");
             Assert.That(additionalExit, Is.Not.Null);
@@ -139,6 +147,9 @@ public sealed class InteriorSizingTests
             Assert.That(
                 additionalPortal.ExteriorArrivalLogicalPosition,
                 Is.EqualTo(exteriorPositions[1]));
+            Assert.That(
+                additionalPortal.InteriorDoorDirection,
+                Is.EqualTo(interiorDirections[1]));
             Assert.That(additionalPortal.HasExteriorArrivalLogicalPosition, Is.True);
             Assert.That(additionalExit.GetComponent<SpriteRenderer>(), Is.Null);
         }
@@ -147,5 +158,22 @@ public sealed class InteriorSizingTests
             Object.DestroyImmediate(gridObject);
             Object.DestroyImmediate(exitObject);
         }
+    }
+
+    [Test]
+    public void InsideFactoryDoorRotationFollowsItsWallDirection()
+    {
+        Assert.That(
+            InsideFactoryVisuals.GetDoorRotation(GridEdgeDirection.South),
+            Is.EqualTo(0f));
+        Assert.That(
+            InsideFactoryVisuals.GetDoorRotation(GridEdgeDirection.West),
+            Is.EqualTo(90f));
+        Assert.That(
+            InsideFactoryVisuals.GetDoorRotation(GridEdgeDirection.East),
+            Is.EqualTo(-90f));
+        Assert.That(
+            InsideFactoryVisuals.GetDoorRotation(GridEdgeDirection.North),
+            Is.EqualTo(180f));
     }
 }

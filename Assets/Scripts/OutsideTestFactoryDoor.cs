@@ -74,6 +74,7 @@ public sealed class OutsideTestFactoryDoor : MonoBehaviour
             grid.LogicalToWorld(exteriorDoorLogicalPosition),
             InteriorSceneName,
             interiorArrivalLogicalPosition,
-            exteriorArrivalLogicalPosition);
+            exteriorArrivalLogicalPosition,
+            wall.Direction);
     }
 }
