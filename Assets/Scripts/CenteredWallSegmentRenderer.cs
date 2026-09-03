@@ -102,6 +102,7 @@ public sealed class CenteredWallSegmentRenderer : MonoBehaviour
         baseSortingOrder = style.GetWallCellSortingOrder(anchorCell);
         meshRenderer.sortingOrder = baseSortingOrder;
 
+        ConfigureOcclusionSurfaces(logicalFootprint);
         ConfigureCollider(includeCollider);
         SetPresentation(Color.white, 0);
     }
@@ -114,6 +115,92 @@ public sealed class CenteredWallSegmentRenderer : MonoBehaviour
     public Vector3[] GetWorldCellBoundary()
     {
         return ToWorldPoints(localCellBoundary);
+    }
+
+    private void ConfigureOcclusionSurfaces(IReadOnlyList<Vector2> logicalFootprint)
+    {
+        var existingSurfaces = new List<DepthOcclusionSurface>(
+            GetComponents<DepthOcclusionSurface>());
+        var groundPolygon = GetWorldFootprint();
+        var surfaceIndex = 0;
+        var logicalStart = new Vector2(anchorCell.x, anchorCell.y);
+        var logicalEnd = logicalStart + Vector2.one;
+
+        for (var index = 0; index < localFootprint.Length; index++)
+        {
+            var nextIndex = (index + 1) % localFootprint.Length;
+            if (IsConnectedBoundary(
+                    logicalFootprint[index],
+                    logicalFootprint[nextIndex]))
+            {
+                continue;
+            }
+
+            var worldStart = transform.TransformPoint(localFootprint[index]);
+            var worldEnd = transform.TransformPoint(localFootprint[nextIndex]);
+            var projectedPolygon = new[]
+            {
+                worldStart,
+                worldEnd,
+                worldEnd + Vector3.up * wallHeight,
+                worldStart + Vector3.up * wallHeight
+            };
+            var surface = GetOcclusionSurface(existingSurfaces, ref surfaceIndex);
+            surface.Configure(
+                projectedPolygon,
+                groundPolygon,
+                (worldStart + worldEnd) * 0.5f,
+                logicalStart,
+                logicalEnd);
+        }
+
+        var joinedTopFootprint = GetJoinedTopFootprint(logicalFootprint);
+        var worldTopPolygon = ToWorldPoints(joinedTopFootprint);
+        for (var index = 0; index < worldTopPolygon.Length; index++)
+        {
+            worldTopPolygon[index] += Vector3.up * wallHeight;
+        }
+
+        var topSurface = GetOcclusionSurface(existingSurfaces, ref surfaceIndex);
+        topSurface.Configure(
+            worldTopPolygon,
+            groundPolygon,
+            GetPolygonCenter(groundPolygon),
+            logicalStart,
+            logicalEnd);
+
+        for (var index = surfaceIndex; index < existingSurfaces.Count; index++)
+        {
+            existingSurfaces[index].enabled = false;
+        }
+    }
+
+    private DepthOcclusionSurface GetOcclusionSurface(
+        List<DepthOcclusionSurface> existingSurfaces,
+        ref int surfaceIndex)
+    {
+        var surface = surfaceIndex < existingSurfaces.Count
+            ? existingSurfaces[surfaceIndex]
+            : gameObject.AddComponent<DepthOcclusionSurface>();
+        if (surfaceIndex == existingSurfaces.Count)
+        {
+            existingSurfaces.Add(surface);
+        }
+
+        surface.enabled = true;
+        surfaceIndex++;
+        return surface;
+    }
+
+    private static Vector3 GetPolygonCenter(IReadOnlyList<Vector3> polygon)
+    {
+        var center = Vector3.zero;
+        foreach (var point in polygon)
+        {
+            center += point;
+        }
+
+        return center / polygon.Count;
     }
 
     public void SetPresentation(Color colorMultiplier, int sortingOrderOffset)

@@ -1,5 +1,6 @@
 // Verifies the selected building perimeter and roof bounds used by TestBuildingCreator.
 using System.Collections.Generic;
+using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -138,5 +139,261 @@ public sealed class TestBuildingCreatorTests
         Assert.That(
             TestBuildingCreator.GetRoofTopHeight(wallHeight, 2.5f, roofThickness),
             Is.EqualTo(2.5f));
+    }
+
+    [Test]
+    public void ExteriorWallSpansClassifyEveryPerimeterDirection()
+    {
+        var spans = new List<TestBuildingCreator.ExteriorWallSpan>();
+
+        TestBuildingCreator.GetExteriorWallSpans(
+            new Vector3Int(-1, -1),
+            new Vector2Int(3, 3),
+            spans);
+
+        Assert.That(spans, Has.Count.EqualTo(12));
+        Assert.That(
+            spans.FindAll(span => span.Direction == GridEdgeDirection.South),
+            Has.Count.EqualTo(3));
+        Assert.That(
+            spans.FindAll(span => span.Direction == GridEdgeDirection.East),
+            Has.Count.EqualTo(3));
+        Assert.That(
+            spans.FindAll(span => span.Direction == GridEdgeDirection.North),
+            Has.Count.EqualTo(3));
+        Assert.That(
+            spans.FindAll(span => span.Direction == GridEdgeDirection.West),
+            Has.Count.EqualTo(3));
+        Assert.That(
+            spans.FindAll(span => !span.IsCorner),
+            Has.Count.EqualTo(4));
+        Assert.That(
+            spans.ConvertAll(span => span.StableId).Distinct().Count(),
+            Is.EqualTo(spans.Count));
+    }
+
+    [Test]
+    public void DoorSelectionUsesTheStableWallId()
+    {
+        var layoutObject = new GameObject("Layout");
+        try
+        {
+            var layout = layoutObject.AddComponent<TestBuildingLayout>();
+            layout.Configure(Vector3Int.zero, new Vector2Int(3, 3));
+            var spans = new List<TestBuildingCreator.ExteriorWallSpan>();
+            layout.GetExteriorWallSpans(spans);
+            var wall = spans.Find(span => !span.IsCorner);
+
+            layout.SetDoor(wall, 0.25f);
+
+            Assert.That(layout.HasDoor, Is.True);
+            Assert.That(layout.DoorWallId, Is.EqualTo(wall.StableId));
+            Assert.That(layout.DoorOffset, Is.EqualTo(0.25f));
+            Assert.That(layout.TryGetDoor(spans, out var resolvedWall), Is.True);
+            Assert.That(resolvedWall.StableId, Is.EqualTo(wall.StableId));
+        }
+        finally
+        {
+            Object.DestroyImmediate(layoutObject);
+        }
+    }
+
+    [Test]
+    public void EditorBuildingsRequireAtLeastTwoCellsInEachDimension()
+    {
+        Assert.That(TestBuildingCreator.IsSupportedSize(new Vector2Int(2, 2)), Is.True);
+        Assert.That(TestBuildingCreator.IsSupportedSize(new Vector2Int(3, 2)), Is.True);
+        Assert.That(TestBuildingCreator.IsSupportedSize(new Vector2Int(2, 3)), Is.True);
+        Assert.That(TestBuildingCreator.IsSupportedSize(new Vector2Int(1, 2)), Is.False);
+        Assert.That(TestBuildingCreator.IsSupportedSize(new Vector2Int(2, 1)), Is.False);
+    }
+
+    [Test]
+    public void DepthGeometryRequiresFootprintIntersection()
+    {
+        var polygon = new List<Vector2>
+        {
+            new(-1f, 0.5f),
+            new(4f, 3f),
+            new(-1f, 5.5f),
+            new(-6f, 3f)
+        };
+
+        Assert.That(
+            BuildingDepthGeometry.IntersectsFootprint(
+                polygon,
+                new Bounds(new Vector3(0.5f, 3f), new Vector3(0.2f, 0.2f, 0.2f))),
+            Is.True);
+        Assert.That(
+            BuildingDepthGeometry.IntersectsFootprint(
+                polygon,
+                new Bounds(new Vector3(0.5f, 7f), new Vector3(0.2f, 0.2f, 0.2f))),
+            Is.False);
+    }
+
+    [Test]
+    public void DepthGeometryDetectsCrossingPolygonsWithoutContainedVertices()
+    {
+        var horizontal = new List<Vector2>
+        {
+            new(-2f, -0.1f),
+            new(2f, -0.1f),
+            new(2f, 0.1f),
+            new(-2f, 0.1f)
+        };
+        var vertical = new List<Vector2>
+        {
+            new(-0.1f, -2f),
+            new(0.1f, -2f),
+            new(0.1f, 2f),
+            new(-0.1f, 2f)
+        };
+
+        Assert.That(BuildingDepthGeometry.IntersectsPolygon(horizontal, vertical), Is.True);
+    }
+
+    [Test]
+    public void DepthSortingUsesHysteresisAtTheSurfaceBoundary()
+    {
+        Assert.That(
+            DepthOcclusionCoordinator.ResolveBehind(1.04f, 1f, false, 0.05f),
+            Is.False);
+        Assert.That(
+            DepthOcclusionCoordinator.ResolveBehind(1.06f, 1f, false, 0.05f),
+            Is.True);
+        Assert.That(
+            DepthOcclusionCoordinator.ResolveBehind(0.96f, 1f, true, 0.05f),
+            Is.True);
+        Assert.That(
+            DepthOcclusionCoordinator.ResolveBehind(0.94f, 1f, true, 0.05f),
+            Is.False);
+    }
+
+    [Test]
+    public void DepthSurfaceUsesTheClosestLocalGroundDepth()
+    {
+        var surfaceObject = new GameObject("Surface");
+        surfaceObject.AddComponent<MeshRenderer>();
+        var surface = surfaceObject.AddComponent<DepthOcclusionSurface>();
+        try
+        {
+            surface.Configure(
+                new List<Vector3>
+                {
+                    new(0f, 0f),
+                    new(2f, 0f),
+                    new(2f, 2f),
+                    new(0f, 2f)
+                },
+                new List<Vector3>
+                {
+                    new(0f, 0f),
+                    new(2f, 1f),
+                    new(2f, 2f),
+                    new(0f, 1f)
+                },
+                new Vector3(1f, 1.5f),
+                Vector2.zero,
+                Vector2.one);
+
+            Assert.That(
+                surface.GetDepthKey(new Vector2(0.25f, 0.2f)),
+                Is.EqualTo(0.2f).Within(0.0001f));
+            Assert.That(
+                surface.GetDepthKey(new Vector2(1.75f, 0.9f)),
+                Is.EqualTo(0.9f).Within(0.0001f));
+            Assert.That(surface.DepthKey, Is.EqualTo(1.5f).Within(0.0001f));
+        }
+        finally
+        {
+            Object.DestroyImmediate(surfaceObject);
+        }
+    }
+
+    [Test]
+    public void TestBuildingPresentationKeepsBaseDoorAlphaAcrossRefresh()
+    {
+        var buildingObject = new GameObject("Building");
+        var doorObject = new GameObject("Door");
+        doorObject.transform.SetParent(buildingObject.transform);
+        var doorRenderer = doorObject.AddComponent<SpriteRenderer>();
+        doorRenderer.color = new Color(1f, 1f, 1f, 0.75f);
+        var presentation = buildingObject.AddComponent<TestBuildingPresentation>();
+
+        try
+        {
+            presentation.RefreshRenderers();
+            presentation.SetOcclusionAlpha(0.2f);
+            presentation.RefreshRenderers();
+            presentation.SetOcclusionAlpha(1f);
+
+            Assert.That(doorRenderer.color.a, Is.EqualTo(0.75f).Within(0.0001f));
+        }
+        finally
+        {
+            Object.DestroyImmediate(buildingObject);
+        }
+    }
+
+    [Test]
+    public void TestBuildingPresentationIgnoresDestroyedRenderers()
+    {
+        var buildingObject = new GameObject("Building");
+        var meshObject = new GameObject("Generated Mesh");
+        meshObject.transform.SetParent(buildingObject.transform);
+        meshObject.AddComponent<MeshRenderer>();
+        var presentation = buildingObject.AddComponent<TestBuildingPresentation>();
+
+        try
+        {
+            presentation.RefreshRenderers();
+            Object.DestroyImmediate(meshObject);
+
+            Assert.DoesNotThrow(() => presentation.SetOcclusionAlpha(0.2f));
+        }
+        finally
+        {
+            Object.DestroyImmediate(buildingObject);
+        }
+    }
+
+    [Test]
+    public void RearEdgeUsesThePlayerFootprintCenterAtItsLogicalDepth()
+    {
+        var polygon = new List<Vector2>
+        {
+            new(-1f, 0.5f),
+            new(4f, 3f),
+            new(-1f, 5.5f),
+            new(-6f, 3f)
+        };
+        var playerFootprint = new Bounds(
+            new Vector3(0.5f, 4.8f),
+            new Vector3(0.2f, 0.6f, 0.2f));
+
+        Assert.That(
+            BuildingDepthGeometry.TryGetRearEdgeY(
+                polygon,
+                playerFootprint,
+                out var rearEdgeY),
+            Is.True);
+        Assert.That(rearEdgeY, Is.EqualTo(4.75f).Within(0.0001f));
+    }
+
+    [Test]
+    public void DoorFacingMirrorsVerticalWallDirections()
+    {
+        var style = ScriptableObject.CreateInstance<BuildingVisualStyle>();
+        try
+        {
+            Assert.That(style.ShouldFlipEntranceX(GridEdgeDirection.South), Is.False);
+            Assert.That(style.ShouldFlipEntranceX(GridEdgeDirection.North), Is.False);
+            Assert.That(style.ShouldFlipEntranceX(GridEdgeDirection.East), Is.True);
+            Assert.That(style.ShouldFlipEntranceX(GridEdgeDirection.West), Is.True);
+        }
+        finally
+        {
+            Object.DestroyImmediate(style);
+        }
     }
 }

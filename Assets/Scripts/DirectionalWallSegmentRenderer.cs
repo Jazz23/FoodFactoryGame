@@ -99,6 +99,7 @@ public sealed class DirectionalWallSegmentRenderer : MonoBehaviour
         baseSortingOrder = style.GetWallSortingOrder(direction, edge);
         meshRenderer.sortingOrder = baseSortingOrder;
 
+        ConfigureOcclusionSurfaces();
         ConfigureCollider(includeCollider);
         SetPresentation(Color.white, 0);
     }
@@ -122,6 +123,94 @@ public sealed class DirectionalWallSegmentRenderer : MonoBehaviour
         }
 
         return points;
+    }
+
+    private void ConfigureOcclusionSurfaces()
+    {
+        var existingSurfaces = new List<DepthOcclusionSurface>(
+            GetComponents<DepthOcclusionSurface>());
+        var groundPolygon = GetWorldFootprint();
+        var surfaceIndex = 0;
+        var logicalStart = new Vector2(edge.Corner.x, edge.Corner.y);
+        var logicalEnd = new Vector2(edge.EndCorner.x, edge.EndCorner.y);
+
+        for (var index = 0; index < localFootprint.Length; index++)
+        {
+            var nextIndex = (index + 1) % localFootprint.Length;
+            var start = localFootprint[index];
+            var end = localFootprint[nextIndex];
+            var midpoint = (start + end) * 0.5f;
+            if (!hasStartCap && Vector3.Distance(midpoint, localStart) <= 0.0001f
+                || !hasEndCap && Vector3.Distance(midpoint, localEnd) <= 0.0001f)
+            {
+                continue;
+            }
+
+            var worldStart = transform.TransformPoint(start);
+            var worldEnd = transform.TransformPoint(end);
+            var projectedPolygon = new[]
+            {
+                worldStart,
+                worldEnd,
+                worldEnd + Vector3.up * wallHeight,
+                worldStart + Vector3.up * wallHeight
+            };
+            var surface = GetOcclusionSurface(existingSurfaces, ref surfaceIndex);
+            surface.Configure(
+                projectedPolygon,
+                groundPolygon,
+                (worldStart + worldEnd) * 0.5f,
+                logicalStart,
+                logicalEnd);
+        }
+
+        var worldTopPolygon = new Vector3[localFootprint.Length];
+        for (var index = 0; index < localFootprint.Length; index++)
+        {
+            worldTopPolygon[index] = transform.TransformPoint(
+                localFootprint[index] + Vector3.up * wallHeight);
+        }
+
+        var topSurface = GetOcclusionSurface(existingSurfaces, ref surfaceIndex);
+        topSurface.Configure(
+            worldTopPolygon,
+            groundPolygon,
+            GetPolygonCenter(groundPolygon),
+            logicalStart,
+            logicalEnd);
+
+        for (var index = surfaceIndex; index < existingSurfaces.Count; index++)
+        {
+            existingSurfaces[index].enabled = false;
+        }
+    }
+
+    private DepthOcclusionSurface GetOcclusionSurface(
+        List<DepthOcclusionSurface> existingSurfaces,
+        ref int surfaceIndex)
+    {
+        var surface = surfaceIndex < existingSurfaces.Count
+            ? existingSurfaces[surfaceIndex]
+            : gameObject.AddComponent<DepthOcclusionSurface>();
+        if (surfaceIndex == existingSurfaces.Count)
+        {
+            existingSurfaces.Add(surface);
+        }
+
+        surface.enabled = true;
+        surfaceIndex++;
+        return surface;
+    }
+
+    private static Vector3 GetPolygonCenter(IReadOnlyList<Vector3> polygon)
+    {
+        var center = Vector3.zero;
+        foreach (var point in polygon)
+        {
+            center += point;
+        }
+
+        return center / polygon.Count;
     }
 
     private void AddSideFaces(

@@ -47,6 +47,11 @@ public sealed class BuildingVisualStyle : ScriptableObject
     public int OutlineSortingOrder => outlineSortingOrder;
     public int EntranceSortingOrder => entranceSortingOrder;
 
+    public bool ShouldFlipEntranceX(GridEdgeDirection direction)
+    {
+        return direction is GridEdgeDirection.East or GridEdgeDirection.West;
+    }
+
     public Color GetWallColor(GridEdgeDirection direction)
     {
         return direction is GridEdgeDirection.South or GridEdgeDirection.East

@@ -45,14 +45,26 @@ public sealed class GridRoofTests
     }
 
     [Test]
-    public void RoofUsesOneCombinedSideSurfaceAndOneTopSurface()
+    public void RoofUsesOneSurfacePerSideAndOneTopSurface()
     {
         var roof = CreateRoof(new Vector2(-0.75f, -0.75f), new Vector2(1.75f, 1.75f), 2f, 0.1f);
 
-        Assert.That(roof.transform.childCount, Is.EqualTo(2));
+        Assert.That(roof.transform.childCount, Is.EqualTo(5));
         Assert.That(roof.GetComponent<MeshRenderer>().enabled, Is.False);
-        Assert.That(roof.transform.GetChild(0).name, Does.EndWith(" Sides"));
-        Assert.That(roof.transform.GetChild(1).name, Does.EndWith(" Top"));
+        Assert.That(roof.GetComponentsInChildren<DepthOcclusionSurface>(true), Has.Length.EqualTo(5));
+
+        for (var index = 0; index < 4; index++)
+        {
+            var side = roof.transform.GetChild(index);
+            Assert.That(side.name, Does.EndWith($" Side {index}"));
+            Assert.That(side.GetComponent<MeshFilter>().sharedMesh.vertexCount, Is.EqualTo(4));
+            Assert.That(side.GetComponent<MeshFilter>().sharedMesh.triangles, Has.Length.EqualTo(6));
+        }
+
+        var top = roof.transform.GetChild(4);
+        Assert.That(top.name, Does.EndWith(" Top"));
+        Assert.That(top.GetComponent<MeshFilter>().sharedMesh.vertexCount, Is.EqualTo(4));
+        Assert.That(top.GetComponent<MeshFilter>().sharedMesh.triangles, Has.Length.EqualTo(6));
     }
 
     private static void AssertVector(Vector3 actual, Vector3 expected)

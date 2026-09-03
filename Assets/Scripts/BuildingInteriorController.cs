@@ -30,9 +30,9 @@ public sealed class BuildingInteriorController : MonoBehaviour
 
     public bool IsInside(Virtual3DSize player)
     {
-        return player is not null
+            return player is not null
             && interiorTrigger is not null
-            && interiorTrigger.OverlapPoint(new Vector2(player.transform.position.x, player.FrontY));
+            && interiorTrigger.OverlapPoint(new Vector2(player.transform.position.x, player.DepthY));
     }
 
     private void Awake()

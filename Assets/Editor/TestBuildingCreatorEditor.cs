@@ -12,16 +12,27 @@ public sealed class TestBuildingCreatorEditor : Editor
     private static readonly Color PreviewLineColor = new(0.35f, 1f, 0.45f, 1f);
 
     private readonly List<TestBuildingCreator.WallPlacement> wallPlacements = new();
+    private readonly List<TestBuildingCreator.ExteriorWallSpan> wallSpans = new();
     private Vector3Int firstCorner;
     private Vector3Int hoveredCell;
+    private TestBuildingCreator.ExteriorWallSpan hoveredDoorWall;
+    private TestBuildingLayout hoveredDoorLayout = null!;
+    private float hoveredDoorOffset;
     private bool hasFirstCorner;
     private bool hasHoveredCell;
+    private bool hasHoveredDoorWall;
+    private bool doorPlacementMode;
     private string statusMessage = string.Empty;
 
     private TestBuildingCreator Creator => (TestBuildingCreator)target;
 
     private void OnEnable()
     {
+        if (target is not TestBuildingCreator || !target)
+        {
+            return;
+        }
+
         MigrateLegacySettings();
         RefreshGeneratedBuildingWalls();
         RefreshGeneratedRoofs();
@@ -32,11 +43,18 @@ public sealed class TestBuildingCreatorEditor : Editor
     {
         hasFirstCorner = false;
         hasHoveredCell = false;
+        hasHoveredDoorWall = false;
+        doorPlacementMode = false;
         SceneView.RepaintAll();
     }
 
     public override void OnInspectorGUI()
     {
+        if (target is not TestBuildingCreator || !target)
+        {
+            return;
+        }
+
         serializedObject.Update();
         DrawPropertiesExcluding(serializedObject, "m_Script");
         serializedObject.ApplyModifiedProperties();
@@ -45,7 +63,7 @@ public sealed class TestBuildingCreatorEditor : Editor
 
         EditorGUILayout.HelpBox(
             "Select the creator, then click two opposite ground cells in Scene View. "
-            + "Each completed selection creates walls and a roof without a door or collider.",
+            + "Each completed selection creates walls, a roof, collision, and no door.",
             MessageType.Info);
 
         if (hasFirstCorner)
@@ -70,11 +88,32 @@ public sealed class TestBuildingCreatorEditor : Editor
         {
             ClearGeneratedBuildings();
         }
+
+        if (GUILayout.Button(doorPlacementMode
+                ? "Cancel Door Placement"
+                : "Place Door in Scene View"))
+        {
+            doorPlacementMode = !doorPlacementMode;
+            hasHoveredDoorWall = false;
+            statusMessage = doorPlacementMode
+                ? "Click a visible straight exterior wall to place a visual door."
+                : string.Empty;
+            SceneView.RepaintAll();
+            Repaint();
+        }
+
+        if (doorPlacementMode)
+        {
+            EditorGUILayout.HelpBox(
+                "Only the topmost visible wall surface can be selected. "
+                + "Corner pieces and positions near corners are rejected.",
+                MessageType.Info);
+        }
     }
 
     private void OnSceneGUI()
     {
-        if (!IsReady())
+        if (target is not TestBuildingCreator || !target || !IsReady())
         {
             return;
         }
@@ -88,10 +127,26 @@ public sealed class TestBuildingCreatorEditor : Editor
 
         if (currentEvent.type == EventType.KeyDown && currentEvent.keyCode == KeyCode.Escape)
         {
-            ResetPlacement();
+            if (doorPlacementMode)
+            {
+                doorPlacementMode = false;
+                hasHoveredDoorWall = false;
+                statusMessage = string.Empty;
+            }
+            else
+            {
+                ResetPlacement();
+            }
+
             currentEvent.Use();
             sceneView?.Repaint();
             Repaint();
+            return;
+        }
+
+        if (doorPlacementMode)
+        {
+            HandleDoorPlacementEvent(currentEvent, sceneView);
             return;
         }
 
@@ -205,6 +260,222 @@ public sealed class TestBuildingCreatorEditor : Editor
         Handles.Label(labelPosition, $"{size.x} x {size.y}");
     }
 
+    private void HandleDoorPlacementEvent(Event currentEvent, SceneView sceneView)
+    {
+        var foundDoorWall = hasHoveredDoorWall;
+        var layout = hoveredDoorLayout;
+        var wall = hoveredDoorWall;
+        var normalizedOffset = hoveredDoorOffset;
+        if (currentEvent.type is EventType.MouseMove or EventType.MouseDown)
+        {
+            foundDoorWall = TryGetVisibleDoorWall(
+                currentEvent.mousePosition,
+                out layout,
+                out wall,
+                out normalizedOffset);
+            if (foundDoorWall)
+            {
+                hoveredDoorLayout = layout;
+                hoveredDoorWall = wall;
+                hoveredDoorOffset = normalizedOffset;
+            }
+
+            hasHoveredDoorWall = foundDoorWall;
+        }
+
+        if (currentEvent.type == EventType.MouseDown
+            && currentEvent.button == 0
+            && !currentEvent.alt)
+        {
+            if (!foundDoorWall)
+            {
+                statusMessage = "Select a visible straight exterior wall surface.";
+            }
+            else if (!IsValidDoorOffset(wall, normalizedOffset))
+            {
+                statusMessage = "Doors must be placed away from wall corners.";
+            }
+            else
+            {
+                PlaceDoor(layout, wall, normalizedOffset);
+                doorPlacementMode = false;
+            }
+
+            currentEvent.Use();
+            sceneView?.Repaint();
+            Repaint();
+            return;
+        }
+
+        if (currentEvent.type == EventType.MouseDown && currentEvent.button == 1)
+        {
+            doorPlacementMode = false;
+            hasHoveredDoorWall = false;
+            statusMessage = string.Empty;
+            currentEvent.Use();
+            sceneView?.Repaint();
+            Repaint();
+            return;
+        }
+
+        if (currentEvent.type == EventType.Repaint && hasHoveredDoorWall)
+        {
+            DrawDoorPreview(hoveredDoorWall, hoveredDoorOffset);
+        }
+    }
+
+    private bool TryGetVisibleDoorWall(
+        Vector2 guiPosition,
+        out TestBuildingLayout layout,
+        out TestBuildingCreator.ExteriorWallSpan wall,
+        out float normalizedOffset)
+    {
+        layout = null!;
+        wall = default;
+        normalizedOffset = 0.5f;
+
+        var pickedObject = HandleUtility.PickGameObject(guiPosition, false);
+        if (pickedObject is null || !pickedObject)
+        {
+            return false;
+        }
+
+        var pickedRenderer = pickedObject.GetComponent<MeshRenderer>();
+        if (pickedRenderer is null || !pickedRenderer || !pickedObject.name.Contains(" Side "))
+        {
+            return false;
+        }
+
+        var pickedWall = pickedObject.GetComponentInParent<GridWall>();
+        if (pickedWall is null || !pickedWall)
+        {
+            return false;
+        }
+
+        layout = pickedWall.GetComponentInParent<TestBuildingLayout>();
+        if (layout is null || !layout)
+        {
+            return false;
+        }
+
+        if (!TryGetLogicalPoint(guiPosition, out var logicalPoint))
+        {
+            return false;
+        }
+
+        layout.GetExteriorWallSpans(wallSpans);
+        var closestDistance = float.PositiveInfinity;
+        var found = false;
+        foreach (var candidate in wallSpans)
+        {
+            if (candidate.IsCorner
+                || candidate.Kind != pickedWall.Kind
+                || candidate.Cell != pickedWall.Cell
+                || !TryGetSegmentOffset(candidate, logicalPoint, out var candidateOffset, out var distance))
+            {
+                continue;
+            }
+
+            if (distance >= closestDistance)
+            {
+                continue;
+            }
+
+            closestDistance = distance;
+            wall = candidate;
+            normalizedOffset = candidateOffset;
+            found = true;
+        }
+
+        return found;
+    }
+
+    private bool TryGetLogicalPoint(Vector2 guiPosition, out Vector2 logicalPoint)
+    {
+        var ray = HandleUtility.GUIPointToWorldRay(guiPosition);
+        var plane = new Plane(Vector3.forward, Creator.Grid.transform.position.z);
+        if (!plane.Raycast(ray, out var distance))
+        {
+            logicalPoint = default;
+            return false;
+        }
+
+        logicalPoint = Creator.Grid.WorldToLogical(ray.GetPoint(distance));
+        return true;
+    }
+
+    private static bool TryGetSegmentOffset(
+        TestBuildingCreator.ExteriorWallSpan wall,
+        Vector2 logicalPoint,
+        out float normalizedOffset,
+        out float distance)
+    {
+        var delta = wall.LogicalEnd - wall.LogicalStart;
+        var lengthSquared = delta.sqrMagnitude;
+        if (lengthSquared <= Mathf.Epsilon)
+        {
+            normalizedOffset = 0.5f;
+            distance = float.PositiveInfinity;
+            return false;
+        }
+
+        normalizedOffset = Mathf.Clamp01(Vector2.Dot(
+            logicalPoint - wall.LogicalStart,
+            delta) / lengthSquared);
+        var closestPoint = Vector2.Lerp(
+            wall.LogicalStart,
+            wall.LogicalEnd,
+            normalizedOffset);
+        distance = Vector2.Distance(logicalPoint, closestPoint);
+        return true;
+    }
+
+    private bool IsValidDoorOffset(
+        TestBuildingCreator.ExteriorWallSpan wall,
+        float normalizedOffset)
+    {
+        var segmentLength = Vector2.Distance(wall.LogicalStart, wall.LogicalEnd);
+        var minimumOffset = Creator.DoorCornerExclusionDistance / segmentLength;
+        return !wall.IsCorner
+            && normalizedOffset >= minimumOffset
+            && normalizedOffset <= 1f - minimumOffset;
+    }
+
+    private void DrawDoorPreview(
+        TestBuildingCreator.ExteriorWallSpan wall,
+        float normalizedOffset)
+    {
+        var start = ToWorld(wall.LogicalStart);
+        var end = ToWorld(wall.LogicalEnd);
+        var point = Vector3.Lerp(start, end, normalizedOffset);
+        var isValid = IsValidDoorOffset(wall, normalizedOffset);
+        Handles.color = isValid
+            ? new Color(0.25f, 1f, 0.35f, 1f)
+            : new Color(1f, 0.2f, 0.2f, 1f);
+        Handles.DrawAAPolyLine(5f, start, end);
+        Handles.SphereHandleCap(
+            0,
+            point,
+            Quaternion.identity,
+            HandleUtility.GetHandleSize(point) * 0.12f,
+            EventType.Repaint);
+        Handles.Label(point, isValid ? "Door" : "Door too close to corner");
+    }
+
+    private void PlaceDoor(
+        TestBuildingLayout layout,
+        TestBuildingCreator.ExteriorWallSpan wall,
+        float normalizedOffset)
+    {
+        var visualDoors = layout.transform.Find(TestBuildingLayout.VisualDoorsName)!;
+        Undo.RecordObject(layout, "Place test building door");
+        layout.SetDoor(wall, normalizedOffset);
+        RebuildDoor(layout, visualDoors);
+        EditorUtility.SetDirty(layout);
+        EditorSceneManager.MarkSceneDirty(Creator.gameObject.scene);
+        statusMessage = $"Placed a door on the {wall.Direction} exterior wall.";
+    }
+
     private Vector3[] GetBoundaryWorldPoints(Vector3Int anchor, Vector2Int size)
     {
         return new[]
@@ -226,9 +497,9 @@ public sealed class TestBuildingCreatorEditor : Editor
     {
         var anchor = TestBuildingCreator.GetAnchorCell(first, second);
         var size = TestBuildingCreator.GetSize(first, second);
-        if (!BuildingFootprint.IsValid(size))
+        if (!TestBuildingCreator.IsSupportedSize(size))
         {
-            statusMessage = "The selected area is not a valid rectangle.";
+            statusMessage = "Test buildings must be at least 2 x 2 cells.";
             return;
         }
 
@@ -243,17 +514,35 @@ public sealed class TestBuildingCreatorEditor : Editor
         layout.Configure(anchor, size);
         EditorUtility.SetDirty(layout);
 
+        var generatedVisuals = CreateGeneratedRoot(
+            buildingObject.transform,
+            TestBuildingLayout.GeneratedVisualsName);
+        var generatedCollision = CreateGeneratedRoot(
+            buildingObject.transform,
+            TestBuildingLayout.GeneratedCollisionName);
+        CreateGeneratedRoot(buildingObject.transform, TestBuildingLayout.VisualDoorsName);
+
         TestBuildingCreator.GetWallPlacements(first, second, wallPlacements);
         foreach (var placement in wallPlacements)
         {
-            CreateWall(buildingObject.transform, placement);
+            CreateWall(generatedVisuals, placement);
         }
 
-        CreateRoof(buildingObject.transform, first, second);
+        CreateRoof(generatedVisuals, first, second);
+        RebuildCollision(layout, generatedCollision, wallPlacements);
+        Undo.AddComponent<TestBuildingPresentation>(buildingObject);
         EditorSceneManager.MarkSceneDirty(Creator.gameObject.scene);
         Undo.CollapseUndoOperations(undoGroup);
         Selection.activeGameObject = Creator.gameObject;
         statusMessage = $"Created {size.x} x {size.y} test building.";
+    }
+
+    private Transform CreateGeneratedRoot(Transform parent, string rootName)
+    {
+        var rootObject = new GameObject(rootName);
+        rootObject.transform.SetParent(parent, false);
+        Undo.RegisterCreatedObjectUndo(rootObject, "Create test building output");
+        return rootObject.transform;
     }
 
     private void CreateWall(
@@ -326,9 +615,14 @@ public sealed class TestBuildingCreatorEditor : Editor
 
         foreach (var layout in Creator.GeneratedBuildings.GetComponentsInChildren<TestBuildingLayout>(true))
         {
+            var hierarchyChanged = EnsureGeneratedHierarchy(
+                layout,
+                out var generatedVisuals,
+                out var generatedCollision,
+                out var visualDoors);
             var secondCorner = layout.AnchorCell + new Vector3Int(layout.Size.x - 1, layout.Size.y - 1);
             TestBuildingCreator.GetWallPlacements(layout.AnchorCell, secondCorner, wallPlacements);
-            var walls = layout.GetComponentsInChildren<GridWall>(true);
+            var walls = generatedVisuals.GetComponentsInChildren<GridWall>(true);
             var needsRefresh = walls.Length != wallPlacements.Count;
             var sharedCount = Mathf.Min(walls.Length, wallPlacements.Count);
             for (var index = 0; index < sharedCount && !needsRefresh; index++)
@@ -337,29 +631,269 @@ public sealed class TestBuildingCreatorEditor : Editor
                     || walls[index].Cell != wallPlacements[index].Cell;
             }
 
-            if (!needsRefresh)
+            if (needsRefresh)
+            {
+                for (var index = walls.Length - 1; index >= wallPlacements.Count; index--)
+                {
+                    Undo.DestroyObjectImmediate(walls[index].gameObject);
+                }
+
+                sharedCount = Mathf.Min(walls.Length, wallPlacements.Count);
+                for (var index = 0; index < sharedCount; index++)
+                {
+                    ConfigureWall(walls[index], wallPlacements[index]);
+                }
+
+                for (var index = sharedCount; index < wallPlacements.Count; index++)
+                {
+                    CreateWall(generatedVisuals, wallPlacements[index]);
+                }
+            }
+
+            var outputsNeedRefresh = hierarchyChanged
+                || needsRefresh
+                || generatedCollision.childCount != wallPlacements.Count
+                || DoorNeedsRefresh(layout, visualDoors);
+            if (!outputsNeedRefresh)
             {
                 continue;
             }
 
-            for (var index = walls.Length - 1; index >= wallPlacements.Count; index--)
-            {
-                Undo.DestroyObjectImmediate(walls[index].gameObject);
-            }
-
-            sharedCount = Mathf.Min(walls.Length, wallPlacements.Count);
-            for (var index = 0; index < sharedCount; index++)
-            {
-                ConfigureWall(walls[index], wallPlacements[index]);
-            }
-
-            for (var index = sharedCount; index < wallPlacements.Count; index++)
-            {
-                CreateWall(layout.transform, wallPlacements[index]);
-            }
-
+            RebuildCollision(layout, generatedCollision, wallPlacements);
+            RebuildDoor(layout, visualDoors);
             EditorSceneManager.MarkSceneDirty(Creator.gameObject.scene);
         }
+    }
+
+    private bool EnsureGeneratedHierarchy(
+        TestBuildingLayout layout,
+        out Transform generatedVisuals,
+        out Transform generatedCollision,
+        out Transform visualDoors)
+    {
+        var hierarchyChanged = false;
+        generatedVisuals = layout.transform.Find(TestBuildingLayout.GeneratedVisualsName)!;
+        if (generatedVisuals is null || !generatedVisuals)
+        {
+            generatedVisuals = CreateGeneratedRoot(
+                layout.transform,
+                TestBuildingLayout.GeneratedVisualsName);
+            hierarchyChanged = true;
+        }
+
+        generatedCollision = layout.transform.Find(TestBuildingLayout.GeneratedCollisionName)!;
+        if (generatedCollision is null || !generatedCollision)
+        {
+            generatedCollision = CreateGeneratedRoot(
+                layout.transform,
+                TestBuildingLayout.GeneratedCollisionName);
+            hierarchyChanged = true;
+        }
+
+        visualDoors = layout.transform.Find(TestBuildingLayout.VisualDoorsName)!;
+        if (visualDoors is null || !visualDoors)
+        {
+            visualDoors = CreateGeneratedRoot(layout.transform, TestBuildingLayout.VisualDoorsName);
+            hierarchyChanged = true;
+        }
+
+        if (!layout.TryGetComponent<TestBuildingPresentation>(out _))
+        {
+            Undo.AddComponent<TestBuildingPresentation>(layout.gameObject);
+            hierarchyChanged = true;
+        }
+
+        for (var index = layout.transform.childCount - 1; index >= 0; index--)
+        {
+            var child = layout.transform.GetChild(index);
+            if (child == generatedVisuals
+                || child == generatedCollision
+                || child == visualDoors
+                || (child.GetComponent<GridWall>() is null && child.GetComponent<GridRoof>() is null))
+            {
+                continue;
+            }
+
+            Undo.SetTransformParent(child, generatedVisuals, "Organize test building output");
+            hierarchyChanged = true;
+        }
+
+        return hierarchyChanged;
+    }
+
+    private bool DoorNeedsRefresh(TestBuildingLayout layout, Transform visualDoors)
+    {
+        if (!layout.HasDoor)
+        {
+            return visualDoors.childCount != 0;
+        }
+
+        if (visualDoors.childCount != 1
+            || visualDoors.GetChild(0).name != $"Door {layout.DoorWallId}")
+        {
+            return true;
+        }
+
+        layout.GetExteriorWallSpans(wallSpans);
+        if (!layout.TryGetDoor(wallSpans, out var wall) || wall.IsCorner)
+        {
+            return true;
+        }
+
+        var doorRenderer = visualDoors.GetChild(0).GetComponent<SpriteRenderer>();
+        var depthSurface = visualDoors.GetChild(0).GetComponent<DepthOcclusionSurface>();
+        return doorRenderer is null
+            || !doorRenderer
+            || depthSurface is null
+            || !depthSurface
+            || !depthSurface.IsConfigured
+            || doorRenderer.flipX != Creator.VisualStyle.ShouldFlipEntranceX(wall.Direction);
+    }
+
+    private void RebuildCollision(
+        TestBuildingLayout layout,
+        Transform generatedCollision,
+        IReadOnlyList<TestBuildingCreator.WallPlacement> placements)
+    {
+        for (var index = generatedCollision.childCount - 1; index >= 0; index--)
+        {
+            Object.DestroyImmediate(generatedCollision.GetChild(index).gameObject);
+        }
+
+        foreach (var placement in placements)
+        {
+            var collisionObject = new GameObject(
+                $"Wall Collision {placement.Kind} ({placement.Cell.x},{placement.Cell.y})");
+            collisionObject.transform.SetParent(generatedCollision, false);
+            var collider = collisionObject.AddComponent<PolygonCollider2D>();
+            var logicalFootprint = GridWall.GetLogicalFootprint(placement.Kind, placement.Cell);
+            var points = new Vector2[logicalFootprint.Count];
+            for (var index = 0; index < logicalFootprint.Count; index++)
+            {
+                var worldPoint = Creator.Grid.LogicalToWorld(logicalFootprint[index]);
+                points[index] = generatedCollision.InverseTransformPoint(worldPoint);
+            }
+
+            collider.pathCount = 1;
+            collider.SetPath(0, points);
+        }
+    }
+
+    private void RebuildDoor(TestBuildingLayout layout, Transform visualDoors)
+    {
+        for (var index = visualDoors.childCount - 1; index >= 0; index--)
+        {
+            Object.DestroyImmediate(visualDoors.GetChild(index).gameObject);
+        }
+
+        if (!layout.HasDoor || Creator.VisualStyle is null || !Creator.VisualStyle)
+        {
+            return;
+        }
+
+        layout.GetExteriorWallSpans(wallSpans);
+        if (!layout.TryGetDoor(wallSpans, out var wall) || wall.IsCorner)
+        {
+            return;
+        }
+
+        CreateDoorVisual(layout, visualDoors, wall, layout.DoorOffset);
+    }
+
+    private void CreateDoorVisual(
+        TestBuildingLayout layout,
+        Transform visualDoors,
+        TestBuildingCreator.ExteriorWallSpan wall,
+        float normalizedOffset)
+    {
+        var doorObject = new GameObject($"Door {wall.StableId}");
+        doorObject.transform.SetParent(visualDoors, false);
+        var logicalPosition = Vector2.Lerp(
+            wall.LogicalStart,
+            wall.LogicalEnd,
+            normalizedOffset);
+        var worldPosition = Creator.Grid.LogicalToWorld(logicalPosition);
+        doorObject.transform.position = new Vector3(
+            worldPosition.x,
+            worldPosition.y,
+            layout.transform.position.z);
+
+        var renderer = doorObject.AddComponent<SpriteRenderer>();
+        renderer.sprite = Creator.VisualStyle.EntranceSprite;
+        renderer.color = Creator.VisualStyle.EntranceColor;
+        renderer.flipX = Creator.VisualStyle.ShouldFlipEntranceX(wall.Direction);
+        renderer.sortingOrder = GetDoorSortingOrder(wall);
+        doorObject.transform.localScale = Vector3.one * (
+            Creator.VisualStyle.EntranceHeight / GetVisibleSpriteHeight(renderer.sprite));
+
+        var logicalFootprint = GridWall.GetLogicalFootprint(wall.Kind, wall.Cell);
+        var groundPolygon = new List<Vector3>(logicalFootprint.Count);
+        foreach (var logicalPoint in logicalFootprint)
+        {
+            var groundPoint = Creator.Grid.LogicalToWorld(logicalPoint);
+            groundPolygon.Add(new Vector3(
+                groundPoint.x,
+                groundPoint.y,
+                layout.transform.position.z));
+        }
+
+        var depthSurface = doorObject.AddComponent<DepthOcclusionSurface>();
+        depthSurface.Configure(
+            GetVisibleSpritePolygon(renderer),
+            groundPolygon,
+            new Vector3(worldPosition.x, worldPosition.y, layout.transform.position.z),
+            wall.LogicalStart,
+            wall.LogicalEnd);
+    }
+
+    private static int GetDoorSortingOrder(TestBuildingCreator.ExteriorWallSpan wall)
+    {
+        var depth = (wall.LogicalStart.x + wall.LogicalStart.y
+            + wall.LogicalEnd.x + wall.LogicalEnd.y) * 0.5f;
+        return 1005 - Mathf.RoundToInt(depth * 10f);
+    }
+
+    private static List<Vector3> GetVisibleSpritePolygon(SpriteRenderer renderer)
+    {
+        var minimum = new Vector2(float.PositiveInfinity, float.PositiveInfinity);
+        var maximum = new Vector2(float.NegativeInfinity, float.NegativeInfinity);
+        foreach (var vertex in renderer.sprite.vertices)
+        {
+            var point = new Vector2(vertex.x, vertex.y);
+            if (renderer.flipX)
+            {
+                point.x = -point.x;
+            }
+
+            if (renderer.flipY)
+            {
+                point.y = -point.y;
+            }
+
+            minimum = Vector2.Min(minimum, point);
+            maximum = Vector2.Max(maximum, point);
+        }
+
+        return new List<Vector3>
+        {
+            renderer.transform.TransformPoint(new Vector3(minimum.x, minimum.y, 0f)),
+            renderer.transform.TransformPoint(new Vector3(maximum.x, minimum.y, 0f)),
+            renderer.transform.TransformPoint(new Vector3(maximum.x, maximum.y, 0f)),
+            renderer.transform.TransformPoint(new Vector3(minimum.x, maximum.y, 0f))
+        };
+    }
+
+    private static float GetVisibleSpriteHeight(Sprite sprite)
+    {
+        var minimum = float.PositiveInfinity;
+        var maximum = float.NegativeInfinity;
+        foreach (var vertex in sprite.vertices)
+        {
+            minimum = Mathf.Min(minimum, vertex.y);
+            maximum = Mathf.Max(maximum, vertex.y);
+        }
+
+        return maximum - minimum;
     }
 
     private void ClearGeneratedBuildings()

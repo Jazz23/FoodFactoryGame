@@ -83,17 +83,24 @@ public sealed class GridRoof : MonoBehaviour
             ToWorld(grid, new Vector2(max.x, max.y)),
             ToWorld(grid, new Vector2(min.x, max.y))
         };
+        var logicalFootprint = new[]
+        {
+            new Vector2(min.x, min.y),
+            new Vector2(max.x, min.y),
+            new Vector2(max.x, max.y),
+            new Vector2(min.x, max.y)
+        };
 
         var vertices = new List<Vector3>();
         var triangles = new List<int>();
         var colors = new List<Color>();
         var bottomHeight = Mathf.Max(0f, topHeight - thickness);
-        var sideVertices = new List<Vector3>();
-        var sideTriangles = new List<int>();
-        var sideColors = new List<Color>();
         for (var index = 0; index < footprint.Length; index++)
         {
             var nextIndex = (index + 1) % footprint.Length;
+            var sideVertices = new List<Vector3>();
+            var sideTriangles = new List<int>();
+            var sideColors = new List<Color>();
             AddQuad(
                 sideVertices,
                 sideTriangles,
@@ -112,8 +119,17 @@ public sealed class GridRoof : MonoBehaviour
                 footprint[nextIndex] + Vector3.up * topHeight,
                 footprint[index] + Vector3.up * topHeight,
                 sideColor);
+            CreateSurface(
+                $"Side {index}",
+                sideVertices,
+                sideTriangles,
+                sideColors,
+                sortingOrder - 1,
+                footprint,
+                (footprint[index] + footprint[nextIndex]) * 0.5f,
+                logicalFootprint[index],
+                logicalFootprint[nextIndex]);
         }
-        CreateSurface("Sides", sideVertices, sideTriangles, sideColors, sortingOrder - 1);
 
         var topVertices = new List<Vector3>();
         var topTriangles = new List<int>();
@@ -136,7 +152,16 @@ public sealed class GridRoof : MonoBehaviour
             footprint[2] + Vector3.up * topHeight,
             footprint[3] + Vector3.up * topHeight,
             topColor);
-        CreateSurface("Top", topVertices, topTriangles, topColors, sortingOrder);
+        CreateSurface(
+            "Top",
+            topVertices,
+            topTriangles,
+            topColors,
+            sortingOrder,
+            footprint,
+            GetPolygonCenter(footprint),
+            logicalFootprint[0],
+            logicalFootprint[2]);
 
         mesh.vertices = vertices.ToArray();
         mesh.triangles = triangles.ToArray();
@@ -210,7 +235,11 @@ public sealed class GridRoof : MonoBehaviour
         List<Vector3> vertices,
         List<int> triangles,
         List<Color> colors,
-        int surfaceSortingOrder)
+        int surfaceSortingOrder,
+        IReadOnlyList<Vector3> groundPolygon,
+        Vector3 depthReference,
+        Vector2 logicalStart,
+        Vector2 logicalEnd)
     {
         var surfaceObject = new GameObject($"{name} {surfaceName}")
         {
@@ -233,6 +262,24 @@ public sealed class GridRoof : MonoBehaviour
         var renderer = surfaceObject.AddComponent<MeshRenderer>();
         renderer.sharedMaterial = material;
         renderer.sortingOrder = surfaceSortingOrder;
+        var occlusionSurface = surfaceObject.AddComponent<DepthOcclusionSurface>();
+        occlusionSurface.Configure(
+            vertices,
+            groundPolygon,
+            depthReference,
+            logicalStart,
+            logicalEnd);
+    }
+
+    private static Vector3 GetPolygonCenter(IReadOnlyList<Vector3> polygon)
+    {
+        var center = Vector3.zero;
+        foreach (var point in polygon)
+        {
+            center += point;
+        }
+
+        return center / polygon.Count;
     }
 
     private void ReleaseGeneratedSurfaces()

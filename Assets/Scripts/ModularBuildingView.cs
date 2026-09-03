@@ -49,11 +49,15 @@ public sealed class ModularBuildingView : MonoBehaviour
         }
 
         ConfigureSorting(anchorCell, size);
+        var groundFootprint = GetGroundFootprint(anchorCell, size, ground);
         CreateSurfaceModule(
             "Floor",
             GetSurfaceVertices(anchorCell, size, ground, 0f, 0f),
             style.FloorColor,
-            style.FloorSortingOrder);
+            style.FloorSortingOrder,
+            System.Array.Empty<Vector3>(),
+            new Vector2(anchorCell.x, anchorCell.y),
+            new Vector2(anchorCell.x + size.x, anchorCell.y + size.y));
         CreateSurfaceModule(
             "Roof",
             GetSurfaceVertices(
@@ -63,7 +67,10 @@ public sealed class ModularBuildingView : MonoBehaviour
                 WallCellGeometry.ThicknessInCells * 0.5f,
                 style.RoofHeight),
             style.RoofColor,
-            style.RoofSortingOrder);
+            style.RoofSortingOrder,
+            groundFootprint,
+            new Vector2(anchorCell.x, anchorCell.y),
+            new Vector2(anchorCell.x + size.x, anchorCell.y + size.y));
 
         var entranceEdge = includeEntrance
             ? BuildingFootprint.GetSouthEntranceEdge(anchorCell, size, entranceCellOffset)
@@ -373,7 +380,10 @@ public sealed class ModularBuildingView : MonoBehaviour
         string moduleName,
         Vector3[] vertices,
         Color color,
-        int sortingOrder)
+        int sortingOrder,
+        IReadOnlyList<Vector3> groundPolygon,
+        Vector2 logicalStart,
+        Vector2 logicalEnd)
     {
         var moduleObject = new GameObject(moduleName);
         moduleObject.transform.SetParent(generatedRoot, false);
@@ -394,6 +404,22 @@ public sealed class ModularBuildingView : MonoBehaviour
         var renderer = moduleObject.AddComponent<MeshRenderer>();
         renderer.sharedMaterial = style.ModuleMaterial;
         renderer.sortingOrder = sortingOrder;
+        if (groundPolygon.Count >= 3)
+        {
+            var worldVertices = new Vector3[vertices.Length];
+            for (var index = 0; index < vertices.Length; index++)
+            {
+                worldVertices[index] = moduleObject.transform.TransformPoint(vertices[index]);
+            }
+
+            var occlusionSurface = moduleObject.AddComponent<DepthOcclusionSurface>();
+            occlusionSurface.Configure(
+                worldVertices,
+                groundPolygon,
+                GetPolygonCenter(groundPolygon),
+                logicalStart,
+                logicalEnd);
+        }
     }
 
     private void CreateSpriteModule(
@@ -475,6 +501,31 @@ public sealed class ModularBuildingView : MonoBehaviour
         }
 
         return vertices;
+    }
+
+    private Vector3[] GetGroundFootprint(
+        Vector3Int anchorCell,
+        Vector2Int size,
+        Tilemap ground)
+    {
+        return new[]
+        {
+            GetCellCornerWorld(ground, anchorCell),
+            GetCellCornerWorld(ground, anchorCell + new Vector3Int(size.x, 0)),
+            GetCellCornerWorld(ground, anchorCell + new Vector3Int(size.x, size.y)),
+            GetCellCornerWorld(ground, anchorCell + new Vector3Int(0, size.y))
+        };
+    }
+
+    private static Vector3 GetPolygonCenter(IReadOnlyList<Vector3> polygon)
+    {
+        var center = Vector3.zero;
+        foreach (var point in polygon)
+        {
+            center += point;
+        }
+
+        return center / polygon.Count;
     }
 
     private void CacheGeneratedVisuals()

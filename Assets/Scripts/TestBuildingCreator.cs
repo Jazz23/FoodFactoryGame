@@ -21,6 +21,33 @@ public sealed class TestBuildingCreator : MonoBehaviour
         public Vector2Int Cell { get; }
     }
 
+    public readonly struct ExteriorWallSpan
+    {
+        public ExteriorWallSpan(
+            WallPlacement placement,
+            int segmentIndex,
+            GridEdgeDirection direction,
+            GridWall.PlaneSegment segment)
+        {
+            Kind = placement.Kind;
+            Cell = placement.Cell;
+            SegmentIndex = segmentIndex;
+            Direction = direction;
+            LogicalStart = segment.Start;
+            LogicalEnd = segment.End;
+        }
+
+        public GridWall.WallKind Kind { get; }
+        public Vector2Int Cell { get; }
+        public int SegmentIndex { get; }
+        public GridEdgeDirection Direction { get; }
+        public Vector2 LogicalStart { get; }
+        public Vector2 LogicalEnd { get; }
+        public bool IsCorner => Kind is not GridWall.WallKind.Horizontal
+            and not GridWall.WallKind.Vertical;
+        public string StableId => $"{Direction}:{Cell.x}:{Cell.y}:{SegmentIndex}";
+    }
+
     [SerializeField] private SceneGrid grid = null!;
     [SerializeField] private Transform generatedBuildings = null!;
     [SerializeField] private Material material = null!;
@@ -30,6 +57,8 @@ public sealed class TestBuildingCreator : MonoBehaviour
     [SerializeField] private Color roofTopColor = new(0.035f, 0.05f, 0.075f, 1f);
     [SerializeField] private Color roofSideColor = new(0.16f, 0.21f, 0.26f, 1f);
     [SerializeField] private int roofSortingOrder = DefaultRoofSortingOrder;
+    [SerializeField] private BuildingVisualStyle visualStyle = null!;
+    [SerializeField, Min(0.01f)] private float doorCornerExclusionDistance = 0.15f;
     [SerializeField, HideInInspector] private int settingsVersion;
 
     public SceneGrid Grid => grid;
@@ -41,6 +70,8 @@ public sealed class TestBuildingCreator : MonoBehaviour
     public Color RoofTopColor => roofTopColor;
     public Color RoofSideColor => roofSideColor;
     public int RoofSortingOrder => roofSortingOrder;
+    public BuildingVisualStyle VisualStyle => visualStyle;
+    public float DoorCornerExclusionDistance => doorCornerExclusionDistance;
 
     public static Vector3Int GetAnchorCell(Vector3Int firstCorner, Vector3Int secondCorner)
     {
@@ -50,6 +81,11 @@ public sealed class TestBuildingCreator : MonoBehaviour
     public static Vector2Int GetSize(Vector3Int firstCorner, Vector3Int secondCorner)
     {
         return BuildingFootprint.GetInclusiveSize(firstCorner, secondCorner);
+    }
+
+    public static bool IsSupportedSize(Vector2Int size)
+    {
+        return size.x >= 2 && size.y >= 2;
     }
 
     public static void GetWallPlacements(
@@ -110,6 +146,63 @@ public sealed class TestBuildingCreator : MonoBehaviour
         placements.Add(new WallPlacement(
             GridWall.WallKind.CornerNorthEast,
             new Vector2Int(maximum.x, maximum.y)));
+    }
+
+    public static void GetExteriorWallSpans(
+        Vector3Int anchorCell,
+        Vector2Int size,
+        List<ExteriorWallSpan> spans)
+    {
+        spans.Clear();
+        if (!BuildingFootprint.IsValid(size))
+        {
+            return;
+        }
+
+        var placements = new List<WallPlacement>();
+        var secondCorner = anchorCell + new Vector3Int(size.x - 1, size.y - 1);
+        GetWallPlacements(anchorCell, secondCorner, placements);
+        foreach (var placement in placements)
+        {
+            var segments = GridWall.GetLogicalPlaneSegments(placement.Kind, placement.Cell);
+            for (var segmentIndex = 0; segmentIndex < segments.Count; segmentIndex++)
+            {
+                spans.Add(new ExteriorWallSpan(
+                    placement,
+                    segmentIndex,
+                    GetExteriorDirection(placement, anchorCell, segmentIndex),
+                    segments[segmentIndex]));
+            }
+        }
+    }
+
+    private static GridEdgeDirection GetExteriorDirection(
+        WallPlacement placement,
+        Vector3Int anchor,
+        int segmentIndex)
+    {
+        return placement.Kind switch
+        {
+            GridWall.WallKind.Horizontal => placement.Cell.y != anchor.y
+                ? GridEdgeDirection.North
+                : GridEdgeDirection.South,
+            GridWall.WallKind.Vertical => placement.Cell.x != anchor.x
+                ? GridEdgeDirection.East
+                : GridEdgeDirection.West,
+            GridWall.WallKind.CornerNorthWest => segmentIndex == 0
+                ? GridEdgeDirection.North
+                : GridEdgeDirection.West,
+            GridWall.WallKind.CornerNorthEast => segmentIndex == 0
+                ? GridEdgeDirection.North
+                : GridEdgeDirection.East,
+            GridWall.WallKind.CornerSouthWest => segmentIndex == 0
+                ? GridEdgeDirection.South
+                : GridEdgeDirection.West,
+            GridWall.WallKind.CornerSouthEast => segmentIndex == 0
+                ? GridEdgeDirection.South
+                : GridEdgeDirection.East,
+            _ => GridEdgeDirection.South
+        };
     }
 
     public static Vector2 GetRoofLogicalMin(Vector3Int firstCorner, Vector3Int secondCorner)

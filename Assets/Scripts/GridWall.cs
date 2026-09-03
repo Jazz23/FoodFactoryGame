@@ -92,9 +92,16 @@ public sealed class GridWall : MonoBehaviour
 
     public List<PlaneSegment> GetLogicalPlaneSegments()
     {
-        var center = SceneGrid.CellCenterLogical(cell);
+        return GetLogicalPlaneSegments(kind, cell);
+    }
+
+    public static List<PlaneSegment> GetLogicalPlaneSegments(
+        WallKind wallKind,
+        Vector2Int wallCell)
+    {
+        var center = SceneGrid.CellCenterLogical(wallCell);
         var segments = new List<PlaneSegment>();
-        switch (kind)
+        switch (wallKind)
         {
             case WallKind.Horizontal:
                 segments.Add(new PlaneSegment(
@@ -125,9 +132,16 @@ public sealed class GridWall : MonoBehaviour
 
     public List<Vector2> GetLogicalFootprint()
     {
-        var center = SceneGrid.CellCenterLogical(cell);
+        return GetLogicalFootprint(kind, cell);
+    }
+
+    public static List<Vector2> GetLogicalFootprint(
+        WallKind wallKind,
+        Vector2Int wallCell)
+    {
+        var center = SceneGrid.CellCenterLogical(wallCell);
         var halfThickness = WallCellGeometry.ThicknessInCells * 0.5f;
-        switch (kind)
+        switch (wallKind)
         {
             case WallKind.Horizontal:
                 return new List<Vector2>
@@ -149,8 +163,8 @@ public sealed class GridWall : MonoBehaviour
             case WallKind.CornerNorthEast:
             case WallKind.CornerSouthWest:
             case WallKind.CornerSouthEast:
-                var xSign = kind is WallKind.CornerNorthWest or WallKind.CornerSouthWest ? 1f : -1f;
-                var ySign = kind is WallKind.CornerNorthWest or WallKind.CornerNorthEast ? 1f : -1f;
+                var xSign = wallKind is WallKind.CornerNorthWest or WallKind.CornerSouthWest ? 1f : -1f;
+                var ySign = wallKind is WallKind.CornerNorthWest or WallKind.CornerNorthEast ? 1f : -1f;
                 var cornerFootprint = new List<Vector2>(CornerFootprint.Length);
                 foreach (var point in CornerFootprint)
                 {
@@ -241,7 +255,11 @@ public sealed class GridWall : MonoBehaviour
                 sideVertices,
                 sideTriangles,
                 sideColors,
-                GetSurfaceSortingOrder(logicalFootprint[index], logicalFootprint[nextIndex]));
+                GetSurfaceSortingOrder(logicalFootprint[index], logicalFootprint[nextIndex]),
+                worldFootprint,
+                (start + end) * 0.5f,
+                logicalFootprint[index],
+                logicalFootprint[nextIndex]);
         }
 
         var topVertices = new List<Vector3>();
@@ -254,7 +272,11 @@ public sealed class GridWall : MonoBehaviour
             topVertices,
             topTriangles,
             topColors,
-            GetTopSortingOrder(logicalFootprint));
+            GetTopSortingOrder(logicalFootprint),
+            worldFootprint,
+            GetPolygonCenter(worldFootprint),
+            logicalFootprint[0],
+            logicalFootprint[2]);
 
         mesh.vertices = vertices.ToArray();
         mesh.triangles = triangles.ToArray();
@@ -499,7 +521,11 @@ public sealed class GridWall : MonoBehaviour
         List<Vector3> vertices,
         List<int> triangles,
         List<Color> colors,
-        int sortingOrder)
+        int sortingOrder,
+        IReadOnlyList<Vector3> groundPolygon,
+        Vector3 depthReference,
+        Vector2 logicalStart,
+        Vector2 logicalEnd)
     {
         var surfaceObject = new GameObject($"{name} {surfaceName}")
         {
@@ -522,6 +548,24 @@ public sealed class GridWall : MonoBehaviour
         var renderer = surfaceObject.AddComponent<MeshRenderer>();
         renderer.sharedMaterial = material;
         renderer.sortingOrder = sortingOrder;
+        var occlusionSurface = surfaceObject.AddComponent<DepthOcclusionSurface>();
+        occlusionSurface.Configure(
+            vertices,
+            groundPolygon,
+            depthReference,
+            logicalStart,
+            logicalEnd);
+    }
+
+    private static Vector3 GetPolygonCenter(IReadOnlyList<Vector3> polygon)
+    {
+        var center = Vector3.zero;
+        foreach (var point in polygon)
+        {
+            center += point;
+        }
+
+        return center / polygon.Count;
     }
 
     private void ReleaseGeneratedSurfaces()
