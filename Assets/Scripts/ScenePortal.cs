@@ -21,12 +21,14 @@ public sealed class ScenePortal : MonoBehaviour
     private bool usesWorldInteractionPosition;
     private Vector2 worldInteractionPosition;
     private Vector2 exteriorArrivalLogicalPosition;
+    private bool hasExteriorArrivalLogicalPosition;
 
     public SceneDestination Destination => destination;
     public string DestinationSceneName => destinationSceneName;
     public Vector2 InteractionLogicalPosition => interactionLogicalPosition;
     public Vector2 ArrivalLogicalPosition => arrivalLogicalPosition;
     public Vector2 ExteriorArrivalLogicalPosition => exteriorArrivalLogicalPosition;
+    public bool HasExteriorArrivalLogicalPosition => hasExteriorArrivalLogicalPosition;
     public uint BuildingInstanceId => buildingInstanceId;
     public Vector2Int BuildingSize => buildingSize;
 
@@ -46,9 +48,25 @@ public sealed class ScenePortal : MonoBehaviour
         destinationSceneName = interiorScene;
         arrivalLogicalPosition = interiorArrivalLogicalPosition;
         exteriorArrivalLogicalPosition = exteriorArrivalPosition;
+        hasExteriorArrivalLogicalPosition = true;
     }
 
     public void ConfigureInterior(Vector2 interiorLogicalPosition)
+    {
+        ConfigureInterior(interiorLogicalPosition, default, false);
+    }
+
+    public void ConfigureInterior(
+        Vector2 interiorLogicalPosition,
+        Vector2 exteriorArrivalPosition)
+    {
+        ConfigureInterior(interiorLogicalPosition, exteriorArrivalPosition, true);
+    }
+
+    private void ConfigureInterior(
+        Vector2 interiorLogicalPosition,
+        Vector2 exteriorArrivalPosition,
+        bool hasExteriorArrival)
     {
         destination = SceneDestination.World;
         destinationSceneName = string.Empty;
@@ -58,7 +76,8 @@ public sealed class ScenePortal : MonoBehaviour
         buildingSize = Vector2Int.zero;
         usesWorldInteractionPosition = false;
         worldInteractionPosition = default;
-        exteriorArrivalLogicalPosition = default;
+        exteriorArrivalLogicalPosition = exteriorArrivalPosition;
+        hasExteriorArrivalLogicalPosition = hasExteriorArrival;
         enabled = true;
     }
 
@@ -89,6 +108,7 @@ public sealed class ScenePortal : MonoBehaviour
         var portals = FindObjectsByType<ScenePortal>(
             FindObjectsInactive.Exclude,
             FindObjectsSortMode.None);
+        var closestDistance = float.PositiveInfinity;
         portal = null!;
 
         if (!SceneGrid.TryGetForScene(scene, out var grid))
@@ -100,16 +120,26 @@ public sealed class ScenePortal : MonoBehaviour
         {
             if (candidate.gameObject.scene != scene
                 || candidate.buildingInstanceId != buildingId
-                || !candidate.CanUse(playerPosition, grid))
+                || candidate.destination != SceneDestination.Inside
+                || !candidate.isActiveAndEnabled)
             {
                 continue;
             }
 
+            var interactionPosition = candidate.usesWorldInteractionPosition
+                ? candidate.worldInteractionPosition
+                : grid.LogicalToWorld(candidate.interactionLogicalPosition);
+            var distance = (playerPosition - interactionPosition).sqrMagnitude;
+            if (distance >= closestDistance || !candidate.CanUse(playerPosition, grid))
+            {
+                continue;
+            }
+
+            closestDistance = distance;
             portal = candidate;
-            return true;
         }
 
-        return false;
+        return portal is not null;
     }
 
     public static bool TryGetClosest(
@@ -131,7 +161,9 @@ public sealed class ScenePortal : MonoBehaviour
 
         foreach (var candidate in portals)
         {
-            if (candidate.gameObject.scene != scene || candidate.destination != destination)
+            if (candidate.gameObject.scene != scene
+                || candidate.destination != destination
+                || !candidate.isActiveAndEnabled)
             {
                 continue;
             }
@@ -170,7 +202,9 @@ public sealed class ScenePortal : MonoBehaviour
 
         foreach (var candidate in portals)
         {
-            if (candidate.gameObject.scene != scene || !candidate.CanUse(playerPosition, grid))
+            if (candidate.gameObject.scene != scene
+                || !candidate.isActiveAndEnabled
+                || !candidate.CanUse(playerPosition, grid))
             {
                 continue;
             }

@@ -18,6 +18,8 @@ public sealed class GameSceneManager : MonoBehaviour
         public NetworkObject Player = null!;
         public Vector2 ArrivalLogicalPosition;
         public Vector2Int BuildingSize;
+        public Vector2[] InteriorExitLogicalPositions = new Vector2[0];
+        public Vector2[] ExteriorArrivalLogicalPositions = new Vector2[0];
         public Scene TargetScene;
     }
 
@@ -72,9 +74,17 @@ public sealed class GameSceneManager : MonoBehaviour
         var targetSceneName = GetSceneName(portal);
         var arrivalLogicalPosition = portal.ArrivalLogicalPosition;
         var buildingSize = Vector2Int.zero;
+        var interiorExitLogicalPositions = new Vector2[0];
+        var exteriorArrivalLogicalPositions = new Vector2[0];
         if (portal.BuildingInstanceId != 0)
         {
             buildingSize = portal.BuildingSize;
+            GetBuildingExitPositions(
+                player.gameObject.scene,
+                portal.BuildingInstanceId,
+                portal,
+                out interiorExitLogicalPositions,
+                out exteriorArrivalLogicalPositions);
             buildingReturns[connection.ClientId] = new BuildingReturn
             {
                 SceneName = player.gameObject.scene.name,
@@ -85,7 +95,9 @@ public sealed class GameSceneManager : MonoBehaviour
             && buildingReturns.TryGetValue(connection.ClientId, out var buildingReturn))
         {
             targetSceneName = buildingReturn.SceneName;
-            arrivalLogicalPosition = buildingReturn.ArrivalLogicalPosition;
+            arrivalLogicalPosition = portal.HasExteriorArrivalLogicalPosition
+                ? portal.ExteriorArrivalLogicalPosition
+                : buildingReturn.ArrivalLogicalPosition;
             buildingReturns.Remove(connection.ClientId);
         }
 
@@ -95,7 +107,9 @@ public sealed class GameSceneManager : MonoBehaviour
             Connection = connection,
             Player = player,
             ArrivalLogicalPosition = arrivalLogicalPosition,
-            BuildingSize = buildingSize
+            BuildingSize = buildingSize,
+            InteriorExitLogicalPositions = interiorExitLogicalPositions,
+            ExteriorArrivalLogicalPositions = exteriorArrivalLogicalPositions
         };
         var sceneLoadData = new SceneLoadData(new[] { lookup }, new[] { player })
         {
@@ -165,7 +179,9 @@ public sealed class GameSceneManager : MonoBehaviour
         ConfigureInterior(
             pendingTransition.TargetScene,
             pendingTransition.BuildingSize,
-            pendingTransition.ArrivalLogicalPosition);
+            pendingTransition.ArrivalLogicalPosition,
+            pendingTransition.InteriorExitLogicalPositions,
+            pendingTransition.ExteriorArrivalLogicalPositions);
         if (!TryGetGrid(pendingTransition.TargetScene, out var grid))
         {
             return;
@@ -204,7 +220,9 @@ public sealed class GameSceneManager : MonoBehaviour
             pendingTransition.Connection,
             targetPosition,
             pendingTransition.BuildingSize,
-            pendingTransition.ArrivalLogicalPosition);
+            pendingTransition.ArrivalLogicalPosition,
+            pendingTransition.InteriorExitLogicalPositions,
+            pendingTransition.ExteriorArrivalLogicalPositions);
         pendingTransitions.Remove(args.Connection.ClientId);
     }
 
@@ -242,17 +260,59 @@ public sealed class GameSceneManager : MonoBehaviour
     private void ConfigureInterior(
         Scene scene,
         Vector2Int buildingSize,
-        Vector2 arrivalLogicalPosition)
+        Vector2 arrivalLogicalPosition,
+        Vector2[] interiorExitLogicalPositions,
+        Vector2[] exteriorArrivalLogicalPositions)
     {
         if (InsideFactoryController.TryConfigureForScene(
                 scene,
                 buildingSize,
-                arrivalLogicalPosition))
+                arrivalLogicalPosition,
+                interiorExitLogicalPositions,
+                exteriorArrivalLogicalPositions))
         {
             return;
         }
 
         IndoorGrid.TryConfigureForScene(scene, buildingSize);
+    }
+
+    private static void GetBuildingExitPositions(
+        Scene scene,
+        uint buildingInstanceId,
+        ScenePortal selectedPortal,
+        out Vector2[] interiorExitLogicalPositions,
+        out Vector2[] exteriorArrivalLogicalPositions)
+    {
+        var interiorPositions = new List<Vector2>();
+        var exteriorPositions = new List<Vector2>();
+        var selectedPortalFound = false;
+        var portals = FindObjectsByType<ScenePortal>(
+            FindObjectsInactive.Exclude,
+            FindObjectsSortMode.None);
+        foreach (var candidate in portals)
+        {
+            if (candidate.gameObject.scene != scene
+                || candidate.BuildingInstanceId != buildingInstanceId
+                || candidate.Destination != SceneDestination.Inside
+                || !candidate.isActiveAndEnabled)
+            {
+                continue;
+            }
+
+            interiorPositions.Add(candidate.ArrivalLogicalPosition);
+            exteriorPositions.Add(candidate.ExteriorArrivalLogicalPosition);
+            selectedPortalFound |= candidate == selectedPortal;
+        }
+
+        if (!selectedPortalFound)
+        {
+            interiorPositions.Add(selectedPortal.ArrivalLogicalPosition);
+            exteriorPositions.Add(selectedPortal.ExteriorArrivalLogicalPosition);
+        }
+
+        interiorExitLogicalPositions = interiorPositions.ToArray();
+        exteriorArrivalLogicalPositions = exteriorPositions.ToArray();
     }
 
     private bool TryGetGrid(Scene scene, out SceneGrid grid)

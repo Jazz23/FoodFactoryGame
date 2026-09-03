@@ -9,6 +9,7 @@ public static class TestBuildingInteriorMapping
     public static bool TryGetMapping(
         TestBuildingLayout layout,
         TestBuildingCreator.ExteriorWallSpan wall,
+        float doorOffset,
         out Vector2 exteriorDoorLogicalPosition,
         out Vector2 exteriorArrivalLogicalPosition,
         out Vector2 interiorArrivalLogicalPosition,
@@ -27,7 +28,7 @@ public static class TestBuildingInteriorMapping
         exteriorDoorLogicalPosition = Vector2.Lerp(
             wall.LogicalStart,
             wall.LogicalEnd,
-            Mathf.Clamp01(layout.DoorOffset));
+            Mathf.Clamp01(doorOffset));
 
         var isHorizontal = wall.Direction is GridEdgeDirection.South or GridEdgeDirection.North;
         var wallStart = isHorizontal
@@ -69,5 +70,23 @@ public static class TestBuildingInteriorMapping
         exteriorArrivalLogicalPosition = exteriorDoorLogicalPosition
             + outwardDirection * ExteriorArrivalOffset;
         return true;
+    }
+
+    public static bool TryGetMapping(
+        TestBuildingLayout layout,
+        TestBuildingCreator.ExteriorWallSpan wall,
+        out Vector2 exteriorDoorLogicalPosition,
+        out Vector2 exteriorArrivalLogicalPosition,
+        out Vector2 interiorArrivalLogicalPosition,
+        out float normalizedWallPosition)
+    {
+        return TryGetMapping(
+            layout,
+            wall,
+            layout.DoorOffset,
+            out exteriorDoorLogicalPosition,
+            out exteriorArrivalLogicalPosition,
+            out interiorArrivalLogicalPosition,
+            out normalizedWallPosition);
     }
 }

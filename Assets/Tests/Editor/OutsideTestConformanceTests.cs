@@ -67,19 +67,27 @@ public sealed class OutsideTestConformanceTests
                 var colliders = collision.GetComponentsInChildren<PolygonCollider2D>(true);
                 Assert.That(walls, Has.Length.EqualTo(expectedPlacements.Count));
                 Assert.That(colliders, Has.Length.EqualTo(walls.Length));
-                Assert.That(doors.childCount, Is.EqualTo(layout.HasDoor ? 1 : 0));
+                Assert.That(doors.childCount, Is.EqualTo(layout.Doors.Count));
                 Assert.That(
                     layout.GetComponentsInChildren<OutsideTestFactoryDoor>(true),
-                    Has.Length.EqualTo(layout.HasDoor ? 1 : 0));
+                    Has.Length.EqualTo(layout.Doors.Count));
                 Assert.That(
                     layout.GetComponentsInChildren<ScenePortal>(true),
-                    Has.Length.EqualTo(layout.HasDoor ? 1 : 0));
+                    Has.Length.EqualTo(layout.Doors.Count));
 
-                if (layout.HasDoor)
+                for (var doorIndex = 0; doorIndex < layout.Doors.Count; doorIndex++)
                 {
-                    var doorSurface = doors.GetChild(0).GetComponent<DepthOcclusionSurface>();
+                    var doorObject = doors.GetChild(doorIndex);
+                    var doorSurface = doorObject.GetComponent<DepthOcclusionSurface>();
+                    var factoryDoor = doorObject.GetComponent<OutsideTestFactoryDoor>();
                     Assert.That(doorSurface, Is.Not.Null);
                     Assert.That(doorSurface.IsConfigured, Is.True);
+                    Assert.That(factoryDoor, Is.Not.Null);
+                    Assert.That(
+                        factoryDoor.Matches(
+                            layout.Doors[doorIndex].WallId,
+                            layout.Doors[doorIndex].NormalizedOffset),
+                        Is.True);
                 }
 
                 foreach (var collider in colliders)

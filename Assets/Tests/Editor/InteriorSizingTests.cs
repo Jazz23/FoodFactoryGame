@@ -95,4 +95,57 @@ public sealed class InteriorSizingTests
             Object.DestroyImmediate(exitObject);
         }
     }
+
+    [Test]
+    public void InsideFactoryControllerCreatesAnExitForEveryEnteredDoor()
+    {
+        var gridObject = new GameObject("Inside Factory Grid");
+        var exitObject = new GameObject("Exit Portal");
+        try
+        {
+            var sceneGrid = gridObject.AddComponent<SceneGrid>();
+            var serializedGrid = new SerializedObject(sceneGrid);
+            serializedGrid.FindProperty("projection").enumValueIndex = (int)GridProjection.Orthogonal;
+            serializedGrid.ApplyModifiedPropertiesWithoutUndo();
+
+            gridObject.AddComponent<EdgeCollider2D>();
+            gridObject.AddComponent<IndoorGrid>();
+            var exitPortal = exitObject.AddComponent<ScenePortal>();
+            var controller = gridObject.AddComponent<InsideFactoryController>();
+            var serializedController = new SerializedObject(controller);
+            serializedController.FindProperty("exitPortal").objectReferenceValue = exitPortal;
+            serializedController.ApplyModifiedPropertiesWithoutUndo();
+
+            var interiorPositions = new[]
+            {
+                new Vector2(2.25f, 0.5f),
+                new Vector2(0.5f, 2.75f)
+            };
+            var exteriorPositions = new[]
+            {
+                new Vector2(2.25f, -0.25f),
+                new Vector2(-0.25f, 2.75f)
+            };
+            controller.Configure(
+                new Vector2Int(5, 4),
+                interiorPositions[0],
+                interiorPositions,
+                exteriorPositions);
+
+            var additionalExit = gridObject.transform.Find("Exit Portal 1");
+            Assert.That(additionalExit, Is.Not.Null);
+            var additionalPortal = additionalExit.GetComponent<ScenePortal>();
+            Assert.That(additionalPortal.InteractionLogicalPosition, Is.EqualTo(interiorPositions[1]));
+            Assert.That(
+                additionalPortal.ExteriorArrivalLogicalPosition,
+                Is.EqualTo(exteriorPositions[1]));
+            Assert.That(additionalPortal.HasExteriorArrivalLogicalPosition, Is.True);
+            Assert.That(additionalExit.GetComponent<SpriteRenderer>(), Is.Null);
+        }
+        finally
+        {
+            Object.DestroyImmediate(gridObject);
+            Object.DestroyImmediate(exitObject);
+        }
+    }
 }

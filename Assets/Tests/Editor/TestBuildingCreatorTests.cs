@@ -199,6 +199,31 @@ public sealed class TestBuildingCreatorTests
     }
 
     [Test]
+    public void DoorSelectionCanStoreMultipleOffsetsOnOneWall()
+    {
+        var layoutObject = new GameObject("Multiple Door Layout");
+        try
+        {
+            var layout = layoutObject.AddComponent<TestBuildingLayout>();
+            layout.Configure(Vector3Int.zero, new Vector2Int(3, 3));
+            var spans = new List<TestBuildingCreator.ExteriorWallSpan>();
+            layout.GetExteriorWallSpans(spans);
+            var wall = spans.Find(span => !span.IsCorner);
+
+            Assert.That(layout.AddDoor(wall, 0.25f), Is.True);
+            Assert.That(layout.AddDoor(wall, 0.75f), Is.True);
+            Assert.That(layout.AddDoor(wall, 0.25f), Is.False);
+            Assert.That(layout.Doors, Has.Count.EqualTo(2));
+            Assert.That(layout.ContainsDoor(wall.StableId, 0.25f), Is.True);
+            Assert.That(layout.ContainsDoor(wall.StableId, 0.75f), Is.True);
+        }
+        finally
+        {
+            Object.DestroyImmediate(layoutObject);
+        }
+    }
+
+    [Test]
     public void SouthDoorMapsToTheBottomInteriorEdgeAtTheSameWallPosition()
     {
         var layoutObject = new GameObject("South Layout");

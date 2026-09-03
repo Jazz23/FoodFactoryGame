@@ -65,7 +65,7 @@ public sealed class TestBuildingCreatorEditor : Editor
         EditorGUILayout.HelpBox(
             "Select the creator, then click two opposite ground cells in Scene View. "
             + "Each completed selection creates walls, a roof, collision, and no door. "
-            + "Use Place Door in Scene View to add an interior entrance.",
+            + "Use Place Door in Scene View to add one or more interior entrances.",
             MessageType.Info);
 
         if (hasFirstCorner)
@@ -98,7 +98,7 @@ public sealed class TestBuildingCreatorEditor : Editor
             doorPlacementMode = !doorPlacementMode;
             hasHoveredDoorWall = false;
             statusMessage = doorPlacementMode
-                ? "Click a visible straight exterior wall to place a visual door."
+                ? "Click visible straight exterior walls to place doors; right-click or Escape when finished."
                 : string.Empty;
             SceneView.RepaintAll();
             Repaint();
@@ -108,7 +108,7 @@ public sealed class TestBuildingCreatorEditor : Editor
         {
             EditorGUILayout.HelpBox(
                 "Only the topmost visible wall surface can be selected. "
-                + "Corner pieces and positions near corners are rejected.",
+                + "Corner pieces and positions near corners are rejected. Click again to add more doors.",
                 MessageType.Info);
         }
     }
@@ -300,7 +300,6 @@ public sealed class TestBuildingCreatorEditor : Editor
             else
             {
                 PlaceDoor(layout, wall, normalizedOffset);
-                doorPlacementMode = false;
             }
 
             currentEvent.Use();
@@ -471,8 +470,13 @@ public sealed class TestBuildingCreatorEditor : Editor
     {
         var visualDoors = layout.transform.Find(TestBuildingLayout.VisualDoorsName)!;
         Undo.RecordObject(layout, "Place test building door");
-        layout.SetDoor(wall, normalizedOffset);
-        RebuildDoor(layout, visualDoors);
+        if (!layout.AddDoor(wall, normalizedOffset))
+        {
+            statusMessage = "A door is already placed at that position.";
+            return;
+        }
+
+        RebuildDoors(layout, visualDoors);
         EditorUtility.SetDirty(layout);
         EditorSceneManager.MarkSceneDirty(Creator.gameObject.scene);
         statusMessage = $"Placed a door on the {wall.Direction} exterior wall.";
@@ -618,6 +622,8 @@ public sealed class TestBuildingCreatorEditor : Editor
             return;
         }
 
+        MigrateLegacyDoors();
+
         foreach (var layout in Creator.GeneratedBuildings.GetComponentsInChildren<TestBuildingLayout>(true))
         {
             var hierarchyChanged = EnsureGeneratedHierarchy(
@@ -665,7 +671,7 @@ public sealed class TestBuildingCreatorEditor : Editor
             }
 
             RebuildCollision(layout, generatedCollision, wallPlacements);
-            RebuildDoor(layout, visualDoors);
+            RebuildDoors(layout, visualDoors);
             EditorSceneManager.MarkSceneDirty(Creator.gameObject.scene);
         }
     }
@@ -733,32 +739,43 @@ public sealed class TestBuildingCreatorEditor : Editor
             return visualDoors.childCount != 0;
         }
 
-        if (visualDoors.childCount != 1
-            || visualDoors.GetChild(0).name != $"Door {layout.DoorWallId}")
+        if (visualDoors.childCount != layout.Doors.Count)
         {
             return true;
         }
 
         layout.GetExteriorWallSpans(wallSpans);
-        if (!layout.TryGetDoor(wallSpans, out var wall) || wall.IsCorner)
+
+        for (var index = 0; index < layout.Doors.Count; index++)
         {
-            return true;
+            var door = layout.Doors[index];
+            if (!layout.TryGetDoor(wallSpans, door.WallId, out var wall) || wall.IsCorner)
+            {
+                return true;
+            }
+
+            var doorObject = visualDoors.GetChild(index);
+            var doorRenderer = doorObject.GetComponent<SpriteRenderer>();
+            var depthSurface = doorObject.GetComponent<DepthOcclusionSurface>();
+            var portal = doorObject.GetComponent<ScenePortal>();
+            var factoryDoor = doorObject.GetComponent<OutsideTestFactoryDoor>();
+            if (doorRenderer is null
+                || !doorRenderer
+                || depthSurface is null
+                || !depthSurface
+                || !depthSurface.IsConfigured
+                || portal is null
+                || !portal
+                || factoryDoor is null
+                || !factoryDoor
+                || !factoryDoor.Matches(door.WallId, door.NormalizedOffset)
+                || doorRenderer.flipX != Creator.VisualStyle.ShouldFlipEntranceX(wall.Direction))
+            {
+                return true;
+            }
         }
 
-        var doorRenderer = visualDoors.GetChild(0).GetComponent<SpriteRenderer>();
-        var depthSurface = visualDoors.GetChild(0).GetComponent<DepthOcclusionSurface>();
-        var portal = visualDoors.GetChild(0).GetComponent<ScenePortal>();
-        var factoryDoor = visualDoors.GetChild(0).GetComponent<OutsideTestFactoryDoor>();
-        return doorRenderer is null
-            || !doorRenderer
-            || depthSurface is null
-            || !depthSurface
-            || !depthSurface.IsConfigured
-            || portal is null
-            || !portal
-            || factoryDoor is null
-            || !factoryDoor
-            || doorRenderer.flipX != Creator.VisualStyle.ShouldFlipEntranceX(wall.Direction);
+        return false;
     }
 
     private void RebuildCollision(
@@ -790,7 +807,7 @@ public sealed class TestBuildingCreatorEditor : Editor
         }
     }
 
-    private void RebuildDoor(TestBuildingLayout layout, Transform visualDoors)
+    private void RebuildDoors(TestBuildingLayout layout, Transform visualDoors)
     {
         for (var index = visualDoors.childCount - 1; index >= 0; index--)
         {
@@ -803,12 +820,15 @@ public sealed class TestBuildingCreatorEditor : Editor
         }
 
         layout.GetExteriorWallSpans(wallSpans);
-        if (!layout.TryGetDoor(wallSpans, out var wall) || wall.IsCorner)
+        foreach (var door in layout.Doors)
         {
-            return;
-        }
+            if (!layout.TryGetDoor(wallSpans, door.WallId, out var wall) || wall.IsCorner)
+            {
+                continue;
+            }
 
-        CreateDoorVisual(layout, visualDoors, wall, layout.DoorOffset);
+            CreateDoorVisual(layout, visualDoors, wall, door.NormalizedOffset);
+        }
     }
 
     private void CreateDoorVisual(
@@ -817,7 +837,7 @@ public sealed class TestBuildingCreatorEditor : Editor
         TestBuildingCreator.ExteriorWallSpan wall,
         float normalizedOffset)
     {
-        var doorObject = new GameObject($"Door {wall.StableId}");
+        var doorObject = new GameObject($"Door {wall.StableId} {normalizedOffset:0.###}");
         doorObject.transform.SetParent(visualDoors, false);
         var logicalPosition = Vector2.Lerp(
             wall.LogicalStart,
@@ -857,7 +877,9 @@ public sealed class TestBuildingCreatorEditor : Editor
             wall.LogicalEnd);
 
         Undo.AddComponent<ScenePortal>(doorObject);
-        Undo.AddComponent<OutsideTestFactoryDoor>(doorObject);
+        var factoryDoor = Undo.AddComponent<OutsideTestFactoryDoor>(doorObject);
+        factoryDoor.Configure(wall.StableId, normalizedOffset);
+        EditorUtility.SetDirty(factoryDoor);
     }
 
     private static int GetDoorSortingOrder(TestBuildingCreator.ExteriorWallSpan wall)
@@ -961,6 +983,26 @@ public sealed class TestBuildingCreatorEditor : Editor
             layout.SetBuildingInstanceId(nextId);
             usedIds.Add(nextId);
             nextId++;
+            EditorUtility.SetDirty(layout);
+            changed = true;
+        }
+
+        if (changed)
+        {
+            EditorSceneManager.MarkSceneDirty(Creator.gameObject.scene);
+        }
+    }
+
+    private void MigrateLegacyDoors()
+    {
+        var changed = false;
+        foreach (var layout in Creator.GeneratedBuildings.GetComponentsInChildren<TestBuildingLayout>(true))
+        {
+            if (!layout.MigrateLegacyDoor())
+            {
+                continue;
+            }
+
             EditorUtility.SetDirty(layout);
             changed = true;
         }
