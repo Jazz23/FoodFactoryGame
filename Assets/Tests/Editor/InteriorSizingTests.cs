@@ -20,11 +20,15 @@ public sealed class InteriorSizingTests
                 "FactoryInterior",
                 new Vector2(2f, 0.5f),
                 new Vector2(3f, 1f),
-                GridEdgeDirection.West);
+                GridEdgeDirection.West,
+                3,
+                2);
 
             Assert.That(portal.BuildingInstanceId, Is.EqualTo(7u));
             Assert.That(portal.BuildingSize, Is.EqualTo(new Vector2Int(4, 5)));
             Assert.That(portal.InteriorDoorDirection, Is.EqualTo(GridEdgeDirection.West));
+            Assert.That(portal.BuildingStoryCount, Is.EqualTo(3));
+            Assert.That(portal.FloorIndex, Is.EqualTo(2));
         }
         finally
         {
@@ -158,6 +162,62 @@ public sealed class InteriorSizingTests
             Object.DestroyImmediate(gridObject);
             Object.DestroyImmediate(exitObject);
         }
+    }
+
+    [Test]
+    public void InsideFactoryControllerDisablesExteriorExitOnUpperFloors()
+    {
+        var gridObject = new GameObject("Inside Factory Grid");
+        var exitObject = new GameObject("Exit Portal");
+        try
+        {
+            var sceneGrid = gridObject.AddComponent<SceneGrid>();
+            var serializedGrid = new SerializedObject(sceneGrid);
+            serializedGrid.FindProperty("projection").enumValueIndex = (int)GridProjection.Orthogonal;
+            serializedGrid.ApplyModifiedPropertiesWithoutUndo();
+
+            gridObject.AddComponent<EdgeCollider2D>();
+            gridObject.AddComponent<IndoorGrid>();
+            var exitPortal = exitObject.AddComponent<ScenePortal>();
+            var controller = gridObject.AddComponent<InsideFactoryController>();
+            var serializedController = new SerializedObject(controller);
+            serializedController.FindProperty("exitPortal").objectReferenceValue = exitPortal;
+            serializedController.ApplyModifiedPropertiesWithoutUndo();
+
+            controller.Configure(
+                new Vector2Int(5, 4),
+                new Vector2(2.25f, 0.5f),
+                new[] { new Vector2(2.25f, 0.5f) },
+                new Vector2[0],
+                new[] { GridEdgeDirection.South },
+                7,
+                3,
+                1);
+
+            var elevator = gridObject.GetComponent<InsideFactoryElevator>();
+            Assert.That(exitObject.activeSelf, Is.False);
+            Assert.That(controller.BuildingInstanceId, Is.EqualTo(7u));
+            Assert.That(controller.StoryCount, Is.EqualTo(3));
+            Assert.That(controller.CurrentFloor, Is.EqualTo(1));
+            Assert.That(elevator.CanOpenPrompt, Is.True);
+            Assert.That(elevator.CanGoUp, Is.True);
+            Assert.That(elevator.CanGoDown, Is.True);
+            Assert.That(elevator.IsFloorAvailable(-1), Is.False);
+            Assert.That(elevator.IsFloorAvailable(3), Is.False);
+        }
+        finally
+        {
+            Object.DestroyImmediate(gridObject);
+            Object.DestroyImmediate(exitObject);
+        }
+    }
+
+    [Test]
+    public void ElevatorInteractionPositionIsCenteredAtTheNorthInteriorEdge()
+    {
+        Assert.That(
+            InsideFactoryElevator.GetInteractionLogicalPosition(new Vector2Int(6, 6)),
+            Is.EqualTo(new Vector2(3f, 5.5f)));
     }
 
     [Test]

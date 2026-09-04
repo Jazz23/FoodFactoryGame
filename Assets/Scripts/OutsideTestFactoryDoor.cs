@@ -6,8 +6,6 @@ using UnityEngine;
 [RequireComponent(typeof(ScenePortal))]
 public sealed class OutsideTestFactoryDoor : MonoBehaviour
 {
-    public const string InteriorSceneName = "insidefactory";
-
     [SerializeField, HideInInspector] private string wallId = string.Empty;
     [SerializeField, HideInInspector, Range(0f, 1f)] private float normalizedOffset = 0.5f;
 
@@ -72,9 +70,11 @@ public sealed class OutsideTestFactoryDoor : MonoBehaviour
             layout.BuildingInstanceId,
             layout.Size,
             grid.LogicalToWorld(exteriorDoorLogicalPosition),
-            InteriorSceneName,
+            TestBuildingFloorScenes.GetSceneName(layout.BuildingInstanceId, 0),
             interiorArrivalLogicalPosition,
             exteriorArrivalLogicalPosition,
-            wall.Direction);
+            wall.Direction,
+            layout.StoryCount,
+            0);
     }
 }

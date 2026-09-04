@@ -32,6 +32,7 @@ public sealed class TestBuildingLayout : MonoBehaviour
     [SerializeField] private Vector3Int anchorCell;
     [SerializeField] private Vector2Int size;
     [SerializeField, Min(1)] private uint buildingInstanceId;
+    [SerializeField, Min(1)] private int storyCount = 1;
     [SerializeField] private List<DoorPlacement> doors = new();
 
     // These fields preserve door data from scenes saved before multi-door support.
@@ -41,6 +42,7 @@ public sealed class TestBuildingLayout : MonoBehaviour
     public Vector3Int AnchorCell => anchorCell;
     public Vector2Int Size => size;
     public uint BuildingInstanceId => buildingInstanceId;
+    public int StoryCount => Mathf.Max(1, storyCount);
     public IReadOnlyList<DoorPlacement> Doors
     {
         get
@@ -63,6 +65,11 @@ public sealed class TestBuildingLayout : MonoBehaviour
     public void SetBuildingInstanceId(uint newBuildingInstanceId)
     {
         buildingInstanceId = newBuildingInstanceId;
+    }
+
+    public void SetStoryCount(int newStoryCount)
+    {
+        storyCount = Mathf.Max(1, newStoryCount);
     }
 
     public bool MigrateLegacyDoor()

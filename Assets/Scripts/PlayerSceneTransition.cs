@@ -9,10 +9,14 @@ using UnityEngine.InputSystem;
 public sealed class PlayerSceneTransition : NetworkBehaviour
 {
     private InputAction interact = null!;
+    private InputAction move = null!;
+    private InputAction cancel = null!;
     private Movement movement = null!;
     private NetworkTransform networkTransform = null!;
     private Rigidbody2D body = null!;
     private bool isTransitioning;
+    private bool elevatorPromptOpen;
+    private InsideFactoryElevator activeElevator = null!;
 
     public static PlayerSceneTransition LocalOwner = null!;
     public bool IsTransitioning => isTransitioning;
@@ -33,8 +37,14 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
 
         LocalOwner = this;
         interact = InputSystem.actions["Interact"];
+        move = InputSystem.actions["Move"];
+        cancel = InputSystem.actions["UI/Cancel"];
         interact.Enable();
+        move.Enable();
+        cancel.Enable();
         interact.performed += InteractPerformed;
+        move.performed += MovePerformed;
+        cancel.performed += CancelPerformed;
     }
 
     public override void OnStopClient()
@@ -45,7 +55,12 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         }
 
         interact.performed -= InteractPerformed;
+        move.performed -= MovePerformed;
+        cancel.performed -= CancelPerformed;
         interact.Disable();
+        move.Disable();
+        cancel.Disable();
+        CloseElevatorPrompt();
 
         if (LocalOwner == this)
         {
@@ -55,13 +70,61 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
 
     private void InteractPerformed(InputAction.CallbackContext _)
     {
-        if (isTransitioning || !ScenePortal.TryGetClosest(gameObject.scene, transform.position, out var portal))
+        if (isTransitioning)
+        {
+            return;
+        }
+
+        if (elevatorPromptOpen)
+        {
+            CloseElevatorPrompt();
+            return;
+        }
+
+        if (InsideFactoryElevator.TryGetForScene(gameObject.scene, out var elevator)
+            && elevator.CanUse(transform.position)
+            && elevator.CanOpenPrompt)
+        {
+            activeElevator = elevator;
+            activeElevator.OpenPrompt();
+            elevatorPromptOpen = true;
+            movement.SetTransitioning(true);
+            return;
+        }
+
+        if (!ScenePortal.TryGetClosest(gameObject.scene, transform.position, out var portal))
         {
             return;
         }
 
         SetTransitionState(true);
         RequestTransitionServerRpc(portal.BuildingInstanceId);
+    }
+
+    private void MovePerformed(InputAction.CallbackContext context)
+    {
+        if (!elevatorPromptOpen || isTransitioning)
+        {
+            return;
+        }
+
+        var movementInput = context.ReadValue<Vector2>();
+        if (movementInput.y > 0.5f && activeElevator.CanGoUp)
+        {
+            RequestElevatorFloor(activeElevator.CurrentFloor + 1);
+        }
+        else if (movementInput.y < -0.5f && activeElevator.CanGoDown)
+        {
+            RequestElevatorFloor(activeElevator.CurrentFloor - 1);
+        }
+    }
+
+    private void CancelPerformed(InputAction.CallbackContext _)
+    {
+        if (!isTransitioning && elevatorPromptOpen)
+        {
+            CloseElevatorPrompt();
+        }
     }
 
     [ServerRpc]
@@ -82,6 +145,33 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         }
     }
 
+    private void RequestElevatorFloor(int targetFloorIndex)
+    {
+        if (!activeElevator.IsFloorAvailable(targetFloorIndex))
+        {
+            return;
+        }
+
+        CloseElevatorPrompt();
+        SetTransitionState(true);
+        RequestElevatorFloorServerRpc(targetFloorIndex);
+    }
+
+    [ServerRpc]
+    private void RequestElevatorFloorServerRpc(int targetFloorIndex)
+    {
+        var elevatorExists = InsideFactoryElevator.TryGetForScene(
+            gameObject.scene,
+            out var elevator);
+        if (!elevatorExists
+            || !elevator.CanUse(transform.position)
+            || !elevator.IsFloorAvailable(targetFloorIndex)
+            || !GameSceneManager.Instance.RequestFloorTransition(NetworkObject, targetFloorIndex))
+        {
+            TargetSetTransitionState(Owner, false);
+        }
+    }
+
     public void ServerTeleport(Vector3 position)
     {
         body.position = position;
@@ -95,7 +185,10 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         Vector2 arrivalLogicalPosition,
         Vector2[] interiorExitLogicalPositions,
         Vector2[] exteriorArrivalLogicalPositions,
-        GridEdgeDirection[] interiorExitDirections)
+        GridEdgeDirection[] interiorExitDirections,
+        uint buildingInstanceId,
+        int storyCount,
+        int floorIndex)
     {
         TargetTeleport(
             connection,
@@ -104,7 +197,10 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
             arrivalLogicalPosition,
             interiorExitLogicalPositions,
             exteriorArrivalLogicalPositions,
-            interiorExitDirections);
+            interiorExitDirections,
+            buildingInstanceId,
+            storyCount,
+            floorIndex);
     }
 
     [TargetRpc]
@@ -121,7 +217,10 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         Vector2 arrivalLogicalPosition,
         Vector2[] interiorExitLogicalPositions,
         Vector2[] exteriorArrivalLogicalPositions,
-        GridEdgeDirection[] interiorExitDirections)
+        GridEdgeDirection[] interiorExitDirections,
+        uint buildingInstanceId,
+        int storyCount,
+        int floorIndex)
     {
         if (!InsideFactoryController.TryConfigureForScene(
                 gameObject.scene,
@@ -129,7 +228,10 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
                 arrivalLogicalPosition,
                 interiorExitLogicalPositions,
                 exteriorArrivalLogicalPositions,
-                interiorExitDirections))
+                interiorExitDirections,
+                buildingInstanceId,
+                storyCount,
+                floorIndex))
         {
             IndoorGrid.TryConfigureForScene(gameObject.scene, buildingSize);
         }
@@ -137,6 +239,7 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         body.position = position;
         transform.SetPositionAndRotation(position, Quaternion.identity);
         networkTransform.Teleport();
+        CloseElevatorPrompt();
         SetTransitionState(false);
     }
 
@@ -144,5 +247,20 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
     {
         isTransitioning = value;
         movement.SetTransitioning(value);
+    }
+
+    private void CloseElevatorPrompt()
+    {
+        if (activeElevator is not null && activeElevator)
+        {
+            activeElevator.ClosePrompt();
+        }
+
+        activeElevator = null!;
+        elevatorPromptOpen = false;
+        if (!isTransitioning)
+        {
+            movement.SetTransitioning(false);
+        }
     }
 }

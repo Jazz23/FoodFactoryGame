@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
+using UnityEditor;
 using UnityEngine;
 
 public sealed class TestBuildingCreatorTests
@@ -40,17 +41,17 @@ public sealed class TestBuildingCreatorTests
     }
 
     [Test]
-    public void RoofBoundsMatchTheSelectedCells()
+    public void RoofBoundsMatchTheWallInnerSurface()
     {
         var first = new Vector3Int(-2, 4);
         var second = new Vector3Int(1, 5);
 
         Assert.That(
             TestBuildingCreator.GetRoofLogicalMin(first, second),
-            Is.EqualTo(new Vector2(-1.75f, 4.25f)));
+            Is.EqualTo(new Vector2(-1.25f, 4.75f)));
         Assert.That(
             TestBuildingCreator.GetRoofLogicalMax(first, second),
-            Is.EqualTo(new Vector2(1.75f, 5.75f)));
+            Is.EqualTo(new Vector2(1.25f, 5.25f)));
     }
 
     [Test]
@@ -139,6 +140,159 @@ public sealed class TestBuildingCreatorTests
         Assert.That(
             TestBuildingCreator.GetRoofTopHeight(wallHeight, 2.5f, roofThickness),
             Is.EqualTo(2.5f));
+    }
+
+    [Test]
+    public void StorySlabsUseTheWallTopAndAZeroPointOneThickness()
+    {
+        Assert.That(
+            TestBuildingCreator.GetStoryBaseHeight(2f, 0),
+            Is.EqualTo(0f));
+        Assert.That(
+            TestBuildingCreator.GetStoryTopHeight(2f, 0),
+            Is.EqualTo(2f));
+        Assert.That(
+            TestBuildingCreator.GetStorySlabBottomHeight(2f, 0, 0.1f),
+            Is.EqualTo(1.9f));
+        Assert.That(
+            TestBuildingCreator.GetStoryBaseHeight(2f, 1),
+            Is.EqualTo(2f));
+        Assert.That(
+            TestBuildingCreator.GetStoryTopHeight(2f, 1),
+            Is.EqualTo(4f));
+        Assert.That(
+            TestBuildingCreator.GetStorySlabBottomHeight(2f, 1, 0.1f),
+            Is.EqualTo(3.9f));
+    }
+
+    [Test]
+    public void LayoutStoriesDefaultToOneAndCanBeIncreased()
+    {
+        var layoutObject = new GameObject("Story Layout");
+        try
+        {
+            var layout = layoutObject.AddComponent<TestBuildingLayout>();
+
+            Assert.That(layout.StoryCount, Is.EqualTo(1));
+            layout.SetStoryCount(3);
+            Assert.That(layout.StoryCount, Is.EqualTo(3));
+            layout.SetStoryCount(0);
+            Assert.That(layout.StoryCount, Is.EqualTo(1));
+        }
+        finally
+        {
+            Object.DestroyImmediate(layoutObject);
+        }
+    }
+
+    [Test]
+    public void FloorSceneNamesKeepTheBuildingIdAndFloorIndex()
+    {
+        Assert.That(
+            TestBuildingFloorScenes.GetSceneName(7, 0),
+            Is.EqualTo("insidefactory_7_0"));
+        Assert.That(
+            TestBuildingFloorScenes.GetScenePath(7, 3),
+            Is.EqualTo("Assets/Scenes/insidefactory_7_3.unity"));
+    }
+
+    [Test]
+    public void DeleteTopStoryRemovesItsSceneAndBuildEntry()
+    {
+        var buildingId = 900000u;
+        while (AssetDatabase.LoadAssetAtPath<SceneAsset>(
+                   TestBuildingFloorScenes.GetScenePath(buildingId, 1)) is not null)
+        {
+            buildingId++;
+        }
+
+        var path = TestBuildingFloorScenes.GetScenePath(buildingId, 1);
+        var originalScenes = EditorBuildSettings.scenes;
+        var layoutObject = new GameObject("Delete Top Story Layout");
+        try
+        {
+            Assert.That(
+                AssetDatabase.CopyAsset(TestBuildingFloorScenes.TemplateScenePath, path),
+                Is.True);
+            var scenes = new List<EditorBuildSettingsScene>(originalScenes)
+            {
+                new(path, true)
+            };
+            EditorBuildSettings.scenes = scenes.ToArray();
+            var layout = layoutObject.AddComponent<TestBuildingLayout>();
+            layout.SetBuildingInstanceId(buildingId);
+            layout.SetStoryCount(2);
+
+            Assert.That(TestBuildingFloorSceneUtility.DeleteTopStory(layout), Is.True);
+            Assert.That(AssetDatabase.LoadAssetAtPath<SceneAsset>(path), Is.Null);
+            Assert.That(layout.StoryCount, Is.EqualTo(1));
+            Assert.That(
+                EditorBuildSettings.scenes.Any(scene => scene.path == path),
+                Is.False);
+        }
+        finally
+        {
+            EditorBuildSettings.scenes = originalScenes;
+            AssetDatabase.DeleteAsset(path);
+            Object.DestroyImmediate(layoutObject);
+        }
+    }
+
+    [Test]
+    public void DeleteFloorScenesRemovesItsScenesAndBuildEntries()
+    {
+        var buildingId = 900000u;
+        while (AssetDatabase.LoadAssetAtPath<SceneAsset>(
+                   TestBuildingFloorScenes.GetScenePath(buildingId, 0)) is not null
+            || AssetDatabase.LoadAssetAtPath<SceneAsset>(
+                   TestBuildingFloorScenes.GetScenePath(buildingId, 1)) is not null)
+        {
+            buildingId++;
+        }
+
+        var paths = new[]
+        {
+            TestBuildingFloorScenes.GetScenePath(buildingId, 0),
+            TestBuildingFloorScenes.GetScenePath(buildingId, 1)
+        };
+        var originalScenes = EditorBuildSettings.scenes;
+        try
+        {
+            foreach (var path in paths)
+            {
+                Assert.That(
+                    AssetDatabase.CopyAsset(TestBuildingFloorScenes.TemplateScenePath, path),
+                    Is.True);
+            }
+
+            var scenes = new List<EditorBuildSettingsScene>(originalScenes);
+            foreach (var path in paths)
+            {
+                scenes.Add(new EditorBuildSettingsScene(path, true));
+            }
+
+            EditorBuildSettings.scenes = scenes.ToArray();
+            var deletedSceneCount = 0;
+            Assert.That(
+                TestBuildingFloorSceneUtility.DeleteFloorScenes(paths, out deletedSceneCount),
+                Is.True);
+            Assert.That(deletedSceneCount, Is.EqualTo(paths.Length));
+            foreach (var path in paths)
+            {
+                Assert.That(AssetDatabase.LoadAssetAtPath<SceneAsset>(path), Is.Null);
+                Assert.That(
+                    EditorBuildSettings.scenes.Any(scene => scene.path == path),
+                    Is.False);
+            }
+        }
+        finally
+        {
+            EditorBuildSettings.scenes = originalScenes;
+            foreach (var path in paths)
+            {
+                AssetDatabase.DeleteAsset(path);
+            }
+        }
     }
 
     [Test]

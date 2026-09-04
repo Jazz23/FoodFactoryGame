@@ -31,10 +31,13 @@ public sealed class GridWall : MonoBehaviour
     [SerializeField] private WallKind kind = WallKind.Horizontal;
     [SerializeField] private Vector2Int cell;
     [SerializeField, Min(0f)] private float wallHeight = 1.75f;
+    [SerializeField, Min(0f)] private float baseHeight;
+    [SerializeField, Min(0)] private int storyIndex;
     [SerializeField] private Material material = null!;
 
     private const float HalfCell = 0.5f;
     private const float SurfaceSortingScale = 10f;
+    private const float VerticalSortingScale = SurfaceSortingScale * 2f;
     private const int WallTopSortingOffset = 6;
     private const int WallBaseSortingOrder = 1000;
 
@@ -58,6 +61,8 @@ public sealed class GridWall : MonoBehaviour
     public WallKind Kind => kind;
     public Vector2Int Cell => cell;
     public float WallHeight => wallHeight;
+    public float BaseHeight => baseHeight;
+    public int StoryIndex => storyIndex;
     public float ThicknessInCells => WallCellGeometry.ThicknessInCells;
 
     private void OnEnable()
@@ -218,6 +223,14 @@ public sealed class GridWall : MonoBehaviour
             worldFootprint.Add(ToWorld(grid, logicalPoint));
         }
 
+        var depthFootprint = new List<Vector3>(worldFootprint.Count);
+        foreach (var point in worldFootprint)
+        {
+            depthFootprint.Add(point + Vector3.up * baseHeight);
+        }
+
+        var topHeight = baseHeight + wallHeight;
+
         for (var index = 0; index < worldFootprint.Count; index++)
         {
             var nextIndex = (index + 1) % worldFootprint.Count;
@@ -236,28 +249,31 @@ public sealed class GridWall : MonoBehaviour
                 sideVertices,
                 sideTriangles,
                 sideColors,
-                start,
-                end,
-                end + Vector3.up * wallHeight,
-                start + Vector3.up * wallHeight,
+                start + Vector3.up * baseHeight,
+                end + Vector3.up * baseHeight,
+                end + Vector3.up * topHeight,
+                start + Vector3.up * topHeight,
                 sideColor);
             AddQuad(
                 vertices,
                 triangles,
                 colors,
-                start,
-                end,
-                end + Vector3.up * wallHeight,
-                start + Vector3.up * wallHeight,
+                start + Vector3.up * baseHeight,
+                end + Vector3.up * baseHeight,
+                end + Vector3.up * topHeight,
+                start + Vector3.up * topHeight,
                 sideColor);
             CreateSurface(
                 $"Side {index}",
                 sideVertices,
                 sideTriangles,
                 sideColors,
-                GetSurfaceSortingOrder(logicalFootprint[index], logicalFootprint[nextIndex]),
-                worldFootprint,
-                (start + end) * 0.5f,
+                GetSurfaceSortingOrder(
+                    logicalFootprint[index],
+                    logicalFootprint[nextIndex],
+                    baseHeight),
+                depthFootprint,
+                (start + end) * 0.5f + Vector3.up * baseHeight,
                 logicalFootprint[index],
                 logicalFootprint[nextIndex]);
         }
@@ -265,16 +281,16 @@ public sealed class GridWall : MonoBehaviour
         var topVertices = new List<Vector3>();
         var topTriangles = new List<int>();
         var topColors = new List<Color>();
-        AddTopFace(topVertices, topTriangles, topColors, worldFootprint, WallTopColor, wallHeight);
-        AddTopFace(vertices, triangles, colors, worldFootprint, WallTopColor, wallHeight);
+        AddTopFace(topVertices, topTriangles, topColors, worldFootprint, WallTopColor, topHeight);
+        AddTopFace(vertices, triangles, colors, worldFootprint, WallTopColor, topHeight);
         CreateSurface(
             "Top",
             topVertices,
             topTriangles,
             topColors,
-            GetTopSortingOrder(logicalFootprint),
-            worldFootprint,
-            GetPolygonCenter(worldFootprint),
+            GetTopSortingOrder(logicalFootprint, baseHeight),
+            depthFootprint,
+            GetPolygonCenter(depthFootprint),
             logicalFootprint[0],
             logicalFootprint[2]);
 
@@ -384,13 +400,22 @@ public sealed class GridWall : MonoBehaviour
             : delta.y > 0f ? WallLightColor : WallShadowColor;
     }
 
-    private static int GetSurfaceSortingOrder(Vector2 start, Vector2 end)
+    public static int GetSurfaceSortingOrder(
+        Vector2 start,
+        Vector2 end,
+        float baseHeight = 0f,
+        int baseSortingOrder = WallBaseSortingOrder)
     {
         var depth = (start.x + start.y + end.x + end.y) * 0.5f;
-        return WallBaseSortingOrder - Mathf.RoundToInt(depth * SurfaceSortingScale);
+        return baseSortingOrder
+            - Mathf.RoundToInt(depth * SurfaceSortingScale)
+            + Mathf.RoundToInt(baseHeight * VerticalSortingScale);
     }
 
-    private static int GetTopSortingOrder(IReadOnlyList<Vector2> footprint)
+    public static int GetTopSortingOrder(
+        IReadOnlyList<Vector2> footprint,
+        float baseHeight = 0f,
+        int baseSortingOrder = WallBaseSortingOrder)
     {
         var depth = 0f;
         foreach (var point in footprint)
@@ -399,7 +424,18 @@ public sealed class GridWall : MonoBehaviour
         }
 
         depth /= footprint.Count;
-        return WallBaseSortingOrder - Mathf.RoundToInt(depth * SurfaceSortingScale) + WallTopSortingOffset;
+        return GetTopSortingOrderAtDepth(depth, baseHeight, baseSortingOrder);
+    }
+
+    public static int GetTopSortingOrderAtDepth(
+        float depth,
+        float baseHeight = 0f,
+        int baseSortingOrder = WallBaseSortingOrder)
+    {
+        return baseSortingOrder
+            - Mathf.RoundToInt(depth * SurfaceSortingScale)
+            + WallTopSortingOffset
+            + Mathf.RoundToInt(baseHeight * VerticalSortingScale);
     }
 
     private bool IsInternalSideEdge(Vector2 start, Vector2 end)

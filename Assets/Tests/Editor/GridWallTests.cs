@@ -106,6 +106,48 @@ public sealed class GridWallTests
     }
 
     [Test]
+    public void StoryWallMeshStartsAtItsConfiguredBaseHeight()
+    {
+        var wall = CreateWall(GridWall.WallKind.Horizontal, new Vector2Int(0, 1));
+        var serializedObject = new SerializedObject(wall);
+        serializedObject.FindProperty("baseHeight").floatValue = 2f;
+        serializedObject.FindProperty("storyIndex").intValue = 1;
+        serializedObject.ApplyModifiedProperties();
+        wall.enabled = false;
+        wall.enabled = true;
+
+        var mesh = wall.GetComponent<MeshFilter>().sharedMesh;
+        var expectedStart = SceneGrid.Project(GridProjection.Dimetric, new Vector2(0f, 1.25f));
+
+        Assert.That(wall.BaseHeight, Is.EqualTo(2f));
+        Assert.That(wall.StoryIndex, Is.EqualTo(1));
+        AssertVector(mesh.vertices[0], new Vector3(expectedStart.x, expectedStart.y + 2f, 0f));
+        var expectedEnd = SceneGrid.Project(GridProjection.Dimetric, new Vector2(1f, 1.25f));
+        AssertVector(mesh.vertices[2], new Vector3(expectedEnd.x, expectedEnd.y + 3.75f, 0f));
+    }
+
+    [Test]
+    public void StoryWallSurfacesKeepTheirLogicalDepthOrdering()
+    {
+        var lowerWall = CreateWall(GridWall.WallKind.Horizontal, new Vector2Int(0, 1));
+        var upperWall = CreateWall(GridWall.WallKind.Horizontal, new Vector2Int(0, 1));
+        var serializedUpperWall = new SerializedObject(upperWall);
+        serializedUpperWall.FindProperty("baseHeight").floatValue = 2f;
+        serializedUpperWall.FindProperty("storyIndex").intValue = 1;
+        serializedUpperWall.ApplyModifiedProperties();
+        upperWall.enabled = false;
+        upperWall.enabled = true;
+
+        var lowerSide = GetSurfaceRenderer(lowerWall, "Side 0");
+        var upperSide = GetSurfaceRenderer(upperWall, "Side 0");
+        var lowerTop = GetSurfaceRenderer(lowerWall, "Top");
+        var upperTop = GetSurfaceRenderer(upperWall, "Top");
+
+        Assert.That(upperSide.sortingOrder, Is.EqualTo(lowerSide.sortingOrder + 40));
+        Assert.That(upperTop.sortingOrder, Is.EqualTo(lowerTop.sortingOrder + 40));
+    }
+
+    [Test]
     public void ThickWallMeshUsesFaceDirectionTonesAndABrighterTopCap()
     {
         var topWall = CreateWall(GridWall.WallKind.Horizontal, new Vector2Int(0, 1));
@@ -228,6 +270,13 @@ public sealed class GridWallTests
         }
 
         return Mathf.Abs(area) * 0.5f;
+    }
+
+    private static MeshRenderer GetSurfaceRenderer(GridWall wall, string surfaceSuffix)
+    {
+        return System.Array.Find(
+            wall.GetComponentsInChildren<MeshRenderer>(),
+            renderer => renderer.gameObject.name.EndsWith($" {surfaceSuffix}"))!;
     }
 
     private GridWall CreateWall(GridWall.WallKind kind, Vector2Int cell)

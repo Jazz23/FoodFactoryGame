@@ -5,9 +5,9 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public sealed class TestBuildingCreator : MonoBehaviour
 {
-    public const int CurrentSettingsVersion = 3;
+    public const int CurrentSettingsVersion = 4;
     public const int DefaultRoofSortingOrder = 1000;
-    public const float RoofBoundaryInset = 0.25f;
+    public const float RoofBoundaryInset = 0.5f + WallCellGeometry.ThicknessInCells * 0.5f;
 
     public readonly struct WallPlacement
     {
@@ -52,7 +52,7 @@ public sealed class TestBuildingCreator : MonoBehaviour
     [SerializeField] private Transform generatedBuildings = null!;
     [SerializeField] private Material material = null!;
     [SerializeField, Min(0f)] private float wallHeight = 2f;
-    [SerializeField, Min(0f)] private float roofTopHeight = 2.1f;
+    [SerializeField, HideInInspector, Min(0f)] private float roofTopHeight = 2f;
     [SerializeField, Min(0f)] private float roofThickness = 0.1f;
     [SerializeField] private Color roofTopColor = new(0.035f, 0.05f, 0.075f, 1f);
     [SerializeField] private Color roofSideColor = new(0.16f, 0.21f, 0.26f, 1f);
@@ -249,6 +249,26 @@ public sealed class TestBuildingCreator : MonoBehaviour
         float roofThickness)
     {
         return Mathf.Max(requestedRoofTopHeight, wallHeight + roofThickness);
+    }
+
+    public static float GetStoryBaseHeight(float wallHeight, int storyIndex)
+    {
+        return Mathf.Max(0f, storyIndex) * Mathf.Max(0f, wallHeight);
+    }
+
+    public static float GetStoryTopHeight(float wallHeight, int storyIndex)
+    {
+        return GetStoryBaseHeight(wallHeight, storyIndex) + Mathf.Max(0f, wallHeight);
+    }
+
+    public static float GetStorySlabBottomHeight(
+        float wallHeight,
+        int storyIndex,
+        float slabThickness)
+    {
+        return Mathf.Max(
+            0f,
+            GetStoryTopHeight(wallHeight, storyIndex) - Mathf.Max(0f, slabThickness));
     }
 
     public static int GetRoofSortingOrder(

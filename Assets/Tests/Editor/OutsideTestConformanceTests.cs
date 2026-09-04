@@ -62,11 +62,34 @@ public sealed class OutsideTestConformanceTests
                 Assert.That(collision, Is.Not.Null);
                 Assert.That(doors, Is.Not.Null);
                 Assert.That(presentation, Is.Not.Null);
+                var roofs = visuals!.GetComponentsInChildren<GridRoof>(true);
+                Assert.That(roofs, Has.Length.EqualTo(layout.StoryCount));
                 Assert.That(layout.BuildingInstanceId, Is.Not.EqualTo(0u));
+                for (var floorIndex = 0; floorIndex < layout.StoryCount; floorIndex++)
+                {
+                    Assert.That(
+                        roofs[floorIndex].LogicalMin,
+                        Is.EqualTo(TestBuildingCreator.GetRoofLogicalMin(
+                            layout.AnchorCell,
+                            secondCorner)));
+                    Assert.That(
+                        roofs[floorIndex].LogicalMax,
+                        Is.EqualTo(TestBuildingCreator.GetRoofLogicalMax(
+                            layout.AnchorCell,
+                            secondCorner)));
+                    Assert.That(
+                        AssetDatabase.LoadAssetAtPath<SceneAsset>(
+                            TestBuildingFloorScenes.GetScenePath(
+                                layout.BuildingInstanceId,
+                                floorIndex)),
+                        Is.Not.Null);
+                }
+
                 var walls = visuals.GetComponentsInChildren<GridWall>(true);
                 var colliders = collision.GetComponentsInChildren<PolygonCollider2D>(true);
-                Assert.That(walls, Has.Length.EqualTo(expectedPlacements.Count));
-                Assert.That(colliders, Has.Length.EqualTo(walls.Length));
+                Assert.That(layout.StoryCount, Is.GreaterThanOrEqualTo(1));
+                Assert.That(walls, Has.Length.EqualTo(expectedPlacements.Count * layout.StoryCount));
+                Assert.That(colliders, Has.Length.EqualTo(expectedPlacements.Count));
                 Assert.That(doors.childCount, Is.EqualTo(layout.Doors.Count));
                 Assert.That(
                     layout.GetComponentsInChildren<OutsideTestFactoryDoor>(true),
@@ -167,7 +190,7 @@ public sealed class OutsideTestConformanceTests
     [Test]
     public void InsideFactoryUsesAnOrthogonalRuntimeSizedGridAndAuthoredExit()
     {
-        var path = "Assets/Scenes/insidefactory.unity";
+        var path = "Assets/Scenes/insidefactory0.unity";
         var scene = SceneManager.GetSceneByPath(path);
         var openedForTest = !scene.isLoaded;
         if (openedForTest)
@@ -192,6 +215,9 @@ public sealed class OutsideTestConformanceTests
             var visualControllers = roots
                 .SelectMany(root => root.GetComponentsInChildren<InsideFactoryVisuals>(true))
                 .ToArray();
+            var elevators = roots
+                .SelectMany(root => root.GetComponentsInChildren<InsideFactoryElevator>(true))
+                .ToArray();
             var portals = roots
                 .SelectMany(root => root.GetComponentsInChildren<ScenePortal>(true))
                 .ToArray();
@@ -203,6 +229,7 @@ public sealed class OutsideTestConformanceTests
             Assert.That(indoorGrids[0].Size, Is.EqualTo(new Vector2Int(6, 6)));
             Assert.That(controllers, Has.Length.EqualTo(1));
             Assert.That(visualControllers, Has.Length.EqualTo(1));
+            Assert.That(elevators, Has.Length.EqualTo(1));
             var visualFields = new SerializedObject(visualControllers[0]);
             Assert.That(visualFields.FindProperty("floorTile").objectReferenceValue, Is.Not.Null);
             Assert.That(visualFields.FindProperty("doorSprite").objectReferenceValue, Is.Not.Null);

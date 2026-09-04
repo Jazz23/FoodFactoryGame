@@ -1,4 +1,4 @@
-// Generates a roof slab over a logical grid rectangle without adding collision.
+// Generates a floor or ceiling slab over a logical grid rectangle without adding collision.
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -10,6 +10,7 @@ public sealed class GridRoof : MonoBehaviour
     [SerializeField] private Vector2 logicalMax = Vector2.one;
     [SerializeField, Min(0f)] private float topHeight = 2.1f;
     [SerializeField, Min(0f)] private float thickness = 0.1f;
+    [SerializeField, Min(0f)] private float baseHeight;
     [SerializeField] private Color topColor = new(0.035f, 0.05f, 0.075f, 1f);
     [SerializeField] private Color sideColor = new(0.16f, 0.21f, 0.26f, 1f);
     [SerializeField] private Material material = null!;
@@ -23,6 +24,7 @@ public sealed class GridRoof : MonoBehaviour
     public Vector2 LogicalMax => logicalMax;
     public float TopHeight => topHeight;
     public float Thickness => thickness;
+    public float BaseHeight => baseHeight;
     public int SortingOrder => sortingOrder;
 
     private void OnEnable()
@@ -98,37 +100,51 @@ public sealed class GridRoof : MonoBehaviour
         for (var index = 0; index < footprint.Length; index++)
         {
             var nextIndex = (index + 1) % footprint.Length;
-            var sideVertices = new List<Vector3>();
-            var sideTriangles = new List<int>();
-            var sideColors = new List<Color>();
-            AddQuad(
-                sideVertices,
-                sideTriangles,
-                sideColors,
-                footprint[index] + Vector3.up * bottomHeight,
-                footprint[nextIndex] + Vector3.up * bottomHeight,
-                footprint[nextIndex] + Vector3.up * topHeight,
-                footprint[index] + Vector3.up * topHeight,
-                sideColor);
-            AddQuad(
-                vertices,
-                triangles,
-                colors,
-                footprint[index] + Vector3.up * bottomHeight,
-                footprint[nextIndex] + Vector3.up * bottomHeight,
-                footprint[nextIndex] + Vector3.up * topHeight,
-                footprint[index] + Vector3.up * topHeight,
-                sideColor);
-            CreateSurface(
-                $"Side {index}",
-                sideVertices,
-                sideTriangles,
-                sideColors,
-                sortingOrder - 1,
-                footprint,
-                (footprint[index] + footprint[nextIndex]) * 0.5f,
+            var edgePoints = GetSplitEdgePoints(
                 logicalFootprint[index],
                 logicalFootprint[nextIndex]);
+            for (var segmentIndex = 0; segmentIndex < edgePoints.Count - 1; segmentIndex++)
+            {
+                var logicalStart = edgePoints[segmentIndex];
+                var logicalEnd = edgePoints[segmentIndex + 1];
+                var start = ToWorld(grid, logicalStart);
+                var end = ToWorld(grid, logicalEnd);
+                var sideVertices = new List<Vector3>();
+                var sideTriangles = new List<int>();
+                var sideColors = new List<Color>();
+                AddQuad(
+                    sideVertices,
+                    sideTriangles,
+                    sideColors,
+                    start + Vector3.up * bottomHeight,
+                    end + Vector3.up * bottomHeight,
+                    end + Vector3.up * topHeight,
+                    start + Vector3.up * topHeight,
+                    sideColor);
+                AddQuad(
+                    vertices,
+                    triangles,
+                    colors,
+                    start + Vector3.up * bottomHeight,
+                    end + Vector3.up * bottomHeight,
+                    end + Vector3.up * topHeight,
+                    start + Vector3.up * topHeight,
+                    sideColor);
+                CreateSurface(
+                    $"Side {index} Segment {segmentIndex}",
+                    sideVertices,
+                    sideTriangles,
+                    sideColors,
+                    GridWall.GetSurfaceSortingOrder(
+                        logicalStart,
+                        logicalEnd,
+                        baseHeight,
+                        sortingOrder) + 1,
+                    footprint,
+                    (start + end) * 0.5f,
+                    logicalStart,
+                    logicalEnd);
+            }
         }
 
         var topVertices = new List<Vector3>();
@@ -152,12 +168,22 @@ public sealed class GridRoof : MonoBehaviour
             footprint[2] + Vector3.up * topHeight,
             footprint[3] + Vector3.up * topHeight,
             topColor);
+        var minimumDepth = float.PositiveInfinity;
+        foreach (var point in logicalFootprint)
+        {
+            minimumDepth = Mathf.Min(minimumDepth, point.x + point.y);
+        }
+
+        var topSortingOrder = GridWall.GetTopSortingOrderAtDepth(
+            minimumDepth - WallCellGeometry.ThicknessInCells * 0.5f,
+            baseHeight,
+            sortingOrder) + 1;
         CreateSurface(
             "Top",
             topVertices,
             topTriangles,
             topColors,
-            sortingOrder,
+            topSortingOrder,
             footprint,
             GetPolygonCenter(footprint),
             logicalFootprint[0],
@@ -204,6 +230,35 @@ public sealed class GridRoof : MonoBehaviour
     {
         var worldPosition = grid.LogicalToWorld(logicalPosition);
         return new Vector3(worldPosition.x, worldPosition.y, 0f);
+    }
+
+    private static List<Vector2> GetSplitEdgePoints(Vector2 start, Vector2 end)
+    {
+        var points = new List<Vector2> { start };
+        var isHorizontal = !Mathf.Approximately(start.x, end.x);
+        var startAxis = isHorizontal ? start.x : start.y;
+        var endAxis = isHorizontal ? end.x : end.y;
+        var direction = Mathf.Sign(endAxis - startAxis);
+        if (direction == 0f)
+        {
+            points.Add(end);
+            return points;
+        }
+
+        var boundary = direction > 0f
+            ? Mathf.Floor(startAxis) + 1f
+            : Mathf.Ceil(startAxis) - 1f;
+        while ((direction > 0f && boundary < endAxis - 0.0001f)
+            || (direction < 0f && boundary > endAxis + 0.0001f))
+        {
+            points.Add(isHorizontal
+                ? new Vector2(boundary, start.y)
+                : new Vector2(start.x, boundary));
+            boundary += direction;
+        }
+
+        points.Add(end);
+        return points;
     }
 
     private static void AddQuad(

@@ -21,6 +21,9 @@ public sealed class GameSceneManager : MonoBehaviour
         public Vector2[] InteriorExitLogicalPositions = new Vector2[0];
         public Vector2[] ExteriorArrivalLogicalPositions = new Vector2[0];
         public GridEdgeDirection[] InteriorExitDirections = new GridEdgeDirection[0];
+        public uint BuildingInstanceId;
+        public int StoryCount = 1;
+        public int FloorIndex;
         public Scene TargetScene;
     }
 
@@ -28,6 +31,13 @@ public sealed class GameSceneManager : MonoBehaviour
     {
         public string SceneName = string.Empty;
         public Vector2 ArrivalLogicalPosition;
+        public Vector2Int BuildingSize;
+        public uint BuildingInstanceId;
+        public int StoryCount = 1;
+        public int CurrentFloor;
+        public Vector2[] InteriorExitLogicalPositions = new Vector2[0];
+        public Vector2[] ExteriorArrivalLogicalPositions = new Vector2[0];
+        public GridEdgeDirection[] InteriorExitDirections = new GridEdgeDirection[0];
     }
 
     [SerializeField] private NetworkObject playerPrefab = null!;
@@ -78,9 +88,15 @@ public sealed class GameSceneManager : MonoBehaviour
         var interiorExitLogicalPositions = new Vector2[0];
         var exteriorArrivalLogicalPositions = new Vector2[0];
         var interiorExitDirections = new GridEdgeDirection[0];
+        var buildingInstanceId = 0u;
+        var storyCount = 1;
+        var floorIndex = 0;
         if (portal.BuildingInstanceId != 0)
         {
             buildingSize = portal.BuildingSize;
+            buildingInstanceId = portal.BuildingInstanceId;
+            storyCount = portal.BuildingStoryCount;
+            floorIndex = portal.FloorIndex;
             GetBuildingExitPositions(
                 player.gameObject.scene,
                 portal.BuildingInstanceId,
@@ -91,7 +107,14 @@ public sealed class GameSceneManager : MonoBehaviour
             buildingReturns[connection.ClientId] = new BuildingReturn
             {
                 SceneName = player.gameObject.scene.name,
-                ArrivalLogicalPosition = portal.ExteriorArrivalLogicalPosition
+                ArrivalLogicalPosition = portal.ExteriorArrivalLogicalPosition,
+                BuildingSize = buildingSize,
+                BuildingInstanceId = buildingInstanceId,
+                StoryCount = storyCount,
+                CurrentFloor = floorIndex,
+                InteriorExitLogicalPositions = interiorExitLogicalPositions,
+                ExteriorArrivalLogicalPositions = exteriorArrivalLogicalPositions,
+                InteriorExitDirections = interiorExitDirections
             };
         }
         else if (targetSceneName == worldSceneName
@@ -113,7 +136,10 @@ public sealed class GameSceneManager : MonoBehaviour
             BuildingSize = buildingSize,
             InteriorExitLogicalPositions = interiorExitLogicalPositions,
             ExteriorArrivalLogicalPositions = exteriorArrivalLogicalPositions,
-            InteriorExitDirections = interiorExitDirections
+            InteriorExitDirections = interiorExitDirections,
+            BuildingInstanceId = buildingInstanceId,
+            StoryCount = storyCount,
+            FloorIndex = floorIndex
         };
         var sceneLoadData = new SceneLoadData(new[] { lookup }, new[] { player })
         {
@@ -125,6 +151,70 @@ public sealed class GameSceneManager : MonoBehaviour
             }
         };
 
+        pendingTransitions[connection.ClientId] = pendingTransition;
+        networkManager.SceneManager.LoadConnectionScenes(connection, sceneLoadData);
+        return true;
+    }
+
+    public bool RequestFloorTransition(NetworkObject player, int targetFloorIndex)
+    {
+        var connection = player.Owner;
+        if (!connection.IsValid || pendingTransitions.ContainsKey(connection.ClientId))
+        {
+            return false;
+        }
+
+        if (!buildingReturns.TryGetValue(connection.ClientId, out var buildingReturn)
+            || !InsideFactoryController.TryGetForScene(
+                player.gameObject.scene,
+                out var controller)
+            || controller.BuildingInstanceId != buildingReturn.BuildingInstanceId
+            || controller.CurrentFloor != buildingReturn.CurrentFloor
+            || controller.StoryCount != buildingReturn.StoryCount)
+        {
+            return false;
+        }
+
+        if (!controller.Elevator.IsFloorAvailable(targetFloorIndex))
+        {
+            return false;
+        }
+
+        var targetSceneName = TestBuildingFloorScenes.GetSceneName(
+            buildingReturn.BuildingInstanceId,
+            targetFloorIndex);
+        if (!Application.CanStreamedLevelBeLoaded(targetSceneName))
+        {
+            return false;
+        }
+
+        var lookup = new SceneLookupData(targetSceneName);
+        var arrivalLogicalPosition = InsideFactoryController.GetElevatorArrivalLogicalPosition(
+            buildingReturn.BuildingSize);
+        var pendingTransition = new PendingTransition
+        {
+            Connection = connection,
+            Player = player,
+            ArrivalLogicalPosition = arrivalLogicalPosition,
+            BuildingSize = buildingReturn.BuildingSize,
+            InteriorExitLogicalPositions = buildingReturn.InteriorExitLogicalPositions,
+            ExteriorArrivalLogicalPositions = buildingReturn.ExteriorArrivalLogicalPositions,
+            InteriorExitDirections = buildingReturn.InteriorExitDirections,
+            BuildingInstanceId = buildingReturn.BuildingInstanceId,
+            StoryCount = buildingReturn.StoryCount,
+            FloorIndex = targetFloorIndex
+        };
+        var sceneLoadData = new SceneLoadData(new[] { lookup }, new[] { player })
+        {
+            ReplaceScenes = ReplaceOption.OnlineOnly,
+            PreferredActiveScene = new PreferredScene(lookup, null!),
+            Params = new LoadParams
+            {
+                ServerParams = new object[] { pendingTransition }
+            }
+        };
+
+        buildingReturn.CurrentFloor = targetFloorIndex;
         pendingTransitions[connection.ClientId] = pendingTransition;
         networkManager.SceneManager.LoadConnectionScenes(connection, sceneLoadData);
         return true;
@@ -186,7 +276,10 @@ public sealed class GameSceneManager : MonoBehaviour
             pendingTransition.ArrivalLogicalPosition,
             pendingTransition.InteriorExitLogicalPositions,
             pendingTransition.ExteriorArrivalLogicalPositions,
-            pendingTransition.InteriorExitDirections);
+            pendingTransition.InteriorExitDirections,
+            pendingTransition.BuildingInstanceId,
+            pendingTransition.StoryCount,
+            pendingTransition.FloorIndex);
         if (!TryGetGrid(pendingTransition.TargetScene, out var grid))
         {
             return;
@@ -228,7 +321,10 @@ public sealed class GameSceneManager : MonoBehaviour
             pendingTransition.ArrivalLogicalPosition,
             pendingTransition.InteriorExitLogicalPositions,
             pendingTransition.ExteriorArrivalLogicalPositions,
-            pendingTransition.InteriorExitDirections);
+            pendingTransition.InteriorExitDirections,
+            pendingTransition.BuildingInstanceId,
+            pendingTransition.StoryCount,
+            pendingTransition.FloorIndex);
         pendingTransitions.Remove(args.Connection.ClientId);
     }
 
@@ -269,7 +365,10 @@ public sealed class GameSceneManager : MonoBehaviour
         Vector2 arrivalLogicalPosition,
         Vector2[] interiorExitLogicalPositions,
         Vector2[] exteriorArrivalLogicalPositions,
-        GridEdgeDirection[] interiorExitDirections)
+        GridEdgeDirection[] interiorExitDirections,
+        uint buildingInstanceId,
+        int storyCount,
+        int floorIndex)
     {
         if (InsideFactoryController.TryConfigureForScene(
                 scene,
@@ -277,7 +376,10 @@ public sealed class GameSceneManager : MonoBehaviour
                 arrivalLogicalPosition,
                 interiorExitLogicalPositions,
                 exteriorArrivalLogicalPositions,
-                interiorExitDirections))
+                interiorExitDirections,
+                buildingInstanceId,
+                storyCount,
+                floorIndex))
         {
             return;
         }

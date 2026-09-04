@@ -18,6 +18,8 @@ public sealed class ScenePortal : MonoBehaviour
 
     private uint buildingInstanceId;
     private Vector2Int buildingSize;
+    private int buildingStoryCount = 1;
+    private int floorIndex;
     private bool usesWorldInteractionPosition;
     private Vector2 worldInteractionPosition;
     private Vector2 exteriorArrivalLogicalPosition;
@@ -33,6 +35,8 @@ public sealed class ScenePortal : MonoBehaviour
     public GridEdgeDirection InteriorDoorDirection => interiorDoorDirection;
     public uint BuildingInstanceId => buildingInstanceId;
     public Vector2Int BuildingSize => buildingSize;
+    public int BuildingStoryCount => Mathf.Max(1, buildingStoryCount);
+    public int FloorIndex => Mathf.Max(0, floorIndex);
 
     public void ConfigureBuilding(
         uint instanceId,
@@ -41,7 +45,9 @@ public sealed class ScenePortal : MonoBehaviour
         string interiorScene,
         Vector2 interiorArrivalLogicalPosition,
         Vector2 exteriorArrivalPosition,
-        GridEdgeDirection interiorDoorDirection = GridEdgeDirection.South)
+        GridEdgeDirection interiorDoorDirection = GridEdgeDirection.South,
+        int storyCount = 1,
+        int targetFloorIndex = 0)
     {
         destination = SceneDestination.Inside;
         buildingInstanceId = instanceId;
@@ -53,6 +59,8 @@ public sealed class ScenePortal : MonoBehaviour
         exteriorArrivalLogicalPosition = exteriorArrivalPosition;
         hasExteriorArrivalLogicalPosition = true;
         this.interiorDoorDirection = interiorDoorDirection;
+        buildingStoryCount = Mathf.Max(1, storyCount);
+        floorIndex = Mathf.Max(0, targetFloorIndex);
     }
 
     public void ConfigureInterior(Vector2 interiorLogicalPosition)
@@ -102,6 +110,8 @@ public sealed class ScenePortal : MonoBehaviour
         arrivalLogicalPosition = interiorLogicalPosition;
         buildingInstanceId = 0;
         buildingSize = Vector2Int.zero;
+        buildingStoryCount = 1;
+        floorIndex = 0;
         usesWorldInteractionPosition = false;
         worldInteractionPosition = default;
         exteriorArrivalLogicalPosition = exteriorArrivalPosition;

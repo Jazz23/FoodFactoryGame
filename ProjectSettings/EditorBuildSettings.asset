@@ -27,8 +27,23 @@ EditorBuildSettings:
     path: Assets/Scenes/OutsideTest.unity
     guid: a1e9e43398920d1439d899d192f4e4b8
   - enabled: 1
-    path: Assets/Scenes/insidefactory.unity
+    path: Assets/Scenes/insidefactory0.unity
     guid: 49c333d61069a8f4ea2180d2edc5442e
+  - enabled: 1
+    path: Assets/Scenes/insidefactory_1_0.unity
+    guid: 431f33d3d83fc134b8612a50b3f30b0f
+  - enabled: 1
+    path: Assets/Scenes/insidefactory_2_0.unity
+    guid: bbf008036094a0e40900ba6e836229b3
+  - enabled: 1
+    path: Assets/Scenes/insidefactory_1_1.unity
+    guid: b605467d19d45394d90a4827dd9b1b14
+  - enabled: 1
+    path: Assets/Scenes/insidefactory_1_2.unity
+    guid: 6aa4a080e14c60343be40f2ea454a034
+  - enabled: 1
+    path: Assets/Scenes/insidefactory_2_1.unity
+    guid: 5a10ed2218eb4ce429ee58bb90fc680c
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 2bcd2660ca9b64942af0de543d8d7100, type: 3}
   m_UseUCBPForAssetBundles: 0

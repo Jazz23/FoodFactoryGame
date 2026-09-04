@@ -12,11 +12,24 @@ public sealed class InsideFactoryController : MonoBehaviour
     private readonly List<ScenePortal> additionalExitPortals = new();
     private SceneGrid grid = null!;
     private IndoorGrid indoorGrid = null!;
+    private InsideFactoryElevator elevator = null!;
+    private uint buildingInstanceId;
+    private int storyCount = 1;
+    private int currentFloor;
+
+    public uint BuildingInstanceId => buildingInstanceId;
+    public int StoryCount => storyCount;
+    public int CurrentFloor => currentFloor;
+    public InsideFactoryElevator Elevator => elevator;
 
     private void Awake()
     {
         grid = GetComponent<SceneGrid>();
         indoorGrid = GetComponent<IndoorGrid>();
+        if (!TryGetComponent<InsideFactoryElevator>(out elevator))
+        {
+            elevator = gameObject.AddComponent<InsideFactoryElevator>();
+        }
     }
 
     public static bool TryConfigureForScene(
@@ -30,7 +43,10 @@ public sealed class InsideFactoryController : MonoBehaviour
             arrivalLogicalPosition,
             new[] { arrivalLogicalPosition },
             new Vector2[0],
-            new GridEdgeDirection[0]);
+            new GridEdgeDirection[0],
+            0,
+            1,
+            0);
     }
 
     public static bool TryConfigureForScene(
@@ -46,7 +62,10 @@ public sealed class InsideFactoryController : MonoBehaviour
             arrivalLogicalPosition,
             interiorExitLogicalPositions,
             exteriorArrivalLogicalPositions,
-            new GridEdgeDirection[0]);
+            new GridEdgeDirection[0],
+            0,
+            1,
+            0);
     }
 
     public static bool TryConfigureForScene(
@@ -56,6 +75,29 @@ public sealed class InsideFactoryController : MonoBehaviour
         Vector2[] interiorExitLogicalPositions,
         Vector2[] exteriorArrivalLogicalPositions,
         GridEdgeDirection[] interiorExitDirections)
+    {
+        return TryConfigureForScene(
+            scene,
+            buildingSize,
+            arrivalLogicalPosition,
+            interiorExitLogicalPositions,
+            exteriorArrivalLogicalPositions,
+            interiorExitDirections,
+            0,
+            1,
+            0);
+    }
+
+    public static bool TryConfigureForScene(
+        Scene scene,
+        Vector2Int buildingSize,
+        Vector2 arrivalLogicalPosition,
+        Vector2[] interiorExitLogicalPositions,
+        Vector2[] exteriorArrivalLogicalPositions,
+        GridEdgeDirection[] interiorExitDirections,
+        uint buildingInstanceId,
+        int storyCount,
+        int floorIndex)
     {
         if (!BuildingFootprint.IsValid(buildingSize))
         {
@@ -77,7 +119,10 @@ public sealed class InsideFactoryController : MonoBehaviour
                 arrivalLogicalPosition,
                 interiorExitLogicalPositions,
                 exteriorArrivalLogicalPositions,
-                interiorExitDirections);
+                interiorExitDirections,
+                buildingInstanceId,
+                storyCount,
+                floorIndex);
             return true;
         }
 
@@ -91,7 +136,10 @@ public sealed class InsideFactoryController : MonoBehaviour
             arrivalLogicalPosition,
             new[] { arrivalLogicalPosition },
             new Vector2[0],
-            new GridEdgeDirection[0]);
+            new GridEdgeDirection[0],
+            0,
+            1,
+            0);
     }
 
     public void Configure(
@@ -105,7 +153,10 @@ public sealed class InsideFactoryController : MonoBehaviour
             arrivalLogicalPosition,
             interiorExitLogicalPositions,
             exteriorArrivalLogicalPositions,
-            new GridEdgeDirection[0]);
+            new GridEdgeDirection[0],
+            0,
+            1,
+            0);
     }
 
     public void Configure(
@@ -115,6 +166,27 @@ public sealed class InsideFactoryController : MonoBehaviour
         IReadOnlyList<Vector2> exteriorArrivalLogicalPositions,
         IReadOnlyList<GridEdgeDirection> interiorExitDirections)
     {
+        Configure(
+            buildingSize,
+            arrivalLogicalPosition,
+            interiorExitLogicalPositions,
+            exteriorArrivalLogicalPositions,
+            interiorExitDirections,
+            0,
+            1,
+            0);
+    }
+
+    public void Configure(
+        Vector2Int buildingSize,
+        Vector2 arrivalLogicalPosition,
+        IReadOnlyList<Vector2> interiorExitLogicalPositions,
+        IReadOnlyList<Vector2> exteriorArrivalLogicalPositions,
+        IReadOnlyList<GridEdgeDirection> interiorExitDirections,
+        uint newBuildingInstanceId,
+        int newStoryCount,
+        int newFloorIndex)
+    {
         if (!BuildingFootprint.IsValid(buildingSize))
         {
             return;
@@ -122,6 +194,13 @@ public sealed class InsideFactoryController : MonoBehaviour
 
         grid ??= GetComponent<SceneGrid>();
         indoorGrid ??= GetComponent<IndoorGrid>();
+        if (!TryGetComponent<InsideFactoryElevator>(out elevator))
+        {
+            elevator = gameObject.AddComponent<InsideFactoryElevator>();
+        }
+        buildingInstanceId = newBuildingInstanceId;
+        storyCount = Mathf.Max(1, newStoryCount);
+        currentFloor = Mathf.Clamp(newFloorIndex, 0, storyCount - 1);
         indoorGrid.ConfigureSize(buildingSize);
         var exitPositions = interiorExitLogicalPositions.Count > 0
             ? interiorExitLogicalPositions
@@ -129,14 +208,40 @@ public sealed class InsideFactoryController : MonoBehaviour
         ConfigureExitPortals(
             exitPositions,
             exteriorArrivalLogicalPositions,
-            interiorExitDirections);
+            interiorExitDirections,
+            currentFloor == 0);
+        elevator.Configure(
+            buildingInstanceId,
+            buildingSize,
+            storyCount,
+            currentFloor);
     }
 
     private void ConfigureExitPortals(
         IReadOnlyList<Vector2> interiorExitLogicalPositions,
         IReadOnlyList<Vector2> exteriorArrivalLogicalPositions,
-        IReadOnlyList<GridEdgeDirection> interiorExitDirections)
+        IReadOnlyList<GridEdgeDirection> interiorExitDirections,
+        bool enableExteriorExits)
     {
+        if (!enableExteriorExits)
+        {
+            exitPortal.gameObject.SetActive(false);
+            foreach (var portal in additionalExitPortals)
+            {
+                portal.gameObject.SetActive(false);
+            }
+
+            if (TryGetComponent<InsideFactoryVisuals>(out var upperFloorVisuals))
+            {
+                upperFloorVisuals.Configure(
+                    indoorGrid.Size,
+                    new Vector2[0],
+                    new GridEdgeDirection[0]);
+            }
+
+            return;
+        }
+
         var exitDirections = new GridEdgeDirection[interiorExitLogicalPositions.Count];
         for (var index = 0; index < interiorExitLogicalPositions.Count; index++)
         {
@@ -188,6 +293,31 @@ public sealed class InsideFactoryController : MonoBehaviour
                 additionalExitPortals[index].gameObject.SetActive(false);
             }
         }
+    }
+
+    public static bool TryGetForScene(Scene scene, out InsideFactoryController controller)
+    {
+        controller = null!;
+        var controllers = FindObjectsByType<InsideFactoryController>(
+            FindObjectsInactive.Include,
+            FindObjectsSortMode.None);
+        foreach (var candidate in controllers)
+        {
+            if (candidate.gameObject.scene != scene || !candidate.isActiveAndEnabled)
+            {
+                continue;
+            }
+
+            controller = candidate;
+            return true;
+        }
+
+        return false;
+    }
+
+    public static Vector2 GetElevatorArrivalLogicalPosition(Vector2Int buildingSize)
+    {
+        return InsideFactoryElevator.GetInteractionLogicalPosition(buildingSize);
     }
 
     private ScenePortal GetExitPortal(int index)
