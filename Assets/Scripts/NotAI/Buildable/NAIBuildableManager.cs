@@ -116,9 +116,11 @@ namespace NotAI
             building.SetBuildingManager(this);
             building.SetBuildingId(SelectedBuildableId.Value);
             ServerManager.Spawn(building);
-            
-            // Temporarily instantly update the grid on the client to prevent further building
-            UpdateGrid(_ghost.transform.position, _ghostRenderer.bounds.size, Guid.Empty);
+            if (IsServerStarted) // For clienthost shenanigans
+                building.OnTrySpawnServer(null);
+            else
+                // Temporarily instantly update the grid on the client to prevent further building
+                UpdateGrid(_ghost.transform.position, _ghostRenderer.bounds.size, Guid.Empty);
         }
 
         [Client]
@@ -163,7 +165,7 @@ namespace NotAI
             {
                 for (var y = 0; y < cellsY; y++)
                 {
-                    occupiedCells.Add(new Vector2(position.x + x * cellSize.x, position.y + y * cellSize.y));
+                    occupiedCells.Add(new Vector2(Mathf.FloorToInt(position.x) + x * cellSize.x, Mathf.FloorToInt(position.y) + y * cellSize.y));
                 }
             }
             

@@ -48,9 +48,7 @@ namespace NotAI
             _spriteRenderer.color = newColor;
             
             if (!IsOwner) return;
-            var mousePos = _pointAction.ReadValue<Vector2>();
-            var worldPos = _camera.ScreenToWorldPoint(mousePos);
-            var cellPos = _grid.WorldToCell(worldPos);
+            var cellPos = NAIExtensions.GetPointerCellPos();
             
             // Calculate the vertical offset from the center of the sprite since the transform's origin is at the bottom
             var spriteHeight = _spriteRenderer.bounds.size.y;

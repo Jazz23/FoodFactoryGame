@@ -16,6 +16,7 @@ GameObject:
   - component: {fileID: 479923286816252861}
   - component: {fileID: 6667278155382574800}
   - component: {fileID: 7664166235045909395}
+  - component: {fileID: 6876185589754376311}
   m_Layer: 0
   m_Name: PizzaOven
   m_TagString: Untagged
@@ -308,5 +309,18 @@ MonoBehaviour:
   _componentIndexCache: 255
   _addedNetworkObject: {fileID: 4232784032675461052}
   _networkObjectCache: {fileID: 0}
-  uuid: 0
+  <uuid>k__BackingField: 0
   buildableId: 0
+--- !u!114 &6876185589754376311
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4926852788526257740}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7e0e271c968c43e5b5b2b16337d7bc63, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  UIPrefab: {fileID: 8215134146268423710, guid: 1384db0e55d5fa1408cf9d368de44a75, type: 3}
