@@ -25,6 +25,15 @@
                     "initialStateCheck": true
                 },
                 {
+                    "name": "Point",
+                    "type": "Value",
+                    "id": "023551c4-2c1f-40f7-b822-958d2c7404eb",
+                    "expectedControlType": "Vector2",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
+                },
+                {
                     "name": "Attack",
                     "type": "Button",
                     "id": "6c2ab1b8-8984-453a-af3d-a3c78ae1679a",
@@ -82,6 +91,15 @@
                     "name": "Sprint",
                     "type": "Button",
                     "id": "641cd816-40e6-41b4-8c3d-04687c349290",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "Select",
+                    "type": "Button",
+                    "id": "52d8491b-8288-4e62-b9ac-67a1ea58498c",
                     "expectedControlType": "",
                     "processors": "",
                     "interactions": "",
@@ -471,6 +489,28 @@
                     "processors": "",
                     "groups": "Keyboard&Mouse",
                     "action": "Crouch",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "5ee80ef4-d420-400c-8e11-0a0315766911",
+                    "path": "<Mouse>/leftButton",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Select",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "63c98bd8-449d-47b5-954d-d7cc2708b331",
+                    "path": "<Pointer>/position",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Point",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }
@@ -997,15 +1037,6 @@
             "id": "b9c41dd7-5a2d-4a4d-b31d-b4ae729f5387",
             "actions": [
                 {
-                    "name": "Point",
-                    "type": "Value",
-                    "id": "c5bed825-467a-4ff9-98d6-bff81279dc91",
-                    "expectedControlType": "Vector2",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": true
-                },
-                {
                     "name": "Build",
                     "type": "Button",
                     "id": "ce2681ae-4d32-451d-b287-d15e36ac5487",
@@ -1061,17 +1092,6 @@
                 }
             ],
             "bindings": [
-                {
-                    "name": "",
-                    "id": "3baab447-baa3-4bbf-bc08-5c9078b65af9",
-                    "path": "<Pointer>/position",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "",
-                    "action": "Point",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
                 {
                     "name": "",
                     "id": "b90329b1-7735-424c-a93e-fe9ebc15a05a",
@@ -1148,7 +1168,7 @@
                     "name": "Toggle",
                     "type": "Button",
                     "id": "057d9407-f879-42fc-8601-14860abf2859",
-                    "expectedControlType": "Button",
+                    "expectedControlType": "",
                     "processors": "",
                     "interactions": "Press",
                     "initialStateCheck": false

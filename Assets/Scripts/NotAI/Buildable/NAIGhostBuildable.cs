@@ -8,13 +8,13 @@ using UnityEngine.InputSystem;
 
 namespace NotAI
 {
-    public class NAIGhostBuilding : NetworkBehaviour
+    public class NAIGhostBuildable : NetworkBehaviour
     {
         public int buildingId;
         
         private Grid _grid;
         private Camera _camera;
-        private NAIBuildingManager _buildingManager;
+        private NAIBuildableManager _buildableManager;
         private SpriteRenderer _spriteRenderer;
         private InputAction _pointAction;
 
@@ -22,17 +22,17 @@ namespace NotAI
 
         public override void OnStartClient()
         {
-            _buildingManager = Owner.GetPlayerComponent<NAIBuildingManager>();
-            _buildingManager.SetGhost(this);
+            _buildableManager = Owner.GetPlayerComponent<NAIBuildableManager>();
+            _buildableManager.SetGhost(this);
             _spriteRenderer = GetComponent<SpriteRenderer>();
-            _spriteRenderer.sprite = _buildingManager.buildingPrefabs[_buildingManager.SelectedBuildingId.Value]
+            _spriteRenderer.sprite = _buildableManager.buildingPrefabs[_buildableManager.SelectedBuildableId.Value]
                 .GetComponent<SpriteRenderer>().sprite;
 
             if (!IsOwner) return;
             
             _camera = Camera.main!;
             _grid = GameObject.Find("Grid").GetComponent<Grid>();
-            (_pointAction = InputSystem.actions["Build/Point"]).Enable();
+            (_pointAction = InputSystem.actions["Player/Point"]).Enable();
         }
 
         public override void OnStopClient()
@@ -43,7 +43,7 @@ namespace NotAI
         // The ghost building is deactivated by building manager so Update() is not called when the player is not building.
         private void Update()
         {
-            var newColor = _buildingManager.CanBuildGhostHere() ? Color.white : Color.red;
+            var newColor = _buildableManager.CanBuildGhostHere() ? Color.white : Color.red;
             newColor.a = _spriteRenderer.color.a;
             _spriteRenderer.color = newColor;
             
@@ -51,7 +51,11 @@ namespace NotAI
             var mousePos = _pointAction.ReadValue<Vector2>();
             var worldPos = _camera.ScreenToWorldPoint(mousePos);
             var cellPos = _grid.WorldToCell(worldPos);
-            transform.position = _grid.GetCellCenterWorld(cellPos);
+            
+            // Calculate the vertical offset from the center of the sprite since the transform's origin is at the bottom
+            var spriteHeight = _spriteRenderer.bounds.size.y;
+            var verticalOffset = spriteHeight / 2f;
+            transform.position = _grid.GetCellCenterWorld(cellPos) - new Vector3(0, verticalOffset, 0);
         }
 
         public void Rotate()

@@ -36,4 +36,6 @@ namespace DefaultNamespace
             return (T)(componentDict[key] = component);
         }
     }
+    
+    public class ReadOnlyAttribute : PropertyAttribute { }
 }
