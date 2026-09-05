@@ -1,7 +1,9 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using FishNet.Connection;
+using NotAI;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace DefaultNamespace
 {
@@ -34,6 +36,27 @@ namespace DefaultNamespace
             // If not cached, find the component on the player's objects, cache it, and return it
             var component = conn.Objects.First(no => no.TryGetComponent<T>(out _)).GetComponent<T>();
             return (T)(componentDict[key] = component);
+        }
+
+        private static InputAction _pointAction;
+        private static Grid _grid;
+        private static Camera _camera;
+        
+        public static Vector3Int GetPointerCellPos()
+        {
+            (_pointAction ??= InputSystem.actions["Player/Point"]).Enable();
+            _grid ??= GameObject.Find("Grid").GetComponent<Grid>();
+            _camera ??= Camera.main!;
+            
+            var mousePos = _pointAction.ReadValue<Vector2>();
+            var worldPos = _camera.ScreenToWorldPoint(mousePos);
+            return _grid.WorldToCell(worldPos);
+        }
+
+        public static Vector2 GetPointerCellPos2D()
+        {
+            var cellPos = GetPointerCellPos();
+            return new Vector2(cellPos.x, cellPos.y);
         }
     }
     
