@@ -10,7 +10,7 @@ namespace NotAI.UI
     {
         private InputAction _selectAction;
         private InputAction _cancelAction;
-        private NAIUI _openUI;
+        private GameObject _openUI;
 
         private void Awake()
         {
@@ -26,6 +26,7 @@ namespace NotAI.UI
         private void OnCancelButton(InputAction.CallbackContext ctx)
         {
             Destroy(_openUI.gameObject);
+            _selectAction.Enable();
         }
 
         private void OnDestroy()
@@ -43,7 +44,6 @@ namespace NotAI.UI
             if (!buildable.TryGetComponent(out NAIOpenableUI openableUI)) return;
             
             _openUI = openableUI.OpenUI(transform);
-            _openUI.OnClose += () => _selectAction.Enable();
             _selectAction.Disable();
         }
     }
