@@ -215,6 +215,7 @@ public sealed class InsideFactoryController : MonoBehaviour
             buildingSize,
             storyCount,
             currentFloor);
+        ConfigureOutsideTestPresentation(buildingInstanceId, currentFloor);
     }
 
     private void ConfigureExitPortals(
@@ -338,5 +339,28 @@ public sealed class InsideFactoryController : MonoBehaviour
         }
 
         return additionalExitPortals[additionalIndex];
+    }
+
+    private void ConfigureOutsideTestPresentation(
+        uint newBuildingInstanceId,
+        int newFloorIndex)
+    {
+        if (newBuildingInstanceId != GameSceneManager.OutsideTestBuildingId)
+        {
+            if (TryGetComponent<OutsideTestFloorPresentation>(out var existingPresentation))
+            {
+                existingPresentation.enabled = false;
+            }
+
+            return;
+        }
+
+        if (!TryGetComponent<OutsideTestFloorPresentation>(out var presentation))
+        {
+            presentation = gameObject.AddComponent<OutsideTestFloorPresentation>();
+        }
+
+        presentation.enabled = true;
+        presentation.Configure(newBuildingInstanceId, newFloorIndex);
     }
 }

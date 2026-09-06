@@ -17,6 +17,7 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
     private bool isTransitioning;
     private bool elevatorPromptOpen;
     private InsideFactoryElevator activeElevator = null!;
+    private OutsideTestFloorDebugPanel debugPanel = null!;
 
     public static PlayerSceneTransition LocalOwner = null!;
     public bool IsTransitioning => isTransitioning;
@@ -45,6 +46,8 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         interact.performed += InteractPerformed;
         move.performed += MovePerformed;
         cancel.performed += CancelPerformed;
+        debugPanel = gameObject.AddComponent<OutsideTestFloorDebugPanel>();
+        debugPanel.Initialize(this);
     }
 
     public override void OnStopClient()
@@ -61,6 +64,11 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         move.Disable();
         cancel.Disable();
         CloseElevatorPrompt();
+        if (debugPanel is not null && debugPanel)
+        {
+            Destroy(debugPanel);
+            debugPanel = null!;
+        }
 
         if (LocalOwner == this)
         {
@@ -178,6 +186,130 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         transform.SetPositionAndRotation(position, Quaternion.identity);
     }
 
+    public bool TryGetCurrentOutsideTestFloor(out int floorIndex)
+    {
+        floorIndex = -1;
+        if (!InsideFactoryController.TryGetForScene(
+                gameObject.scene,
+                out var controller)
+            || controller.BuildingInstanceId != GameSceneManager.OutsideTestBuildingId)
+        {
+            return false;
+        }
+
+        floorIndex = controller.CurrentFloor;
+        return true;
+    }
+
+    public void RequestOutsideTestFloorSnapshot()
+    {
+        if (!IsOwner)
+        {
+            return;
+        }
+
+        RequestOutsideTestFloorSnapshotServerRpc();
+    }
+
+    public void RequestSetOutsideTestFloorState(
+        int floorIndex,
+        string label,
+        float productionRate,
+        Vector2 markerPosition)
+    {
+        if (!IsOwner)
+        {
+            return;
+        }
+
+        RequestSetOutsideTestFloorStateServerRpc(
+            floorIndex,
+            label,
+            productionRate,
+            markerPosition);
+    }
+
+    public void RequestSaveOutsideTestFloorState()
+    {
+        if (IsOwner)
+        {
+            RequestSaveOutsideTestFloorStateServerRpc();
+        }
+    }
+
+    public void RequestLoadOutsideTestFloorState()
+    {
+        if (IsOwner)
+        {
+            RequestLoadOutsideTestFloorStateServerRpc();
+        }
+    }
+
+    public void ServerSendOutsideTestFloorState(
+        OutsideTestFloorRecord floor,
+        int loadedInteriorCount)
+    {
+        TargetReceiveOutsideTestFloorState(
+            Owner,
+            floor.FloorIndex,
+            floor.Label,
+            floor.ProductionRate,
+            floor.AccumulatedProduction,
+            floor.MarkerPosition,
+            loadedInteriorCount);
+    }
+
+    [ServerRpc]
+    private void RequestOutsideTestFloorSnapshotServerRpc()
+    {
+        GameSceneManager.Instance.SendOutsideTestFloorSnapshot(this);
+    }
+
+    [ServerRpc]
+    private void RequestSetOutsideTestFloorStateServerRpc(
+        int floorIndex,
+        string label,
+        float productionRate,
+        Vector2 markerPosition)
+    {
+        GameSceneManager.Instance.TrySetOutsideTestFloorState(
+            floorIndex,
+            label,
+            productionRate,
+            markerPosition);
+    }
+
+    [ServerRpc]
+    private void RequestSaveOutsideTestFloorStateServerRpc()
+    {
+        GameSceneManager.Instance.SaveOutsideTestFloorState();
+    }
+
+    [ServerRpc]
+    private void RequestLoadOutsideTestFloorStateServerRpc()
+    {
+        GameSceneManager.Instance.LoadOutsideTestFloorState();
+    }
+
+    [TargetRpc]
+    private void TargetReceiveOutsideTestFloorState(
+        NetworkConnection connection,
+        int floorIndex,
+        string label,
+        float productionRate,
+        float accumulatedProduction,
+        Vector2 markerPosition,
+        int loadedInteriorCount)
+    {
+        GameSceneManager.Instance.ReceiveOutsideTestFloorState(
+            floorIndex,
+            label,
+            productionRate,
+            accumulatedProduction,
+            markerPosition,
+            loadedInteriorCount);
+    }
+
     public void CompleteTransition(
         NetworkConnection connection,
         Vector3 position,
@@ -241,6 +373,15 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         networkTransform.Teleport();
         CloseElevatorPrompt();
         SetTransitionState(false);
+        if (buildingInstanceId == GameSceneManager.OutsideTestBuildingId)
+        {
+            if (debugPanel is not null && debugPanel)
+            {
+                debugPanel.SelectFloor(floorIndex);
+            }
+
+            RequestOutsideTestFloorSnapshot();
+        }
     }
 
     private void SetTransitionState(bool value)
