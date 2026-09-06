@@ -31,8 +31,11 @@ namespace DefaultNamespace
             (_move = InputSystem.actions["Move"]).Enable();
             var cam = Camera.main!;
             cam.transform.SetParent(transform);
-            cam.transform.SetPosition(false,
-                new Vector3(transform.position.x, transform.position.y, cam.transform.position.z));
+            
+            // Calculate veritical offset from player sprite's center since the transform's origin is at the bottom of the sprite
+            var spriteHeight = GetComponent<SpriteRenderer>().bounds.size.y;
+            var verticalOffset = spriteHeight / 2f;
+            cam.transform.position = new Vector3(transform.position.x, transform.position.y + verticalOffset, cam.transform.position.z);
         }
 
         public override void OnStopClient()

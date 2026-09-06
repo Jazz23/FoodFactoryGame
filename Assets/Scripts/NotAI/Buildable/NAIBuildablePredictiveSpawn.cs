@@ -6,32 +6,35 @@ using FishNet.Serializing;
 
 namespace NotAI
 {
-    public class NAIBuildingPredictiveSpawn : PredictedSpawn
+    public class NAIBuildablePredictiveSpawn : PredictedSpawn
     {
-        private NAIBuildingManager _buildingManager;
+        private NAIBuildableManager _buildableManager;
         private int _buildingId;
         
-        public void SetBuildingManager(NAIBuildingManager buildingManager) => _buildingManager = buildingManager;
+        public void SetBuildingManager(NAIBuildableManager buildableManager) => _buildableManager = buildableManager;
         public void SetBuildingId(int buildingId) => _buildingId = buildingId;
 
         public override void WritePayload(NetworkConnection connection, Writer writer)
         {
-            writer.WriteNetworkBehaviour(_buildingManager);
+            writer.WriteNetworkBehaviour(_buildableManager);
             writer.WriteInt32(_buildingId);
         }
 
         public override void ReadPayload(NetworkConnection connection, Reader reader)
         {
-            _buildingManager = reader.ReadNetworkBehaviour() as NAIBuildingManager;
+            _buildableManager = reader.ReadNetworkBehaviour() as NAIBuildableManager;
             _buildingId = reader.ReadInt32();
         }
 
         public override bool OnTrySpawnServer(NetworkConnection spawner, NetworkConnection owner = null)
         {
             var size = GetComponent<UnityEngine.SpriteRenderer>().bounds.size;
-            if (!_buildingManager.CanBuildHere(transform.position, size)) return false;
+            if (!_buildableManager.CanBuildHere(transform.position, size)) return false;
 
-            _buildingManager.UpdateGrid(transform.position, size, _buildingId);
+            // Spawn the buildable on the server
+            var guid = System.Guid.NewGuid();
+            _buildableManager.UpdateGrid(transform.position, size, guid);
+            NAIStateManager.Buildables[guid] = GetComponent<NAIBuildable>();
             return true;
         }
     }

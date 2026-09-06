@@ -56,7 +56,7 @@ public sealed class Builder : NetworkBehaviour
 
     private void Awake()
     {
-        point = InputSystem.actions.FindAction("Build/Point", true);
+        point = InputSystem.actions.FindAction("Player/Point", true);
         place = InputSystem.actions.FindAction("Build/Place", true);
         demolish = InputSystem.actions.FindAction("Build/Demolish", true);
         nextBuilding = InputSystem.actions.FindAction("Build/NextBuilding", true);
