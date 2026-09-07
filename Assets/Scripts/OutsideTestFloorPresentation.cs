@@ -10,6 +10,7 @@ public sealed class OutsideTestFloorPresentation : MonoBehaviour
     private Transform marker = null!;
     private TextMesh markerLabel = null!;
     private Sprite markerSprite = null!;
+    private uint buildingInstanceId;
     private int floorIndex;
     private bool isConfigured;
 
@@ -29,6 +30,7 @@ public sealed class OutsideTestFloorPresentation : MonoBehaviour
     {
         if (!isConfigured
             || !GameSceneManager.Instance.TryGetOutsideTestFloorState(
+                buildingInstanceId,
                 floorIndex,
                 out var state))
         {
@@ -40,18 +42,17 @@ public sealed class OutsideTestFloorPresentation : MonoBehaviour
 
     public void Configure(uint buildingInstanceId, int newFloorIndex)
     {
-        if (buildingInstanceId != GameSceneManager.OutsideTestBuildingId)
+        if (buildingInstanceId == 0 || newFloorIndex < 0)
         {
             return;
         }
 
-        floorIndex = Mathf.Clamp(
-            newFloorIndex,
-            0,
-            GameSceneManager.OutsideTestFloorCount - 1);
+        this.buildingInstanceId = buildingInstanceId;
+        floorIndex = newFloorIndex;
         isConfigured = true;
         CreateVisuals();
         if (GameSceneManager.Instance.TryGetOutsideTestFloorState(
+                buildingInstanceId,
                 floorIndex,
                 out var state))
         {
@@ -94,9 +95,14 @@ public sealed class OutsideTestFloorPresentation : MonoBehaviour
 
     private void ApplyState(OutsideTestFloorRecord state)
     {
-        if (SceneGrid.TryGetForScene(gameObject.scene, out var grid))
+        var markerPosition = state.MarkerPosition;
+        if (SceneGrid.TryGetForScene(gameObject.scene, out var grid)
+            && IndoorGrid.TryGetForScene(gameObject.scene, out var indoorGrid))
         {
-            var worldPosition = grid.LogicalToWorld(state.MarkerPosition);
+            markerPosition = OutsideTestFloorRecord.ClampMarkerPosition(
+                markerPosition,
+                indoorGrid.Size);
+            var worldPosition = grid.LogicalToWorld(markerPosition);
             var position = new Vector3(
                 worldPosition.x,
                 worldPosition.y,

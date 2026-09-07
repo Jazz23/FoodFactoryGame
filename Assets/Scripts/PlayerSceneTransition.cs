@@ -186,17 +186,21 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         transform.SetPositionAndRotation(position, Quaternion.identity);
     }
 
-    public bool TryGetCurrentOutsideTestFloor(out int floorIndex)
+    public bool TryGetCurrentOutsideTestFloor(
+        out uint buildingInstanceId,
+        out int floorIndex)
     {
+        buildingInstanceId = 0;
         floorIndex = -1;
         if (!InsideFactoryController.TryGetForScene(
                 gameObject.scene,
                 out var controller)
-            || controller.BuildingInstanceId != GameSceneManager.OutsideTestBuildingId)
+            || controller.BuildingInstanceId == 0)
         {
             return false;
         }
 
+        buildingInstanceId = controller.BuildingInstanceId;
         floorIndex = controller.CurrentFloor;
         return true;
     }
@@ -212,6 +216,7 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
     }
 
     public void RequestSetOutsideTestFloorState(
+        uint buildingInstanceId,
         int floorIndex,
         string label,
         float productionRate,
@@ -223,6 +228,7 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         }
 
         RequestSetOutsideTestFloorStateServerRpc(
+            buildingInstanceId,
             floorIndex,
             label,
             productionRate,
@@ -251,6 +257,7 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
     {
         TargetReceiveOutsideTestFloorState(
             Owner,
+            floor.BuildingInstanceId,
             floor.FloorIndex,
             floor.Label,
             floor.ProductionRate,
@@ -267,12 +274,14 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
 
     [ServerRpc]
     private void RequestSetOutsideTestFloorStateServerRpc(
+        uint buildingInstanceId,
         int floorIndex,
         string label,
         float productionRate,
         Vector2 markerPosition)
     {
         GameSceneManager.Instance.TrySetOutsideTestFloorState(
+            buildingInstanceId,
             floorIndex,
             label,
             productionRate,
@@ -294,6 +303,7 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
     [TargetRpc]
     private void TargetReceiveOutsideTestFloorState(
         NetworkConnection connection,
+        uint buildingInstanceId,
         int floorIndex,
         string label,
         float productionRate,
@@ -302,6 +312,7 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         int loadedInteriorCount)
     {
         GameSceneManager.Instance.ReceiveOutsideTestFloorState(
+            buildingInstanceId,
             floorIndex,
             label,
             productionRate,
@@ -373,11 +384,11 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         networkTransform.Teleport();
         CloseElevatorPrompt();
         SetTransitionState(false);
-        if (buildingInstanceId == GameSceneManager.OutsideTestBuildingId)
+        if (buildingInstanceId != 0)
         {
             if (debugPanel is not null && debugPanel)
             {
-                debugPanel.SelectFloor(floorIndex);
+                debugPanel.SelectFloor(buildingInstanceId, floorIndex);
             }
 
             RequestOutsideTestFloorSnapshot();

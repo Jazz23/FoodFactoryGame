@@ -345,7 +345,11 @@ public sealed class InsideFactoryController : MonoBehaviour
         uint newBuildingInstanceId,
         int newFloorIndex)
     {
-        if (newBuildingInstanceId != GameSceneManager.OutsideTestBuildingId)
+        if (newBuildingInstanceId == 0
+            || GameSceneManager.Instance is null
+            || !GameSceneManager.Instance.TryGetOutsideTestBuildingInfo(
+                newBuildingInstanceId,
+                out _))
         {
             if (TryGetComponent<OutsideTestFloorPresentation>(out var existingPresentation))
             {

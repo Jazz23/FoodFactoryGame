@@ -57,6 +57,26 @@ public sealed class IndoorGrid : MonoBehaviour
         return false;
     }
 
+    public static bool TryGetForScene(Scene scene, out IndoorGrid indoorGrid)
+    {
+        indoorGrid = null!;
+        var indoorGrids = FindObjectsByType<IndoorGrid>(
+            FindObjectsInactive.Include,
+            FindObjectsSortMode.None);
+        foreach (var candidate in indoorGrids)
+        {
+            if (candidate.gameObject.scene != scene || !candidate.isActiveAndEnabled)
+            {
+                continue;
+            }
+
+            indoorGrid = candidate;
+            return true;
+        }
+
+        return false;
+    }
+
     private void Rebuild()
     {
         generatedRoot = GetGeneratedRoot();

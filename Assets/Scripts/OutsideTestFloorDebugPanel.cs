@@ -18,11 +18,14 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
     private Text statusText = null!;
     private InputField labelInput = null!;
     private InputField rateInput = null!;
+    private Transform selectorRoot = null!;
     private InputAction toggle = null!;
     private InputAction cancel = null!;
     private InputAction moveMarker = null!;
     private GameObject createdEventSystem = null!;
     private string statusMessage = "Waiting for server state";
+    private string selectorFingerprint = string.Empty;
+    private uint selectedBuildingInstanceId;
     private int selectedFloor;
     private bool initialized;
     private bool isOpen = true;
@@ -53,13 +56,33 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
         Refresh();
     }
 
-    public void SelectFloor(int floorIndex)
+    public void SelectFloor(uint buildingInstanceId, int floorIndex)
     {
-        selectedFloor = Mathf.Clamp(
-            floorIndex,
-            0,
-            GameSceneManager.OutsideTestFloorCount - 1);
-        statusMessage = $"Selected floor {selectedFloor}";
+        if (!GameSceneManager.Instance.IsValidOutsideTestFloor(
+                buildingInstanceId,
+                floorIndex))
+        {
+            return;
+        }
+
+        selectedBuildingInstanceId = buildingInstanceId;
+        selectedFloor = floorIndex;
+        statusMessage = $"Selected building {buildingInstanceId}, floor {selectedFloor}";
+        Refresh();
+    }
+
+    private void SelectBuilding(uint buildingInstanceId)
+    {
+        if (!GameSceneManager.Instance.TryGetOutsideTestBuildingInfo(
+                buildingInstanceId,
+                out var info))
+        {
+            return;
+        }
+
+        selectedBuildingInstanceId = buildingInstanceId;
+        selectedFloor = Mathf.Clamp(selectedFloor, 0, info.StoryCount - 1);
+        statusMessage = $"Selected building {buildingInstanceId}";
         Refresh();
     }
 
@@ -138,6 +161,7 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
     private void MoveMarker(Vector2 delta)
     {
         if (!GameSceneManager.Instance.TryGetOutsideTestFloorState(
+                selectedBuildingInstanceId,
                 selectedFloor,
                 out var floor))
         {
@@ -151,16 +175,12 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
 
         var markerPosition = floor.MarkerPosition + delta;
         owner.RequestSetOutsideTestFloorState(
+            selectedBuildingInstanceId,
             selectedFloor,
             label,
             productionRate,
             markerPosition);
         statusMessage = "Marker edit sent";
-    }
-
-    private void SelectFloorButton(int floorIndex)
-    {
-        SelectFloor(floorIndex);
     }
 
     private void ApplyEditsClicked()
@@ -193,6 +213,7 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
     private bool TrySubmitEditorState()
     {
         if (!GameSceneManager.Instance.TryGetOutsideTestFloorState(
+                selectedBuildingInstanceId,
                 selectedFloor,
                 out var floor)
             || !TryReadEditorState(out var label, out var productionRate))
@@ -201,6 +222,7 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
         }
 
         owner.RequestSetOutsideTestFloorState(
+            selectedBuildingInstanceId,
             selectedFloor,
             label,
             productionRate,
@@ -233,12 +255,16 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             return;
         }
 
+        RefreshSelectionButtons();
         var hasState = GameSceneManager.Instance.TryGetOutsideTestFloorState(
+            selectedBuildingInstanceId,
             selectedFloor,
             out var selectedState);
-        var isInside = owner.TryGetCurrentOutsideTestFloor(out var currentFloor);
+        var isInside = owner.TryGetCurrentOutsideTestFloor(
+            out var currentBuilding,
+            out var currentFloor);
         titleText.text = isInside
-            ? $"OUTSIDETEST DEBUG  |  INSIDE FLOOR {currentFloor}"
+            ? $"OUTSIDETEST DEBUG  |  INSIDE B{currentBuilding} / F{currentFloor}"
             : "OUTSIDETEST DEBUG  |  OUTSIDE";
         stateText.text = hasState
             ? $"SELECTED: BUILDING {selectedState.BuildingInstanceId} / FLOOR {selectedState.FloorIndex}\n"
@@ -264,21 +290,30 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
         }
 
         var summary = "FLOOR TOTALS\n";
-        for (var floorIndex = 0;
-            floorIndex < GameSceneManager.OutsideTestFloorCount;
-            floorIndex++)
+        foreach (var buildingInstanceId in GameSceneManager.Instance.GetRegisteredOutsideTestBuildingIds())
         {
-            if (!GameSceneManager.Instance.TryGetOutsideTestFloorState(
-                    floorIndex,
-                    out var floor))
+            if (!GameSceneManager.Instance.TryGetOutsideTestBuildingInfo(
+                    buildingInstanceId,
+                    out var info))
             {
-                summary += $"F{floorIndex}: waiting\n";
                 continue;
             }
 
-            summary += $"F{floorIndex} {floor.Label}: "
-                + $"{floor.AccumulatedProduction.ToString("0.0", CultureInfo.InvariantCulture)} "
-                + $"@ {floor.ProductionRate.ToString("0.###", CultureInfo.InvariantCulture)} / sec\n";
+            for (var floorIndex = 0; floorIndex < info.StoryCount; floorIndex++)
+            {
+                if (!GameSceneManager.Instance.TryGetOutsideTestFloorState(
+                        buildingInstanceId,
+                        floorIndex,
+                        out var floor))
+                {
+                    summary += $"B{buildingInstanceId}/F{floorIndex}: waiting\n";
+                    continue;
+                }
+
+                summary += $"B{buildingInstanceId}/F{floorIndex} {floor.Label}: "
+                    + $"{floor.AccumulatedProduction.ToString("0.0", CultureInfo.InvariantCulture)} "
+                    + $"@ {floor.ProductionRate.ToString("0.###", CultureInfo.InvariantCulture)} / sec\n";
+            }
         }
 
         summaryText.text = summary.TrimEnd();
@@ -318,7 +353,7 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             "OutsideTest Debug Panel",
             canvasObject.transform,
             new Color(0.025f, 0.055f, 0.075f, 0.94f));
-        SetTopRect(root.GetComponent<RectTransform>(), 16f, 16f, 420f, 510f);
+        SetTopRect(root.GetComponent<RectTransform>(), 16f, 16f, 420f, 560f);
 
         titleText = CreateText(
             "Title",
@@ -347,52 +382,41 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             new Color(0.66f, 0.82f, 0.8f));
         SetTopRect(summaryText.rectTransform, 14f, 148f, 392f, 100f);
 
-        for (var floorIndex = 0;
-            floorIndex < GameSceneManager.OutsideTestFloorCount;
-            floorIndex++)
-        {
-            var capturedFloorIndex = floorIndex;
-            var button = CreateButton(
-                $"Floor {floorIndex} Button",
-                $"FLOOR {floorIndex}",
-                root.transform,
-                14f + floorIndex * 132f,
-                252f,
-                124f,
-                30f,
-                () => SelectFloorButton(capturedFloorIndex));
-            button.GetComponent<Image>().color = new Color(0.12f, 0.25f, 0.28f, 1f);
-        }
+        selectorRoot = new GameObject(
+            "Building and Floor Selectors",
+            typeof(RectTransform)).transform;
+        selectorRoot.SetParent(root.transform, false);
+        SetTopRect(selectorRoot.GetComponent<RectTransform>(), 14f, 252f, 392f, 70f);
 
-        CreateTextLabel(root.transform, "Label", "LABEL", 14f, 292f);
+        CreateTextLabel(root.transform, "Label", "LABEL", 14f, 332f);
         labelInput = CreateInputField(
             root.transform,
             "Label Input",
             string.Empty,
             90f,
-            286f,
+            326f,
             316f,
             34f,
             InputField.ContentType.Standard);
 
-        CreateTextLabel(root.transform, "Rate", "RATE", 14f, 332f);
+        CreateTextLabel(root.transform, "Rate", "RATE", 14f, 372f);
         rateInput = CreateInputField(
             root.transform,
             "Rate Input",
             string.Empty,
             90f,
-            326f,
+            366f,
             316f,
             34f,
             InputField.ContentType.DecimalNumber);
 
-        CreateTextLabel(root.transform, "Marker", "MARKER", 14f, 374f);
+        CreateTextLabel(root.transform, "Marker", "MARKER", 14f, 414f);
         CreateButton(
             "Marker Left",
             "<",
             root.transform,
             90f,
-            368f,
+            408f,
             52f,
             32f,
             () => MoveMarker(new Vector2(-0.25f, 0f)));
@@ -401,7 +425,7 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             "v",
             root.transform,
             148f,
-            368f,
+            408f,
             52f,
             32f,
             () => MoveMarker(new Vector2(0f, -0.25f)));
@@ -410,7 +434,7 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             "^",
             root.transform,
             206f,
-            368f,
+            408f,
             52f,
             32f,
             () => MoveMarker(new Vector2(0f, 0.25f)));
@@ -419,7 +443,7 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             ">",
             root.transform,
             264f,
-            368f,
+            408f,
             52f,
             32f,
             () => MoveMarker(new Vector2(0.25f, 0f)));
@@ -429,7 +453,7 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             "APPLY",
             root.transform,
             322f,
-            368f,
+            408f,
             84f,
             32f,
             ApplyEditsClicked);
@@ -438,7 +462,7 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             "SAVE",
             root.transform,
             14f,
-            412f,
+            452f,
             188f,
             34f,
             SaveClicked);
@@ -447,7 +471,7 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             "LOAD",
             root.transform,
             218f,
-            412f,
+            452f,
             188f,
             34f,
             LoadClicked);
@@ -459,8 +483,79 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             11,
             TextAnchor.UpperLeft,
             new Color(0.6f, 0.78f, 0.76f));
-        SetTopRect(statusText.rectTransform, 14f, 454f, 392f, 44f);
+        SetTopRect(statusText.rectTransform, 14f, 494f, 392f, 44f);
         root.SetActive(true);
+    }
+
+    private void RefreshSelectionButtons()
+    {
+        var buildingIds = GameSceneManager.Instance.GetRegisteredOutsideTestBuildingIds();
+        if (buildingIds.Length == 0)
+        {
+            return;
+        }
+
+        if (!GameSceneManager.Instance.IsValidOutsideTestFloor(
+                selectedBuildingInstanceId,
+                selectedFloor))
+        {
+            selectedBuildingInstanceId = buildingIds[0];
+            selectedFloor = 0;
+        }
+
+        var fingerprint = $"selected:{selectedBuildingInstanceId}|"
+            + buildingIds.Length.ToString(CultureInfo.InvariantCulture);
+        foreach (var buildingId in buildingIds)
+        {
+            GameSceneManager.Instance.TryGetOutsideTestBuildingInfo(
+                buildingId,
+                out var info);
+            fingerprint += $"|{buildingId}:{info.StoryCount}";
+        }
+
+        if (fingerprint == selectorFingerprint)
+        {
+            return;
+        }
+
+        selectorFingerprint = fingerprint;
+        for (var index = selectorRoot.childCount - 1; index >= 0; index--)
+        {
+            Destroy(selectorRoot.GetChild(index).gameObject);
+        }
+
+        for (var index = 0; index < buildingIds.Length; index++)
+        {
+            var buildingId = buildingIds[index];
+            var buildingButton = CreateButton(
+                $"Building {buildingId} Button",
+                $"BUILDING {buildingId}",
+                selectorRoot,
+                index * 126f,
+                0f,
+                120f,
+                30f,
+                () => SelectBuilding(buildingId));
+            buildingButton.GetComponent<Image>().color = new Color(0.12f, 0.25f, 0.28f, 1f);
+        }
+
+        GameSceneManager.Instance.TryGetOutsideTestBuildingInfo(
+            selectedBuildingInstanceId,
+            out var selectedInfo);
+        for (var floorIndex = 0; floorIndex < selectedInfo.StoryCount; floorIndex++)
+        {
+            var capturedFloorIndex = floorIndex;
+            var floorButton = CreateButton(
+                $"Floor {floorIndex} Button",
+                $"FLOOR {floorIndex}",
+                selectorRoot,
+                floorIndex * 126f,
+                34f,
+                120f,
+                30f,
+                () => SelectFloor(selectedBuildingInstanceId, capturedFloorIndex));
+            floorButton.GetComponent<Image>().color = new Color(0.16f, 0.3f, 0.32f, 1f);
+        }
     }
 
     private static InputField CreateInputField(

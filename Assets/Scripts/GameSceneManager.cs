@@ -1,5 +1,4 @@
 // Loads building-specific interior scenes and returns players to their source building.
-using System;
 using System.Collections.Generic;
 using System.IO;
 using FishNet.Connection;
@@ -14,8 +13,7 @@ using UnitySceneManager = UnityEngine.SceneManagement.SceneManager;
 [RequireComponent(typeof(NetworkManager))]
 public sealed class GameSceneManager : MonoBehaviour
 {
-    public const uint OutsideTestBuildingId = 1;
-    public const int OutsideTestFloorCount = 3;
+    public const uint LegacyOutsideTestBuildingId = 1;
 
     private const string OutsideTestStateFileName = "outsidetest-floor-state.json";
     private const float OutsideTestBroadcastInterval = 0.25f;
@@ -56,10 +54,13 @@ public sealed class GameSceneManager : MonoBehaviour
     private readonly Dictionary<int, NetworkObject> players = new();
     private readonly Dictionary<int, PendingTransition> pendingTransitions = new();
     private readonly Dictionary<int, BuildingReturn> buildingReturns = new();
-    private readonly Dictionary<int, OutsideTestFloorRecord> outsideTestFloors = new();
-    private readonly Dictionary<int, OutsideTestFloorRecord> clientOutsideTestFloors = new();
+    private readonly HashSet<uint> duplicateOutsideTestBuildingWarnings = new();
     private NetworkManager networkManager = null!;
+    private OutsideTestFloorStateOwner outsideTestStateOwner = null!;
     private bool outsideTestStateLoaded;
+    private bool outsideTestStateLoadedFromDisk;
+    private bool outsideTestStateNeedsSave;
+    private int registeredOutsideTestSceneHandle = -1;
     private int clientOutsideTestLoadedInteriorCount;
     private float nextOutsideTestBroadcastTime;
 
@@ -73,6 +74,8 @@ public sealed class GameSceneManager : MonoBehaviour
     {
         Instance = this;
         networkManager = GetComponent<NetworkManager>();
+        outsideTestStateOwner = new OutsideTestFloorStateOwner(
+            LegacyOutsideTestBuildingId);
         EnsureOutsideTestStateLoaded();
     }
 
@@ -108,16 +111,17 @@ public sealed class GameSceneManager : MonoBehaviour
 
     private void Update()
     {
+        EnsureOutsideTestStateLoaded();
+
         if (!networkManager.IsServerStarted)
         {
             return;
         }
 
-        EnsureOutsideTestStateLoaded();
-        var deltaTime = Time.deltaTime;
-        foreach (var floor in outsideTestFloors.Values)
+        outsideTestStateOwner.AdvanceProduction(Time.deltaTime);
+        if (outsideTestStateNeedsSave)
         {
-            floor.Advance(deltaTime);
+            SaveOutsideTestFloorState();
         }
 
         if (Time.unscaledTime < nextOutsideTestBroadcastTime)
@@ -130,53 +134,49 @@ public sealed class GameSceneManager : MonoBehaviour
     }
 
     public bool TryGetOutsideTestFloorState(
+        uint buildingInstanceId,
         int floorIndex,
         out OutsideTestFloorRecord state)
     {
         EnsureOutsideTestStateLoaded();
-        var floors = networkManager.IsServerStarted
-            ? outsideTestFloors
-            : clientOutsideTestFloors;
-        return floors.TryGetValue(floorIndex, out state);
+        return outsideTestStateOwner.TryGetFloorState(
+            buildingInstanceId,
+            floorIndex,
+            out state);
     }
 
     public bool TrySetOutsideTestFloorState(
+        uint buildingInstanceId,
         int floorIndex,
         string label,
         float productionRate,
         Vector2 markerPosition)
     {
         if (!networkManager.IsServerStarted
-            || !outsideTestFloors.TryGetValue(floorIndex, out var floor))
+            || !outsideTestStateOwner.TrySetFloorState(
+                buildingInstanceId,
+                floorIndex,
+                label,
+                productionRate,
+                markerPosition))
         {
             return false;
         }
 
-        floor.SetState(
-            label,
-            productionRate,
-            floor.AccumulatedProduction,
-            markerPosition);
-        BroadcastOutsideTestFloorState(floorIndex);
+        BroadcastOutsideTestFloorState(buildingInstanceId, floorIndex);
         return true;
     }
 
     public bool SaveOutsideTestFloorState()
     {
         EnsureOutsideTestStateLoaded();
-        var saveData = new OutsideTestFloorSaveData(outsideTestFloors.Values);
-        try
+        if (!outsideTestStateOwner.SaveToFile(GetOutsideTestStatePath()))
         {
-            File.WriteAllText(GetOutsideTestStatePath(), JsonUtility.ToJson(saveData, true));
-            return true;
-        }
-        catch (Exception exception)
-        {
-            Debug.LogError(
-                $"Could not save OutsideTest floor state: {exception.Message}",
-                this);
             return false;
         }
+
+        outsideTestStateNeedsSave = false;
+        return true;
     }
 
     public bool LoadOutsideTestFloorState()
@@ -187,6 +187,7 @@ public sealed class GameSceneManager : MonoBehaviour
         }
 
         outsideTestStateLoaded = false;
+        outsideTestStateLoadedFromDisk = false;
         EnsureOutsideTestStateLoaded();
         SaveOutsideTestFloorState();
         BroadcastOutsideTestFloorStates();
@@ -201,13 +202,14 @@ public sealed class GameSceneManager : MonoBehaviour
         }
 
         var loadedInteriorCount = OutsideTestLoadedInteriorCount;
-        foreach (var floor in outsideTestFloors.Values)
+        foreach (var floor in outsideTestStateOwner.FloorStates)
         {
             player.ServerSendOutsideTestFloorState(floor, loadedInteriorCount);
         }
     }
 
     public void ReceiveOutsideTestFloorState(
+        uint buildingInstanceId,
         int floorIndex,
         string label,
         float productionRate,
@@ -215,31 +217,13 @@ public sealed class GameSceneManager : MonoBehaviour
         Vector2 markerPosition,
         int loadedInteriorCount)
     {
-        if (floorIndex < 0 || floorIndex >= OutsideTestFloorCount)
-        {
-            return;
-        }
-
-        if (!clientOutsideTestFloors.TryGetValue(floorIndex, out var floor))
-        {
-            floor = new OutsideTestFloorRecord(
-                OutsideTestBuildingId,
-                floorIndex,
-                label,
-                productionRate,
-                accumulatedProduction,
-                markerPosition);
-            clientOutsideTestFloors.Add(floorIndex, floor);
-        }
-        else
-        {
-            floor.SetState(
-                label,
-                productionRate,
-                accumulatedProduction,
-                markerPosition);
-        }
-
+        outsideTestStateOwner.ApplySnapshot(
+            buildingInstanceId,
+            floorIndex,
+            label,
+            productionRate,
+            accumulatedProduction,
+            markerPosition);
         clientOutsideTestLoadedInteriorCount = loadedInteriorCount;
     }
 
@@ -261,15 +245,22 @@ public sealed class GameSceneManager : MonoBehaviour
 
     private void BroadcastOutsideTestFloorStates()
     {
-        foreach (var floor in outsideTestFloors.Values)
+        foreach (var floor in outsideTestStateOwner.FloorStates)
         {
-            BroadcastOutsideTestFloorState(floor.FloorIndex);
+            BroadcastOutsideTestFloorState(
+                floor.BuildingInstanceId,
+                floor.FloorIndex);
         }
     }
 
-    private void BroadcastOutsideTestFloorState(int floorIndex)
+    private void BroadcastOutsideTestFloorState(
+        uint buildingInstanceId,
+        int floorIndex)
     {
-        if (!outsideTestFloors.TryGetValue(floorIndex, out var floor))
+        if (!outsideTestStateOwner.TryGetFloorState(
+                buildingInstanceId,
+                floorIndex,
+                out var floor))
         {
             return;
         }
@@ -284,71 +275,127 @@ public sealed class GameSceneManager : MonoBehaviour
 
     private void EnsureOutsideTestStateLoaded()
     {
+        var path = GetOutsideTestStatePath();
+        if (networkManager.IsServerStarted && !outsideTestStateLoadedFromDisk)
+        {
+            if (File.Exists(path))
+            {
+                if (!outsideTestStateOwner.LoadFromFile(path))
+                {
+                    Debug.LogWarning(
+                        "Could not read OutsideTest floor state.",
+                        this);
+                }
+            }
+
+            outsideTestStateLoadedFromDisk = true;
+        }
+
         if (outsideTestStateLoaded)
+        {
+            RegisterOutsideTestLayouts();
+            return;
+        }
+
+        outsideTestStateLoaded = true;
+        RegisterOutsideTestLayouts();
+        if (networkManager.IsServerStarted && !File.Exists(path))
+        {
+            outsideTestStateNeedsSave = true;
+        }
+    }
+
+    public uint[] GetRegisteredOutsideTestBuildingIds()
+    {
+        EnsureOutsideTestStateLoaded();
+        var result = new List<uint>();
+        foreach (var building in outsideTestStateOwner.Buildings)
+        {
+            result.Add(building.BuildingInstanceId);
+        }
+
+        result.Sort();
+        return result.ToArray();
+    }
+
+    public bool TryGetOutsideTestBuildingInfo(
+        uint buildingInstanceId,
+        out OutsideTestBuildingInfo info)
+    {
+        EnsureOutsideTestStateLoaded();
+        return outsideTestStateOwner.TryGetBuildingInfo(
+            buildingInstanceId,
+            out info);
+    }
+
+    public bool IsValidOutsideTestFloor(
+        uint buildingInstanceId,
+        int floorIndex)
+    {
+        return TryGetOutsideTestBuildingInfo(
+                buildingInstanceId,
+                out var info)
+            && floorIndex >= 0
+            && floorIndex < info.StoryCount;
+    }
+
+    private void RegisterOutsideTestLayouts()
+    {
+        var worldScene = UnitySceneManager.GetSceneByName(worldSceneName);
+        if (!worldScene.IsValid()
+            || !worldScene.isLoaded
+            || worldScene.handle == registeredOutsideTestSceneHandle)
         {
             return;
         }
 
-        outsideTestFloors.Clear();
-        var needsSave = true;
-        var path = GetOutsideTestStatePath();
-        if (File.Exists(path))
+        var layouts = FindObjectsByType<TestBuildingLayout>(
+            FindObjectsInactive.Include,
+            FindObjectsSortMode.None);
+        var layoutsById = new Dictionary<uint, TestBuildingLayout>();
+        foreach (var layout in layouts)
         {
-            try
-            {
-                var data = JsonUtility.FromJson<OutsideTestFloorSaveData>(
-                    File.ReadAllText(path));
-                if (data is not null && data.Floors is not null)
-                {
-                    foreach (var floor in data.Floors)
-                    {
-                        if (floor is null
-                            || floor.BuildingInstanceId != OutsideTestBuildingId
-                            || floor.FloorIndex < 0
-                            || floor.FloorIndex >= OutsideTestFloorCount)
-                        {
-                            continue;
-                        }
-
-                        floor.SetState(
-                            floor.Label,
-                            floor.ProductionRate,
-                            floor.AccumulatedProduction,
-                            floor.MarkerPosition);
-                        outsideTestFloors[floor.FloorIndex] = floor;
-                    }
-
-                    needsSave = false;
-                }
-            }
-            catch (Exception exception)
-            {
-                Debug.LogWarning(
-                    $"Could not read OutsideTest floor state: {exception.Message}",
-                    this);
-            }
-        }
-
-        for (var floorIndex = 0; floorIndex < OutsideTestFloorCount; floorIndex++)
-        {
-            if (outsideTestFloors.ContainsKey(floorIndex))
+            if (layout.gameObject.scene.name != worldSceneName
+                || layout.BuildingInstanceId == 0)
             {
                 continue;
             }
 
-            outsideTestFloors.Add(
-                floorIndex,
-                OutsideTestFloorRecord.CreateDefault(
-                    OutsideTestBuildingId,
-                    floorIndex));
-            needsSave = true;
+            if (layoutsById.ContainsKey(layout.BuildingInstanceId))
+            {
+                if (duplicateOutsideTestBuildingWarnings.Add(layout.BuildingInstanceId))
+                {
+                    Debug.LogError(
+                        $"OutsideTest contains duplicate building ID {layout.BuildingInstanceId}; duplicate layout rejected.",
+                        layout);
+                }
+
+                continue;
+            }
+
+            layoutsById.Add(layout.BuildingInstanceId, layout);
         }
 
-        outsideTestStateLoaded = true;
-        if (needsSave && networkManager.IsServerStarted)
+        foreach (var layout in layoutsById.Values)
         {
-            SaveOutsideTestFloorState();
+            if (!outsideTestStateOwner.TryRegisterBuilding(
+                    layout.BuildingInstanceId,
+                    layout.StoryCount,
+                    layout.Size,
+                    out var error))
+            {
+                if (!string.IsNullOrEmpty(error))
+                {
+                    Debug.LogError(error, layout);
+                }
+
+                continue;
+            }
+
+            outsideTestStateNeedsSave = true;
         }
+
+        registeredOutsideTestSceneHandle = worldScene.handle;
     }
 
     private static string GetOutsideTestStatePath()

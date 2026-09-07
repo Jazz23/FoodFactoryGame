@@ -95,9 +95,27 @@ public sealed class OutsideTestFloorRecord
             || float.IsInfinity(newAccumulatedProduction)
             ? 0f
             : Mathf.Max(0f, newAccumulatedProduction);
-        markerPosition = new Vector2(
-            Mathf.Clamp(newMarkerPosition.x, 0.5f, 5.5f),
-            Mathf.Clamp(newMarkerPosition.y, 0.5f, 5.5f));
+        markerPosition = SanitizeMarkerPosition(newMarkerPosition);
+    }
+
+    public static Vector2 SanitizeMarkerPosition(Vector2 position)
+    {
+        return new Vector2(
+            float.IsNaN(position.x) || float.IsInfinity(position.x) ? 0.5f : position.x,
+            float.IsNaN(position.y) || float.IsInfinity(position.y) ? 0.5f : position.y);
+    }
+
+    public static Vector2 ClampMarkerPosition(
+        Vector2 position,
+        Vector2Int interiorSize)
+    {
+        var safePosition = SanitizeMarkerPosition(position);
+        var maximum = new Vector2(
+            Mathf.Max(0.5f, interiorSize.x - 0.5f),
+            Mathf.Max(0.5f, interiorSize.y - 0.5f));
+        return new Vector2(
+            Mathf.Clamp(safePosition.x, 0.5f, maximum.x),
+            Mathf.Clamp(safePosition.y, 0.5f, maximum.y));
     }
 
     public void Advance(float deltaTime)
@@ -109,7 +127,7 @@ public sealed class OutsideTestFloorRecord
 [Serializable]
 public sealed class OutsideTestFloorSaveData
 {
-    public int Version = 1;
+    public int Version = OutsideTestFloorStateOwner.CurrentSaveVersion;
     public List<OutsideTestFloorRecord> Floors = new();
 
     public OutsideTestFloorSaveData()
