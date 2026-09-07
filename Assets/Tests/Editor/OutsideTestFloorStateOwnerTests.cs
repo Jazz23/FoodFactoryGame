@@ -1,5 +1,7 @@
 // Verifies independent OutsideTest floor identity, registration, migration, and simulation.
+using System;
 using System.Collections.Generic;
+using System.IO;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -113,6 +115,129 @@ public sealed class OutsideTestFloorStateOwnerTests
 
         Assert.That(owner.TryGetFloorState(1, 0, out var state), Is.True);
         Assert.That(state.AccumulatedProduction, Is.EqualTo(10f).Within(0.0001f));
+    }
+
+    [Test]
+    public void FixedTickSimulationAdvancesBothFloorsWithoutSceneObjects()
+    {
+        var owner = new OutsideTestFloorStateOwner(1);
+        owner.TryRegisterBuilding(2, 2, new Vector2Int(5, 3), out _);
+        owner.TrySetFloorState(2, 0, "Ground", 3f, new Vector2(1f, 1f));
+        owner.TrySetFloorState(2, 1, "Upper", 7f, new Vector2(4f, 2f));
+        var simulation = new FactorySimulation(owner.AdvanceProduction);
+
+        Assert.That(simulation.Advance(0.25f), Is.EqualTo(2));
+        Assert.That(owner.TryGetFloorState(2, 0, out var ground), Is.True);
+        Assert.That(owner.TryGetFloorState(2, 1, out var upper), Is.True);
+        Assert.That(ground.AccumulatedProduction, Is.EqualTo(0.6f).Within(0.0001f));
+        Assert.That(upper.AccumulatedProduction, Is.EqualTo(1.4f).Within(0.0001f));
+
+        Assert.That(simulation.Advance(0.04f), Is.EqualTo(0));
+        Assert.That(simulation.Advance(0.01f), Is.EqualTo(1));
+        Assert.That(owner.TryGetFloorState(2, 0, out ground), Is.True);
+        Assert.That(owner.TryGetFloorState(2, 1, out upper), Is.True);
+        Assert.That(ground.AccumulatedProduction, Is.EqualTo(0.9f).Within(0.0001f));
+        Assert.That(upper.AccumulatedProduction, Is.EqualTo(2.1f).Within(0.0001f));
+        Assert.That(ground.Entities, Has.Count.EqualTo(1));
+        Assert.That(upper.Entities, Has.Count.EqualTo(1));
+        Assert.That(ground.Entities[0].DefinitionId, Is.EqualTo("test-machine-ground"));
+        Assert.That(upper.Entities[0].DefinitionId, Is.EqualTo("test-machine-upper"));
+        Assert.That(ground.Entities[0].ProducedCount, Is.EqualTo(0));
+        Assert.That(upper.Entities[0].ProducedCount, Is.EqualTo(0));
+        Assert.That(ground.Entities[0].CycleProgress, Is.EqualTo(0.4f).Within(0.0001f));
+        Assert.That(upper.Entities[0].CycleProgress, Is.EqualTo(0.8f).Within(0.0001f));
+    }
+
+    [Test]
+    public void EntitySnapshotRestoresIndependentFloorContents()
+    {
+        var source = new OutsideTestFloorStateOwner(1);
+        source.TryRegisterBuilding(2, 2, new Vector2Int(5, 3), out _);
+        Assert.That(source.TryGetFloorState(2, 1, out var sourceFloor), Is.True);
+        sourceFloor.Entities[0].SetState(
+            17u,
+            "test-machine-upper",
+            new Vector2(100f, -100f),
+            2f,
+            0.4f,
+            5);
+
+        var target = new OutsideTestFloorStateOwner(1);
+        target.TryRegisterBuilding(2, 2, new Vector2Int(5, 3), out _);
+        Assert.That(
+            target.ApplySnapshot(
+                2,
+                1,
+                sourceFloor.Label,
+                sourceFloor.ProductionRate,
+                sourceFloor.AccumulatedProduction,
+                sourceFloor.MarkerPosition,
+                sourceFloor.GetEntitySnapshots()),
+            Is.True);
+        Assert.That(target.TryGetFloorState(2, 1, out var targetFloor), Is.True);
+        Assert.That(targetFloor.Entities, Has.Count.EqualTo(1));
+        Assert.That(targetFloor.Entities[0].EntityId, Is.EqualTo(17u));
+        Assert.That(targetFloor.Entities[0].DefinitionId, Is.EqualTo("test-machine-upper"));
+        Assert.That(targetFloor.Entities[0].LogicalPosition, Is.EqualTo(new Vector2(4.5f, 0.5f)));
+        Assert.That(targetFloor.Entities[0].ProducedCount, Is.EqualTo(5));
+    }
+
+    [Test]
+    public void TwoFloorSaveLoadRoundTripPreservesIndependentProgress()
+    {
+        var owner = new OutsideTestFloorStateOwner(1);
+        owner.TryRegisterBuilding(2, 2, new Vector2Int(5, 3), out _);
+        owner.TrySetFloorState(
+            2,
+            0,
+            "Ground Line",
+            3f,
+            new Vector2(1f, 1f));
+        owner.TrySetFloorState(
+            2,
+            1,
+            "Upper Line",
+            7f,
+            new Vector2(4f, 2f));
+        var simulation = new FactorySimulation(owner.AdvanceProduction);
+        simulation.Advance(1.25f);
+        var path = Path.Combine(
+            Application.temporaryCachePath,
+            $"outside-test-two-floor-{Guid.NewGuid():N}.json");
+
+        try
+        {
+            Assert.That(owner.SaveToFile(path), Is.True);
+
+            var restored = new OutsideTestFloorStateOwner(1);
+            restored.TryRegisterBuilding(2, 2, new Vector2Int(5, 3), out _);
+            Assert.That(restored.LoadFromFile(path), Is.True);
+            Assert.That(restored.TryGetFloorState(2, 0, out var ground), Is.True);
+            Assert.That(restored.TryGetFloorState(2, 1, out var upper), Is.True);
+            Assert.That(ground.Label, Is.EqualTo("Ground Line"));
+            Assert.That(upper.Label, Is.EqualTo("Upper Line"));
+            Assert.That(ground.MarkerPosition, Is.EqualTo(new Vector2(1f, 1f)));
+            Assert.That(upper.MarkerPosition, Is.EqualTo(new Vector2(4f, 2f)));
+            Assert.That(ground.AccumulatedProduction, Is.EqualTo(3.6f).Within(0.0001f));
+            Assert.That(upper.AccumulatedProduction, Is.EqualTo(8.4f).Within(0.0001f));
+            Assert.That(ground.Entities, Has.Count.EqualTo(1));
+            Assert.That(upper.Entities, Has.Count.EqualTo(1));
+            Assert.That(ground.Entities[0].EntityId, Is.EqualTo(1u));
+            Assert.That(upper.Entities[0].EntityId, Is.EqualTo(1u));
+            Assert.That(ground.Entities[0].DefinitionId, Is.EqualTo("test-machine-ground"));
+            Assert.That(upper.Entities[0].DefinitionId, Is.EqualTo("test-machine-upper"));
+            Assert.That(ground.Entities[0].ProducedCount, Is.EqualTo(0));
+            Assert.That(upper.Entities[0].ProducedCount, Is.EqualTo(1));
+            Assert.That(ground.Entities[0].CycleProgress, Is.EqualTo(0.85f).Within(0.0001f));
+            Assert.That(upper.Entities[0].CycleProgress, Is.EqualTo(0.7f).Within(0.0001f));
+        }
+        finally
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
     }
 
     [Test]

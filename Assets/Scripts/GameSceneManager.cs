@@ -57,6 +57,7 @@ public sealed class GameSceneManager : MonoBehaviour
     private readonly HashSet<uint> duplicateOutsideTestBuildingWarnings = new();
     private NetworkManager networkManager = null!;
     private OutsideTestFloorStateOwner outsideTestStateOwner = null!;
+    private FactorySimulation outsideTestSimulation = null!;
     private bool outsideTestStateLoaded;
     private bool outsideTestStateLoadedFromDisk;
     private bool outsideTestStateNeedsSave;
@@ -76,6 +77,8 @@ public sealed class GameSceneManager : MonoBehaviour
         networkManager = GetComponent<NetworkManager>();
         outsideTestStateOwner = new OutsideTestFloorStateOwner(
             LegacyOutsideTestBuildingId);
+        outsideTestSimulation = new FactorySimulation(
+            outsideTestStateOwner.AdvanceProduction);
         EnsureOutsideTestStateLoaded();
     }
 
@@ -118,7 +121,7 @@ public sealed class GameSceneManager : MonoBehaviour
             return;
         }
 
-        outsideTestStateOwner.AdvanceProduction(Time.deltaTime);
+        outsideTestSimulation.Advance(Time.deltaTime);
         if (outsideTestStateNeedsSave)
         {
             SaveOutsideTestFloorState();
@@ -188,6 +191,7 @@ public sealed class GameSceneManager : MonoBehaviour
 
         outsideTestStateLoaded = false;
         outsideTestStateLoadedFromDisk = false;
+        outsideTestSimulation.Reset();
         EnsureOutsideTestStateLoaded();
         SaveOutsideTestFloorState();
         BroadcastOutsideTestFloorStates();
@@ -215,6 +219,7 @@ public sealed class GameSceneManager : MonoBehaviour
         float productionRate,
         float accumulatedProduction,
         Vector2 markerPosition,
+        FactoryEntitySnapshot[] entitySnapshots,
         int loadedInteriorCount)
     {
         outsideTestStateOwner.ApplySnapshot(
@@ -223,7 +228,8 @@ public sealed class GameSceneManager : MonoBehaviour
             label,
             productionRate,
             accumulatedProduction,
-            markerPosition);
+            markerPosition,
+            entitySnapshots);
         clientOutsideTestLoadedInteriorCount = loadedInteriorCount;
     }
 

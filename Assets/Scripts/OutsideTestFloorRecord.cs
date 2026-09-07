@@ -12,6 +12,7 @@ public sealed class OutsideTestFloorRecord
     [SerializeField] private float productionRate;
     [SerializeField] private float accumulatedProduction;
     [SerializeField] private Vector2 markerPosition;
+    [SerializeField] private List<FactoryEntityRecord> entities = new();
 
     public OutsideTestFloorRecord()
     {
@@ -40,12 +41,13 @@ public sealed class OutsideTestFloorRecord
     public float ProductionRate => productionRate;
     public float AccumulatedProduction => accumulatedProduction;
     public Vector2 MarkerPosition => markerPosition;
+    public IReadOnlyList<FactoryEntityRecord> Entities => GetEntities();
 
     public static OutsideTestFloorRecord CreateDefault(
         uint newBuildingInstanceId,
         int newFloorIndex)
     {
-        return newFloorIndex switch
+        var result = newFloorIndex switch
         {
             0 => new OutsideTestFloorRecord(
                 newBuildingInstanceId,
@@ -76,6 +78,8 @@ public sealed class OutsideTestFloorRecord
                 0f,
                 new Vector2(3f, 3f))
         };
+        result.EnsureDefaultEntity();
+        return result;
     }
 
     public void SetState(
@@ -121,6 +125,80 @@ public sealed class OutsideTestFloorRecord
     public void Advance(float deltaTime)
     {
         accumulatedProduction += productionRate * Mathf.Max(0f, deltaTime);
+        foreach (var entity in GetEntities())
+        {
+            if (entity is not null)
+            {
+                entity.Advance(deltaTime);
+            }
+        }
+    }
+
+    public void SetEntities(IEnumerable<FactoryEntityRecord> newEntities)
+    {
+        var entityList = GetEntities();
+        entityList.Clear();
+        foreach (var entity in newEntities)
+        {
+            if (entity is not null)
+            {
+                entityList.Add(entity.Clone());
+            }
+        }
+    }
+
+    public void SetEntitySnapshots(
+        IReadOnlyList<FactoryEntitySnapshot> snapshots)
+    {
+        var entityList = GetEntities();
+        entityList.Clear();
+        foreach (var snapshot in snapshots)
+        {
+            entityList.Add(FactoryEntityRecord.FromSnapshot(snapshot));
+        }
+    }
+
+    public void EnsureDefaultEntity()
+    {
+        if (GetEntities().Count == 0)
+        {
+            GetEntities().Add(FactoryEntityRecord.CreateDefault(1u, floorIndex));
+        }
+    }
+
+    public void ClampEntityPositions(Vector2Int interiorSize)
+    {
+        foreach (var entity in GetEntities())
+        {
+            if (entity is not null)
+            {
+                entity.ClampPosition(interiorSize);
+            }
+        }
+    }
+
+    public FactoryEntitySnapshot[] GetEntitySnapshots()
+    {
+        var snapshots = new List<FactoryEntitySnapshot>(GetEntities().Count);
+        foreach (var entity in GetEntities())
+        {
+            if (entity is not null && entity.EntityId != 0)
+            {
+                snapshots.Add(entity.ToSnapshot());
+            }
+        }
+
+        return snapshots.ToArray();
+    }
+
+    private List<FactoryEntityRecord> GetEntities()
+    {
+        if (entities is null)
+        {
+            entities = new List<FactoryEntityRecord>();
+        }
+
+        return entities;
     }
 }
 

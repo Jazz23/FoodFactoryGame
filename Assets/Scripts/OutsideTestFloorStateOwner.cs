@@ -60,7 +60,7 @@ public readonly struct OutsideTestBuildingInfo
 
 public sealed class OutsideTestFloorStateOwner
 {
-    public const int CurrentSaveVersion = 2;
+    public const int CurrentSaveVersion = 3;
 
     private readonly uint legacyBuildingInstanceId;
     private readonly Dictionary<OutsideTestFloorKey, OutsideTestFloorRecord> floorStates = new();
@@ -185,14 +185,18 @@ public sealed class OutsideTestFloorStateOwner
         string label,
         float productionRate,
         float accumulatedProduction,
-        Vector2 markerPosition)
+        Vector2 markerPosition,
+        FactoryEntitySnapshot[] entitySnapshots)
     {
         if (buildingInstanceId == 0 || floorIndex < 0)
         {
             return false;
         }
 
-        if (buildings.TryGetValue(buildingInstanceId, out var registration)
+        var hasRegistration = buildings.TryGetValue(
+            buildingInstanceId,
+            out var registration);
+        if (hasRegistration
             && floorIndex >= registration.StoryCount)
         {
             return false;
@@ -208,8 +212,6 @@ public sealed class OutsideTestFloorStateOwner
                 productionRate,
                 accumulatedProduction,
                 ClampMarkerPosition(buildingInstanceId, markerPosition));
-            floorStates.Add(key, state);
-            return true;
         }
 
         state.SetState(
@@ -217,6 +219,21 @@ public sealed class OutsideTestFloorStateOwner
             productionRate,
             accumulatedProduction,
             ClampMarkerPosition(buildingInstanceId, markerPosition));
+        state.SetEntitySnapshots(entitySnapshots);
+        if (hasRegistration)
+        {
+            NormalizeFloorState(registration, state);
+        }
+        else
+        {
+            state.EnsureDefaultEntity();
+        }
+
+        if (!floorStates.ContainsKey(key))
+        {
+            floorStates.Add(key, state);
+        }
+
         return true;
     }
 
@@ -279,6 +296,8 @@ public sealed class OutsideTestFloorStateOwner
                     savedState.ProductionRate,
                     savedState.AccumulatedProduction,
                     savedState.MarkerPosition);
+                migratedState.SetEntities(savedState.Entities);
+                migratedState.EnsureDefaultEntity();
                 var key = new OutsideTestFloorKey(
                     buildingInstanceId,
                     savedState.FloorIndex);
@@ -338,14 +357,23 @@ public sealed class OutsideTestFloorStateOwner
                 floorStates.Add(key, state);
             }
 
-            state.SetState(
-                state.Label,
-                state.ProductionRate,
-                state.AccumulatedProduction,
-                ClampMarkerPosition(
-                    registration.BuildingInstanceId,
-                    state.MarkerPosition));
+            NormalizeFloorState(registration, state);
         }
+    }
+
+    private void NormalizeFloorState(
+        OutsideTestBuildingInfo registration,
+        OutsideTestFloorRecord state)
+    {
+        state.SetState(
+            state.Label,
+            state.ProductionRate,
+            state.AccumulatedProduction,
+            ClampMarkerPosition(
+                registration.BuildingInstanceId,
+                state.MarkerPosition));
+        state.EnsureDefaultEntity();
+        state.ClampEntityPositions(registration.InteriorSize);
     }
 
     private List<OutsideTestFloorRecord> GetSortedFloorStates()

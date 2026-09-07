@@ -263,6 +263,7 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
             floor.ProductionRate,
             floor.AccumulatedProduction,
             floor.MarkerPosition,
+            floor.GetEntitySnapshots(),
             loadedInteriorCount);
     }
 
@@ -309,6 +310,7 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         float productionRate,
         float accumulatedProduction,
         Vector2 markerPosition,
+        FactoryEntitySnapshot[] entitySnapshots,
         int loadedInteriorCount)
     {
         GameSceneManager.Instance.ReceiveOutsideTestFloorState(
@@ -318,6 +320,7 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
             productionRate,
             accumulatedProduction,
             markerPosition,
+            entitySnapshots,
             loadedInteriorCount);
     }
 
