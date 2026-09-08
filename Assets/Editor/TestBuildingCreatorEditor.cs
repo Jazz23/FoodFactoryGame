@@ -38,7 +38,6 @@ public sealed class TestBuildingCreatorEditor : Editor
         MigrateLegacySettings();
         EnsureBuildingInstanceIds();
         MigrateLegacyDoors();
-        EnsureFloorScenes();
         RefreshGeneratedBuildings();
         PersistAuthoredBuildings();
         SceneView.RepaintAll();
@@ -64,7 +63,6 @@ public sealed class TestBuildingCreatorEditor : Editor
         serializedObject.Update();
         DrawPropertiesExcluding(serializedObject, "m_Script");
         serializedObject.ApplyModifiedProperties();
-        EnsureFloorScenes();
         RefreshGeneratedBuildings();
 
         EditorGUILayout.HelpBox(
@@ -128,7 +126,7 @@ public sealed class TestBuildingCreatorEditor : Editor
         if (layouts.Length == 0)
         {
             EditorGUILayout.HelpBox(
-                "Create a building to manage its interior floor scenes.",
+                "Create a building to manage its shared-template interior floors.",
                 MessageType.Info);
             return;
         }
@@ -142,13 +140,12 @@ public sealed class TestBuildingCreatorEditor : Editor
             if (GUILayout.Button("Add Story", GUILayout.Width(80f)))
             {
                 Undo.RegisterCompleteObjectUndo(layout, "Add test building story");
-                if (TestBuildingFloorSceneUtility.AddStory(layout))
-                {
-                    RefreshGeneratedBuildings();
-                    PersistAuthoredBuildings();
-                    EditorSceneManager.MarkSceneDirty(Creator.gameObject.scene);
-                    statusMessage = $"Added story {layout.StoryCount - 1} to building {layout.BuildingInstanceId}.";
-                }
+                layout.SetStoryCount(layout.StoryCount + 1);
+                EditorUtility.SetDirty(layout);
+                RefreshGeneratedBuildings();
+                PersistAuthoredBuildings();
+                EditorSceneManager.MarkSceneDirty(Creator.gameObject.scene);
+                statusMessage = $"Added story {layout.StoryCount - 1} to building {layout.BuildingInstanceId}.";
 
                 GUIUtility.ExitGUI();
             }
@@ -160,7 +157,7 @@ public sealed class TestBuildingCreatorEditor : Editor
                 {
                     if (!EditorUtility.DisplayDialog(
                             "Delete top story?",
-                            $"Delete story {layout.StoryCount - 1} and its scene?",
+                            $"Delete story {layout.StoryCount - 1}?",
                             "Delete",
                             "Cancel"))
                     {
@@ -168,17 +165,12 @@ public sealed class TestBuildingCreatorEditor : Editor
                     }
 
                     Undo.RegisterCompleteObjectUndo(layout, "Delete test building story");
-                    if (TestBuildingFloorSceneUtility.DeleteTopStory(layout))
-                    {
-                        RefreshGeneratedBuildings();
-                        PersistAuthoredBuildings();
-                        EditorSceneManager.MarkSceneDirty(Creator.gameObject.scene);
-                        statusMessage = $"Deleted the top story from building {layout.BuildingInstanceId}.";
-                    }
-                    else
-                    {
-                        statusMessage = $"Could not delete the top story from building {layout.BuildingInstanceId}. Check the Console for details.";
-                    }
+                    layout.SetStoryCount(layout.StoryCount - 1);
+                    EditorUtility.SetDirty(layout);
+                    RefreshGeneratedBuildings();
+                    PersistAuthoredBuildings();
+                    EditorSceneManager.MarkSceneDirty(Creator.gameObject.scene);
+                    statusMessage = $"Deleted the top story from building {layout.BuildingInstanceId}.";
 
                     Repaint();
                     SceneView.RepaintAll();
@@ -187,13 +179,9 @@ public sealed class TestBuildingCreatorEditor : Editor
             }
 
             EditorGUILayout.EndHorizontal();
-            var lastFloorSceneName = TestBuildingFloorScenes.GetSceneName(
-                layout.BuildingInstanceId,
-                layout.StoryCount - 1);
             EditorGUILayout.LabelField(
-                "Floor scenes",
-                TestBuildingFloorScenes.GetSceneName(layout.BuildingInstanceId, 0)
-                + $" through {lastFloorSceneName}");
+                "Interior",
+                $"Shared template ({layout.StoryCount} {(layout.StoryCount == 1 ? "floor" : "floors")})");
         }
     }
 
@@ -614,7 +602,6 @@ public sealed class TestBuildingCreatorEditor : Editor
 
         Undo.RegisterCreatedObjectUndo(buildingObject, "Create test building");
         var layout = buildingObject.GetComponent<TestBuildingLayout>();
-        TestBuildingFloorSceneUtility.EnsureFloorScenes(layout);
         EditorUtility.SetDirty(layout);
         EditorSceneManager.MarkSceneDirty(Creator.gameObject.scene);
         PersistAuthoredBuildings();
@@ -838,14 +825,6 @@ public sealed class TestBuildingCreatorEditor : Editor
         if (changed)
         {
             EditorSceneManager.MarkSceneDirty(Creator.gameObject.scene);
-        }
-    }
-
-    private void EnsureFloorScenes()
-    {
-        foreach (var layout in Creator.GeneratedBuildings.GetComponentsInChildren<TestBuildingLayout>(true))
-        {
-            TestBuildingFloorSceneUtility.EnsureFloorScenes(layout);
         }
     }
 

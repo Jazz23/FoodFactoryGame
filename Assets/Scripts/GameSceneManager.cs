@@ -36,6 +36,10 @@ public sealed class GameSceneManager : MonoBehaviour
         public uint BuildingInstanceId;
         public int StoryCount = 1;
         public int FloorIndex;
+        public uint Sequence;
+        public Scene PreviousScene;
+        public bool CreatesBuildingReturn;
+        public bool ClearsBuildingReturn;
         public Scene TargetScene;
     }
 
@@ -61,6 +65,7 @@ public sealed class GameSceneManager : MonoBehaviour
     private readonly Dictionary<int, NetworkObject> players = new();
     private readonly Dictionary<int, PendingTransition> pendingTransitions = new();
     private readonly Dictionary<int, BuildingReturn> buildingReturns = new();
+    private readonly OutsideTestFloorInstanceRegistry outsideTestFloorInstances = new();
     private readonly HashSet<uint> duplicateOutsideTestBuildingWarnings = new();
     private NetworkManager networkManager = null!;
     private OutsideTestFloorStateOwner outsideTestStateOwner = null!;
@@ -73,6 +78,7 @@ public sealed class GameSceneManager : MonoBehaviour
     private bool outsideTestWorldReconciled;
     private int clientOutsideTestLoadedInteriorCount;
     private float nextOutsideTestBroadcastTime;
+    private uint nextTransitionSequence;
     private string lastOutsideTestError = string.Empty;
 
     public static GameSceneManager Instance = null!;
@@ -83,6 +89,23 @@ public sealed class GameSceneManager : MonoBehaviour
 
     public string OutsideTestStatePath => GetOutsideTestStatePath();
     public string LastOutsideTestError => lastOutsideTestError;
+
+    public bool TryGetOutsideTestFloorScene(
+        uint buildingInstanceId,
+        int floorIndex,
+        out Scene scene)
+    {
+        if (outsideTestFloorInstances.TryGetLoaded(
+                new OutsideTestFloorKey(buildingInstanceId, floorIndex),
+                out var instance))
+        {
+            scene = instance.Scene;
+            return true;
+        }
+
+        scene = default;
+        return false;
+    }
 
     public static string GetDefaultOutsideTestStatePath()
     {
@@ -104,6 +127,7 @@ public sealed class GameSceneManager : MonoBehaviour
         outsideTestWorldReconciled = false;
         outsideTestStateLoadFailed = false;
         outsideTestStateNeedsSave = false;
+        outsideTestFloorInstances.Clear();
         registeredOutsideTestSceneHandle = default;
         lastOutsideTestError = string.Empty;
         outsideTestStateOwner = new OutsideTestFloorStateOwner(
@@ -129,6 +153,7 @@ public sealed class GameSceneManager : MonoBehaviour
         networkManager.ServerManager.OnServerConnectionState += ServerConnectionStateChanged;
         networkManager.ServerManager.OnRemoteConnectionState += RemoteConnectionStateChanged;
         networkManager.SceneManager.OnLoadEnd += SceneLoadEnd;
+        networkManager.SceneManager.OnUnloadEnd += SceneUnloadEnd;
         networkManager.SceneManager.OnClientPresenceChangeEnd += ClientPresenceChangeEnd;
     }
 
@@ -138,11 +163,14 @@ public sealed class GameSceneManager : MonoBehaviour
         networkManager.ServerManager.OnServerConnectionState -= ServerConnectionStateChanged;
         networkManager.ServerManager.OnRemoteConnectionState -= RemoteConnectionStateChanged;
         networkManager.SceneManager.OnLoadEnd -= SceneLoadEnd;
+        networkManager.SceneManager.OnUnloadEnd -= SceneUnloadEnd;
         networkManager.SceneManager.OnClientPresenceChangeEnd -= ClientPresenceChangeEnd;
         if (networkManager.IsServerStarted && !outsideTestStateLoadFailed)
         {
             SaveOutsideTestFloorState();
         }
+
+        outsideTestFloorInstances.Clear();
     }
 
     private void OnApplicationQuit()
@@ -151,6 +179,8 @@ public sealed class GameSceneManager : MonoBehaviour
         {
             SaveOutsideTestFloorState();
         }
+
+        outsideTestFloorInstances.Clear();
     }
 
     private void Update()
@@ -354,6 +384,8 @@ public sealed class GameSceneManager : MonoBehaviour
             {
                 SaveOutsideTestFloorState();
             }
+
+            outsideTestFloorInstances.Clear();
         }
     }
 
@@ -500,6 +532,42 @@ public sealed class GameSceneManager : MonoBehaviour
         EnsureOutsideTestStateLoaded();
         return outsideTestStateOwner.GetNextBuildingId(
             GetAuthoredOutsideTestBuildingIds());
+    }
+
+    public bool TryCreateBuilding(
+        Vector3Int anchorCell,
+        Vector2Int footprintSize,
+        int storyCount,
+        bool includeEntrance,
+        out uint buildingInstanceId,
+        out string error)
+    {
+        var doors = System.Array.Empty<BuildingRecord.DoorPlacement>();
+        var entrance = (BuildingRecord.DoorPlacement)null!;
+        if (includeEntrance
+            && !TestBuildingCreator.TryGetDefaultEntrance(
+                anchorCell,
+                footprintSize,
+                out entrance,
+                out error))
+        {
+            buildingInstanceId = 0;
+            lastOutsideTestError = error;
+            return false;
+        }
+
+        if (includeEntrance)
+        {
+            doors = new[] { entrance };
+        }
+
+        return TryCreateBuilding(
+            anchorCell,
+            footprintSize,
+            storyCount,
+            doors,
+            out buildingInstanceId,
+            out error);
     }
 
     public bool TryCreateBuilding(
@@ -936,6 +1004,7 @@ public sealed class GameSceneManager : MonoBehaviour
         var buildingInstanceId = 0u;
         var storyCount = 1;
         var floorIndex = 0;
+        var clearsBuildingReturn = false;
         if (portal.BuildingInstanceId != 0)
         {
             buildingSize = portal.BuildingSize;
@@ -969,10 +1038,23 @@ public sealed class GameSceneManager : MonoBehaviour
             arrivalLogicalPosition = portal.HasExteriorArrivalLogicalPosition
                 ? portal.ExteriorArrivalLogicalPosition
                 : buildingReturn.ArrivalLogicalPosition;
-            buildingReturns.Remove(connection.ClientId);
+            clearsBuildingReturn = true;
         }
 
-        var lookup = new SceneLookupData(targetSceneName);
+        if (buildingInstanceId != 0)
+        {
+            var floorKey = new OutsideTestFloorKey(buildingInstanceId, floorIndex);
+            if (!outsideTestFloorInstances.TryGetLoaded(floorKey, out _)
+                && !outsideTestFloorInstances.TryBeginLoad(floorKey))
+            {
+                return false;
+            }
+        }
+
+        var lookup = GetOutsideTestFloorLookup(
+            buildingInstanceId,
+            floorIndex,
+            targetSceneName);
         var pendingTransition = new PendingTransition
         {
             Connection = connection,
@@ -984,12 +1066,17 @@ public sealed class GameSceneManager : MonoBehaviour
             InteriorExitDirections = interiorExitDirections,
             BuildingInstanceId = buildingInstanceId,
             StoryCount = storyCount,
-            FloorIndex = floorIndex
+            FloorIndex = floorIndex,
+            Sequence = ++nextTransitionSequence,
+            PreviousScene = player.gameObject.scene,
+            CreatesBuildingReturn = portal.BuildingInstanceId != 0,
+            ClearsBuildingReturn = clearsBuildingReturn
         };
         var sceneLoadData = new SceneLoadData(new[] { lookup }, new[] { player })
         {
             ReplaceScenes = ReplaceOption.OnlineOnly,
             PreferredActiveScene = new PreferredScene(lookup, null!),
+            Options = GetOutsideTestLoadOptions(buildingInstanceId != 0),
             Params = new LoadParams
             {
                 ServerParams = new object[] { pendingTransition }
@@ -1025,15 +1112,19 @@ public sealed class GameSceneManager : MonoBehaviour
             return false;
         }
 
-        var targetSceneName = TestBuildingFloorScenes.GetSceneName(
+        var floorKey = new OutsideTestFloorKey(
             buildingReturn.BuildingInstanceId,
             targetFloorIndex);
-        if (!Application.CanStreamedLevelBeLoaded(targetSceneName))
+        if (!outsideTestFloorInstances.TryGetLoaded(floorKey, out _)
+            && !outsideTestFloorInstances.TryBeginLoad(floorKey))
         {
             return false;
         }
 
-        var lookup = new SceneLookupData(targetSceneName);
+        var lookup = GetOutsideTestFloorLookup(
+            buildingReturn.BuildingInstanceId,
+            targetFloorIndex,
+            TestBuildingFloorScenes.TemplateSceneName);
         var arrivalLogicalPosition = InsideFactoryController.GetElevatorArrivalLogicalPosition(
             buildingReturn.BuildingSize);
         var pendingTransition = new PendingTransition
@@ -1047,19 +1138,21 @@ public sealed class GameSceneManager : MonoBehaviour
             InteriorExitDirections = buildingReturn.InteriorExitDirections,
             BuildingInstanceId = buildingReturn.BuildingInstanceId,
             StoryCount = buildingReturn.StoryCount,
-            FloorIndex = targetFloorIndex
+            FloorIndex = targetFloorIndex,
+            Sequence = ++nextTransitionSequence,
+            PreviousScene = player.gameObject.scene
         };
         var sceneLoadData = new SceneLoadData(new[] { lookup }, new[] { player })
         {
             ReplaceScenes = ReplaceOption.OnlineOnly,
             PreferredActiveScene = new PreferredScene(lookup, null!),
+            Options = GetOutsideTestLoadOptions(true),
             Params = new LoadParams
             {
                 ServerParams = new object[] { pendingTransition }
             }
         };
 
-        buildingReturn.CurrentFloor = targetFloorIndex;
         pendingTransitions[connection.ClientId] = pendingTransition;
         networkManager.SceneManager.LoadConnectionScenes(connection, sceneLoadData);
         return true;
@@ -1085,6 +1178,14 @@ public sealed class GameSceneManager : MonoBehaviour
 
         awaitingInitialSpawn.Remove(connection.ClientId);
         players.Remove(connection.ClientId);
+        if (pendingTransitions.TryGetValue(connection.ClientId, out var pendingTransition)
+            && pendingTransition.BuildingInstanceId != 0)
+        {
+            outsideTestFloorInstances.FailLoad(
+                new OutsideTestFloorKey(
+                    pendingTransition.BuildingInstanceId,
+                    pendingTransition.FloorIndex));
+        }
         pendingTransitions.Remove(connection.ClientId);
         buildingReturns.Remove(connection.ClientId);
     }
@@ -1115,6 +1216,42 @@ public sealed class GameSceneManager : MonoBehaviour
         }
 
         pendingTransition.TargetScene = args.QueueData.SceneLoadData.GetFirstLookupScene();
+        if (!pendingTransition.TargetScene.IsValid()
+            || !pendingTransition.TargetScene.isLoaded)
+        {
+            if (pendingTransition.BuildingInstanceId != 0)
+            {
+                outsideTestFloorInstances.FailLoad(
+                    new OutsideTestFloorKey(
+                        pendingTransition.BuildingInstanceId,
+                        pendingTransition.FloorIndex));
+            }
+
+            pendingTransitions.Remove(pendingTransition.Connection.ClientId);
+            if (pendingTransition.CreatesBuildingReturn)
+            {
+                buildingReturns.Remove(pendingTransition.Connection.ClientId);
+            }
+            return;
+        }
+        if (pendingTransition.BuildingInstanceId != 0
+            && !outsideTestFloorInstances.RegisterLoaded(
+                new OutsideTestFloorKey(
+                    pendingTransition.BuildingInstanceId,
+                    pendingTransition.FloorIndex),
+                pendingTransition.TargetScene))
+        {
+            outsideTestFloorInstances.FailLoad(
+                new OutsideTestFloorKey(
+                    pendingTransition.BuildingInstanceId,
+                    pendingTransition.FloorIndex));
+            pendingTransitions.Remove(pendingTransition.Connection.ClientId);
+            if (pendingTransition.CreatesBuildingReturn)
+            {
+                buildingReturns.Remove(pendingTransition.Connection.ClientId);
+            }
+            return;
+        }
         if (pendingTransition.Player is null || !pendingTransition.Player)
         {
             pendingTransitions.Remove(pendingTransition.Connection.ClientId);
@@ -1133,6 +1270,12 @@ public sealed class GameSceneManager : MonoBehaviour
             pendingTransition.FloorIndex);
         if (!TryGetGrid(pendingTransition.TargetScene, out var grid))
         {
+            pendingTransitions.Remove(pendingTransition.Connection.ClientId);
+            if (pendingTransition.CreatesBuildingReturn)
+            {
+                buildingReturns.Remove(pendingTransition.Connection.ClientId);
+            }
+
             return;
         }
 
@@ -1172,6 +1315,18 @@ public sealed class GameSceneManager : MonoBehaviour
 
         var targetPosition = grid.LogicalToWorld(pendingTransition.ArrivalLogicalPosition);
         pendingTransitions.Remove(args.Connection.ClientId);
+        if (pendingTransition.BuildingInstanceId != 0
+            && buildingReturns.TryGetValue(
+                args.Connection.ClientId,
+                out var buildingReturn))
+        {
+            buildingReturn.CurrentFloor = pendingTransition.FloorIndex;
+        }
+        UnloadEmptyPreviousScene(pendingTransition.PreviousScene, pendingTransition.TargetScene);
+        if (pendingTransition.ClearsBuildingReturn)
+        {
+            buildingReturns.Remove(args.Connection.ClientId);
+        }
         pendingTransition.Player.GetComponent<PlayerSceneTransition>().CompleteTransition(
             pendingTransition.Connection,
             targetPosition,
@@ -1182,7 +1337,29 @@ public sealed class GameSceneManager : MonoBehaviour
             pendingTransition.InteriorExitDirections,
             pendingTransition.BuildingInstanceId,
             pendingTransition.StoryCount,
-            pendingTransition.FloorIndex);
+            pendingTransition.FloorIndex,
+            pendingTransition.Sequence);
+    }
+
+    private void UnloadEmptyPreviousScene(Scene previousScene, Scene targetScene)
+    {
+        if (!previousScene.IsValid()
+            || previousScene.GetRawHandle() == targetScene.GetRawHandle())
+        {
+            return;
+        }
+
+        if (networkManager.SceneManager.SceneConnections.TryGetValue(
+                previousScene,
+                out var connections)
+            && connections.Count != 0)
+        {
+            return;
+        }
+
+        networkManager.SceneManager.UnloadConnectionScenes(
+            System.Array.Empty<NetworkConnection>(),
+            new SceneUnloadData(new SceneLookupData(previousScene)));
     }
 
     private void SpawnInitialPlayer(NetworkConnection connection, Scene scene)
@@ -1211,9 +1388,58 @@ public sealed class GameSceneManager : MonoBehaviour
 
     private string GetSceneName(ScenePortal portal)
     {
+        if (portal.BuildingInstanceId != 0)
+        {
+            return TestBuildingFloorScenes.TemplateSceneName;
+        }
+
         return string.IsNullOrWhiteSpace(portal.DestinationSceneName)
             ? GetSceneName(portal.Destination)
             : portal.DestinationSceneName;
+    }
+
+    private void SceneUnloadEnd(SceneUnloadEndEventArgs args)
+    {
+        if (!args.QueueData.AsServer)
+        {
+            return;
+        }
+
+        foreach (var scene in args.UnloadedScenesV2)
+        {
+            outsideTestFloorInstances.Remove(scene.Handle);
+        }
+    }
+
+    private SceneLookupData GetOutsideTestFloorLookup(
+        uint buildingInstanceId,
+        int floorIndex,
+        string fallbackSceneName)
+    {
+        if (buildingInstanceId != 0
+            && outsideTestFloorInstances.TryGetLoaded(
+                new OutsideTestFloorKey(buildingInstanceId, floorIndex),
+                out var instance))
+        {
+            return new SceneLookupData(instance.Scene);
+        }
+
+        return new SceneLookupData(fallbackSceneName);
+    }
+
+    private static LoadOptions GetOutsideTestLoadOptions(bool allowStacking)
+    {
+        if (!allowStacking)
+        {
+            return new LoadOptions();
+        }
+
+        return new LoadOptions
+        {
+            AllowStacking = allowStacking,
+            AutomaticallyUnload = allowStacking,
+            LocalPhysics = LocalPhysicsMode.Physics2D
+        };
     }
 
     private void ConfigureInterior(

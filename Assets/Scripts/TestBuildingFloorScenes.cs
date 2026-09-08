@@ -1,4 +1,4 @@
-// Defines the numbered scene names used by each test building's interior floors.
+// Defines the shared interior template and legacy numbered-scene compatibility names.
 using UnityEngine;
 
 public static class TestBuildingFloorScenes

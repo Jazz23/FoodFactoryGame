@@ -89,9 +89,7 @@ public sealed class OutsideTestFactoryDoor : MonoBehaviour
 
         var creator = layout.GetComponentInParent<TestBuildingCreator>();
         var grid = creator.Grid;
-        var interiorSceneName = TestBuildingFloorScenes.GetSceneName(
-            layout.BuildingInstanceId,
-            0);
+        var interiorSceneName = TestBuildingFloorScenes.TemplateSceneName;
         if (!Application.CanStreamedLevelBeLoaded(interiorSceneName))
         {
             portal.enabled = false;

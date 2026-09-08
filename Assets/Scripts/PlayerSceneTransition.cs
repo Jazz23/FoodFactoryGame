@@ -16,6 +16,7 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
     private Rigidbody2D body = null!;
     private bool isTransitioning;
     private bool elevatorPromptOpen;
+    private uint lastCompletedTransitionSequence;
     private InsideFactoryElevator activeElevator = null!;
     private OutsideTestFloorDebugPanel debugPanel = null!;
 
@@ -254,14 +255,16 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
     public void RequestCreateOutsideTestBuilding(
         Vector3Int anchorCell,
         Vector2Int footprintSize,
-        int storyCount)
+        int storyCount,
+        bool includeEntrance = true)
     {
         if (IsOwner)
         {
             RequestCreateOutsideTestBuildingServerRpc(
                 anchorCell,
                 footprintSize,
-                storyCount);
+                storyCount,
+                includeEntrance);
         }
     }
 
@@ -320,12 +323,14 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         Vector3Int anchorCell,
         Vector2Int footprintSize,
         int storyCount,
+        bool includeEntrance,
         NetworkConnection sender = null)
     {
         var created = GameSceneManager.Instance.TryCreateBuilding(
             anchorCell,
             footprintSize,
             storyCount,
+            includeEntrance,
             out var buildingInstanceId,
             out var error);
         TargetReceiveOutsideTestBuildingCreation(
@@ -384,7 +389,8 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         GridEdgeDirection[] interiorExitDirections,
         uint buildingInstanceId,
         int storyCount,
-        int floorIndex)
+        int floorIndex,
+        uint sequence)
     {
         TargetTeleport(
             connection,
@@ -396,7 +402,8 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
             interiorExitDirections,
             buildingInstanceId,
             storyCount,
-            floorIndex);
+            floorIndex,
+            sequence);
     }
 
     [TargetRpc]
@@ -416,12 +423,10 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         GridEdgeDirection[] interiorExitDirections,
         uint buildingInstanceId,
         int storyCount,
-        int floorIndex)
+        int floorIndex,
+        uint sequence)
     {
-        if (buildingInstanceId != 0
-            && gameObject.scene.name != TestBuildingFloorScenes.GetSceneName(
-                buildingInstanceId,
-                floorIndex))
+        if (sequence <= lastCompletedTransitionSequence)
         {
             return;
         }
@@ -440,6 +445,17 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
             IndoorGrid.TryConfigureForScene(gameObject.scene, buildingSize);
         }
 
+        if (buildingInstanceId != 0
+            && (!InsideFactoryController.TryGetForScene(
+                    gameObject.scene,
+                    out var configuredController)
+                || configuredController.BuildingInstanceId != buildingInstanceId
+                || configuredController.CurrentFloor != floorIndex))
+        {
+            return;
+        }
+
+        lastCompletedTransitionSequence = sequence;
         body.position = position;
         transform.SetPositionAndRotation(position, Quaternion.identity);
         networkTransform.Teleport();

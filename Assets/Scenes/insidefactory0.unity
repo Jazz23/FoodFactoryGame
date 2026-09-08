@@ -298,6 +298,18 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   exitPortal: {fileID: 1242031709}
+--- !u!114 &1099895021
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1242031701}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: de33cdde6d0769046a86bc7e73ba68d8, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: FoodFactoryGame.Runtime::OutsideTestLocalPhysicsDriver
 --- !u!1 &1242031701
 GameObject:
   m_ObjectHideFlags: 0
@@ -314,6 +326,7 @@ GameObject:
   - component: {fileID: 889739437}
   - component: {fileID: 329697102}
   - component: {fileID: 296908070}
+  - component: {fileID: 1099895021}
   m_Layer: 0
   m_Name: Indoor Grid
   m_TagString: Untagged

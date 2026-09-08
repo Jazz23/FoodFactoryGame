@@ -200,6 +200,58 @@ public sealed class TestBuildingCreator : MonoBehaviour
         }
     }
 
+    public static bool TryGetDefaultEntrance(
+        Vector3Int anchorCell,
+        Vector2Int size,
+        out BuildingRecord.DoorPlacement door,
+        out string error)
+    {
+        door = null!;
+        error = string.Empty;
+        var spans = new List<ExteriorWallSpan>();
+        GetExteriorWallSpans(anchorCell, size, spans);
+        var footprintCenter = new Vector2(
+            anchorCell.x + size.x * 0.5f,
+            anchorCell.y + size.y * 0.5f);
+        var bestDistance = float.PositiveInfinity;
+        var bestMidpointX = float.PositiveInfinity;
+        var bestWallId = string.Empty;
+        var found = false;
+        foreach (var span in spans)
+        {
+            if (span.Direction != GridEdgeDirection.South || span.IsCorner)
+            {
+                continue;
+            }
+
+            var midpoint = (span.LogicalStart + span.LogicalEnd) * 0.5f;
+            var distance = (midpoint - footprintCenter).sqrMagnitude;
+            if (found
+                && (distance > bestDistance
+                    || (Mathf.Approximately(distance, bestDistance)
+                        && (midpoint.x > bestMidpointX
+                            || (Mathf.Approximately(midpoint.x, bestMidpointX)
+                                && string.CompareOrdinal(span.StableId, bestWallId) >= 0)))))
+            {
+                continue;
+            }
+
+            found = true;
+            bestDistance = distance;
+            bestMidpointX = midpoint.x;
+            bestWallId = span.StableId;
+            door = new BuildingRecord.DoorPlacement(span.StableId, 0.5f);
+        }
+
+        if (found)
+        {
+            return true;
+        }
+
+        error = "An entrance requires a valid straight south wall span.";
+        return false;
+    }
+
     private static GridEdgeDirection GetExteriorDirection(
         WallPlacement placement,
         Vector3Int anchor,

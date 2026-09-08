@@ -160,17 +160,17 @@ public sealed class OutsideTestFloorTransitionTests
             "The building entry transition was rejected.");
 
         yield return WaitForCondition(
-            () => player.gameObject.scene.name == "insidefactory_2_0"
+            () => player.gameObject.scene.name == TestBuildingFloorScenes.TemplateSceneName
                 && player.TryGetCurrentOutsideTestFloor(out var building, out var floor)
                 && building == 2
                 && floor == 0
                 && !player.IsTransitioning
-                && SceneManager.GetSceneByName("insidefactory_2_0").isLoaded,
+                && IsFloorLoaded(sceneManager, 2, 0),
             10f,
             "The player did not enter building 2 floor 0.");
 
         yield return WaitForCondition(
-            () => HasEntityLabel("insidefactory_2_0", groundProof.Entity.DefinitionId),
+            () => HasEntityLabel(TestBuildingFloorScenes.TemplateSceneName, groundProof.Entity.DefinitionId),
             3f,
             "The ground floor entity view was not hydrated.");
         AssertFloorIdentityAndPresentation(groundProof);
@@ -180,21 +180,21 @@ public sealed class OutsideTestFloorTransitionTests
             3f,
             "The floor transition request to floor 1 was rejected.");
         yield return WaitForCondition(
-            () => player.gameObject.scene.name == "insidefactory_2_1"
+            () => player.gameObject.scene.name == TestBuildingFloorScenes.TemplateSceneName
                 && player.TryGetCurrentOutsideTestFloor(out var building, out var floor)
                 && building == 2
                 && floor == 1
                 && !player.IsTransitioning
-                && SceneManager.GetSceneByName("insidefactory_2_1").isLoaded,
+                && IsFloorLoaded(sceneManager, 2, 1),
             10f,
             "The floor transition to floor 1 did not complete.");
 
         yield return WaitForCondition(
-            () => !SceneManager.GetSceneByName("insidefactory_2_0").isLoaded,
+            () => !IsFloorLoaded(sceneManager, 2, 0),
             10f,
             "The ground floor scene was not unloaded after the elevator transition.");
         yield return WaitForCondition(
-            () => HasEntityLabel("insidefactory_2_1", upperProof.Entity.DefinitionId),
+            () => HasEntityLabel(TestBuildingFloorScenes.TemplateSceneName, upperProof.Entity.DefinitionId),
             3f,
             "The upper floor entity view was not hydrated.");
         AssertFloorIdentityAndPresentation(upperProof);
@@ -211,31 +211,31 @@ public sealed class OutsideTestFloorTransitionTests
             3f,
             "The floor transition request back to floor 0 was rejected.");
         yield return WaitForCondition(
-            () => player.gameObject.scene.name == "insidefactory_2_0"
+            () => player.gameObject.scene.name == TestBuildingFloorScenes.TemplateSceneName
                 && player.TryGetCurrentOutsideTestFloor(out var building, out var floor)
                 && building == 2
                 && floor == 0
                 && !player.IsTransitioning
-                && SceneManager.GetSceneByName("insidefactory_2_0").isLoaded,
+                && IsFloorLoaded(sceneManager, 2, 0),
             10f,
             "The floor transition return to floor 0 did not complete.");
         yield return WaitForCondition(
-            () => !SceneManager.GetSceneByName("insidefactory_2_1").isLoaded,
+            () => !IsFloorLoaded(sceneManager, 2, 1),
             10f,
             "The upper floor scene was not unloaded after returning to floor 0.");
         yield return WaitForCondition(
-            () => HasEntityLabel("insidefactory_2_0", groundProof.Entity.DefinitionId),
+            () => HasEntityLabel(TestBuildingFloorScenes.TemplateSceneName, groundProof.Entity.DefinitionId),
             3f,
             "The ground floor entity view was not restored.");
         AssertFloorIdentityAndPresentation(groundProof);
 
         var groundExitPortal = FindPortal(
-            "insidefactory_2_0",
+            TestBuildingFloorScenes.TemplateSceneName,
             portal => portal.Destination == SceneDestination.World);
         Assert.That(
             groundExitPortal,
             Is.Not.Null,
-            DescribeScenePortals("insidefactory_2_0"));
+            DescribeScenePortals(TestBuildingFloorScenes.TemplateSceneName));
         Assert.That(groundExitPortal.isActiveAndEnabled, Is.True);
         player.transform.position = groundExitPortal.transform.position;
         yield return WaitForCondition(
@@ -245,8 +245,8 @@ public sealed class OutsideTestFloorTransitionTests
         yield return WaitForCondition(
             () => player.gameObject.scene.name == "OutsideTest"
                 && !player.IsTransitioning
-                && !SceneManager.GetSceneByName("insidefactory_2_0").isLoaded
-                && !SceneManager.GetSceneByName("insidefactory_2_1").isLoaded
+                && !IsFloorLoaded(sceneManager, 2, 0)
+                && !IsFloorLoaded(sceneManager, 2, 1)
                 && sceneManager.OutsideTestLoadedInteriorCount == 0,
             10f,
             "The player did not return outside with both building-2 interiors unloaded.");
@@ -280,12 +280,12 @@ public sealed class OutsideTestFloorTransitionTests
             3f,
             "The building entry transition after offline production was rejected.");
         yield return WaitForCondition(
-            () => player.gameObject.scene.name == "insidefactory_2_0"
+            () => player.gameObject.scene.name == TestBuildingFloorScenes.TemplateSceneName
                 && !player.IsTransitioning,
             10f,
             "The ground floor did not reload after offline production.");
         yield return WaitForCondition(
-            () => HasEntityLabel("insidefactory_2_0", groundProof.Entity.DefinitionId),
+            () => HasEntityLabel(TestBuildingFloorScenes.TemplateSceneName, groundProof.Entity.DefinitionId),
             3f,
             "The ground floor entity did not hydrate after offline production.");
         AssertFloorIdentityAndPresentation(groundProof);
@@ -298,12 +298,12 @@ public sealed class OutsideTestFloorTransitionTests
             3f,
             "The upper floor did not become available after re-entry.");
         yield return WaitForCondition(
-            () => player.gameObject.scene.name == "insidefactory_2_1"
+            () => player.gameObject.scene.name == TestBuildingFloorScenes.TemplateSceneName
                 && !player.IsTransitioning,
             10f,
             "The upper floor did not reload after offline production.");
         yield return WaitForCondition(
-            () => HasEntityLabel("insidefactory_2_1", upperProof.Entity.DefinitionId),
+            () => HasEntityLabel(TestBuildingFloorScenes.TemplateSceneName, upperProof.Entity.DefinitionId),
             3f,
             "The upper floor entity did not hydrate after offline production.");
         AssertFloorIdentityAndPresentation(upperProof);
@@ -311,8 +311,11 @@ public sealed class OutsideTestFloorTransitionTests
             GetEntity(sceneManager, upperProof).ProducedCount,
             Is.GreaterThanOrEqualTo(upperAfterOfflineProduction.Entity.ProducedCount));
 
+        Assert.That(
+            sceneManager.TryGetOutsideTestFloorScene(2, 1, out var upperScene),
+            Is.True);
         groundExitPortal = FindPortal(
-            "insidefactory_2_1",
+            upperScene,
             portal => portal.Destination == SceneDestination.World
                 && portal.isActiveAndEnabled);
         Assert.That(groundExitPortal, Is.Null);
@@ -321,25 +324,29 @@ public sealed class OutsideTestFloorTransitionTests
             3f,
             "The ground floor did not become available before saving.");
         yield return WaitForCondition(
-            () => player.gameObject.scene.name == "insidefactory_2_0"
+            () => player.gameObject.scene.name == TestBuildingFloorScenes.TemplateSceneName
                 && !player.IsTransitioning,
             10f,
             "The player did not return to the ground floor before saving.");
         yield return WaitForCondition(
-            () => FindPortal(
-                "insidefactory_2_0",
+            () => sceneManager.TryGetOutsideTestFloorScene(2, 0, out var groundScene)
+                && FindPortal(
+                groundScene,
                 portal => portal.Destination == SceneDestination.World
                     && portal.isActiveAndEnabled) is not null,
             3f,
             "The ground-floor exit portal was not configured before saving.",
-            () => DescribeScenePortals("insidefactory_2_0"));
+            () => DescribeScenePortals(TestBuildingFloorScenes.TemplateSceneName));
+        Assert.That(
+            sceneManager.TryGetOutsideTestFloorScene(2, 0, out var restoredGroundScene),
+            Is.True);
         groundExitPortal = FindPortal(
-            "insidefactory_2_0",
+            restoredGroundScene,
             portal => portal.Destination == SceneDestination.World);
         Assert.That(
             groundExitPortal,
             Is.Not.Null,
-            DescribeScenePortals("insidefactory_2_0"));
+            DescribeScenePortals(TestBuildingFloorScenes.TemplateSceneName));
         Assert.That(groundExitPortal.isActiveAndEnabled, Is.True);
         player.transform.position = groundExitPortal.transform.position;
         yield return WaitForCondition(
@@ -429,12 +436,12 @@ public sealed class OutsideTestFloorTransitionTests
             3f,
             "The restarted host rejected the building entry transition.");
         yield return WaitForCondition(
-            () => player.gameObject.scene.name == "insidefactory_2_0"
+            () => player.gameObject.scene.name == TestBuildingFloorScenes.TemplateSceneName
                 && !player.IsTransitioning,
             10f,
             "The restarted host did not enter building 2 floor 0.");
         yield return WaitForCondition(
-            () => HasEntityLabel("insidefactory_2_0", groundProof.Entity.DefinitionId),
+            () => HasEntityLabel(TestBuildingFloorScenes.TemplateSceneName, groundProof.Entity.DefinitionId),
             3f,
             "The ground floor presentation did not hydrate after the fresh host session.");
         AssertFloorIdentityAndPresentation(groundProof);
@@ -443,12 +450,12 @@ public sealed class OutsideTestFloorTransitionTests
             3f,
             "The restarted host rejected the floor 1 transition.");
         yield return WaitForCondition(
-            () => player.gameObject.scene.name == "insidefactory_2_1"
+            () => player.gameObject.scene.name == TestBuildingFloorScenes.TemplateSceneName
                 && !player.IsTransitioning,
             10f,
             "The restarted host did not enter building 2 floor 1.");
         yield return WaitForCondition(
-            () => HasEntityLabel("insidefactory_2_1", upperProof.Entity.DefinitionId),
+            () => HasEntityLabel(TestBuildingFloorScenes.TemplateSceneName, upperProof.Entity.DefinitionId),
             3f,
             "The upper floor presentation did not hydrate after the fresh host session.");
         AssertFloorIdentityAndPresentation(upperProof);
@@ -603,10 +610,14 @@ public sealed class OutsideTestFloorTransitionTests
         Assert.That(entity.ProducedCount, Is.GreaterThanOrEqualTo(expected.Entity.ProducedCount));
         Assert.That(entity.CycleProgress, Is.InRange(0f, 1f));
 
-        var sceneName = TestBuildingFloorScenes.GetSceneName(
-            expected.BuildingInstanceId,
-            expected.FloorIndex);
-        var entityObject = FindEntityObject(sceneName, expected.Entity.EntityId);
+        var sceneName = TestBuildingFloorScenes.TemplateSceneName;
+        Assert.That(
+            sceneManager.TryGetOutsideTestFloorScene(
+                expected.BuildingInstanceId,
+                expected.FloorIndex,
+                out var scene),
+            Is.True);
+        var entityObject = FindEntityObject(scene, expected.Entity.EntityId);
         Assert.That(
             entityObject,
             Is.Not.Null,
@@ -614,7 +625,7 @@ public sealed class OutsideTestFloorTransitionTests
             + DescribeSceneTransforms(sceneName)
             + "; " + DescribeScenePresentations(sceneName)
             + $"; state={DescribeFloor(sceneManager, expected)}");
-        var grid = FindSceneGrid(sceneName);
+        var grid = FindSceneGrid(scene);
         var expectedWorldPosition = grid.LogicalToWorld(entity.LogicalPosition);
         Assert.That(
             Vector2.Distance(entityObject.transform.position, expectedWorldPosition),
@@ -718,12 +729,19 @@ public sealed class OutsideTestFloorTransitionTests
         string sceneName,
         Func<ScenePortal, bool> predicate)
     {
+        return FindPortal(SceneManager.GetSceneByName(sceneName), predicate);
+    }
+
+    private static ScenePortal FindPortal(
+        Scene scene,
+        Func<ScenePortal, bool> predicate)
+    {
         var portals = UnityEngine.Object.FindObjectsByType<ScenePortal>(
             FindObjectsInactive.Include,
             FindObjectsSortMode.None);
         foreach (var portal in portals)
         {
-            if (portal.gameObject.scene.name == sceneName && predicate(portal))
+            if (portal.gameObject.scene == scene && predicate(portal))
             {
                 return portal;
             }
@@ -732,9 +750,26 @@ public sealed class OutsideTestFloorTransitionTests
         return null!;
     }
 
+    private static bool IsFloorLoaded(
+        GameSceneManager sceneManager,
+        uint buildingInstanceId,
+        int floorIndex)
+    {
+        return sceneManager.TryGetOutsideTestFloorScene(
+                buildingInstanceId,
+                floorIndex,
+                out var scene)
+            && scene.isLoaded;
+    }
+
     private static GameObject FindEntityObject(string sceneName, uint entityId)
     {
         var scene = SceneManager.GetSceneByName(sceneName);
+        return FindEntityObject(scene, entityId);
+    }
+
+    private static GameObject FindEntityObject(Scene scene, uint entityId)
+    {
         if (!scene.isLoaded)
         {
             return null!;
@@ -818,6 +853,11 @@ public sealed class OutsideTestFloorTransitionTests
     private static SceneGrid FindSceneGrid(string sceneName)
     {
         var scene = SceneManager.GetSceneByName(sceneName);
+        return FindSceneGrid(scene);
+    }
+
+    private static SceneGrid FindSceneGrid(Scene scene)
+    {
         foreach (var root in scene.GetRootGameObjects())
         {
             foreach (var grid in root.GetComponentsInChildren<SceneGrid>(true))
@@ -829,7 +869,7 @@ public sealed class OutsideTestFloorTransitionTests
             }
         }
 
-        Assert.Fail($"Scene '{sceneName}' has no enabled SceneGrid.");
+        Assert.Fail($"Scene '{scene.name}' has no enabled SceneGrid.");
         return null!;
     }
 

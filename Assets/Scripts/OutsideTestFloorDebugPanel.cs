@@ -23,6 +23,7 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
     private InputField widthInput = null!;
     private InputField heightInput = null!;
     private InputField storyCountInput = null!;
+    private Toggle includeEntranceToggle = null!;
     private Transform selectorRoot = null!;
     private InputAction toggle = null!;
     private InputAction cancel = null!;
@@ -535,12 +536,20 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             56f,
             32f,
             InputField.ContentType.IntegerNumber);
+        includeEntranceToggle = CreateToggle(
+            root.transform,
+            "Include Entrance",
+            "INCLUDE ENTRANCE",
+            14f,
+            566f,
+            180f,
+            30f);
         CreateButton(
             "Create Building",
             "CREATE BUILDING",
             root.transform,
             14f,
-            566f,
+            600f,
             392f,
             34f,
             CreateBuildingClicked);
@@ -549,7 +558,7 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             "SAVE",
             root.transform,
             14f,
-            608f,
+            642f,
             188f,
             34f,
             SaveClicked);
@@ -558,7 +567,7 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             "LOAD",
             root.transform,
             218f,
-            608f,
+            642f,
             188f,
             34f,
             LoadClicked);
@@ -570,7 +579,7 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             11,
             TextAnchor.UpperLeft,
             new Color(0.6f, 0.78f, 0.76f));
-        SetTopRect(statusText.rectTransform, 14f, 650f, 392f, 44f);
+        SetTopRect(statusText.rectTransform, 14f, 684f, 392f, 44f);
         root.SetActive(true);
     }
 
@@ -589,7 +598,8 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
         owner.RequestCreateOutsideTestBuilding(
             new Vector3Int(anchorX, anchorY, 0),
             new Vector2Int(width, height),
-            storyCount);
+            storyCount,
+            includeEntranceToggle.isOn);
         statusMessage = "Building creation requested";
     }
 
@@ -730,6 +740,40 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             new Color(0.9f, 0.98f, 0.96f));
         Stretch(text.rectTransform, Vector2.zero, Vector2.zero);
         return button;
+    }
+
+    private static Toggle CreateToggle(
+        Transform parent,
+        string name,
+        string value,
+        float x,
+        float y,
+        float width,
+        float height)
+    {
+        var toggleObject = CreateImage(
+            name,
+            parent,
+            new Color(0.1f, 0.15f, 0.17f, 1f));
+        SetTopRect(toggleObject.GetComponent<RectTransform>(), x, y, width, height);
+        var toggle = toggleObject.AddComponent<Toggle>();
+        toggle.targetGraphic = toggleObject.GetComponent<Image>();
+        var checkmarkObject = CreateImage(
+            "Checkmark",
+            toggleObject.transform,
+            new Color(0.25f, 0.85f, 0.68f, 1f));
+        SetTopRect(checkmarkObject.GetComponent<RectTransform>(), 7f, 5f, 20f, 20f);
+        toggle.graphic = checkmarkObject.GetComponent<Image>();
+        toggle.isOn = true;
+        var text = CreateText(
+            "Text",
+            toggleObject.transform,
+            value,
+            12,
+            TextAnchor.MiddleLeft,
+            new Color(0.9f, 0.98f, 0.96f));
+        SetTopRect(text.rectTransform, 34f, 0f, width - 34f, height);
+        return toggle;
     }
 
     private static void CreateTextLabel(

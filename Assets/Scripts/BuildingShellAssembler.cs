@@ -112,14 +112,11 @@ public sealed class BuildingShellAssembler
         return assembler.NeedsRebuildInternal(newRecord, newCreator, shell, layout);
     }
 
-    public static bool HasNumberedFloorScene(BuildingRecord newRecord)
+    public static bool HasInteriorTemplate(BuildingRecord newRecord)
     {
         return newRecord is not null
             && newRecord.BuildingInstanceId != 0
-            && Application.CanStreamedLevelBeLoaded(
-                TestBuildingFloorScenes.GetSceneName(
-                    newRecord.BuildingInstanceId,
-                    0));
+            && Application.CanStreamedLevelBeLoaded(TestBuildingFloorScenes.TemplateSceneName);
     }
 
     private bool RebuildShell(
@@ -359,7 +356,7 @@ public sealed class BuildingShellAssembler
                 || !factoryDoor.Matches(door.WallId, door.NormalizedOffset)
                 || renderer.sprite != newCreator.VisualStyle.EntranceSprite
                 || renderer.flipX != newCreator.VisualStyle.ShouldFlipEntranceX(wall.Direction)
-                || portal.enabled != HasNumberedFloorScene(newRecord))
+                || portal.enabled != HasInteriorTemplate(newRecord))
             {
                 return true;
             }
@@ -594,9 +591,9 @@ public sealed class BuildingShellAssembler
         factoryDoor.Configure(
             wall.StableId,
             normalizedOffset,
-            HasNumberedFloorScene(newRecord));
+            HasInteriorTemplate(newRecord));
         factoryDoor.Initialize();
-        portal.enabled = HasNumberedFloorScene(newRecord);
+        portal.enabled = HasInteriorTemplate(newRecord);
         doorObject.SetActive(true);
     }
 

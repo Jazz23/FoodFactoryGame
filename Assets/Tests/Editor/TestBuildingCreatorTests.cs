@@ -561,6 +561,34 @@ public sealed class TestBuildingCreatorTests
     }
 
     [Test]
+    public void DefaultEntranceUsesTheNearestSouthSpanAndLowestXOnATie()
+    {
+        Assert.That(
+            TestBuildingCreator.TryGetDefaultEntrance(
+                Vector3Int.zero,
+                new Vector2Int(4, 4),
+                out var door,
+                out var error),
+            Is.True,
+            error);
+        Assert.That(door.WallId, Is.EqualTo("South:1:0:0"));
+        Assert.That(door.NormalizedOffset, Is.EqualTo(0.5f));
+    }
+
+    [Test]
+    public void DefaultEntranceRejectsAWidthWithoutAStraightSouthSpan()
+    {
+        Assert.That(
+            TestBuildingCreator.TryGetDefaultEntrance(
+                Vector3Int.zero,
+                new Vector2Int(2, 4),
+                out _,
+                out var error),
+            Is.False);
+        Assert.That(error, Does.Contain("straight south wall span"));
+    }
+
+    [Test]
     public void DepthSurfaceUsesTheClosestLocalGroundDepth()
     {
         var surfaceObject = new GameObject("Surface");

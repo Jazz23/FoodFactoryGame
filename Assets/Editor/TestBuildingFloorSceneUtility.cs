@@ -1,4 +1,4 @@
-// Creates, registers, and removes the unique interior scenes owned by test buildings.
+// Retains legacy numbered-scene migration helpers without using them for new editor buildings.
 using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
