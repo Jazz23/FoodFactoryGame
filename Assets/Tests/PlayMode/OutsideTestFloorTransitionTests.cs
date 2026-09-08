@@ -130,6 +130,15 @@ public sealed class OutsideTestFloorTransitionTests
         player.RequestAddCurrentFloorMachine(new Vector2(2f, 1f));
         yield return WaitForCondition(() => floor.Entities.Count == 2, 3f, "Second machine request failed.");
         var survivorId = floor.Entities[1].EntityId;
+        var survivor = floor.Entities[1];
+        survivor.SetState(
+            survivor.EntityId,
+            survivor.DefinitionId,
+            survivor.LogicalPosition,
+            survivor.CycleRate,
+            survivor.CycleProgress,
+            survivor.ProducedCount,
+            FactoryEntityRecord.OutputCapacity - 1);
         yield return WaitForCondition(() => HasMachineView(player.gameObject.scene, firstId)
             && HasMachineView(player.gameObject.scene, survivorId), 3f, "Machine views did not appear.");
         FindMachineButton(player, "Next Machine").onClick.Invoke();
@@ -157,10 +166,15 @@ public sealed class OutsideTestFloorTransitionTests
             && building == 2 && index == 0 && !player.IsTransitioning
             && HasMachineView(player.gameObject.scene, survivorId), 10f, "Survivor view did not restore.");
         Assert.That(HasMachineView(player.gameObject.scene, firstId), Is.False);
+        yield return WaitForCondition(
+            () => floor.Entities[0].OutputCount == FactoryEntityRecord.OutputCapacity,
+            3f,
+            "Seeded machine did not fill its output buffer.");
+        var lifetimeAtCapacity = floor.Entities[0].ProducedCount;
         yield return ExitMachineTestBuilding();
-        var count = floor.Entities[0].ProducedCount;
-        yield return WaitForCondition(() => floor.Entities[0].ProducedCount > count,
-            3f, "Unloaded machine did not finish a cycle.");
+        yield return new WaitForSeconds(0.5f);
+        Assert.That(floor.Entities[0].OutputCount, Is.EqualTo(FactoryEntityRecord.OutputCapacity));
+        Assert.That(floor.Entities[0].ProducedCount, Is.EqualTo(lifetimeAtCapacity));
         Assert.That(manager.SaveOutsideTestFloorState(), Is.True);
         yield return RestartMachineTestHost();
         manager = GameSceneManager.Instance;
@@ -169,11 +183,30 @@ public sealed class OutsideTestFloorTransitionTests
         Assert.That(floor.Entities[0].EntityId, Is.EqualTo(survivorId));
         Assert.That(floor.Entities[0].DefinitionId, Is.EqualTo("test-machine"));
         Assert.That(floor.Entities[0].LogicalPosition, Is.EqualTo(new Vector2(2f, 1f)));
-        Assert.That(floor.Entities[0].ProducedCount, Is.GreaterThan(count));
+        Assert.That(floor.Entities[0].OutputCount, Is.EqualTo(FactoryEntityRecord.OutputCapacity));
+        Assert.That(floor.Entities[0].ProducedCount, Is.EqualTo(lifetimeAtCapacity));
         yield return EnterMachineTestBuilding();
         player = PlayerSceneTransition.LocalOwner;
         yield return WaitForCondition(() => HasMachineView(player.gameObject.scene, survivorId),
             3f, "Restarted machine view did not restore.");
+        FindMachineButton(player, "Next Machine").onClick.Invoke();
+        yield return null;
+        var lifetimeBeforeDrain = floor.Entities[0].ProducedCount;
+        var outputBeforeDrain = floor.Entities[0].OutputCount;
+        Assert.That(outputBeforeDrain, Is.EqualTo(FactoryEntityRecord.OutputCapacity));
+        var drainButton = FindMachineButton(player, "Drain Output");
+        Assert.That(drainButton.interactable, Is.True);
+        drainButton.onClick.Invoke();
+        yield return WaitForCondition(
+            () => floor.Entities.Count == 1 && floor.Entities[0].OutputCount == 0,
+            3f,
+            "Drain output request did not clear the buffer.");
+        Assert.That(floor.Entities[0].ProducedCount, Is.EqualTo(lifetimeBeforeDrain));
+        yield return WaitForCondition(
+            () => floor.Entities[0].ProducedCount > lifetimeBeforeDrain
+                && floor.Entities[0].OutputCount > 0,
+            3f,
+            "Production did not resume after draining output.");
         player.RequestRemoveCurrentFloorMachine(survivorId);
         yield return WaitForCondition(() => floor.Entities.Count == 0
             && !HasMachineView(player.gameObject.scene, survivorId), 3f, "Final removal failed.");

@@ -146,7 +146,13 @@ public sealed class OutsideTestFloorPresentation : MonoBehaviour
             view.Object.transform.position = position;
             view.Label.transform.position = position + Vector3.up * 0.45f;
             view.Renderer.color = GetEntityColor(entity.DefinitionId);
-            view.Label.text = $"{entity.DefinitionId}\n{entity.ProducedCount} @ {entity.CycleProgress:0.00}";
+            var outputStatus = entity.OutputCount >= FactoryEntityRecord.OutputCapacity
+                ? "Output full"
+                : "Producing";
+            view.Label.text = $"{entity.DefinitionId}\n"
+                + $"{entity.OutputCount}/{FactoryEntityRecord.OutputCapacity} {FactoryEntityRecord.OutputProductId}\n"
+                + $"Lifetime {entity.ProducedCount} @ {entity.CycleProgress:0.00}\n"
+                + outputStatus;
         }
 
         staleEntityIds.Clear();

@@ -27,9 +27,11 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
     private InputField machineXInput = null!;
     private InputField machineYInput = null!;
     private Text machineSelectionText = null!;
+    private Text machineDetailsText = null!;
     private Text machineStatusText = null!;
     private Button addMachineButton = null!;
     private Button removeMachineButton = null!;
+    private Button drainOutputButton = null!;
     private Button nextMachineButton = null!;
     private uint machineBuildingId;
     private int machineFloorIndex = -1;
@@ -73,6 +75,12 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
         owner.RequestRemoveCurrentFloorMachine(selectedMachineId);
     }
 
+    private void DrainOutputClicked()
+    {
+        machineStatusText.text = "Draining output; buffered test-product will be discarded...";
+        owner.RequestDrainCurrentFloorMachine(selectedMachineId);
+    }
+
     private void NextMachineClicked()
     {
         RefreshMachines();
@@ -100,8 +108,11 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
     private void RefreshMachines()
     {
         var canEdit = GameSceneManager.Instance.CanEditCurrentFloorMachines(owner);
-        owner.TryGetCurrentOutsideTestFloor(out var buildingId, out var floorIndex);
-        if (buildingId != machineBuildingId || floorIndex != machineFloorIndex || !canEdit)
+        var hasCurrentFloor = owner.TryGetCurrentOutsideTestFloor(
+            out var buildingId,
+            out var floorIndex);
+        if (hasCurrentFloor
+            && (buildingId != machineBuildingId || floorIndex != machineFloorIndex))
         {
             selectedMachineId = 0;
             machineBuildingId = buildingId;
@@ -110,8 +121,17 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
 
         var selected = false;
         var count = 0;
-        machineSelectionText.text = canEdit ? "No machine selected" : "Enter a floor as host to edit machines";
-        if (canEdit && GameSceneManager.Instance.TryGetOutsideTestFloorState(buildingId, floorIndex, out var floor))
+        machineSelectionText.text = hasCurrentFloor
+            ? "No machine selected"
+            : "Enter a floor as host to edit machines";
+        machineDetailsText.text = hasCurrentFloor
+            ? "Select a machine to inspect its output."
+            : "Machine editing is unavailable outside a floor.";
+        if (hasCurrentFloor
+            && GameSceneManager.Instance.TryGetOutsideTestFloorState(
+                buildingId,
+                floorIndex,
+                out var floor))
         {
             count = floor.Entities.Count;
             foreach (var entity in floor.Entities)
@@ -119,13 +139,20 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
                 if (entity.EntityId == selectedMachineId)
                 {
                     selected = true;
+                    var outputStatus = entity.OutputCount >= FactoryEntityRecord.OutputCapacity
+                        ? "Output full"
+                        : "Producing";
+                    machineDetailsText.text = $"OUTPUT: {entity.OutputCount}/{FactoryEntityRecord.OutputCapacity} "
+                        + $"{FactoryEntityRecord.OutputProductId}\n"
+                        + $"LIFETIME: {entity.ProducedCount}\n"
+                        + outputStatus;
                     machineSelectionText.text = $"B{buildingId}/F{floorIndex} — {entity.EntityId}: {entity.DefinitionId}";
                     break;
                 }
             }
         }
 
-        if (!selected)
+        if (hasCurrentFloor && !selected)
         {
             selectedMachineId = 0;
         }
@@ -135,6 +162,7 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
         addMachineButton.interactable = canEdit;
         nextMachineButton.interactable = canEdit && count > 0;
         removeMachineButton.interactable = canEdit && selected;
+        drainOutputButton.interactable = canEdit && selected;
     }
 
     public void Initialize(PlayerSceneTransition newOwner)
@@ -683,7 +711,7 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
         SetTopRect(statusText.rectTransform, 14f, 446f, 392f, 40f);
         var machines = CreateImage("Current Floor Machines", root.transform,
             new Color(0.025f, 0.055f, 0.075f, 0.94f));
-        SetTopRect(machines.GetComponent<RectTransform>(), 434f, 0f, 310f, 272f);
+        SetTopRect(machines.GetComponent<RectTransform>(), 434f, 0f, 310f, 344f);
         var machineTitle = CreateText("Machine Title", machines.transform, "CURRENT FLOOR MACHINES", 16,
             TextAnchor.MiddleLeft, new Color(0.78f, 1f, 0.9f));
         SetTopRect(machineTitle.rectTransform, 12f, 10f, 286f, 28f);
@@ -697,14 +725,19 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             12f, 84f, 286f, 32f, AddMachineClicked);
         machineSelectionText = CreateText("Machine Selection", machines.transform, string.Empty, 13,
             TextAnchor.MiddleLeft, Color.white);
-        SetTopRect(machineSelectionText.rectTransform, 12f, 122f, 286f, 44f);
+        SetTopRect(machineSelectionText.rectTransform, 12f, 122f, 286f, 38f);
+        machineDetailsText = CreateText("Machine Details", machines.transform, string.Empty, 12,
+            TextAnchor.UpperLeft, new Color(0.9f, 0.94f, 0.96f));
+        SetTopRect(machineDetailsText.rectTransform, 12f, 160f, 286f, 48f);
         nextMachineButton = CreateButton("Next Machine", "SELECT NEXT", machines.transform,
-            12f, 172f, 134f, 32f, NextMachineClicked);
+            12f, 212f, 134f, 32f, NextMachineClicked);
         removeMachineButton = CreateButton("Remove Machine", "REMOVE SELECTED", machines.transform,
-            152f, 172f, 146f, 32f, RemoveMachineClicked);
-        machineStatusText = CreateText("Machine Status", machines.transform, "Select a machine to remove it.", 12,
+            152f, 212f, 146f, 32f, RemoveMachineClicked);
+        drainOutputButton = CreateButton("Drain Output", "DRAIN OUTPUT", machines.transform,
+            12f, 252f, 286f, 32f, DrainOutputClicked);
+        machineStatusText = CreateText("Machine Status", machines.transform, "Select a machine to drain or remove it.", 12,
             TextAnchor.UpperLeft, new Color(0.6f, 0.78f, 0.76f));
-        SetTopRect(machineStatusText.rectTransform, 12f, 214f, 286f, 48f);
+        SetTopRect(machineStatusText.rectTransform, 12f, 294f, 286f, 44f);
         root.SetActive(true);
     }
 

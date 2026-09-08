@@ -1,0 +1,23 @@
+{
+  "feature": "persistent-machine-output-buffers",
+  "verifiedAt": "2026-09-08",
+  "unityVersion": "6000.5.9f1",
+  "editorTests": {
+    "jobId": "44c90d68d90f4a3db58d8bb84fb10dd8",
+    "total": 125,
+    "passed": 125,
+    "failed": 0,
+    "skipped": 0
+  },
+  "playModeTests": {
+    "jobId": "ac136713ba9240bbaf774cc11e446e88",
+    "total": 2,
+    "passed": 2,
+    "failed": 0,
+    "skipped": 0
+  },
+  "notes": [
+    "EditMode coverage includes capacity, no-backlog resume, draining, cloning, snapshots, version 4 migration, version 5 persistence, and empty floors.",
+    "PlayMode coverage passed the machine-edit and two-floor travel/restart lifecycle regression tests, including near-capacity fill, full-buffer pause, restart restore, Drain Output, and resumed production."
+  ]
+}

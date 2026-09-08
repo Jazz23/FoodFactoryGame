@@ -222,6 +222,14 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         }
     }
 
+    public void RequestDrainCurrentFloorMachine(uint entityId)
+    {
+        if (IsOwner)
+        {
+            RequestDrainCurrentFloorMachineServerRpc(entityId);
+        }
+    }
+
     [ServerRpc]
     private void RequestAddCurrentFloorMachineServerRpc(Vector2 position)
     {
@@ -235,6 +243,20 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
     {
         var removed = GameSceneManager.Instance.TryRemoveCurrentFloorMachine(this, entityId, out var error);
         TargetReceiveMachineEditResult(Owner, removed ? $"Removed machine {entityId}." : error);
+    }
+
+    [ServerRpc]
+    private void RequestDrainCurrentFloorMachineServerRpc(uint entityId)
+    {
+        var drained = GameSceneManager.Instance.TryDrainCurrentFloorMachine(
+            this,
+            entityId,
+            out var removed,
+            out var error);
+        var message = drained
+            ? $"Drained {removed} {FactoryEntityRecord.OutputProductId} item(s); discarded."
+            : error;
+        TargetReceiveMachineEditResult(Owner, message);
     }
 
     [TargetRpc]

@@ -269,6 +269,34 @@ public sealed class GameSceneManager : MonoBehaviour
         return true;
     }
 
+    public bool TryDrainCurrentFloorMachine(
+        PlayerSceneTransition player,
+        uint entityId,
+        out int removed,
+        out string error)
+    {
+        removed = 0;
+        error = "Only the local host inside a floor can edit machines; wait for travel to finish.";
+        if (!CanEditCurrentFloorMachines(player))
+        {
+            return false;
+        }
+
+        player.TryGetCurrentOutsideTestFloor(out var buildingId, out var floorIndex);
+        if (!outsideTestStateOwner.TryDrainTestMachine(
+                buildingId,
+                floorIndex,
+                entityId,
+                out removed,
+                out error))
+        {
+            return false;
+        }
+
+        BroadcastOutsideTestFloorState(buildingId, floorIndex);
+        return true;
+    }
+
     public bool TrySetOutsideTestFloorState(
         uint buildingInstanceId,
         int floorIndex,

@@ -598,6 +598,184 @@ public sealed class OutsideTestFloorStateOwnerTests
         Assert.That(state.MarkerPosition, Is.EqualTo(new Vector2(4.5f, 0.5f)));
     }
 
+    [Test]
+    public void CompletedCyclesIncrementLifetimeAndStoredOutput()
+    {
+        var entity = new FactoryEntityRecord(
+            1u,
+            "test-machine",
+            Vector2.one,
+            2f,
+            0.5f,
+            7,
+            4);
+
+        entity.Advance(0.25f);
+
+        Assert.That(entity.OutputCount, Is.EqualTo(5));
+        Assert.That(entity.ProducedCount, Is.EqualTo(8));
+        Assert.That(entity.CycleProgress, Is.EqualTo(0f).Within(0.0001f));
+    }
+
+    [Test]
+    public void FullOutputStopsAtCapacityAndDiscardsUnusedTickTime()
+    {
+        var entity = new FactoryEntityRecord(
+            1u,
+            "test-machine",
+            Vector2.one,
+            1f,
+            0f,
+            10,
+            FactoryEntityRecord.OutputCapacity - 1);
+
+        entity.Advance(2.5f);
+
+        Assert.That(entity.OutputCount, Is.EqualTo(FactoryEntityRecord.OutputCapacity));
+        Assert.That(entity.ProducedCount, Is.EqualTo(11));
+        Assert.That(entity.CycleProgress, Is.EqualTo(0f).Within(0.0001f));
+
+        Assert.That(entity.DrainOutput(), Is.EqualTo(FactoryEntityRecord.OutputCapacity));
+        entity.Advance(0.25f);
+        Assert.That(entity.OutputCount, Is.Zero);
+        Assert.That(entity.ProducedCount, Is.EqualTo(11));
+        Assert.That(entity.CycleProgress, Is.EqualTo(0.25f).Within(0.0001f));
+    }
+
+    [Test]
+    public void FullBufferPreservesFractionalProgressUntilDrained()
+    {
+        var entity = new FactoryEntityRecord(
+            1u,
+            "test-machine",
+            Vector2.one,
+            1f,
+            0.4f,
+            12,
+            FactoryEntityRecord.OutputCapacity);
+
+        entity.Advance(2f);
+
+        Assert.That(entity.OutputCount, Is.EqualTo(FactoryEntityRecord.OutputCapacity));
+        Assert.That(entity.ProducedCount, Is.EqualTo(12));
+        Assert.That(entity.CycleProgress, Is.EqualTo(0.4f).Within(0.0001f));
+        Assert.That(entity.DrainOutput(), Is.EqualTo(FactoryEntityRecord.OutputCapacity));
+        Assert.That(entity.ProducedCount, Is.EqualTo(12));
+        Assert.That(entity.CycleProgress, Is.EqualTo(0.4f).Within(0.0001f));
+    }
+
+    [Test]
+    public void MissingDrainTargetLeavesStateUnchangedAndEmptyDrainSucceeds()
+    {
+        var owner = new OutsideTestFloorStateOwner(1);
+        owner.TryRegisterBuilding(2, 1, new Vector2Int(5, 3), out _);
+        owner.TryGetFloorState(2, 0, out var floor);
+        floor.Entities[0].SetState(
+            17u,
+            "test-machine",
+            Vector2.one,
+            1f,
+            0.3f,
+            8,
+            0);
+        var before = owner.ToJson();
+
+        Assert.That(owner.TryDrainTestMachine(2, 0, 44u, out var removed, out _), Is.False);
+        Assert.That(removed, Is.Zero);
+        Assert.That(owner.ToJson(), Is.EqualTo(before));
+        Assert.That(owner.TryDrainTestMachine(2, 0, 17u, out removed, out _), Is.True);
+        Assert.That(removed, Is.Zero);
+        Assert.That(owner.ToJson(), Is.EqualTo(before));
+        Assert.That(floor.Entities[0].ProducedCount, Is.EqualTo(8));
+        Assert.That(floor.Entities[0].CycleProgress, Is.EqualTo(0.3f).Within(0.0001f));
+    }
+
+    [Test]
+    public void CloneSnapshotsAndVersionFiveSaveLoadPreserveOutput()
+    {
+        var source = new OutsideTestFloorStateOwner(1);
+        source.TryRegisterBuilding(2, 2, new Vector2Int(5, 3), out _);
+        source.TryGetFloorState(2, 0, out var ground);
+        source.TryGetFloorState(2, 1, out var upper);
+        var entity = new FactoryEntityRecord(
+            41u,
+            "test-machine",
+            new Vector2(1.5f, 1.5f),
+            3f,
+            0.75f,
+            22,
+            FactoryEntityRecord.OutputCapacity);
+        ground.SetEntities(new[] { entity });
+        upper.SetEntities(Array.Empty<FactoryEntityRecord>());
+
+        Assert.That(entity.Clone().OutputCount, Is.EqualTo(FactoryEntityRecord.OutputCapacity));
+        Assert.That(FactoryEntityRecord.FromSnapshot(entity.ToSnapshot()).OutputCount,
+            Is.EqualTo(FactoryEntityRecord.OutputCapacity));
+
+        var restored = new OutsideTestFloorStateOwner(1);
+        Assert.That(restored.LoadFromJson(source.ToJson()), Is.True);
+        Assert.That(restored.LastLoadedVersion, Is.EqualTo(OutsideTestFloorStateOwner.CurrentSaveVersion));
+        Assert.That(restored.TryGetFloorState(2, 0, out var restoredGround), Is.True);
+        Assert.That(restored.TryGetFloorState(2, 1, out var restoredUpper), Is.True);
+        Assert.That(restoredGround.Entities[0].OutputCount,
+            Is.EqualTo(FactoryEntityRecord.OutputCapacity));
+        Assert.That(restoredGround.Entities[0].ProducedCount, Is.EqualTo(22));
+        Assert.That(restoredUpper.Entities, Is.Empty);
+    }
+
+    [Test]
+    public void VersionFourRuntimeBuildingRetainsTopologyAndStartsWithEmptyOutput()
+    {
+        var building = new BuildingRecord(
+            71u,
+            new Vector3Int(8, -2, 0),
+            new Vector2Int(5, 4),
+            2);
+        var ground = new OutsideTestFloorRecord(
+            71,
+            0,
+            "Runtime Ground",
+            1f,
+            0f,
+            Vector2.one);
+        ground.SetEntities(new[]
+        {
+            new FactoryEntityRecord(
+                9u,
+                "runtime-machine",
+                Vector2.one,
+                1f,
+                0.6f,
+                14,
+                77)
+        });
+        var upper = new OutsideTestFloorRecord(
+            71,
+            1,
+            "Runtime Upper",
+            1f,
+            0f,
+            Vector2.one);
+        upper.SetEntities(Array.Empty<FactoryEntityRecord>());
+        var data = new OutsideTestFloorSaveData
+        {
+            Version = OutsideTestFloorStateOwner.BuildingRecordsSaveVersion,
+            Buildings = new List<BuildingRecord> { building },
+            Floors = new List<OutsideTestFloorRecord> { ground, upper }
+        };
+
+        var restored = new OutsideTestFloorStateOwner(1);
+        Assert.That(restored.LoadFromJson(JsonUtility.ToJson(data)), Is.True);
+        Assert.That(restored.LastLoadHadBuildingRecords, Is.True);
+        Assert.That(restored.TryGetBuildingRecord(71, out var restoredBuilding), Is.True);
+        Assert.That(restoredBuilding.HasSameTopology(building), Is.True);
+        Assert.That(restored.TryGetFloorState(71, 0, out var restoredGround), Is.True);
+        Assert.That(restored.TryGetFloorState(71, 1, out var restoredUpper), Is.True);
+        Assert.That(restoredGround.Entities[0].ProducedCount, Is.EqualTo(14));
+        Assert.That(restoredGround.Entities[0].OutputCount, Is.Zero);
+        Assert.That(restoredUpper.Entities, Is.Empty);
+    }
+
     private static void AssertEntityFields(
         FactoryEntityRecord actual,
         FactoryEntityRecord expected)
@@ -608,5 +786,6 @@ public sealed class OutsideTestFloorStateOwnerTests
         Assert.That(actual.CycleRate, Is.EqualTo(expected.CycleRate));
         Assert.That(actual.CycleProgress, Is.EqualTo(expected.CycleProgress));
         Assert.That(actual.ProducedCount, Is.EqualTo(expected.ProducedCount));
+        Assert.That(actual.OutputCount, Is.EqualTo(expected.OutputCount));
     }
 }

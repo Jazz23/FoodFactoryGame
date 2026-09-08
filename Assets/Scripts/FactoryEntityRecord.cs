@@ -13,7 +13,8 @@ public struct FactoryEntitySnapshot
         Vector2 newLogicalPosition,
         float newCycleRate,
         float newCycleProgress,
-        int newProducedCount)
+        int newProducedCount,
+        int newOutputCount = 0)
     {
         EntityId = newEntityId;
         DefinitionId = newDefinitionId;
@@ -21,6 +22,7 @@ public struct FactoryEntitySnapshot
         CycleRate = newCycleRate;
         CycleProgress = newCycleProgress;
         ProducedCount = newProducedCount;
+        OutputCount = newOutputCount;
     }
 
     public uint EntityId;
@@ -29,11 +31,15 @@ public struct FactoryEntitySnapshot
     public float CycleRate;
     public float CycleProgress;
     public int ProducedCount;
+    public int OutputCount;
 }
 
 [Serializable]
 public sealed class FactoryEntityRecord
 {
+    public const int OutputCapacity = 100;
+    public const string OutputProductId = "test-product";
+
     private const string DefaultDefinitionId = "test-machine";
 
     [SerializeField] private uint entityId;
@@ -42,6 +48,7 @@ public sealed class FactoryEntityRecord
     [SerializeField] private float cycleRate;
     [SerializeField] private float cycleProgress;
     [SerializeField] private int producedCount;
+    [SerializeField] private int outputCount;
 
     public FactoryEntityRecord()
     {
@@ -53,7 +60,8 @@ public sealed class FactoryEntityRecord
         Vector2 newLogicalPosition,
         float newCycleRate,
         float newCycleProgress,
-        int newProducedCount)
+        int newProducedCount,
+        int newOutputCount = 0)
     {
         SetState(
             newEntityId,
@@ -61,7 +69,8 @@ public sealed class FactoryEntityRecord
             newLogicalPosition,
             newCycleRate,
             newCycleProgress,
-            newProducedCount);
+            newProducedCount,
+            newOutputCount);
     }
 
     public uint EntityId => entityId;
@@ -70,6 +79,7 @@ public sealed class FactoryEntityRecord
     public float CycleRate => cycleRate;
     public float CycleProgress => cycleProgress;
     public int ProducedCount => producedCount;
+    public int OutputCount => outputCount;
 
     public static FactoryEntityRecord CreateDefault(
         uint newEntityId,
@@ -118,7 +128,8 @@ public sealed class FactoryEntityRecord
             snapshot.LogicalPosition,
             snapshot.CycleRate,
             snapshot.CycleProgress,
-            snapshot.ProducedCount);
+            snapshot.ProducedCount,
+            snapshot.OutputCount);
     }
 
     public void SetState(
@@ -127,7 +138,8 @@ public sealed class FactoryEntityRecord
         Vector2 newLogicalPosition,
         float newCycleRate,
         float newCycleProgress,
-        int newProducedCount)
+        int newProducedCount,
+        int newOutputCount = 0)
     {
         entityId = newEntityId;
         definitionId = string.IsNullOrWhiteSpace(newDefinitionId)
@@ -143,6 +155,7 @@ public sealed class FactoryEntityRecord
             ? 0f
             : Mathf.Clamp01(newCycleProgress);
         producedCount = Mathf.Max(0, newProducedCount);
+        outputCount = Mathf.Clamp(newOutputCount, 0, OutputCapacity);
     }
 
     public void ClampPosition(Vector2Int interiorSize)
@@ -166,15 +179,37 @@ public sealed class FactoryEntityRecord
             return;
         }
 
-        cycleProgress += cycleRate * deltaTime;
-        while (cycleProgress >= 1f)
+        if (outputCount >= OutputCapacity)
         {
-            cycleProgress -= 1f;
+            return;
+        }
+
+        var remainingTime = (double)deltaTime;
+        var rate = (double)cycleRate;
+        while (remainingTime > 0d && outputCount < OutputCapacity)
+        {
+            var timeToComplete = (1d - cycleProgress) / rate;
+            if (timeToComplete > remainingTime)
+            {
+                cycleProgress += (float)(rate * remainingTime);
+                return;
+            }
+
+            cycleProgress = 0f;
+            remainingTime -= timeToComplete;
+            outputCount++;
             if (producedCount < int.MaxValue)
             {
                 producedCount++;
             }
         }
+    }
+
+    public int DrainOutput()
+    {
+        var removed = outputCount;
+        outputCount = 0;
+        return removed;
     }
 
     public FactoryEntityRecord Clone()
@@ -185,7 +220,8 @@ public sealed class FactoryEntityRecord
             logicalPosition,
             cycleRate,
             cycleProgress,
-            producedCount);
+            producedCount,
+            outputCount);
     }
 
     public FactoryEntitySnapshot ToSnapshot()
@@ -196,7 +232,8 @@ public sealed class FactoryEntityRecord
             logicalPosition,
             cycleRate,
             cycleProgress,
-            producedCount);
+            producedCount,
+            outputCount);
     }
 
     private static Vector2 SanitizeLogicalPosition(Vector2 position)

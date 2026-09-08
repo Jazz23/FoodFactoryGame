@@ -73,7 +73,8 @@ public readonly struct OutsideTestBuildingInfo
 
 public sealed class OutsideTestFloorStateOwner
 {
-    public const int CurrentSaveVersion = 4;
+    public const int BuildingRecordsSaveVersion = 4;
+    public const int CurrentSaveVersion = 5;
 
     private readonly uint legacyBuildingInstanceId;
     private readonly Dictionary<OutsideTestFloorKey, OutsideTestFloorRecord> floorStates = new();
@@ -401,6 +402,41 @@ public sealed class OutsideTestFloorStateOwner
         return true;
     }
 
+    public bool TryDrainTestMachine(
+        uint buildingInstanceId,
+        int floorIndex,
+        uint entityId,
+        out int removed,
+        out string error)
+    {
+        removed = 0;
+        error = string.Empty;
+        if (!buildingRecords.ContainsKey(buildingInstanceId)
+            || !TryGetFloorState(buildingInstanceId, floorIndex, out var floor))
+        {
+            error = "The floor does not exist.";
+            return false;
+        }
+
+        if (entityId == 0)
+        {
+            error = "The selected machine no longer exists.";
+            return false;
+        }
+
+        foreach (var entity in floor.Entities)
+        {
+            if (entity is not null && entity.EntityId == entityId)
+            {
+                removed = entity.DrainOutput();
+                return true;
+            }
+        }
+
+        error = "The selected machine no longer exists.";
+        return false;
+    }
+
     public bool TrySetFloorState(
         uint buildingInstanceId,
         int floorIndex,
@@ -552,7 +588,7 @@ public sealed class OutsideTestFloorStateOwner
             }
 
             var loadedBuildingRecords = new Dictionary<uint, BuildingRecord>();
-            if (version >= CurrentSaveVersion)
+            if (version >= BuildingRecordsSaveVersion)
             {
                 if (!HasJsonArrayProperty(json, "Buildings")
                     || data.Buildings is null
@@ -618,6 +654,17 @@ public sealed class OutsideTestFloorStateOwner
                     savedState.AccumulatedProduction,
                     savedState.MarkerPosition);
                 migratedState.SetEntities(savedState.Entities);
+                if (version < CurrentSaveVersion)
+                {
+                    foreach (var entity in migratedState.Entities)
+                    {
+                        if (entity is not null)
+                        {
+                            entity.DrainOutput();
+                        }
+                    }
+                }
+
                 if (version < 3 && migratedState.Entities.Count == 0)
                 {
                     migratedState.EnsureDefaultEntity();
@@ -673,7 +720,7 @@ public sealed class OutsideTestFloorStateOwner
             }
 
             lastLoadedVersion = version;
-            lastLoadHadBuildingRecords = version >= CurrentSaveVersion;
+            lastLoadHadBuildingRecords = version >= BuildingRecordsSaveVersion;
             return true;
         }
         catch (Exception)
