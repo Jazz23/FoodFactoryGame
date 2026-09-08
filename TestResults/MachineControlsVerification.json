@@ -1,0 +1,179 @@
+[
+  {
+    "data": {
+      "selection": "object",
+      "path": "",
+      "offset": 0,
+      "limit": 50,
+      "total": 5,
+      "has_more": false,
+      "data": {
+        "success": true,
+        "message": "Test job status retrieved.",
+        "error": null,
+        "data": {
+          "job_id": "e2bf6e1a99c74efdb98d2e1d14aeb2dd",
+          "status": "succeeded",
+          "mode": "EditMode",
+          "started_unix_ms": 1788897132256,
+          "finished_unix_ms": 1788897133088,
+          "last_update_unix_ms": 1788897133088,
+          "progress": {
+            "completed": 23,
+            "total": 23,
+            "current_test_full_name": null,
+            "current_test_started_unix_ms": 1788897133056,
+            "last_finished_test_full_name": "OutsideTestFloorStateOwnerTests.VersionThreeEmptyEntitiesRemainEmptyAfterRegistrationSaveLoadAndSnapshots",
+            "last_finished_unix_ms": 1788897133058,
+            "stuck_suspected": false,
+            "editor_is_focused": true,
+            "blocked_reason": null,
+            "failures_so_far": [],
+            "failures_capped": false
+          },
+          "error": null,
+          "result": {
+            "mode": "EditMode",
+            "summary": {
+              "total": 23,
+              "passed": 23,
+              "failed": 0,
+              "skipped": 0,
+              "durationSeconds": 0.0940895,
+              "resultState": "Passed"
+            },
+            "results": []
+          }
+        },
+        "hint": null
+      }
+    },
+    "meta": {
+      "output_mode": "full",
+      "truncated": false,
+      "original_chars": 1009,
+      "returned_chars": 1009,
+      "result_id": "res_-sYKIwoxEewP"
+    },
+    "operation": "tests.result",
+    "ok": true
+  },
+  {
+    "data": {
+      "selection": "object",
+      "path": "",
+      "offset": 0,
+      "limit": 50,
+      "total": 5,
+      "has_more": false,
+      "data": {
+        "success": true,
+        "message": "Test job status retrieved.",
+        "error": null,
+        "data": {
+          "job_id": "395d9c850ff74a5591056c344f0ac150",
+          "status": "succeeded",
+          "mode": "PlayMode",
+          "started_unix_ms": 1788897216537,
+          "finished_unix_ms": 1788897223260,
+          "last_update_unix_ms": 1788897223260,
+          "progress": {
+            "completed": 1,
+            "total": 1,
+            "current_test_full_name": null,
+            "current_test_started_unix_ms": 1788897218247,
+            "last_finished_test_full_name": "OutsideTestFloorTransitionTests.MachineRequestsPersistAcrossTravelAndRestart",
+            "last_finished_unix_ms": 1788897223231,
+            "stuck_suspected": false,
+            "editor_is_focused": true,
+            "blocked_reason": null,
+            "failures_so_far": [],
+            "failures_capped": false
+          },
+          "error": null,
+          "result": {
+            "mode": "PlayMode",
+            "summary": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0,
+              "skipped": 0,
+              "durationSeconds": 5.0056054,
+              "resultState": "Passed"
+            },
+            "results": []
+          }
+        },
+        "hint": null
+      }
+    },
+    "meta": {
+      "output_mode": "full",
+      "truncated": false,
+      "original_chars": 976,
+      "returned_chars": 976,
+      "result_id": "res_BuIlJezVVHLK"
+    },
+    "operation": "tests.result",
+    "ok": true
+  },
+  {
+    "data": {
+      "selection": "object",
+      "path": "",
+      "offset": 0,
+      "limit": 50,
+      "total": 5,
+      "has_more": false,
+      "data": {
+        "success": true,
+        "message": "Test job status retrieved.",
+        "error": null,
+        "data": {
+          "job_id": "8b76db8951a540d587dd7619f297a9d6",
+          "status": "succeeded",
+          "mode": "PlayMode",
+          "started_unix_ms": 1788897247303,
+          "finished_unix_ms": 1788897253083,
+          "last_update_unix_ms": 1788897253083,
+          "progress": {
+            "completed": 1,
+            "total": 1,
+            "current_test_full_name": null,
+            "current_test_started_unix_ms": 1788897249078,
+            "last_finished_test_full_name": "OutsideTestFloorTransitionTests.TwoFloorSceneLifecycleKeepsRecordsProducing",
+            "last_finished_unix_ms": 1788897253047,
+            "stuck_suspected": false,
+            "editor_is_focused": true,
+            "blocked_reason": null,
+            "failures_so_far": [],
+            "failures_capped": false
+          },
+          "error": null,
+          "result": {
+            "mode": "PlayMode",
+            "summary": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0,
+              "skipped": 0,
+              "durationSeconds": 3.9891065,
+              "resultState": "Passed"
+            },
+            "results": []
+          }
+        },
+        "hint": null
+      }
+    },
+    "meta": {
+      "output_mode": "full",
+      "truncated": false,
+      "original_chars": 975,
+      "returned_chars": 975,
+      "result_id": "res_ZdO3U59z1Jy7"
+    },
+    "operation": "tests.result",
+    "ok": true
+  }
+]

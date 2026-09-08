@@ -24,6 +24,16 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
     private InputField heightInput = null!;
     private InputField storyCountInput = null!;
     private Toggle includeEntranceToggle = null!;
+    private InputField machineXInput = null!;
+    private InputField machineYInput = null!;
+    private Text machineSelectionText = null!;
+    private Text machineStatusText = null!;
+    private Button addMachineButton = null!;
+    private Button removeMachineButton = null!;
+    private Button nextMachineButton = null!;
+    private uint machineBuildingId;
+    private int machineFloorIndex = -1;
+    private uint selectedMachineId;
     private Transform selectorRoot = null!;
     private InputAction toggle = null!;
     private InputAction cancel = null!;
@@ -37,6 +47,95 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
     private bool isOpen = true;
 
     public bool IsOpen => isOpen;
+
+    public void SetMachineEditResult(string message)
+    {
+        machineStatusText.text = message;
+        RefreshMachines();
+    }
+
+    private void AddMachineClicked()
+    {
+        if (!float.TryParse(machineXInput.text, NumberStyles.Float, CultureInfo.InvariantCulture, out var x)
+            || !float.TryParse(machineYInput.text, NumberStyles.Float, CultureInfo.InvariantCulture, out var y))
+        {
+            machineStatusText.text = "X and Y must be finite numbers.";
+            return;
+        }
+
+        machineStatusText.text = "Adding machine...";
+        owner.RequestAddCurrentFloorMachine(new Vector2(x, y));
+    }
+
+    private void RemoveMachineClicked()
+    {
+        machineStatusText.text = "Removing machine...";
+        owner.RequestRemoveCurrentFloorMachine(selectedMachineId);
+    }
+
+    private void NextMachineClicked()
+    {
+        RefreshMachines();
+        if (!GameSceneManager.Instance.CanEditCurrentFloorMachines(owner)
+            || !GameSceneManager.Instance.TryGetOutsideTestFloorState(machineBuildingId, machineFloorIndex, out var floor)
+            || floor.Entities.Count == 0)
+        {
+            return;
+        }
+
+        var nextIndex = 0;
+        for (var index = 0; index < floor.Entities.Count; index++)
+        {
+            if (floor.Entities[index].EntityId == selectedMachineId)
+            {
+                nextIndex = (index + 1) % floor.Entities.Count;
+                break;
+            }
+        }
+
+        selectedMachineId = floor.Entities[nextIndex].EntityId;
+        RefreshMachines();
+    }
+
+    private void RefreshMachines()
+    {
+        var canEdit = GameSceneManager.Instance.CanEditCurrentFloorMachines(owner);
+        owner.TryGetCurrentOutsideTestFloor(out var buildingId, out var floorIndex);
+        if (buildingId != machineBuildingId || floorIndex != machineFloorIndex || !canEdit)
+        {
+            selectedMachineId = 0;
+            machineBuildingId = buildingId;
+            machineFloorIndex = floorIndex;
+        }
+
+        var selected = false;
+        var count = 0;
+        machineSelectionText.text = canEdit ? "No machine selected" : "Enter a floor as host to edit machines";
+        if (canEdit && GameSceneManager.Instance.TryGetOutsideTestFloorState(buildingId, floorIndex, out var floor))
+        {
+            count = floor.Entities.Count;
+            foreach (var entity in floor.Entities)
+            {
+                if (entity.EntityId == selectedMachineId)
+                {
+                    selected = true;
+                    machineSelectionText.text = $"B{buildingId}/F{floorIndex} — {entity.EntityId}: {entity.DefinitionId}";
+                    break;
+                }
+            }
+        }
+
+        if (!selected)
+        {
+            selectedMachineId = 0;
+        }
+
+        machineXInput.interactable = canEdit;
+        machineYInput.interactable = canEdit;
+        addMachineButton.interactable = canEdit;
+        nextMachineButton.interactable = canEdit && count > 0;
+        removeMachineButton.interactable = canEdit && selected;
+    }
 
     public void Initialize(PlayerSceneTransition newOwner)
     {
@@ -166,7 +265,8 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
 
     private void MoveMarkerPerformed(InputAction.CallbackContext context)
     {
-        if (!isOpen || labelInput.isFocused || rateInput.isFocused)
+        if (!isOpen || labelInput.isFocused || rateInput.isFocused
+            || machineXInput.isFocused || machineYInput.isFocused)
         {
             return;
         }
@@ -281,6 +381,7 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
         }
 
         RefreshSelectionButtons();
+        RefreshMachines();
         var hasState = GameSceneManager.Instance.TryGetOutsideTestFloorState(
             selectedBuildingInstanceId,
             selectedFloor,
@@ -579,7 +680,31 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             11,
             TextAnchor.UpperLeft,
             new Color(0.6f, 0.78f, 0.76f));
-        SetTopRect(statusText.rectTransform, 14f, 684f, 392f, 44f);
+        SetTopRect(statusText.rectTransform, 14f, 446f, 392f, 40f);
+        var machines = CreateImage("Current Floor Machines", root.transform,
+            new Color(0.025f, 0.055f, 0.075f, 0.94f));
+        SetTopRect(machines.GetComponent<RectTransform>(), 434f, 0f, 310f, 272f);
+        var machineTitle = CreateText("Machine Title", machines.transform, "CURRENT FLOOR MACHINES", 16,
+            TextAnchor.MiddleLeft, new Color(0.78f, 1f, 0.9f));
+        SetTopRect(machineTitle.rectTransform, 12f, 10f, 286f, 28f);
+        CreateTextLabel(machines.transform, "Machine X Label", "X", 12f, 46f);
+        machineXInput = CreateInputField(machines.transform, "Machine X Input", "1", 38f, 42f, 95f, 32f,
+            InputField.ContentType.DecimalNumber);
+        CreateTextLabel(machines.transform, "Machine Y Label", "Y", 157f, 46f);
+        machineYInput = CreateInputField(machines.transform, "Machine Y Input", "1", 183f, 42f, 115f, 32f,
+            InputField.ContentType.DecimalNumber);
+        addMachineButton = CreateButton("Add Test Machine", "ADD TEST MACHINE", machines.transform,
+            12f, 84f, 286f, 32f, AddMachineClicked);
+        machineSelectionText = CreateText("Machine Selection", machines.transform, string.Empty, 13,
+            TextAnchor.MiddleLeft, Color.white);
+        SetTopRect(machineSelectionText.rectTransform, 12f, 122f, 286f, 44f);
+        nextMachineButton = CreateButton("Next Machine", "SELECT NEXT", machines.transform,
+            12f, 172f, 134f, 32f, NextMachineClicked);
+        removeMachineButton = CreateButton("Remove Machine", "REMOVE SELECTED", machines.transform,
+            152f, 172f, 146f, 32f, RemoveMachineClicked);
+        machineStatusText = CreateText("Machine Status", machines.transform, "Select a machine to remove it.", 12,
+            TextAnchor.UpperLeft, new Color(0.6f, 0.78f, 0.76f));
+        SetTopRect(machineStatusText.rectTransform, 12f, 214f, 286f, 48f);
         root.SetActive(true);
     }
 

@@ -219,6 +219,56 @@ public sealed class GameSceneManager : MonoBehaviour
             out state);
     }
 
+    public bool CanEditCurrentFloorMachines(PlayerSceneTransition player)
+    {
+        return networkManager.IsServerStarted && networkManager.IsClientStarted
+            && player.IsOwner && player.Owner == networkManager.ClientManager.Connection
+            && !player.IsTransitioning
+            && !pendingTransitions.ContainsKey(player.Owner.ClientId)
+            && player.TryGetCurrentOutsideTestFloor(out var buildingId, out var floorIndex)
+            && IsValidOutsideTestFloor(buildingId, floorIndex);
+    }
+
+    public bool TryAddCurrentFloorMachine(PlayerSceneTransition player, Vector2 position,
+        out uint entityId, out string error)
+    {
+        entityId = 0;
+        error = "Only the local host inside a floor can edit machines; wait for travel to finish.";
+        if (!CanEditCurrentFloorMachines(player))
+        {
+            return false;
+        }
+
+        player.TryGetCurrentOutsideTestFloor(out var buildingId, out var floorIndex);
+        if (!outsideTestStateOwner.TryAddTestMachine(buildingId, floorIndex, position,
+                out entityId, out error))
+        {
+            return false;
+        }
+
+        BroadcastOutsideTestFloorState(buildingId, floorIndex);
+        return true;
+    }
+
+    public bool TryRemoveCurrentFloorMachine(PlayerSceneTransition player, uint entityId,
+        out string error)
+    {
+        error = "Only the local host inside a floor can edit machines; wait for travel to finish.";
+        if (!CanEditCurrentFloorMachines(player))
+        {
+            return false;
+        }
+
+        player.TryGetCurrentOutsideTestFloor(out var buildingId, out var floorIndex);
+        if (!outsideTestStateOwner.TryRemoveTestMachine(buildingId, floorIndex, entityId, out error))
+        {
+            return false;
+        }
+
+        BroadcastOutsideTestFloorState(buildingId, floorIndex);
+        return true;
+    }
+
     public bool TrySetOutsideTestFloorState(
         uint buildingInstanceId,
         int floorIndex,

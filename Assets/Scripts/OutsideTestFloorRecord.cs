@@ -134,6 +134,23 @@ public sealed class OutsideTestFloorRecord
         }
     }
 
+    public void AddEntity(FactoryEntityRecord entity)
+    {
+        GetEntities().Add(entity.Clone());
+    }
+
+    public bool RemoveEntity(uint entityId)
+    {
+        var index = GetEntities().FindIndex(entity => entity.EntityId == entityId);
+        if (index < 0)
+        {
+            return false;
+        }
+
+        GetEntities().RemoveAt(index);
+        return true;
+    }
+
     public void SetEntities(IEnumerable<FactoryEntityRecord> newEntities)
     {
         var entityList = GetEntities();

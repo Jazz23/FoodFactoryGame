@@ -8,6 +8,7 @@ using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
+using UnityEngine.UI;
 
 public sealed class OutsideTestFloorTransitionTests
 {
@@ -104,6 +105,154 @@ public sealed class OutsideTestFloorTransitionTests
         Application.logMessageReceived -= CaptureSceneGridError;
         Application.logMessageReceived -= CaptureUnexpectedUnityError;
         Assert.That(unexpectedUnityErrors, Is.Empty, string.Join("\n", unexpectedUnityErrors));
+    }
+
+    [UnityTest]
+    public IEnumerator MachineRequestsPersistAcrossTravelAndRestart()
+    {
+        yield return WaitForCondition(() => PlayerSceneTransition.LocalOwner.gameObject.scene.name == "OutsideTest",
+            10f, "Player did not reach the world.");
+        var player = PlayerSceneTransition.LocalOwner;
+        var manager = GameSceneManager.Instance;
+        Assert.That(manager.CanEditCurrentFloorMachines(player), Is.False);
+        Assert.That(manager.TryAddCurrentFloorMachine(player, Vector2.one, out _, out _), Is.False);
+        manager.TryGetOutsideTestFloorState(2, 0, out var floor);
+        floor.SetEntities(Array.Empty<FactoryEntityRecord>());
+        yield return EnterMachineTestBuilding();
+
+        // The debug selection intentionally differs from the occupied floor.
+        player.GetComponent<OutsideTestFloorDebugPanel>().SelectFloor(2, 1);
+        var addButton = FindMachineButton(player, "Add Test Machine");
+        Assert.That(addButton.interactable, Is.True);
+        addButton.onClick.Invoke();
+        yield return WaitForCondition(() => floor.Entities.Count == 1, 3f, "First machine request failed.");
+        var firstId = floor.Entities[0].EntityId;
+        player.RequestAddCurrentFloorMachine(new Vector2(2f, 1f));
+        yield return WaitForCondition(() => floor.Entities.Count == 2, 3f, "Second machine request failed.");
+        var survivorId = floor.Entities[1].EntityId;
+        yield return WaitForCondition(() => HasMachineView(player.gameObject.scene, firstId)
+            && HasMachineView(player.gameObject.scene, survivorId), 3f, "Machine views did not appear.");
+        FindMachineButton(player, "Next Machine").onClick.Invoke();
+        var removeButton = FindMachineButton(player, "Remove Machine");
+        Assert.That(removeButton.interactable, Is.True);
+        removeButton.onClick.Invoke();
+        yield return WaitForCondition(() => floor.Entities.Count == 1
+            && !HasMachineView(player.gameObject.scene, firstId), 3f, "Removed machine view remains.");
+        yield return WaitForCondition(() =>
+        {
+            if (!manager.RequestFloorTransition(player.NetworkObject, 1))
+            {
+                return false;
+            }
+
+            Assert.That(manager.CanEditCurrentFloorMachines(player), Is.False, "Edits allowed during pending travel.");
+            Assert.That(manager.TryRemoveCurrentFloorMachine(player, survivorId, out _), Is.False);
+            return true;
+        }, 3f, "Upper floor transition rejected.");
+        yield return WaitForCondition(() => player.TryGetCurrentOutsideTestFloor(out var building, out var index)
+            && building == 2 && index == 1 && !player.IsTransitioning, 10f, "Upper floor arrival failed.");
+        yield return WaitForCondition(() => manager.RequestFloorTransition(player.NetworkObject, 0),
+            3f, "Ground floor transition rejected.");
+        yield return WaitForCondition(() => player.TryGetCurrentOutsideTestFloor(out var building, out var index)
+            && building == 2 && index == 0 && !player.IsTransitioning
+            && HasMachineView(player.gameObject.scene, survivorId), 10f, "Survivor view did not restore.");
+        Assert.That(HasMachineView(player.gameObject.scene, firstId), Is.False);
+        yield return ExitMachineTestBuilding();
+        var count = floor.Entities[0].ProducedCount;
+        yield return WaitForCondition(() => floor.Entities[0].ProducedCount > count,
+            3f, "Unloaded machine did not finish a cycle.");
+        Assert.That(manager.SaveOutsideTestFloorState(), Is.True);
+        yield return RestartMachineTestHost();
+        manager = GameSceneManager.Instance;
+        manager.TryGetOutsideTestFloorState(2, 0, out floor);
+        Assert.That(floor.Entities, Has.Count.EqualTo(1));
+        Assert.That(floor.Entities[0].EntityId, Is.EqualTo(survivorId));
+        Assert.That(floor.Entities[0].DefinitionId, Is.EqualTo("test-machine"));
+        Assert.That(floor.Entities[0].LogicalPosition, Is.EqualTo(new Vector2(2f, 1f)));
+        Assert.That(floor.Entities[0].ProducedCount, Is.GreaterThan(count));
+        yield return EnterMachineTestBuilding();
+        player = PlayerSceneTransition.LocalOwner;
+        yield return WaitForCondition(() => HasMachineView(player.gameObject.scene, survivorId),
+            3f, "Restarted machine view did not restore.");
+        player.RequestRemoveCurrentFloorMachine(survivorId);
+        yield return WaitForCondition(() => floor.Entities.Count == 0
+            && !HasMachineView(player.gameObject.scene, survivorId), 3f, "Final removal failed.");
+        yield return ExitMachineTestBuilding();
+        Assert.That(manager.SaveOutsideTestFloorState(), Is.True);
+        yield return RestartMachineTestHost();
+        GameSceneManager.Instance.TryGetOutsideTestFloorState(2, 0, out floor);
+        Assert.That(floor.Entities, Is.Empty);
+        yield return EnterMachineTestBuilding();
+        yield return null;
+        Assert.That(floor.Entities, Is.Empty);
+        Assert.That(HasMachineView(PlayerSceneTransition.LocalOwner.gameObject.scene, survivorId), Is.False);
+    }
+
+    private IEnumerator EnterMachineTestBuilding()
+    {
+        var player = PlayerSceneTransition.LocalOwner;
+        var portal = FindPortal("OutsideTest", candidate => candidate.BuildingInstanceId == 2);
+        Assert.That(portal, Is.Not.Null);
+        player.ServerTeleport(portal.transform.position);
+        yield return WaitForCondition(() => GameSceneManager.Instance.RequestTransition(player.NetworkObject, portal),
+            3f, "Machine test building entry rejected.");
+        yield return WaitForCondition(() => player.TryGetCurrentOutsideTestFloor(out var building, out var index)
+            && building == 2 && index == 0 && !player.IsTransitioning
+            && GameSceneManager.Instance.CanEditCurrentFloorMachines(player), 10f, "Machine test building entry failed.");
+    }
+
+    private IEnumerator ExitMachineTestBuilding()
+    {
+        var player = PlayerSceneTransition.LocalOwner;
+        var portal = FindPortal(player.gameObject.scene, candidate => candidate.Destination == SceneDestination.World);
+        Assert.That(portal, Is.Not.Null);
+        player.ServerTeleport(portal.transform.position);
+        yield return WaitForCondition(() => GameSceneManager.Instance.RequestTransition(player.NetworkObject, portal),
+            3f, "Machine test building exit rejected.");
+        yield return WaitForCondition(() => player.gameObject.scene.name == "OutsideTest"
+            && !player.IsTransitioning && GameSceneManager.Instance.OutsideTestLoadedInteriorCount == 0,
+            10f, "Interiors did not unload after exit.");
+    }
+
+    private IEnumerator RestartMachineTestHost()
+    {
+        yield return StopNetworking();
+        yield return SceneManager.LoadSceneAsync("Bootstrap", LoadSceneMode.Single);
+        yield return null;
+        networkManager = UnityEngine.Object.FindFirstObjectByType<NetworkManager>();
+        Assert.That(GameSceneManager.Instance.ConfigureOutsideTestStatePath(savePath), Is.True);
+        networkManager.ServerManager.StartConnection();
+        networkManager.ClientManager.StartConnection();
+        yield return WaitForCondition(() => PlayerSceneTransition.LocalOwner is not null
+            && PlayerSceneTransition.LocalOwner.gameObject.scene.name == "OutsideTest",
+            10f, "Restarted machine test host did not arrive outside.");
+    }
+
+    private static Button FindMachineButton(PlayerSceneTransition player, string name)
+    {
+        foreach (var button in player.GetComponentsInChildren<Button>(true))
+        {
+            if (button.name == name)
+            {
+                return button;
+            }
+        }
+
+        Assert.Fail($"Missing machine debug button: {name}");
+        return null!;
+    }
+
+    private static bool HasMachineView(Scene scene, uint entityId)
+    {
+        foreach (var renderer in UnityEngine.Object.FindObjectsByType<SpriteRenderer>(FindObjectsSortMode.None))
+        {
+            if (renderer.gameObject.scene == scene && renderer.gameObject.name == $"Factory Entity {entityId}")
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     [UnityTest]

@@ -339,6 +339,68 @@ public sealed class OutsideTestFloorStateOwner
             out state);
     }
 
+    public bool TryAddTestMachine(uint buildingInstanceId, int floorIndex,
+        Vector2 position, out uint entityId, out string error)
+    {
+        entityId = 0;
+        error = string.Empty;
+        if (!buildingRecords.TryGetValue(buildingInstanceId, out var building)
+            || !TryGetFloorState(buildingInstanceId, floorIndex, out var floor))
+        {
+            error = "The floor does not exist.";
+            return false;
+        }
+
+        if (float.IsNaN(position.x) || float.IsInfinity(position.x)
+            || float.IsNaN(position.y) || float.IsInfinity(position.y)
+            || position.x < 0.5f || position.y < 0.5f
+            || position.x > building.FootprintSize.x - 0.5f
+            || position.y > building.FootprintSize.y - 0.5f)
+        {
+            error = "Machine position must be finite and inside the floor bounds.";
+            return false;
+        }
+
+        var maximumId = 0u;
+        foreach (var entity in floor.Entities)
+        {
+            if (entity.EntityId > maximumId)
+            {
+                maximumId = entity.EntityId;
+            }
+        }
+
+        if (maximumId == uint.MaxValue)
+        {
+            error = "No machine IDs are available on this floor.";
+            return false;
+        }
+
+        entityId = maximumId + 1;
+        floor.AddEntity(new FactoryEntityRecord(entityId, "test-machine", position, 1f, 0f, 0));
+        return true;
+    }
+
+    public bool TryRemoveTestMachine(uint buildingInstanceId, int floorIndex,
+        uint entityId, out string error)
+    {
+        error = string.Empty;
+        if (!buildingRecords.ContainsKey(buildingInstanceId)
+            || !TryGetFloorState(buildingInstanceId, floorIndex, out var floor))
+        {
+            error = "The floor does not exist.";
+            return false;
+        }
+
+        if (entityId == 0 || !floor.RemoveEntity(entityId))
+        {
+            error = "The selected machine no longer exists.";
+            return false;
+        }
+
+        return true;
+    }
+
     public bool TrySetFloorState(
         uint buildingInstanceId,
         int floorIndex,

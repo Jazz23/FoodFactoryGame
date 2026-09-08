@@ -206,6 +206,43 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         return true;
     }
 
+    public void RequestAddCurrentFloorMachine(Vector2 position)
+    {
+        if (IsOwner)
+        {
+            RequestAddCurrentFloorMachineServerRpc(position);
+        }
+    }
+
+    public void RequestRemoveCurrentFloorMachine(uint entityId)
+    {
+        if (IsOwner)
+        {
+            RequestRemoveCurrentFloorMachineServerRpc(entityId);
+        }
+    }
+
+    [ServerRpc]
+    private void RequestAddCurrentFloorMachineServerRpc(Vector2 position)
+    {
+        var added = GameSceneManager.Instance.TryAddCurrentFloorMachine(
+            this, position, out var entityId, out var error);
+        TargetReceiveMachineEditResult(Owner, added ? $"Added machine {entityId}." : error);
+    }
+
+    [ServerRpc]
+    private void RequestRemoveCurrentFloorMachineServerRpc(uint entityId)
+    {
+        var removed = GameSceneManager.Instance.TryRemoveCurrentFloorMachine(this, entityId, out var error);
+        TargetReceiveMachineEditResult(Owner, removed ? $"Removed machine {entityId}." : error);
+    }
+
+    [TargetRpc]
+    private void TargetReceiveMachineEditResult(NetworkConnection connection, string message)
+    {
+        debugPanel.SetMachineEditResult(message);
+    }
+
     public void RequestOutsideTestFloorSnapshot()
     {
         if (!IsOwner)

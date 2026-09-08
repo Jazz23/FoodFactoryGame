@@ -8,6 +8,71 @@ using UnityEngine;
 public sealed class OutsideTestFloorStateOwnerTests
 {
     [Test]
+    public void MachineEditsPreserveSurvivorsProductionAndEmptyFloors()
+    {
+        var owner = new OutsideTestFloorStateOwner(1);
+        owner.TryRegisterBuilding(2, 2, new Vector2Int(5, 3), out _);
+        owner.TryGetFloorState(2, 0, out var floor);
+        floor.SetEntities(Array.Empty<FactoryEntityRecord>());
+        Assert.That(owner.TryAddTestMachine(2, 0, new Vector2(1f, 1f), out var firstId, out var error), Is.True, error);
+        Assert.That(owner.TryAddTestMachine(2, 0, new Vector2(2f, 2f), out var secondId, out error), Is.True, error);
+        Assert.That(firstId, Is.GreaterThan(0));
+        Assert.That(secondId, Is.GreaterThan(firstId));
+        new FactorySimulation(owner.AdvanceProduction).Advance(1.5f);
+        Assert.That(owner.TryRemoveTestMachine(2, 0, firstId, out error), Is.True, error);
+        Assert.That(floor.Entities, Has.Count.EqualTo(1));
+        Assert.That(floor.Entities[0].EntityId, Is.EqualTo(secondId));
+        Assert.That(floor.Entities[0].DefinitionId, Is.EqualTo("test-machine"));
+        Assert.That(floor.Entities[0].LogicalPosition, Is.EqualTo(new Vector2(2f, 2f)));
+        Assert.That(floor.Entities[0].ProducedCount, Is.EqualTo(1));
+        Assert.That(floor.Entities[0].CycleProgress, Is.EqualTo(0.5f).Within(0.0001f));
+        Assert.That(owner.TryRemoveTestMachine(2, 0, secondId, out error), Is.True, error);
+        var restored = new OutsideTestFloorStateOwner(1);
+        Assert.That(restored.LoadFromJson(owner.ToJson()), Is.True);
+        restored.TryRegisterBuilding(2, 2, new Vector2Int(5, 3), out _);
+        restored.TryGetFloorState(2, 0, out var empty);
+        Assert.That(empty.Entities, Is.Empty);
+        restored.ApplySnapshot(2, 0, empty.Label, empty.ProductionRate, empty.AccumulatedProduction,
+            empty.MarkerPosition, floor.GetEntitySnapshots());
+        Assert.That(empty.Entities, Is.Empty);
+        restored.TryGetFloorState(2, 1, out var upper);
+        Assert.That(upper.Entities, Has.Count.EqualTo(1));
+    }
+
+    [TestCase(float.NaN, 1f)]
+    [TestCase(float.PositiveInfinity, 1f)]
+    [TestCase(1f, float.NegativeInfinity)]
+    [TestCase(0.49f, 1f)]
+    [TestCase(4.51f, 1f)]
+    [TestCase(1f, 2.51f)]
+    public void InvalidMachinePositionLeavesStateUnchanged(float x, float y)
+    {
+        var owner = new OutsideTestFloorStateOwner(1);
+        owner.TryRegisterBuilding(2, 2, new Vector2Int(5, 3), out _);
+        var before = owner.ToJson();
+        Assert.That(owner.TryAddTestMachine(2, 0, new Vector2(x, y), out var id, out var error), Is.False);
+        Assert.That(id, Is.Zero);
+        Assert.That(error, Is.Not.Empty);
+        Assert.That(owner.ToJson(), Is.EqualTo(before));
+    }
+
+    [Test]
+    public void InvalidMachineTargetsAndIdExhaustionLeaveStateUnchanged()
+    {
+        var owner = new OutsideTestFloorStateOwner(1);
+        owner.TryRegisterBuilding(2, 2, new Vector2Int(5, 3), out _);
+        owner.TryGetFloorState(2, 0, out var floor);
+        floor.SetEntities(new[] { new FactoryEntityRecord(uint.MaxValue, "test-machine", Vector2.one, 1f, 0f, 0) });
+        var before = owner.ToJson();
+        Assert.That(owner.TryAddTestMachine(2, 0, Vector2.one, out _, out _), Is.False);
+        Assert.That(owner.TryAddTestMachine(2, 9, Vector2.one, out _, out _), Is.False);
+        Assert.That(owner.TryAddTestMachine(99, 0, Vector2.one, out _, out _), Is.False);
+        Assert.That(owner.TryRemoveTestMachine(2, 0, 44u, out _), Is.False);
+        Assert.That(owner.TryRemoveTestMachine(2, 9, 1u, out _), Is.False);
+        Assert.That(owner.ToJson(), Is.EqualTo(before));
+    }
+
+    [Test]
     public void CompositeIdentityKeepsBuildingsIndependent()
     {
         var owner = new OutsideTestFloorStateOwner(1);
