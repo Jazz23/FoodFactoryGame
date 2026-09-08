@@ -368,6 +368,14 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         int storyCount,
         int floorIndex)
     {
+        if (buildingInstanceId != 0
+            && gameObject.scene.name != TestBuildingFloorScenes.GetSceneName(
+                buildingInstanceId,
+                floorIndex))
+        {
+            return;
+        }
+
         if (!InsideFactoryController.TryConfigureForScene(
                 gameObject.scene,
                 buildingSize,

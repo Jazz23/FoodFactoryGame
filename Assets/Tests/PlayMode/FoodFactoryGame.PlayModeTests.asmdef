@@ -1,0 +1,21 @@
+{
+    "name": "FoodFactoryGame.PlayModeTests",
+    "rootNamespace": "",
+    "references": [
+        "FoodFactoryGame.Runtime",
+        "FishNet.Runtime",
+        "Unity.InputSystem"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

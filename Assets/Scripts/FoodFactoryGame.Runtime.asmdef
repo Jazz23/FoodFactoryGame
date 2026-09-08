@@ -1,0 +1,22 @@
+{
+    "name": "FoodFactoryGame.Runtime",
+    "rootNamespace": "",
+    "references": [
+        "FishNet.Runtime",
+        "Unity.InputSystem",
+        "Unity.RenderPipelines.Universal.Runtime",
+        "Unity.Mathematics",
+        "Unity.Collections",
+        "Gilzoide.SqliteNet",
+        "GameKit.Dependencies"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

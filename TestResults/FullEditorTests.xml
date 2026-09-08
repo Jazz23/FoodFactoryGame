@@ -1,0 +1,676 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="102" result="Passed" total="102" passed="102" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:06Z" duration="2.2535443">
+  <test-suite type="TestSuite" id="1136" name="FoodFactoryGame" fullname="FoodFactoryGame" runstate="Runnable" testcasecount="102" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:06Z" duration="2.253544" total="102" passed="102" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="EditMode" />
+    </properties>
+    <test-suite type="Assembly" id="1127" name="Assembly-CSharp-Editor.dll" fullname="E:/Projects/Unity/FoodFactoryGame/Library/ScriptAssemblies/Assembly-CSharp-Editor.dll" runstate="Runnable" testcasecount="102" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:06Z" duration="2.250510" total="102" passed="102" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="11020" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="EditMode" />
+        <property name="EditorOnly" value="True" />
+      </properties>
+      <test-suite type="TestFixture" id="1010" name="BuildingFootprintTests" fullname="BuildingFootprintTests" classname="BuildingFootprintTests" runstate="Runnable" testcasecount="6" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:04Z" duration="0.001126" total="6" passed="6" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-case id="1015" name="GetBoundaryCellsContainsEachPerimeterCellOnce" fullname="BuildingFootprintTests.GetBoundaryCellsContainsEachPerimeterCellOnce" methodname="GetBoundaryCellsContainsEachPerimeterCellOnce" classname="BuildingFootprintTests" runstate="Runnable" seed="341805812" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:04Z" duration="0.000254" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1012" name="GetCellsRejectsZeroAndNegativeSizes" fullname="BuildingFootprintTests.GetCellsRejectsZeroAndNegativeSizes" methodname="GetCellsRejectsZeroAndNegativeSizes" classname="BuildingFootprintTests" runstate="Runnable" seed="1537024279" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:04Z" duration="0.000029" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1011" name="GetCellsUsesTheAnchorAsTheLowerLeftCell" fullname="BuildingFootprintTests.GetCellsUsesTheAnchorAsTheLowerLeftCell" methodname="GetCellsUsesTheAnchorAsTheLowerLeftCell" classname="BuildingFootprintTests" runstate="Runnable" seed="671194467" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:04Z" duration="0.000063" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1016" name="GetEffectiveSizeUsesDefinitionSizeForInvalidSerializedData" fullname="BuildingFootprintTests.GetEffectiveSizeUsesDefinitionSizeForInvalidSerializedData" methodname="GetEffectiveSizeUsesDefinitionSizeForInvalidSerializedData" classname="BuildingFootprintTests" runstate="Runnable" seed="1681515419" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:04Z" duration="0.000038" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1013" name="GetVisualAnchorCellAppliesTheDefinitionOffset" fullname="BuildingFootprintTests.GetVisualAnchorCellAppliesTheDefinitionOffset" methodname="GetVisualAnchorCellAppliesTheDefinitionOffset" classname="BuildingFootprintTests" runstate="Runnable" seed="1509370642" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:04Z" duration="0.000040" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1014" name="InclusiveRectangleUsesEitherCornerOrder" fullname="BuildingFootprintTests.InclusiveRectangleUsesEitherCornerOrder" methodname="InclusiveRectangleUsesEitherCornerOrder" classname="BuildingFootprintTests" runstate="Runnable" seed="1740178970" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:04Z" duration="0.000036" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+      </test-suite>
+      <test-suite type="TestFixture" id="1017" name="BuildingOccupancyTests" fullname="BuildingOccupancyTests" classname="BuildingOccupancyTests" runstate="Runnable" testcasecount="8" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:04Z" duration="0.001170" total="8" passed="8" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-case id="1025" name="AreaPerimeterEdgePreventsDuplicateEdgeReservation" fullname="BuildingOccupancyTests.AreaPerimeterEdgePreventsDuplicateEdgeReservation" methodname="AreaPerimeterEdgePreventsDuplicateEdgeReservation" classname="BuildingOccupancyTests" runstate="Runnable" seed="1998059489" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:04Z" duration="0.000060" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1024" name="CellAndPerimeterEdgeAdjacencyIsPlacementOrderIndependent" fullname="BuildingOccupancyTests.CellAndPerimeterEdgeAdjacencyIsPlacementOrderIndependent" methodname="CellAndPerimeterEdgeAdjacencyIsPlacementOrderIndependent" classname="BuildingOccupancyTests" runstate="Runnable" seed="1143235909" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:04Z" duration="0.000043" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1022" name="DifferentEdgesAroundOneCellCanBeReserved" fullname="BuildingOccupancyTests.DifferentEdgesAroundOneCellCanBeReserved" methodname="DifferentEdgesAroundOneCellCanBeReserved" classname="BuildingOccupancyTests" runstate="Runnable" seed="1294690940" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:04Z" duration="0.000035" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1023" name="OppositeDescriptionsOfOneEdgeConflict" fullname="BuildingOccupancyTests.OppositeDescriptionsOfOneEdgeConflict" methodname="OppositeDescriptionsOfOneEdgeConflict" classname="BuildingOccupancyTests" runstate="Runnable" seed="237964586" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:04Z" duration="0.000030" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1021" name="ReleaseFreesTheEntireBuildingFootprint" fullname="BuildingOccupancyTests.ReleaseFreesTheEntireBuildingFootprint" methodname="ReleaseFreesTheEntireBuildingFootprint" classname="BuildingOccupancyTests" runstate="Runnable" seed="1782081188" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:04Z" duration="0.000028" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1018" name="TryReserveMapsEveryFootprintCellToOneBuilding" fullname="BuildingOccupancyTests.TryReserveMapsEveryFootprintCellToOneBuilding" methodname="TryReserveMapsEveryFootprintCellToOneBuilding" classname="BuildingOccupancyTests" runstate="Runnable" seed="796795706" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:04Z" duration="0.000035" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1020" name="TryReserveRejectsDuplicateCells" fullname="BuildingOccupancyTests.TryReserveRejectsDuplicateCells" methodname="TryReserveRejectsDuplicateCells" classname="BuildingOccupancyTests" runstate="Runnable" seed="1003684556" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:04Z" duration="0.000027" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1019" name="TryReserveRejectsOverlapsWithoutPartiallyReservingCells" fullname="BuildingOccupancyTests.TryReserveRejectsOverlapsWithoutPartiallyReservingCells" methodname="TryReserveRejectsOverlapsWithoutPartiallyReservingCells" classname="BuildingOccupancyTests" runstate="Runnable" seed="2081942514" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:04Z" duration="0.000032" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+      </test-suite>
+      <test-suite type="TestFixture" id="1026" name="DirectionalWallSegmentTests" fullname="DirectionalWallSegmentTests" classname="DirectionalWallSegmentTests" runstate="Runnable" testcasecount="9" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:04Z" duration="0.041212" total="9" passed="9" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-case id="1035" name="JoinedConnectionsRemoveOnlyInternalCapFaces" fullname="DirectionalWallSegmentTests.JoinedConnectionsRemoveOnlyInternalCapFaces" methodname="JoinedConnectionsRemoveOnlyInternalCapFaces" classname="DirectionalWallSegmentTests" runstate="Runnable" seed="792514583" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:04Z" duration="0.026314" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1036" name="JoinedConnectionsRequireCompatibleNeighborEnds" fullname="DirectionalWallSegmentTests.JoinedConnectionsRequireCompatibleNeighborEnds" methodname="JoinedConnectionsRequireCompatibleNeighborEnds" classname="DirectionalWallSegmentTests" runstate="Runnable" seed="1835138562" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:04Z" duration="0.000057" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-suite type="ParameterizedMethod" id="1033" name="PreviewAndRuntimeUseTheSameCenteredMesh" fullname="DirectionalWallSegmentTests.PreviewAndRuntimeUseTheSameCenteredMesh" classname="DirectionalWallSegmentTests" runstate="Runnable" testcasecount="6" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:04Z" duration="0.013931" total="6" passed="6" failed="0" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <test-case id="1027" name="PreviewAndRuntimeUseTheSameCenteredMesh(Horizontal)" fullname="DirectionalWallSegmentTests.PreviewAndRuntimeUseTheSameCenteredMesh(Horizontal)" methodname="PreviewAndRuntimeUseTheSameCenteredMesh" classname="DirectionalWallSegmentTests" runstate="Runnable" seed="2060972171" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:04Z" duration="0.001341" asserts="0">
+            <properties>
+              <property name="retryIteration" value="0" />
+              <property name="repeatIteration" value="0" />
+            </properties>
+          </test-case>
+          <test-case id="1028" name="PreviewAndRuntimeUseTheSameCenteredMesh(Vertical)" fullname="DirectionalWallSegmentTests.PreviewAndRuntimeUseTheSameCenteredMesh(Vertical)" methodname="PreviewAndRuntimeUseTheSameCenteredMesh" classname="DirectionalWallSegmentTests" runstate="Runnable" seed="649221167" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:04Z" duration="0.001321" asserts="0">
+            <properties>
+              <property name="retryIteration" value="0" />
+              <property name="repeatIteration" value="0" />
+            </properties>
+          </test-case>
+          <test-case id="1029" name="PreviewAndRuntimeUseTheSameCenteredMesh(CornerNorthEast)" fullname="DirectionalWallSegmentTests.PreviewAndRuntimeUseTheSameCenteredMesh(CornerNorthEast)" methodname="PreviewAndRuntimeUseTheSameCenteredMesh" classname="DirectionalWallSegmentTests" runstate="Runnable" seed="2011003636" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:04Z" duration="0.001710" asserts="0">
+            <properties>
+              <property name="retryIteration" value="0" />
+              <property name="repeatIteration" value="0" />
+            </properties>
+          </test-case>
+          <test-case id="1030" name="PreviewAndRuntimeUseTheSameCenteredMesh(CornerSouthEast)" fullname="DirectionalWallSegmentTests.PreviewAndRuntimeUseTheSameCenteredMesh(CornerSouthEast)" methodname="PreviewAndRuntimeUseTheSameCenteredMesh" classname="DirectionalWallSegmentTests" runstate="Runnable" seed="625333148" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:04Z" duration="0.001548" asserts="0">
+            <properties>
+              <property name="retryIteration" value="0" />
+              <property name="repeatIteration" value="0" />
+            </properties>
+          </test-case>
+          <test-case id="1031" name="PreviewAndRuntimeUseTheSameCenteredMesh(CornerSouthWest)" fullname="DirectionalWallSegmentTests.PreviewAndRuntimeUseTheSameCenteredMesh(CornerSouthWest)" methodname="PreviewAndRuntimeUseTheSameCenteredMesh" classname="DirectionalWallSegmentTests" runstate="Runnable" seed="374991233" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:04Z" duration="0.001546" asserts="0">
+            <properties>
+              <property name="retryIteration" value="0" />
+              <property name="repeatIteration" value="0" />
+            </properties>
+          </test-case>
+          <test-case id="1032" name="PreviewAndRuntimeUseTheSameCenteredMesh(CornerNorthWest)" fullname="DirectionalWallSegmentTests.PreviewAndRuntimeUseTheSameCenteredMesh(CornerNorthWest)" methodname="PreviewAndRuntimeUseTheSameCenteredMesh" classname="DirectionalWallSegmentTests" runstate="Runnable" seed="159347220" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:04Z" duration="0.001562" asserts="0">
+            <properties>
+              <property name="retryIteration" value="0" />
+              <property name="repeatIteration" value="0" />
+            </properties>
+          </test-case>
+        </test-suite>
+        <test-case id="1034" name="StraightWallFootprintsAreExactlyHalfACellThick" fullname="DirectionalWallSegmentTests.StraightWallFootprintsAreExactlyHalfACellThick" methodname="StraightWallFootprintsAreExactlyHalfACellThick" classname="DirectionalWallSegmentTests" runstate="Runnable" seed="1503812026" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:04Z" duration="0.000051" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+      </test-suite>
+      <test-suite type="TestFixture" id="1037" name="GridEdgeTests" fullname="GridEdgeTests" classname="GridEdgeTests" runstate="Runnable" testcasecount="2" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:04Z" duration="0.004319" total="2" passed="2" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-case id="1039" name="ClockwiseRotationVisitsEveryDirection" fullname="GridEdgeTests.ClockwiseRotationVisitsEveryDirection" methodname="ClockwiseRotationVisitsEveryDirection" classname="GridEdgeTests" runstate="Runnable" seed="432803522" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:04Z" duration="0.000046" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1038" name="OppositeCellSidesProduceTheSameCanonicalEdge" fullname="GridEdgeTests.OppositeCellSidesProduceTheSameCanonicalEdge" methodname="OppositeCellSidesProduceTheSameCanonicalEdge" classname="GridEdgeTests" runstate="Runnable" seed="117488259" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:04Z" duration="0.000043" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+      </test-suite>
+      <test-suite type="TestFixture" id="1040" name="GridRoofTests" fullname="GridRoofTests" classname="GridRoofTests" runstate="Runnable" testcasecount="6" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:04Z" duration="0.341828" total="6" passed="6" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-case id="1042" name="RoofDoesNotAddACollider" fullname="GridRoofTests.RoofDoesNotAddACollider" methodname="RoofDoesNotAddACollider" classname="GridRoofTests" runstate="Runnable" seed="1839930855" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:04Z" duration="0.058788" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1041" name="RoofMeshKeepsTopAtConfiguredHeightAndLipBelowIt" fullname="GridRoofTests.RoofMeshKeepsTopAtConfiguredHeightAndLipBelowIt" methodname="RoofMeshKeepsTopAtConfiguredHeightAndLipBelowIt" classname="GridRoofTests" runstate="Runnable" seed="521711667" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:04Z" duration="0.056245" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1043" name="RoofUsesSplitSurfacesPerSideAndOneTopSurface" fullname="GridRoofTests.RoofUsesSplitSurfacesPerSideAndOneTopSurface" methodname="RoofUsesSplitSurfacesPerSideAndOneTopSurface" classname="GridRoofTests" runstate="Runnable" seed="544971920" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:04Z" duration="0.052992" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1044" name="SlabSurfacesFollowTheirLogicalDepthAndSortAfterTheMatchingWall" fullname="GridRoofTests.SlabSurfacesFollowTheirLogicalDepthAndSortAfterTheMatchingWall" methodname="SlabSurfacesFollowTheirLogicalDepthAndSortAfterTheMatchingWall" classname="GridRoofTests" runstate="Runnable" seed="547455619" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:04Z" duration="0.057841" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1046" name="StorySlabSurfacesSortAfterTheLowerStory" fullname="GridRoofTests.StorySlabSurfacesSortAfterTheLowerStory" methodname="StorySlabSurfacesSortAfterTheLowerStory" classname="GridRoofTests" runstate="Runnable" seed="1261330537" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:04Z" duration="0.052584" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1045" name="TopSurfaceSortsAfterAWallAtTheSharedInnerCorner" fullname="GridRoofTests.TopSurfaceSortsAfterAWallAtTheSharedInnerCorner" methodname="TopSurfaceSortsAfterAWallAtTheSharedInnerCorner" classname="GridRoofTests" runstate="Runnable" seed="1019158436" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:04Z" duration="0.061473" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+      </test-suite>
+      <test-suite type="TestFixture" id="1047" name="GridWallTests" fullname="GridWallTests" classname="GridWallTests" runstate="Runnable" testcasecount="11" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:05Z" duration="0.639487" total="11" passed="11" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-case id="1049" name="CornerPlanesFormLShapesAtTheirCellCenters" fullname="GridWallTests.CornerPlanesFormLShapesAtTheirCellCenters" methodname="CornerPlanesFormLShapesAtTheirCellCenters" classname="GridWallTests" runstate="Runnable" seed="397797921" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:04Z" duration="0.056563" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1056" name="CornerWallMeshUsesAJoinedLFootprintWithInnerCornerFaces" fullname="GridWallTests.CornerWallMeshUsesAJoinedLFootprintWithInnerCornerFaces" methodname="CornerWallMeshUsesAJoinedLFootprintWithInnerCornerFaces" classname="GridWallTests" runstate="Runnable" seed="1488491436" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:04Z" duration="0.053784" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1053" name="StoryWallMeshStartsAtItsConfiguredBaseHeight" fullname="GridWallTests.StoryWallMeshStartsAtItsConfiguredBaseHeight" methodname="StoryWallMeshStartsAtItsConfiguredBaseHeight" classname="GridWallTests" runstate="Runnable" seed="109099404" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:04Z" duration="0.054113" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1054" name="StoryWallSurfacesKeepTheirLogicalDepthOrdering" fullname="GridWallTests.StoryWallSurfacesKeepTheirLogicalDepthOrdering" methodname="StoryWallSurfacesKeepTheirLogicalDepthOrdering" classname="GridWallTests" runstate="Runnable" seed="870086497" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:04Z" duration="0.055519" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1048" name="StraightPlanesSpanOneCellThroughTheirCellCenters" fullname="GridWallTests.StraightPlanesSpanOneCellThroughTheirCellCenters" methodname="StraightPlanesSpanOneCellThroughTheirCellCenters" classname="GridWallTests" runstate="Runnable" seed="1208858512" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:04Z" duration="0.051984" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1051" name="StraightWallFootprintsAreCenteredAndHalfACellThick" fullname="GridWallTests.StraightWallFootprintsAreCenteredAndHalfACellThick" methodname="StraightWallFootprintsAreCenteredAndHalfACellThick" classname="GridWallTests" runstate="Runnable" seed="457885678" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:04Z" duration="0.055417" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1055" name="ThickWallMeshUsesFaceDirectionTonesAndABrighterTopCap" fullname="GridWallTests.ThickWallMeshUsesFaceDirectionTonesAndABrighterTopCap" methodname="ThickWallMeshUsesFaceDirectionTonesAndABrighterTopCap" classname="GridWallTests" runstate="Runnable" seed="79021196" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:04Z" duration="0.060520" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1052" name="ThickWallMeshUsesTheSceneGridProjectionAndIncludesOneWallTopCap" fullname="GridWallTests.ThickWallMeshUsesTheSceneGridProjectionAndIncludesOneWallTopCap" methodname="ThickWallMeshUsesTheSceneGridProjectionAndIncludesOneWallTopCap" classname="GridWallTests" runstate="Runnable" seed="1283811628" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:04Z" duration="0.055447" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1050" name="ThickWallsKeepTheirConfiguredHeightAndHalfCellThickness" fullname="GridWallTests.ThickWallsKeepTheirConfiguredHeightAndHalfCellThickness" methodname="ThickWallsKeepTheirConfiguredHeightAndHalfCellThickness" classname="GridWallTests" runstate="Runnable" seed="337876020" result="Passed" start-time="2026-09-08 01:36:04Z" end-time="2026-09-08 01:36:05Z" duration="0.062174" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1058" name="ThreeByThreePerimeterPiecesFormOneClosedCenteredLoop" fullname="GridWallTests.ThreeByThreePerimeterPiecesFormOneClosedCenteredLoop" methodname="ThreeByThreePerimeterPiecesFormOneClosedCenteredLoop" classname="GridWallTests" runstate="Runnable" seed="184138239" result="Passed" start-time="2026-09-08 01:36:05Z" end-time="2026-09-08 01:36:05Z" duration="0.061681" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1057" name="WallTopSurfaceRendersAfterItsSideSurfaces" fullname="GridWallTests.WallTopSurfaceRendersAfterItsSideSurfaces" methodname="WallTopSurfaceRendersAfterItsSideSurfaces" classname="GridWallTests" runstate="Runnable" seed="2060161439" result="Passed" start-time="2026-09-08 01:36:05Z" end-time="2026-09-08 01:36:05Z" duration="0.065444" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+      </test-suite>
+      <test-suite type="TestFixture" id="1059" name="InteriorSizingTests" fullname="InteriorSizingTests" classname="InteriorSizingTests" runstate="Runnable" testcasecount="7" result="Passed" start-time="2026-09-08 01:36:05Z" end-time="2026-09-08 01:36:05Z" duration="0.008817" total="7" passed="7" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-case id="1065" name="ElevatorInteractionPositionIsCenteredAtTheNorthInteriorEdge" fullname="InteriorSizingTests.ElevatorInteractionPositionIsCenteredAtTheNorthInteriorEdge" methodname="ElevatorInteractionPositionIsCenteredAtTheNorthInteriorEdge" classname="InteriorSizingTests" runstate="Runnable" seed="1697162657" result="Passed" start-time="2026-09-08 01:36:05Z" end-time="2026-09-08 01:36:05Z" duration="0.000063" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1061" name="IndoorGridConfigureSizeRebuildsLinesAndCollisionBounds" fullname="InteriorSizingTests.IndoorGridConfigureSizeRebuildsLinesAndCollisionBounds" methodname="IndoorGridConfigureSizeRebuildsLinesAndCollisionBounds" classname="InteriorSizingTests" runstate="Runnable" seed="729687103" result="Passed" start-time="2026-09-08 01:36:05Z" end-time="2026-09-08 01:36:05Z" duration="0.000638" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1063" name="InsideFactoryControllerCreatesAnExitForEveryEnteredDoor" fullname="InteriorSizingTests.InsideFactoryControllerCreatesAnExitForEveryEnteredDoor" methodname="InsideFactoryControllerCreatesAnExitForEveryEnteredDoor" classname="InteriorSizingTests" runstate="Runnable" seed="870066277" result="Passed" start-time="2026-09-08 01:36:05Z" end-time="2026-09-08 01:36:05Z" duration="0.000784" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1064" name="InsideFactoryControllerDisablesExteriorExitOnUpperFloors" fullname="InteriorSizingTests.InsideFactoryControllerDisablesExteriorExitOnUpperFloors" methodname="InsideFactoryControllerDisablesExteriorExitOnUpperFloors" classname="InteriorSizingTests" runstate="Runnable" seed="1406450017" result="Passed" start-time="2026-09-08 01:36:05Z" end-time="2026-09-08 01:36:05Z" duration="0.000725" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1062" name="InsideFactoryControllerUsesTheEnteredDoorPositionForItsExit" fullname="InteriorSizingTests.InsideFactoryControllerUsesTheEnteredDoorPositionForItsExit" methodname="InsideFactoryControllerUsesTheEnteredDoorPositionForItsExit" classname="InteriorSizingTests" runstate="Runnable" seed="716721621" result="Passed" start-time="2026-09-08 01:36:05Z" end-time="2026-09-08 01:36:05Z" duration="0.000673" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1066" name="InsideFactoryDoorRotationFollowsItsWallDirection" fullname="InteriorSizingTests.InsideFactoryDoorRotationFollowsItsWallDirection" methodname="InsideFactoryDoorRotationFollowsItsWallDirection" classname="InteriorSizingTests" runstate="Runnable" seed="1650480871" result="Passed" start-time="2026-09-08 01:36:05Z" end-time="2026-09-08 01:36:05Z" duration="0.000040" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1060" name="ScenePortalStoresConfiguredBuildingSize" fullname="InteriorSizingTests.ScenePortalStoresConfiguredBuildingSize" methodname="ScenePortalStoresConfiguredBuildingSize" classname="InteriorSizingTests" runstate="Runnable" seed="742867298" result="Passed" start-time="2026-09-08 01:36:05Z" end-time="2026-09-08 01:36:05Z" duration="0.000102" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+      </test-suite>
+      <test-suite type="TestFixture" id="1067" name="ModularBuildingViewTests" fullname="ModularBuildingViewTests" classname="ModularBuildingViewTests" runstate="Runnable" testcasecount="1" result="Passed" start-time="2026-09-08 01:36:05Z" end-time="2026-09-08 01:36:05Z" duration="0.085062" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-case id="1068" name="ConfigureBuildsContinuousSurfacesAndWallRunsWithAnEntranceOpening" fullname="ModularBuildingViewTests.ConfigureBuildsContinuousSurfacesAndWallRunsWithAnEntranceOpening" methodname="ConfigureBuildsContinuousSurfacesAndWallRunsWithAnEntranceOpening" classname="ModularBuildingViewTests" runstate="Runnable" seed="493044589" result="Passed" start-time="2026-09-08 01:36:05Z" end-time="2026-09-08 01:36:05Z" duration="0.081907" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+      </test-suite>
+      <test-suite type="TestFixture" id="1069" name="OutsideTestConformanceTests" fullname="OutsideTestConformanceTests" classname="OutsideTestConformanceTests" runstate="Runnable" testcasecount="3" result="Passed" start-time="2026-09-08 01:36:05Z" end-time="2026-09-08 01:36:05Z" duration="0.113449" total="3" passed="3" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-case id="1071" name="BootstrapIsFirstAndLoadsOutsideTestForItsNetworkManager" fullname="OutsideTestConformanceTests.BootstrapIsFirstAndLoadsOutsideTestForItsNetworkManager" methodname="BootstrapIsFirstAndLoadsOutsideTestForItsNetworkManager" classname="OutsideTestConformanceTests" runstate="Runnable" seed="1699272924" result="Passed" start-time="2026-09-08 01:36:05Z" end-time="2026-09-08 01:36:05Z" duration="0.004491" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1072" name="InsideFactoryUsesAnOrthogonalRuntimeSizedGridAndAuthoredExit" fullname="OutsideTestConformanceTests.InsideFactoryUsesAnOrthogonalRuntimeSizedGridAndAuthoredExit" methodname="InsideFactoryUsesAnOrthogonalRuntimeSizedGridAndAuthoredExit" classname="OutsideTestConformanceTests" runstate="Runnable" seed="610735151" result="Passed" start-time="2026-09-08 01:36:05Z" end-time="2026-09-08 01:36:05Z" duration="0.004147" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1070" name="OutsideTestContainsActiveCanonicalBuildingsWithMatchingCollision" fullname="OutsideTestConformanceTests.OutsideTestContainsActiveCanonicalBuildingsWithMatchingCollision" methodname="OutsideTestContainsActiveCanonicalBuildingsWithMatchingCollision" classname="OutsideTestConformanceTests" runstate="Runnable" seed="131134302" result="Passed" start-time="2026-09-08 01:36:05Z" end-time="2026-09-08 01:36:05Z" duration="0.099638" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+      </test-suite>
+      <test-suite type="TestFixture" id="1073" name="OutsideTestFloorStateOwnerTests" fullname="OutsideTestFloorStateOwnerTests" classname="OutsideTestFloorStateOwnerTests" runstate="Runnable" testcasecount="12" result="Passed" start-time="2026-09-08 01:36:05Z" end-time="2026-09-08 01:36:05Z" duration="0.012131" total="12" passed="12" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-case id="1074" name="CompositeIdentityKeepsBuildingsIndependent" fullname="OutsideTestFloorStateOwnerTests.CompositeIdentityKeepsBuildingsIndependent" methodname="CompositeIdentityKeepsBuildingsIndependent" classname="OutsideTestFloorStateOwnerTests" runstate="Runnable" seed="1518763943" result="Passed" start-time="2026-09-08 01:36:05Z" end-time="2026-09-08 01:36:05Z" duration="0.000119" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1080" name="DifferentEntitiesAdvanceThroughIndependentCycles" fullname="OutsideTestFloorStateOwnerTests.DifferentEntitiesAdvanceThroughIndependentCycles" methodname="DifferentEntitiesAdvanceThroughIndependentCycles" classname="OutsideTestFloorStateOwnerTests" runstate="Runnable" seed="988158436" result="Passed" start-time="2026-09-08 01:36:05Z" end-time="2026-09-08 01:36:05Z" duration="0.000071" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1079" name="EntitySnapshotRestoresIndependentFloorContents" fullname="OutsideTestFloorStateOwnerTests.EntitySnapshotRestoresIndependentFloorContents" methodname="EntitySnapshotRestoresIndependentFloorContents" classname="OutsideTestFloorStateOwnerTests" runstate="Runnable" seed="2086581323" result="Passed" start-time="2026-09-08 01:36:05Z" end-time="2026-09-08 01:36:05Z" duration="0.000069" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1084" name="FailedLoadPreservesCurrentStateAndSourceFile" fullname="OutsideTestFloorStateOwnerTests.FailedLoadPreservesCurrentStateAndSourceFile" methodname="FailedLoadPreservesCurrentStateAndSourceFile" classname="OutsideTestFloorStateOwnerTests" runstate="Runnable" seed="326511376" result="Passed" start-time="2026-09-08 01:36:05Z" end-time="2026-09-08 01:36:05Z" duration="0.001298" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1078" name="FixedTickSimulationAdvancesBothFloorsWithoutSceneObjects" fullname="OutsideTestFloorStateOwnerTests.FixedTickSimulationAdvancesBothFloorsWithoutSceneObjects" methodname="FixedTickSimulationAdvancesBothFloorsWithoutSceneObjects" classname="OutsideTestFloorStateOwnerTests" runstate="Runnable" seed="1621883213" result="Passed" start-time="2026-09-08 01:36:05Z" end-time="2026-09-08 01:36:05Z" duration="0.000067" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1085" name="MarkerPositionUsesRegisteredInteriorBounds" fullname="OutsideTestFloorStateOwnerTests.MarkerPositionUsesRegisteredInteriorBounds" methodname="MarkerPositionUsesRegisteredInteriorBounds" classname="OutsideTestFloorStateOwnerTests" runstate="Runnable" seed="2115995930" result="Passed" start-time="2026-09-08 01:36:05Z" end-time="2026-09-08 01:36:05Z" duration="0.000062" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1077" name="ProductionAdvancesWithoutSceneObjects" fullname="OutsideTestFloorStateOwnerTests.ProductionAdvancesWithoutSceneObjects" methodname="ProductionAdvancesWithoutSceneObjects" classname="OutsideTestFloorStateOwnerTests" runstate="Runnable" seed="2023078776" result="Passed" start-time="2026-09-08 01:36:05Z" end-time="2026-09-08 01:36:05Z" duration="0.000051" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1075" name="RepeatedRegistrationPreservesStateAndConflictsAreRejected" fullname="OutsideTestFloorStateOwnerTests.RepeatedRegistrationPreservesStateAndConflictsAreRejected" methodname="RepeatedRegistrationPreservesStateAndConflictsAreRejected" classname="OutsideTestFloorStateOwnerTests" runstate="Runnable" seed="89235816" result="Passed" start-time="2026-09-08 01:36:05Z" end-time="2026-09-08 01:36:05Z" duration="0.000069" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1082" name="SaveLoadPreservesEveryFloorAndEntityField" fullname="OutsideTestFloorStateOwnerTests.SaveLoadPreservesEveryFloorAndEntityField" methodname="SaveLoadPreservesEveryFloorAndEntityField" classname="OutsideTestFloorStateOwnerTests" runstate="Runnable" seed="865080453" result="Passed" start-time="2026-09-08 01:36:05Z" end-time="2026-09-08 01:36:05Z" duration="0.001421" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1081" name="TwoFloorSaveLoadRoundTripPreservesIndependentProgress" fullname="OutsideTestFloorStateOwnerTests.TwoFloorSaveLoadRoundTripPreservesIndependentProgress" methodname="TwoFloorSaveLoadRoundTripPreservesIndependentProgress" classname="OutsideTestFloorStateOwnerTests" runstate="Runnable" seed="1667736050" result="Passed" start-time="2026-09-08 01:36:05Z" end-time="2026-09-08 01:36:05Z" duration="0.001350" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1076" name="VersionOneSaveMigratesLegacyRecordsAndAddsMissingBuildings" fullname="OutsideTestFloorStateOwnerTests.VersionOneSaveMigratesLegacyRecordsAndAddsMissingBuildings" methodname="VersionOneSaveMigratesLegacyRecordsAndAddsMissingBuildings" classname="OutsideTestFloorStateOwnerTests" runstate="Runnable" seed="43194883" result="Passed" start-time="2026-09-08 01:36:05Z" end-time="2026-09-08 01:36:05Z" duration="0.000349" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1083" name="VersionThreeEmptyEntitiesRemainEmptyAfterRegistrationSaveLoadAndSnapshots" fullname="OutsideTestFloorStateOwnerTests.VersionThreeEmptyEntitiesRemainEmptyAfterRegistrationSaveLoadAndSnapshots" methodname="VersionThreeEmptyEntitiesRemainEmptyAfterRegistrationSaveLoadAndSnapshots" classname="OutsideTestFloorStateOwnerTests" runstate="Runnable" seed="252542677" result="Passed" start-time="2026-09-08 01:36:05Z" end-time="2026-09-08 01:36:05Z" duration="0.000132" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+      </test-suite>
+      <test-suite type="TestFixture" id="1086" name="SceneGridTests" fullname="SceneGridTests" classname="SceneGridTests" runstate="Runnable" testcasecount="6" result="Passed" start-time="2026-09-08 01:36:05Z" end-time="2026-09-08 01:36:05Z" duration="0.357236" total="6" passed="6" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-case id="1088" name="DimetricProjectionRoundTripsLogicalCoordinates" fullname="SceneGridTests.DimetricProjectionRoundTripsLogicalCoordinates" methodname="DimetricProjectionRoundTripsLogicalCoordinates" classname="SceneGridTests" runstate="Runnable" seed="446951433" result="Passed" start-time="2026-09-08 01:36:05Z" end-time="2026-09-08 01:36:05Z" duration="0.060138" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1087" name="DimetricProjectionUsesTheExistingTwoToOneBasis" fullname="SceneGridTests.DimetricProjectionUsesTheExistingTwoToOneBasis" methodname="DimetricProjectionUsesTheExistingTwoToOneBasis" classname="SceneGridTests" runstate="Runnable" seed="135904083" result="Passed" start-time="2026-09-08 01:36:05Z" end-time="2026-09-08 01:36:05Z" duration="0.055567" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1089" name="OrthogonalProjectionPreservesCellSpacing" fullname="SceneGridTests.OrthogonalProjectionPreservesCellSpacing" methodname="OrthogonalProjectionPreservesCellSpacing" classname="SceneGridTests" runstate="Runnable" seed="80654735" result="Passed" start-time="2026-09-08 01:36:05Z" end-time="2026-09-08 01:36:05Z" duration="0.056213" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1092" name="TryGetForSceneRejectsAMissingGrid" fullname="SceneGridTests.TryGetForSceneRejectsAMissingGrid" methodname="TryGetForSceneRejectsAMissingGrid" classname="SceneGridTests" runstate="Runnable" seed="363708518" result="Passed" start-time="2026-09-08 01:36:05Z" end-time="2026-09-08 01:36:05Z" duration="0.057266" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1091" name="TryGetForSceneRejectsAnInactiveGrid" fullname="SceneGridTests.TryGetForSceneRejectsAnInactiveGrid" methodname="TryGetForSceneRejectsAnInactiveGrid" classname="SceneGridTests" runstate="Runnable" seed="916678342" result="Passed" start-time="2026-09-08 01:36:05Z" end-time="2026-09-08 01:36:05Z" duration="0.061892" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1090" name="TryGetForSceneResolvesItsExactEnabledGrid" fullname="SceneGridTests.TryGetForSceneResolvesItsExactEnabledGrid" methodname="TryGetForSceneResolvesItsExactEnabledGrid" classname="SceneGridTests" runstate="Runnable" seed="1540105706" result="Passed" start-time="2026-09-08 01:36:05Z" end-time="2026-09-08 01:36:05Z" duration="0.063126" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+      </test-suite>
+      <test-suite type="TestFixture" id="1093" name="TestBuildingCreatorTests" fullname="TestBuildingCreatorTests" classname="TestBuildingCreatorTests" runstate="Runnable" testcasecount="26" result="Passed" start-time="2026-09-08 01:36:05Z" end-time="2026-09-08 01:36:06Z" duration="0.476368" total="26" passed="26" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-case id="1105" name="DeleteFloorScenesRemovesItsScenesAndBuildEntries" fullname="TestBuildingCreatorTests.DeleteFloorScenesRemovesItsScenesAndBuildEntries" methodname="DeleteFloorScenesRemovesItsScenesAndBuildEntries" classname="TestBuildingCreatorTests" runstate="Runnable" seed="366769432" result="Passed" start-time="2026-09-08 01:36:05Z" end-time="2026-09-08 01:36:06Z" duration="0.305927" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1104" name="DeleteTopStoryRemovesItsSceneAndBuildEntry" fullname="TestBuildingCreatorTests.DeleteTopStoryRemovesItsSceneAndBuildEntry" methodname="DeleteTopStoryRemovesItsSceneAndBuildEntry" classname="TestBuildingCreatorTests" runstate="Runnable" seed="1278314294" result="Passed" start-time="2026-09-08 01:36:06Z" end-time="2026-09-08 01:36:06Z" duration="0.158317" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1113" name="DepthGeometryDetectsCrossingPolygonsWithoutContainedVertices" fullname="TestBuildingCreatorTests.DepthGeometryDetectsCrossingPolygonsWithoutContainedVertices" methodname="DepthGeometryDetectsCrossingPolygonsWithoutContainedVertices" classname="TestBuildingCreatorTests" runstate="Runnable" seed="133910355" result="Passed" start-time="2026-09-08 01:36:06Z" end-time="2026-09-08 01:36:06Z" duration="0.000074" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1112" name="DepthGeometryRequiresFootprintIntersection" fullname="TestBuildingCreatorTests.DepthGeometryRequiresFootprintIntersection" methodname="DepthGeometryRequiresFootprintIntersection" classname="TestBuildingCreatorTests" runstate="Runnable" seed="335597632" result="Passed" start-time="2026-09-08 01:36:06Z" end-time="2026-09-08 01:36:06Z" duration="0.000059" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1114" name="DepthSortingUsesHysteresisAtTheSurfaceBoundary" fullname="TestBuildingCreatorTests.DepthSortingUsesHysteresisAtTheSurfaceBoundary" methodname="DepthSortingUsesHysteresisAtTheSurfaceBoundary" classname="TestBuildingCreatorTests" runstate="Runnable" seed="304117746" result="Passed" start-time="2026-09-08 01:36:06Z" end-time="2026-09-08 01:36:06Z" duration="0.000045" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1115" name="DepthSurfaceUsesTheClosestLocalGroundDepth" fullname="TestBuildingCreatorTests.DepthSurfaceUsesTheClosestLocalGroundDepth" methodname="DepthSurfaceUsesTheClosestLocalGroundDepth" classname="TestBuildingCreatorTests" runstate="Runnable" seed="1657807715" result="Passed" start-time="2026-09-08 01:36:06Z" end-time="2026-09-08 01:36:06Z" duration="0.000202" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1119" name="DoorFacingMirrorsVerticalWallDirections" fullname="TestBuildingCreatorTests.DoorFacingMirrorsVerticalWallDirections" methodname="DoorFacingMirrorsVerticalWallDirections" classname="TestBuildingCreatorTests" runstate="Runnable" seed="1595159650" result="Passed" start-time="2026-09-08 01:36:06Z" end-time="2026-09-08 01:36:06Z" duration="0.000111" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1108" name="DoorSelectionCanStoreMultipleOffsetsOnOneWall" fullname="TestBuildingCreatorTests.DoorSelectionCanStoreMultipleOffsetsOnOneWall" methodname="DoorSelectionCanStoreMultipleOffsetsOnOneWall" classname="TestBuildingCreatorTests" runstate="Runnable" seed="1053910013" result="Passed" start-time="2026-09-08 01:36:06Z" end-time="2026-09-08 01:36:06Z" duration="0.000186" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1107" name="DoorSelectionUsesTheStableWallId" fullname="TestBuildingCreatorTests.DoorSelectionUsesTheStableWallId" methodname="DoorSelectionUsesTheStableWallId" classname="TestBuildingCreatorTests" runstate="Runnable" seed="1273680405" result="Passed" start-time="2026-09-08 01:36:06Z" end-time="2026-09-08 01:36:06Z" duration="0.000156" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1111" name="EditorBuildingsRequireAtLeastTwoCellsInEachDimension" fullname="TestBuildingCreatorTests.EditorBuildingsRequireAtLeastTwoCellsInEachDimension" methodname="EditorBuildingsRequireAtLeastTwoCellsInEachDimension" classname="TestBuildingCreatorTests" runstate="Runnable" seed="1363197721" result="Passed" start-time="2026-09-08 01:36:06Z" end-time="2026-09-08 01:36:06Z" duration="0.000045" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1106" name="ExteriorWallSpansClassifyEveryPerimeterDirection" fullname="TestBuildingCreatorTests.ExteriorWallSpansClassifyEveryPerimeterDirection" methodname="ExteriorWallSpansClassifyEveryPerimeterDirection" classname="TestBuildingCreatorTests" runstate="Runnable" seed="985933553" result="Passed" start-time="2026-09-08 01:36:06Z" end-time="2026-09-08 01:36:06Z" duration="0.000136" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1103" name="FloorSceneNamesKeepTheBuildingIdAndFloorIndex" fullname="TestBuildingCreatorTests.FloorSceneNamesKeepTheBuildingIdAndFloorIndex" methodname="FloorSceneNamesKeepTheBuildingIdAndFloorIndex" classname="TestBuildingCreatorTests" runstate="Runnable" seed="1580184556" result="Passed" start-time="2026-09-08 01:36:06Z" end-time="2026-09-08 01:36:06Z" duration="0.000054" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1102" name="LayoutStoriesDefaultToOneAndCanBeIncreased" fullname="TestBuildingCreatorTests.LayoutStoriesDefaultToOneAndCanBeIncreased" methodname="LayoutStoriesDefaultToOneAndCanBeIncreased" classname="TestBuildingCreatorTests" runstate="Runnable" seed="1827860825" result="Passed" start-time="2026-09-08 01:36:06Z" end-time="2026-09-08 01:36:06Z" duration="0.000126" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1098" name="OneCellWideSelectionsDoNotDuplicateStraightWallPieces" fullname="TestBuildingCreatorTests.OneCellWideSelectionsDoNotDuplicateStraightWallPieces" methodname="OneCellWideSelectionsDoNotDuplicateStraightWallPieces" classname="TestBuildingCreatorTests" runstate="Runnable" seed="2070173680" result="Passed" start-time="2026-09-08 01:36:06Z" end-time="2026-09-08 01:36:06Z" duration="0.000064" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1118" name="RearEdgeUsesThePlayerFootprintCenterAtItsLogicalDepth" fullname="TestBuildingCreatorTests.RearEdgeUsesThePlayerFootprintCenterAtItsLogicalDepth" methodname="RearEdgeUsesThePlayerFootprintCenterAtItsLogicalDepth" classname="TestBuildingCreatorTests" runstate="Runnable" seed="1155272919" result="Passed" start-time="2026-09-08 01:36:06Z" end-time="2026-09-08 01:36:06Z" duration="0.000052" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1095" name="RoofBoundsMatchTheWallInnerSurface" fullname="TestBuildingCreatorTests.RoofBoundsMatchTheWallInnerSurface" methodname="RoofBoundsMatchTheWallInnerSurface" classname="TestBuildingCreatorTests" runstate="Runnable" seed="1732329809" result="Passed" start-time="2026-09-08 01:36:06Z" end-time="2026-09-08 01:36:06Z" duration="0.000075" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1100" name="RoofClearanceKeepsTheSlabAboveTheWallTop" fullname="TestBuildingCreatorTests.RoofClearanceKeepsTheSlabAboveTheWallTop" methodname="RoofClearanceKeepsTheSlabAboveTheWallTop" classname="TestBuildingCreatorTests" runstate="Runnable" seed="1940706300" result="Passed" start-time="2026-09-08 01:36:06Z" end-time="2026-09-08 01:36:06Z" duration="0.000049" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1099" name="RoofSortingFollowsTheBuildingDepth" fullname="TestBuildingCreatorTests.RoofSortingFollowsTheBuildingDepth" methodname="RoofSortingFollowsTheBuildingDepth" classname="TestBuildingCreatorTests" runstate="Runnable" seed="611588686" result="Passed" start-time="2026-09-08 01:36:06Z" end-time="2026-09-08 01:36:06Z" duration="0.000050" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1096" name="SingleCellSelectionCreatesFourCornerWallPieces" fullname="TestBuildingCreatorTests.SingleCellSelectionCreatesFourCornerWallPieces" methodname="SingleCellSelectionCreatesFourCornerWallPieces" classname="TestBuildingCreatorTests" runstate="Runnable" seed="1496892535" result="Passed" start-time="2026-09-08 01:36:06Z" end-time="2026-09-08 01:36:06Z" duration="0.000099" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1109" name="SouthDoorMapsToTheBottomInteriorEdgeAtTheSameWallPosition" fullname="TestBuildingCreatorTests.SouthDoorMapsToTheBottomInteriorEdgeAtTheSameWallPosition" methodname="SouthDoorMapsToTheBottomInteriorEdgeAtTheSameWallPosition" classname="TestBuildingCreatorTests" runstate="Runnable" seed="143278534" result="Passed" start-time="2026-09-08 01:36:06Z" end-time="2026-09-08 01:36:06Z" duration="0.000165" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1101" name="StorySlabsUseTheWallTopAndAZeroPointOneThickness" fullname="TestBuildingCreatorTests.StorySlabsUseTheWallTopAndAZeroPointOneThickness" methodname="StorySlabsUseTheWallTopAndAZeroPointOneThickness" classname="TestBuildingCreatorTests" runstate="Runnable" seed="690761343" result="Passed" start-time="2026-09-08 01:36:06Z" end-time="2026-09-08 01:36:06Z" duration="0.000056" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1117" name="TestBuildingPresentationIgnoresDestroyedRenderers" fullname="TestBuildingCreatorTests.TestBuildingPresentationIgnoresDestroyedRenderers" methodname="TestBuildingPresentationIgnoresDestroyedRenderers" classname="TestBuildingCreatorTests" runstate="Runnable" seed="34629332" result="Passed" start-time="2026-09-08 01:36:06Z" end-time="2026-09-08 01:36:06Z" duration="0.000194" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1116" name="TestBuildingPresentationKeepsBaseDoorAlphaAcrossRefresh" fullname="TestBuildingCreatorTests.TestBuildingPresentationKeepsBaseDoorAlphaAcrossRefresh" methodname="TestBuildingPresentationKeepsBaseDoorAlphaAcrossRefresh" classname="TestBuildingCreatorTests" runstate="Runnable" seed="652777565" result="Passed" start-time="2026-09-08 01:36:06Z" end-time="2026-09-08 01:36:06Z" duration="0.000175" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1097" name="ThreeByThreeSelectionCreatesOnlyItsPerimeterWallPieces" fullname="TestBuildingCreatorTests.ThreeByThreeSelectionCreatesOnlyItsPerimeterWallPieces" methodname="ThreeByThreeSelectionCreatesOnlyItsPerimeterWallPieces" classname="TestBuildingCreatorTests" runstate="Runnable" seed="1876672695" result="Passed" start-time="2026-09-08 01:36:06Z" end-time="2026-09-08 01:36:06Z" duration="0.000078" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1094" name="WallRingMatchesTheSelectedCellsAsItsFootprint" fullname="TestBuildingCreatorTests.WallRingMatchesTheSelectedCellsAsItsFootprint" methodname="WallRingMatchesTheSelectedCellsAsItsFootprint" classname="TestBuildingCreatorTests" runstate="Runnable" seed="513097565" result="Passed" start-time="2026-09-08 01:36:06Z" end-time="2026-09-08 01:36:06Z" duration="0.000074" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1110" name="WestDoorMapsToTheLeftInteriorEdgeAtTheSameWallPosition" fullname="TestBuildingCreatorTests.WestDoorMapsToTheLeftInteriorEdgeAtTheSameWallPosition" methodname="WestDoorMapsToTheLeftInteriorEdgeAtTheSameWallPosition" classname="TestBuildingCreatorTests" runstate="Runnable" seed="1783113250" result="Passed" start-time="2026-09-08 01:36:06Z" end-time="2026-09-08 01:36:06Z" duration="0.000167" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+      </test-suite>
+      <test-suite type="TestFixture" id="1120" name="WallPlacementRulesTests" fullname="WallPlacementRulesTests" classname="WallPlacementRulesTests" runstate="Runnable" testcasecount="4" result="Passed" start-time="2026-09-08 01:36:06Z" end-time="2026-09-08 01:36:06Z" duration="0.043408" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-case id="1122" name="DifferentWallShapesCannotReserveTheSameCell" fullname="WallPlacementRulesTests.DifferentWallShapesCannotReserveTheSameCell" methodname="DifferentWallShapesCannotReserveTheSameCell" classname="WallPlacementRulesTests" runstate="Runnable" seed="543968397" result="Passed" start-time="2026-09-08 01:36:06Z" end-time="2026-09-08 01:36:06Z" duration="0.024612" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1124" name="PlacementRotationVisitsBothStraightsAndEveryCorner" fullname="WallPlacementRulesTests.PlacementRotationVisitsBothStraightsAndEveryCorner" methodname="PlacementRotationVisitsBothStraightsAndEveryCorner" classname="WallPlacementRulesTests" runstate="Runnable" seed="757268515" result="Passed" start-time="2026-09-08 01:36:06Z" end-time="2026-09-08 01:36:06Z" duration="0.000074" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1123" name="WallBuildabilityUsesItsAnchorCellOnly" fullname="WallPlacementRulesTests.WallBuildabilityUsesItsAnchorCellOnly" methodname="WallBuildabilityUsesItsAnchorCellOnly" classname="WallPlacementRulesTests" runstate="Runnable" seed="392130242" result="Passed" start-time="2026-09-08 01:36:06Z" end-time="2026-09-08 01:36:06Z" duration="0.000253" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+        <test-case id="1121" name="WallReservationContainsOnlyItsAnchorCell" fullname="WallPlacementRulesTests.WallReservationContainsOnlyItsAnchorCell" methodname="WallReservationContainsOnlyItsAnchorCell" classname="WallPlacementRulesTests" runstate="Runnable" seed="500222566" result="Passed" start-time="2026-09-08 01:36:06Z" end-time="2026-09-08 01:36:06Z" duration="0.000083" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+        </test-case>
+      </test-suite>
+      <test-suite type="TestFixture" id="1125" name="WorldWallMigrationTests" fullname="WorldWallMigrationTests" classname="WorldWallMigrationTests" runstate="Runnable" testcasecount="1" result="Passed" start-time="2026-09-08 01:36:06Z" end-time="2026-09-08 01:36:06Z" duration="0.120917" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-case id="1126" name="WorldContainsOnlyValidNonOverlappingWallCells" fullname="WorldWallMigrationTests.WorldContainsOnlyValidNonOverlappingWallCells" methodname="WorldContainsOnlyValidNonOverlappingWallCells" classname="WorldWallMigrationTests" runstate="Runnable" seed="1565875457" result="Passed" start-time="2026-09-08 01:36:06Z" end-time="2026-09-08 01:36:06Z" duration="0.117310" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+          <output><![CDATA[Saving results to: C:/Users/Deven/AppData/LocalLow/DefaultCompany/FoodFactoryGame\TestResults.xml
+Saving results to: C:/Users/Deven/AppData/LocalLow/DefaultCompany/FoodFactoryGame\TestResults.xml
+]]></output>
+        </test-case>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

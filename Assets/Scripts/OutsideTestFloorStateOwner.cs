@@ -224,10 +224,6 @@ public sealed class OutsideTestFloorStateOwner
         {
             NormalizeFloorState(registration, state);
         }
-        else
-        {
-            state.EnsureDefaultEntity();
-        }
 
         if (!floorStates.ContainsKey(key))
         {
@@ -239,7 +235,7 @@ public sealed class OutsideTestFloorStateOwner
 
     public bool LoadFromFile(string path)
     {
-        if (!File.Exists(path))
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
         {
             return false;
         }
@@ -256,6 +252,12 @@ public sealed class OutsideTestFloorStateOwner
 
     public bool LoadFromJson(string json)
     {
+        if (string.IsNullOrWhiteSpace(json)
+            || !HasJsonArrayProperty(json, "Floors"))
+        {
+            return false;
+        }
+
         try
         {
             var data = JsonUtility.FromJson<OutsideTestFloorSaveData>(json);
@@ -270,12 +272,12 @@ public sealed class OutsideTestFloorStateOwner
                 return false;
             }
 
-            floorStates.Clear();
+            var loadedFloorStates = new Dictionary<OutsideTestFloorKey, OutsideTestFloorRecord>();
             foreach (var savedState in data.Floors)
             {
                 if (savedState is null || savedState.FloorIndex < 0)
                 {
-                    continue;
+                    return false;
                 }
 
                 var buildingInstanceId = savedState.BuildingInstanceId;
@@ -286,7 +288,15 @@ public sealed class OutsideTestFloorStateOwner
 
                 if (buildingInstanceId == 0)
                 {
-                    continue;
+                    return false;
+                }
+
+                if (buildings.TryGetValue(
+                        buildingInstanceId,
+                        out var registration)
+                    && savedState.FloorIndex >= registration.StoryCount)
+                {
+                    return false;
                 }
 
                 var migratedState = new OutsideTestFloorRecord(
@@ -297,19 +307,53 @@ public sealed class OutsideTestFloorStateOwner
                     savedState.AccumulatedProduction,
                     savedState.MarkerPosition);
                 migratedState.SetEntities(savedState.Entities);
-                migratedState.EnsureDefaultEntity();
+                if (version < CurrentSaveVersion
+                    && migratedState.Entities.Count == 0)
+                {
+                    migratedState.EnsureDefaultEntity();
+                }
+
+                if (buildings.TryGetValue(
+                        buildingInstanceId,
+                        out registration))
+                {
+                    NormalizeFloorState(registration, migratedState);
+                }
+
                 var key = new OutsideTestFloorKey(
                     buildingInstanceId,
                     savedState.FloorIndex);
-                if (!floorStates.ContainsKey(key))
+                if (!loadedFloorStates.TryAdd(key, migratedState))
                 {
-                    floorStates.Add(key, migratedState);
+                    return false;
                 }
             }
 
             foreach (var registration in buildings.Values)
             {
-                NormalizeBuildingFloorStates(registration);
+                for (var floorIndex = 0;
+                    floorIndex < registration.StoryCount;
+                    floorIndex++)
+                {
+                    var key = new OutsideTestFloorKey(
+                        registration.BuildingInstanceId,
+                        floorIndex);
+                    if (!loadedFloorStates.TryGetValue(key, out var state))
+                    {
+                        state = OutsideTestFloorRecord.CreateDefault(
+                            registration.BuildingInstanceId,
+                            floorIndex);
+                        loadedFloorStates.Add(key, state);
+                    }
+
+                    NormalizeFloorState(registration, state);
+                }
+            }
+
+            floorStates.Clear();
+            foreach (var pair in loadedFloorStates)
+            {
+                floorStates.Add(pair.Key, pair.Value);
             }
 
             return true;
@@ -372,7 +416,6 @@ public sealed class OutsideTestFloorStateOwner
             ClampMarkerPosition(
                 registration.BuildingInstanceId,
                 state.MarkerPosition));
-        state.EnsureDefaultEntity();
         state.ClampEntityPositions(registration.InteriorSize);
     }
 
@@ -387,5 +430,32 @@ public sealed class OutsideTestFloorStateOwner
                 : left.FloorIndex.CompareTo(right.FloorIndex);
         });
         return result;
+    }
+
+    private static bool HasJsonArrayProperty(string json, string propertyName)
+    {
+        var propertyToken = $"\"{propertyName}\"";
+        var propertyIndex = json.IndexOf(propertyToken, StringComparison.Ordinal);
+        if (propertyIndex < 0)
+        {
+            return false;
+        }
+
+        var valueIndex = json.IndexOf(
+            ':',
+            propertyIndex + propertyToken.Length);
+        if (valueIndex < 0)
+        {
+            return false;
+        }
+
+        valueIndex++;
+        while (valueIndex < json.Length
+            && char.IsWhiteSpace(json[valueIndex]))
+        {
+            valueIndex++;
+        }
+
+        return valueIndex < json.Length && json[valueIndex] == '[';
     }
 }

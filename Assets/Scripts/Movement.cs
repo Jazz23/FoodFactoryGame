@@ -1,3 +1,4 @@
+// Owns local player movement and pauses safely while FishNet changes the player's scene.
 using FishNet.Connection;
 using FishNet.Object;
 using UnityEngine;
@@ -82,7 +83,6 @@ public class Movement : NetworkBehaviour
 
         if (!SceneGrid.TryGetForScene(gameObject.scene, out var grid))
         {
-            SceneGrid.LogMissingGrid(gameObject.scene, this);
             return;
         }
 

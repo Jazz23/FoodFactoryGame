@@ -128,13 +128,16 @@ public sealed class DepthOcclusionCoordinator : MonoBehaviour
                 var overlapsVisibleShape = BuildingDepthGeometry.IntersectsPolygon(
                     surfacePolygon,
                     playerPolygon);
-                if (affectsLocalOpacity
-                    && presentation is not null
+                if (presentation is not null
                     && presentation
                     && isBehind
                     && overlapsVisibleShape)
                 {
-                    occludedPresentations.Add(presentation);
+                    if (affectsLocalOpacity)
+                    {
+                        occludedPresentations.Add(presentation);
+                    }
+
                     playerOccludedPresentations.Add(presentation);
                 }
 
@@ -144,7 +147,7 @@ public sealed class DepthOcclusionCoordinator : MonoBehaviour
                 }
 
                 var surfaceSortingOrder = surface.GetSortingOrder();
-                var distance = Mathf.Abs(player.FrontY - surfaceDepthKey);
+                var distance = Mathf.Abs(player.DepthY - surfaceDepthKey);
                 if (isInside)
                 {
                     if (bestIsInside && surfaceSortingOrder >= bestSortingOrder)
@@ -202,17 +205,17 @@ public sealed class DepthOcclusionCoordinator : MonoBehaviour
     }
 
     public static bool ResolveBehind(
-        float playerFeetY,
+        float playerDepthY,
         float surfaceDepthKey,
         bool previousValue,
         float hysteresis)
     {
         if (previousValue)
         {
-            return playerFeetY >= surfaceDepthKey - hysteresis;
+            return playerDepthY >= surfaceDepthKey - hysteresis;
         }
 
-        return playerFeetY > surfaceDepthKey + hysteresis;
+        return playerDepthY > surfaceDepthKey + hysteresis;
     }
 
     private bool ResolveBehind(
@@ -227,7 +230,7 @@ public sealed class DepthOcclusionCoordinator : MonoBehaviour
         }
 
         var resolvedValue = ResolveBehind(
-            player.FrontY,
+            player.DepthY,
             surfaceDepthKey,
             previousValue,
             sortingHysteresis);

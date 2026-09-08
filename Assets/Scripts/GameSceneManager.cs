@@ -49,6 +49,7 @@ public sealed class GameSceneManager : MonoBehaviour
     [SerializeField] private NetworkObject playerPrefab = null!;
     [SerializeField] private string worldSceneName = "World";
     [SerializeField] private string insideSceneName = "Inside";
+    [SerializeField] private string outsideTestStatePath = string.Empty;
 
     private readonly HashSet<int> awaitingInitialSpawn = new();
     private readonly Dictionary<int, NetworkObject> players = new();
@@ -60,6 +61,7 @@ public sealed class GameSceneManager : MonoBehaviour
     private FactorySimulation outsideTestSimulation = null!;
     private bool outsideTestStateLoaded;
     private bool outsideTestStateLoadedFromDisk;
+    private bool outsideTestStateLoadFailed;
     private bool outsideTestStateNeedsSave;
     private int registeredOutsideTestSceneHandle = -1;
     private int clientOutsideTestLoadedInteriorCount;
@@ -70,6 +72,24 @@ public sealed class GameSceneManager : MonoBehaviour
     public int OutsideTestLoadedInteriorCount => networkManager.IsServerStarted
         ? OutsideTestFloorPresentation.LoadedCount
         : clientOutsideTestLoadedInteriorCount;
+
+    public string OutsideTestStatePath => GetOutsideTestStatePath();
+
+    public bool ConfigureOutsideTestStatePath(string path)
+    {
+        if (networkManager.IsServerStarted)
+        {
+            return false;
+        }
+
+        outsideTestStatePath = string.IsNullOrWhiteSpace(path)
+            ? string.Empty
+            : path;
+        outsideTestStateLoadedFromDisk = false;
+        outsideTestStateLoadFailed = false;
+        outsideTestStateNeedsSave = false;
+        return true;
+    }
 
     private void Awake()
     {
@@ -98,7 +118,7 @@ public sealed class GameSceneManager : MonoBehaviour
         networkManager.ServerManager.OnRemoteConnectionState -= RemoteConnectionStateChanged;
         networkManager.SceneManager.OnLoadEnd -= SceneLoadEnd;
         networkManager.SceneManager.OnClientPresenceChangeEnd -= ClientPresenceChangeEnd;
-        if (networkManager.IsServerStarted)
+        if (networkManager.IsServerStarted && !outsideTestStateLoadFailed)
         {
             SaveOutsideTestFloorState();
         }
@@ -106,7 +126,7 @@ public sealed class GameSceneManager : MonoBehaviour
 
     private void OnApplicationQuit()
     {
-        if (networkManager.IsServerStarted)
+        if (networkManager.IsServerStarted && !outsideTestStateLoadFailed)
         {
             SaveOutsideTestFloorState();
         }
@@ -122,7 +142,7 @@ public sealed class GameSceneManager : MonoBehaviour
         }
 
         outsideTestSimulation.Advance(Time.deltaTime);
-        if (outsideTestStateNeedsSave)
+        if (outsideTestStateNeedsSave && !outsideTestStateLoadFailed)
         {
             SaveOutsideTestFloorState();
         }
@@ -179,6 +199,7 @@ public sealed class GameSceneManager : MonoBehaviour
         }
 
         outsideTestStateNeedsSave = false;
+        outsideTestStateLoadFailed = false;
         return true;
     }
 
@@ -189,11 +210,20 @@ public sealed class GameSceneManager : MonoBehaviour
             return false;
         }
 
-        outsideTestStateLoaded = false;
-        outsideTestStateLoadedFromDisk = false;
-        outsideTestSimulation.Reset();
         EnsureOutsideTestStateLoaded();
-        SaveOutsideTestFloorState();
+        if (!outsideTestStateOwner.LoadFromFile(GetOutsideTestStatePath()))
+        {
+            outsideTestStateLoadFailed = true;
+            outsideTestStateNeedsSave = false;
+            return false;
+        }
+
+        outsideTestStateLoaded = true;
+        outsideTestStateLoadedFromDisk = true;
+        outsideTestStateLoadFailed = false;
+        outsideTestStateNeedsSave = false;
+        outsideTestSimulation.Reset();
+        nextOutsideTestBroadcastTime = 0f;
         BroadcastOutsideTestFloorStates();
         return true;
     }
@@ -222,6 +252,12 @@ public sealed class GameSceneManager : MonoBehaviour
         FactoryEntitySnapshot[] entitySnapshots,
         int loadedInteriorCount)
     {
+        if (networkManager.IsServerStarted)
+        {
+            clientOutsideTestLoadedInteriorCount = loadedInteriorCount;
+            return;
+        }
+
         outsideTestStateOwner.ApplySnapshot(
             buildingInstanceId,
             floorIndex,
@@ -238,14 +274,20 @@ public sealed class GameSceneManager : MonoBehaviour
         if (args.ConnectionState == LocalConnectionState.Started)
         {
             EnsureOutsideTestStateLoaded();
-            SaveOutsideTestFloorState();
+            if (!outsideTestStateLoadFailed)
+            {
+                SaveOutsideTestFloorState();
+            }
             BroadcastOutsideTestFloorStates();
             return;
         }
 
         if (args.ConnectionState == LocalConnectionState.Stopped)
         {
-            SaveOutsideTestFloorState();
+            if (!outsideTestStateLoadFailed)
+            {
+                SaveOutsideTestFloorState();
+            }
         }
     }
 
@@ -274,7 +316,17 @@ public sealed class GameSceneManager : MonoBehaviour
         var loadedInteriorCount = OutsideTestLoadedInteriorCount;
         foreach (var playerObject in players.Values)
         {
+            if (playerObject is null || !playerObject)
+            {
+                continue;
+            }
+
             var player = playerObject.GetComponent<PlayerSceneTransition>();
+            if (player is null || !player)
+            {
+                continue;
+            }
+
             player.ServerSendOutsideTestFloorState(floor, loadedInteriorCount);
         }
     }
@@ -284,10 +336,12 @@ public sealed class GameSceneManager : MonoBehaviour
         var path = GetOutsideTestStatePath();
         if (networkManager.IsServerStarted && !outsideTestStateLoadedFromDisk)
         {
+            outsideTestStateLoadFailed = false;
             if (File.Exists(path))
             {
                 if (!outsideTestStateOwner.LoadFromFile(path))
                 {
+                    outsideTestStateLoadFailed = true;
                     Debug.LogWarning(
                         "Could not read OutsideTest floor state.",
                         this);
@@ -404,9 +458,11 @@ public sealed class GameSceneManager : MonoBehaviour
         registeredOutsideTestSceneHandle = worldScene.handle;
     }
 
-    private static string GetOutsideTestStatePath()
+    private string GetOutsideTestStatePath()
     {
-        return Path.Combine(Application.persistentDataPath, OutsideTestStateFileName);
+        return string.IsNullOrWhiteSpace(outsideTestStatePath)
+            ? Path.Combine(Application.persistentDataPath, OutsideTestStateFileName)
+            : outsideTestStatePath;
     }
 
     public bool RequestTransition(NetworkObject player, ScenePortal portal)
@@ -605,6 +661,12 @@ public sealed class GameSceneManager : MonoBehaviour
         }
 
         pendingTransition.TargetScene = args.QueueData.SceneLoadData.GetFirstLookupScene();
+        if (pendingTransition.Player is null || !pendingTransition.Player)
+        {
+            pendingTransitions.Remove(pendingTransition.Connection.ClientId);
+            return;
+        }
+
         ConfigureInterior(
             pendingTransition.TargetScene,
             pendingTransition.BuildingSize,
@@ -640,6 +702,12 @@ public sealed class GameSceneManager : MonoBehaviour
         if (!pendingTransitions.TryGetValue(args.Connection.ClientId, out var pendingTransition)
             || args.Scene.handle != pendingTransition.TargetScene.handle)
         {
+            return;
+        }
+
+        if (pendingTransition.Player is null || !pendingTransition.Player)
+        {
+            pendingTransitions.Remove(args.Connection.ClientId);
             return;
         }
 

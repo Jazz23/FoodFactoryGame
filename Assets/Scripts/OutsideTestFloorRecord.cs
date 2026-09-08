@@ -12,7 +12,7 @@ public sealed class OutsideTestFloorRecord
     [SerializeField] private float productionRate;
     [SerializeField] private float accumulatedProduction;
     [SerializeField] private Vector2 markerPosition;
-    [SerializeField] private List<FactoryEntityRecord> entities = new();
+    [SerializeField] private List<FactoryEntityRecord> entities = null!;
 
     public OutsideTestFloorRecord()
     {
@@ -138,6 +138,11 @@ public sealed class OutsideTestFloorRecord
     {
         var entityList = GetEntities();
         entityList.Clear();
+        if (newEntities is null)
+        {
+            return;
+        }
+
         foreach (var entity in newEntities)
         {
             if (entity is not null)
@@ -152,6 +157,11 @@ public sealed class OutsideTestFloorRecord
     {
         var entityList = GetEntities();
         entityList.Clear();
+        if (snapshots is null)
+        {
+            return;
+        }
+
         foreach (var snapshot in snapshots)
         {
             entityList.Add(FactoryEntityRecord.FromSnapshot(snapshot));
@@ -182,7 +192,7 @@ public sealed class OutsideTestFloorRecord
         var snapshots = new List<FactoryEntitySnapshot>(GetEntities().Count);
         foreach (var entity in GetEntities())
         {
-            if (entity is not null && entity.EntityId != 0)
+            if (entity is not null)
             {
                 snapshots.Add(entity.ToSnapshot());
             }
