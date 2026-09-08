@@ -1,4 +1,5 @@
-﻿using DefaultNamespace;
+﻿using System;
+using DefaultNamespace;
 using FishNet.Connection;
 using FishNet.Object;
 using FishNet.Serializing;
@@ -9,18 +10,21 @@ namespace NotAI
     public class NAIBuildable : NetworkBehaviour
     {
         [field: SerializeField, ReadOnly]
-        public int uuid { get; set; }
+        public Guid guid { get; set; }
         public int buildableId;
+        
+        [NonSerialized]
+        public byte[] State;
 
         public override void WritePayload(NetworkConnection connection, Writer writer)
         {
-            writer.WriteInt32(uuid);
+            writer.Write(guid);
             writer.WriteInt32(buildableId);
         }
 
         public override void ReadPayload(NetworkConnection connection, Reader reader)
         {
-            uuid = reader.ReadInt32();
+            guid = reader.ReadGuid();
             buildableId = reader.ReadInt32();
         }
     }

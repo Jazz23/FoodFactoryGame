@@ -33,8 +33,11 @@ namespace NotAI
 
             // Spawn the buildable on the server
             var guid = System.Guid.NewGuid();
+            var buildable = GetComponent<NAIBuildable>();
+            buildable.guid = guid;
+            buildable.buildableId = _buildingId;
             _buildableManager.UpdateGrid(transform.position, size, guid);
-            NAIStateManager.Buildables[guid] = GetComponent<NAIBuildable>();
+            NAIStateManager.Buildables[guid] = buildable;
             return true;
         }
     }
