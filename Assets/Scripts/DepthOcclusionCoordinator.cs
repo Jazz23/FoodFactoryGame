@@ -2,6 +2,11 @@
 using System.Collections.Generic;
 using FishNet.Object;
 using UnityEngine;
+#if UNITY_6000_5_OR_NEWER
+using ObjectId = UnityEngine.EntityId;
+#else
+using ObjectId = System.Int32;
+#endif
 
 [DefaultExecutionOrder(1000)]
 [DisallowMultipleComponent]
@@ -11,14 +16,14 @@ public sealed class DepthOcclusionCoordinator : MonoBehaviour
 
     private readonly struct SortingStateKey
     {
-        public SortingStateKey(int surfaceId, int playerId)
+        public SortingStateKey(ObjectId surfaceId, ObjectId playerId)
         {
             SurfaceId = surfaceId;
             PlayerId = playerId;
         }
 
-        public int SurfaceId { get; }
-        public int PlayerId { get; }
+        public ObjectId SurfaceId { get; }
+        public ObjectId PlayerId { get; }
     }
 
     [SerializeField, Range(0.05f, 1f)] private float occludedAlpha = 0.2f;
@@ -223,7 +228,11 @@ public sealed class DepthOcclusionCoordinator : MonoBehaviour
         Virtual3DSize player,
         float surfaceDepthKey)
     {
+#if UNITY_6000_5_OR_NEWER
+        var key = new SortingStateKey(surface.GetEntityId(), player.GetEntityId());
+#else
         var key = new SortingStateKey(surface.GetInstanceID(), player.GetInstanceID());
+#endif
         if (!sortingStates.TryGetValue(key, out var previousValue))
         {
             previousValue = false;

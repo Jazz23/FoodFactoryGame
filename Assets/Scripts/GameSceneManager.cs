@@ -6,9 +6,15 @@ using FishNet.Managing;
 using FishNet.Managing.Scened;
 using FishNet.Object;
 using FishNet.Transporting;
+using FishNet.Utility.Extension;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnitySceneManager = UnityEngine.SceneManagement.SceneManager;
+#if UNITY_6000_5_OR_NEWER
+using SceneHandle = System.UInt64;
+#else
+using SceneHandle = System.Int32;
+#endif
 
 [RequireComponent(typeof(NetworkManager))]
 public sealed class GameSceneManager : MonoBehaviour
@@ -63,7 +69,7 @@ public sealed class GameSceneManager : MonoBehaviour
     private bool outsideTestStateLoadedFromDisk;
     private bool outsideTestStateLoadFailed;
     private bool outsideTestStateNeedsSave;
-    private int registeredOutsideTestSceneHandle = -1;
+    private SceneHandle registeredOutsideTestSceneHandle;
     private int clientOutsideTestLoadedInteriorCount;
     private float nextOutsideTestBroadcastTime;
 
@@ -404,7 +410,7 @@ public sealed class GameSceneManager : MonoBehaviour
         var worldScene = UnitySceneManager.GetSceneByName(worldSceneName);
         if (!worldScene.IsValid()
             || !worldScene.isLoaded
-            || worldScene.handle == registeredOutsideTestSceneHandle)
+            || worldScene.GetRawHandle() == registeredOutsideTestSceneHandle)
         {
             return;
         }
@@ -455,7 +461,7 @@ public sealed class GameSceneManager : MonoBehaviour
             outsideTestStateNeedsSave = true;
         }
 
-        registeredOutsideTestSceneHandle = worldScene.handle;
+        registeredOutsideTestSceneHandle = worldScene.GetRawHandle();
     }
 
     private string GetOutsideTestStatePath()
@@ -700,7 +706,7 @@ public sealed class GameSceneManager : MonoBehaviour
         }
 
         if (!pendingTransitions.TryGetValue(args.Connection.ClientId, out var pendingTransition)
-            || args.Scene.handle != pendingTransition.TargetScene.handle)
+            || args.Scene.GetRawHandle() != pendingTransition.TargetScene.GetRawHandle())
         {
             return;
         }

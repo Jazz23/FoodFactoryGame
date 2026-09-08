@@ -1,7 +1,13 @@
 // Converts continuous logical positions to world positions for each scene's grid projection.
 using System.Collections.Generic;
+using FishNet.Utility.Extension;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+#if UNITY_6000_5_OR_NEWER
+using SceneHandle = System.UInt64;
+#else
+using SceneHandle = System.Int32;
+#endif
 
 public enum GridProjection
 {
@@ -11,9 +17,9 @@ public enum GridProjection
 
 public sealed class SceneGrid : MonoBehaviour
 {
-    private static readonly Dictionary<int, SceneGrid> sceneGrids = new();
-    private static readonly HashSet<int> unresolvedScenes = new();
-    private static readonly HashSet<int> reportedScenes = new();
+    private static readonly Dictionary<SceneHandle, SceneGrid> sceneGrids = new();
+    private static readonly HashSet<SceneHandle> unresolvedScenes = new();
+    private static readonly HashSet<SceneHandle> reportedScenes = new();
 
     [SerializeField] private GridProjection projection;
     [SerializeField] private Vector2 logicalOrigin;
@@ -47,17 +53,18 @@ public sealed class SceneGrid : MonoBehaviour
             return;
         }
 
-        if (sceneGrids.TryGetValue(scene.handle, out var grid) && grid != this)
+        var sceneHandle = scene.GetRawHandle();
+        if (sceneGrids.TryGetValue(sceneHandle, out var grid) && grid != this)
         {
-            sceneGrids.Remove(scene.handle);
+            sceneGrids.Remove(sceneHandle);
         }
         else
         {
-            sceneGrids[scene.handle] = this;
+            sceneGrids[sceneHandle] = this;
         }
 
-        unresolvedScenes.Remove(scene.handle);
-        reportedScenes.Remove(scene.handle);
+        unresolvedScenes.Remove(sceneHandle);
+        reportedScenes.Remove(sceneHandle);
     }
 
     private void OnDisable()
@@ -68,13 +75,14 @@ public sealed class SceneGrid : MonoBehaviour
             return;
         }
 
-        if (sceneGrids.TryGetValue(scene.handle, out var grid) && grid == this)
+        var sceneHandle = scene.GetRawHandle();
+        if (sceneGrids.TryGetValue(sceneHandle, out var grid) && grid == this)
         {
-            sceneGrids.Remove(scene.handle);
+            sceneGrids.Remove(sceneHandle);
         }
 
-        unresolvedScenes.Remove(scene.handle);
-        reportedScenes.Remove(scene.handle);
+        unresolvedScenes.Remove(sceneHandle);
+        reportedScenes.Remove(sceneHandle);
     }
 
     public Vector2 LogicalToWorld(Vector2 logicalPosition)
@@ -110,12 +118,18 @@ public sealed class SceneGrid : MonoBehaviour
     public static bool TryGetForScene(Scene scene, out SceneGrid grid)
     {
         grid = null!;
-        if (!scene.IsValid() || unresolvedScenes.Contains(scene.handle))
+        if (!scene.IsValid())
         {
             return false;
         }
 
-        if (sceneGrids.TryGetValue(scene.handle, out var cachedGrid)
+        var sceneHandle = scene.GetRawHandle();
+        if (unresolvedScenes.Contains(sceneHandle))
+        {
+            return false;
+        }
+
+        if (sceneGrids.TryGetValue(sceneHandle, out var cachedGrid)
             && cachedGrid.gameObject.scene == scene
             && cachedGrid.isActiveAndEnabled)
         {
@@ -123,7 +137,7 @@ public sealed class SceneGrid : MonoBehaviour
             return true;
         }
 
-        sceneGrids.Remove(scene.handle);
+        sceneGrids.Remove(sceneHandle);
         var grids = FindObjectsByType<SceneGrid>(
             FindObjectsInactive.Include,
             FindObjectsSortMode.None);
@@ -138,7 +152,7 @@ public sealed class SceneGrid : MonoBehaviour
 
             if (resolvedGrid != null)
             {
-                unresolvedScenes.Add(scene.handle);
+                unresolvedScenes.Add(sceneHandle);
                 return false;
             }
 
@@ -147,18 +161,18 @@ public sealed class SceneGrid : MonoBehaviour
 
         if (resolvedGrid == null)
         {
-            unresolvedScenes.Add(scene.handle);
+            unresolvedScenes.Add(sceneHandle);
             return false;
         }
 
-        sceneGrids[scene.handle] = resolvedGrid;
+        sceneGrids[sceneHandle] = resolvedGrid;
         grid = resolvedGrid;
         return true;
     }
 
     public static void LogMissingGrid(Scene scene, Object context)
     {
-        if (!scene.IsValid() || !reportedScenes.Add(scene.handle))
+        if (!scene.IsValid() || !reportedScenes.Add(scene.GetRawHandle()))
         {
             return;
         }
