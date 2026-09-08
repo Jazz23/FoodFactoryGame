@@ -26,6 +26,33 @@ public sealed class GridRoof : MonoBehaviour
     public float Thickness => thickness;
     public float BaseHeight => baseHeight;
     public int SortingOrder => sortingOrder;
+    public Color TopColor => topColor;
+    public Color SideColor => sideColor;
+    public Material Material => material;
+
+    public void Configure(
+        Vector2 newLogicalMin,
+        Vector2 newLogicalMax,
+        float newBaseHeight,
+        float newTopHeight,
+        float newThickness,
+        Color newTopColor,
+        Color newSideColor,
+        Material newMaterial,
+        int newSortingOrder)
+    {
+        logicalMin = newLogicalMin;
+        logicalMax = newLogicalMax;
+        baseHeight = Mathf.Max(0f, newBaseHeight);
+        topHeight = Mathf.Max(0f, newTopHeight);
+        thickness = Mathf.Max(0f, newThickness);
+        topColor = newTopColor;
+        sideColor = newSideColor;
+        material = newMaterial;
+        sortingOrder = newSortingOrder;
+        rebuildRequested = true;
+        RebuildIfRequired();
+    }
 
     private void OnEnable()
     {
@@ -65,6 +92,15 @@ public sealed class GridRoof : MonoBehaviour
         renderer.enabled = false;
         if (!TryGetGrid(out var grid))
         {
+            rebuildRequested = true;
+            return;
+        }
+
+        if (Application.isPlaying && transform.childCount > 0)
+        {
+            ReleaseGeneratedSurfaces();
+            ReleaseMesh();
+            rebuildRequested = true;
             return;
         }
 

@@ -20,8 +20,8 @@ using SceneHandle = System.Int32;
 public sealed class GameSceneManager : MonoBehaviour
 {
     public const uint LegacyOutsideTestBuildingId = 1;
+    public const string OutsideTestStateFileName = "outsidetest-floor-state.json";
 
-    private const string OutsideTestStateFileName = "outsidetest-floor-state.json";
     private const float OutsideTestBroadcastInterval = 0.25f;
 
     private sealed class PendingTransition
@@ -70,8 +70,10 @@ public sealed class GameSceneManager : MonoBehaviour
     private bool outsideTestStateLoadFailed;
     private bool outsideTestStateNeedsSave;
     private SceneHandle registeredOutsideTestSceneHandle;
+    private bool outsideTestWorldReconciled;
     private int clientOutsideTestLoadedInteriorCount;
     private float nextOutsideTestBroadcastTime;
+    private string lastOutsideTestError = string.Empty;
 
     public static GameSceneManager Instance = null!;
 
@@ -80,6 +82,12 @@ public sealed class GameSceneManager : MonoBehaviour
         : clientOutsideTestLoadedInteriorCount;
 
     public string OutsideTestStatePath => GetOutsideTestStatePath();
+    public string LastOutsideTestError => lastOutsideTestError;
+
+    public static string GetDefaultOutsideTestStatePath()
+    {
+        return Path.Combine(Application.persistentDataPath, OutsideTestStateFileName);
+    }
 
     public bool ConfigureOutsideTestStatePath(string path)
     {
@@ -92,8 +100,16 @@ public sealed class GameSceneManager : MonoBehaviour
             ? string.Empty
             : path;
         outsideTestStateLoadedFromDisk = false;
+        outsideTestStateLoaded = false;
+        outsideTestWorldReconciled = false;
         outsideTestStateLoadFailed = false;
         outsideTestStateNeedsSave = false;
+        registeredOutsideTestSceneHandle = default;
+        lastOutsideTestError = string.Empty;
+        outsideTestStateOwner = new OutsideTestFloorStateOwner(
+            LegacyOutsideTestBuildingId);
+        outsideTestSimulation = new FactorySimulation(
+            outsideTestStateOwner.AdvanceProduction);
         return true;
     }
 
@@ -105,7 +121,6 @@ public sealed class GameSceneManager : MonoBehaviour
             LegacyOutsideTestBuildingId);
         outsideTestSimulation = new FactorySimulation(
             outsideTestStateOwner.AdvanceProduction);
-        EnsureOutsideTestStateLoaded();
     }
 
     private void OnEnable()
@@ -181,6 +196,7 @@ public sealed class GameSceneManager : MonoBehaviour
         float productionRate,
         Vector2 markerPosition)
     {
+        EnsureOutsideTestStateLoaded();
         if (!networkManager.IsServerStarted
             || !outsideTestStateOwner.TrySetFloorState(
                 buildingInstanceId,
@@ -199,13 +215,25 @@ public sealed class GameSceneManager : MonoBehaviour
     public bool SaveOutsideTestFloorState()
     {
         EnsureOutsideTestStateLoaded();
-        if (!outsideTestStateOwner.SaveToFile(GetOutsideTestStatePath()))
+        if (outsideTestStateLoadFailed)
         {
             return false;
         }
 
+        if (!outsideTestStateOwner.SaveToFile(GetOutsideTestStatePath()))
+        {
+            lastOutsideTestError = "Could not save OutsideTest building and floor state.";
+            return false;
+        }
+
         outsideTestStateNeedsSave = false;
+        if (outsideTestWorldReconciled)
+        {
+            outsideTestStateLoadedFromDisk = true;
+            outsideTestStateOwner.MarkCurrentStateAsAuthoritative();
+        }
         outsideTestStateLoadFailed = false;
+        lastOutsideTestError = string.Empty;
         return true;
     }
 
@@ -213,14 +241,29 @@ public sealed class GameSceneManager : MonoBehaviour
     {
         if (!networkManager.IsServerStarted)
         {
+            lastOutsideTestError = "Only the host can load OutsideTest world state.";
             return false;
         }
 
         EnsureOutsideTestStateLoaded();
-        if (!outsideTestStateOwner.LoadFromFile(GetOutsideTestStatePath()))
+        if (!CanLoadOutsideTestState(out var safetyError))
+        {
+            lastOutsideTestError = safetyError;
+            return false;
+        }
+
+        var previousState = outsideTestStateOwner.ToJson();
+        var creator = FindOutsideTestCreator();
+        var doorCornerExclusionDistance = creator is null || !creator
+            ? TestBuildingCreator.DefaultDoorCornerExclusionDistance
+            : creator.DoorCornerExclusionDistance;
+        if (!outsideTestStateOwner.LoadFromFile(
+                GetOutsideTestStatePath(),
+                doorCornerExclusionDistance))
         {
             outsideTestStateLoadFailed = true;
             outsideTestStateNeedsSave = false;
+            lastOutsideTestError = "Could not read OutsideTest building and floor state.";
             return false;
         }
 
@@ -228,9 +271,26 @@ public sealed class GameSceneManager : MonoBehaviour
         outsideTestStateLoadedFromDisk = true;
         outsideTestStateLoadFailed = false;
         outsideTestStateNeedsSave = false;
+        outsideTestWorldReconciled = false;
+        if (!ReconcileOutsideTestWorld(
+                !outsideTestStateOwner.LastLoadHadBuildingRecords,
+                out var reconciliationError))
+        {
+            outsideTestStateOwner.LoadFromJson(
+                previousState,
+                doorCornerExclusionDistance);
+            outsideTestWorldReconciled = false;
+            ReconcileOutsideTestWorld(
+                false,
+                out _);
+            lastOutsideTestError = reconciliationError;
+            return false;
+        }
+
         outsideTestSimulation.Reset();
         nextOutsideTestBroadcastTime = 0f;
         BroadcastOutsideTestFloorStates();
+        lastOutsideTestError = string.Empty;
         return true;
     }
 
@@ -345,11 +405,18 @@ public sealed class GameSceneManager : MonoBehaviour
             outsideTestStateLoadFailed = false;
             if (File.Exists(path))
             {
-                if (!outsideTestStateOwner.LoadFromFile(path))
+                var creator = FindOutsideTestCreator();
+                var doorCornerExclusionDistance = creator is null || !creator
+                    ? TestBuildingCreator.DefaultDoorCornerExclusionDistance
+                    : creator.DoorCornerExclusionDistance;
+                if (!outsideTestStateOwner.LoadFromFile(
+                        path,
+                        doorCornerExclusionDistance))
                 {
                     outsideTestStateLoadFailed = true;
+                    lastOutsideTestError = "Could not read OutsideTest building and floor state.";
                     Debug.LogWarning(
-                        "Could not read OutsideTest floor state.",
+                        lastOutsideTestError,
                         this);
                 }
             }
@@ -357,15 +424,39 @@ public sealed class GameSceneManager : MonoBehaviour
             outsideTestStateLoadedFromDisk = true;
         }
 
-        if (outsideTestStateLoaded)
+        if (outsideTestStateLoadFailed)
         {
-            RegisterOutsideTestLayouts();
+            return;
+        }
+
+        var worldScene = GetOutsideTestWorldScene();
+        if (!worldScene.IsValid() || !worldScene.isLoaded)
+        {
+            return;
+        }
+
+        if (outsideTestWorldReconciled
+            && worldScene.GetRawHandle() == registeredOutsideTestSceneHandle)
+        {
+            return;
+        }
+
+        var importSceneLayouts = !outsideTestStateLoadedFromDisk
+            || !outsideTestStateOwner.LastLoadHadBuildingRecords;
+        if (!ReconcileOutsideTestWorld(
+                importSceneLayouts,
+                out var reconciliationError))
+        {
+            outsideTestStateLoadFailed = true;
+            lastOutsideTestError = reconciliationError;
+            Debug.LogError(reconciliationError, this);
             return;
         }
 
         outsideTestStateLoaded = true;
-        RegisterOutsideTestLayouts();
-        if (networkManager.IsServerStarted && !File.Exists(path))
+        outsideTestWorldReconciled = true;
+        registeredOutsideTestSceneHandle = worldScene.GetRawHandle();
+        if (networkManager.IsServerStarted && importSceneLayouts)
         {
             outsideTestStateNeedsSave = true;
         }
@@ -394,6 +485,181 @@ public sealed class GameSceneManager : MonoBehaviour
             out info);
     }
 
+    public bool TryGetOutsideTestBuildingRecord(
+        uint buildingInstanceId,
+        out BuildingRecord record)
+    {
+        EnsureOutsideTestStateLoaded();
+        return outsideTestStateOwner.TryGetBuildingRecord(
+            buildingInstanceId,
+            out record);
+    }
+
+    public uint GetNextOutsideTestBuildingId()
+    {
+        EnsureOutsideTestStateLoaded();
+        return outsideTestStateOwner.GetNextBuildingId(
+            GetAuthoredOutsideTestBuildingIds());
+    }
+
+    public bool TryCreateBuilding(
+        Vector3Int anchorCell,
+        Vector2Int footprintSize,
+        int storyCount,
+        IEnumerable<BuildingRecord.DoorPlacement> doorPlacements,
+        out uint buildingInstanceId,
+        out string error)
+    {
+        buildingInstanceId = 0;
+        error = string.Empty;
+        if (!networkManager.IsServerStarted)
+        {
+            error = "Only the host can create OutsideTest buildings.";
+            lastOutsideTestError = error;
+            return false;
+        }
+
+        EnsureOutsideTestStateLoaded();
+        if (outsideTestStateLoadFailed)
+        {
+            error = lastOutsideTestError;
+            return false;
+        }
+
+        var creator = FindOutsideTestCreator();
+        if (creator is null || !creator)
+        {
+            error = $"World scene '{worldSceneName}' has no TestBuildingCreator.";
+            lastOutsideTestError = error;
+            return false;
+        }
+
+        buildingInstanceId = outsideTestStateOwner.GetNextBuildingId(
+            GetAuthoredOutsideTestBuildingIds());
+        if (buildingInstanceId == 0)
+        {
+            error = "No building IDs are available.";
+            lastOutsideTestError = error;
+            buildingInstanceId = 0;
+            return false;
+        }
+
+        var record = new BuildingRecord(
+            buildingInstanceId,
+            anchorCell,
+            footprintSize,
+            storyCount,
+            doorPlacements);
+        if (!BuildingShellValidation.TryValidate(
+                record,
+                outsideTestStateOwner.BuildingRecords,
+                creator.DoorCornerExclusionDistance,
+                out error))
+        {
+            lastOutsideTestError = error;
+            buildingInstanceId = 0;
+            return false;
+        }
+
+        if (!outsideTestStateOwner.TryRegisterBuilding(record, out error))
+        {
+            if (string.IsNullOrEmpty(error))
+            {
+                error = $"Building {buildingInstanceId} is already registered.";
+            }
+
+            lastOutsideTestError = error;
+            buildingInstanceId = 0;
+            return false;
+        }
+
+        var assembler = new BuildingShellAssembler();
+        var shell = assembler.CreateShell(
+            record,
+            creator,
+            creator.GeneratedBuildings);
+        if (shell is null || !shell)
+        {
+            outsideTestStateOwner.RemoveBuildingAndFloors(record.BuildingInstanceId);
+            error = "The building shell could not be assembled; creation was rolled back.";
+            lastOutsideTestError = error;
+            buildingInstanceId = 0;
+            return false;
+        }
+
+        outsideTestStateNeedsSave = true;
+        outsideTestStateLoaded = true;
+        outsideTestWorldReconciled = true;
+        registeredOutsideTestSceneHandle = creator.gameObject.scene.GetRawHandle();
+        lastOutsideTestError = string.Empty;
+        BroadcastOutsideTestFloorStates();
+        return true;
+    }
+
+    public bool TryCreateBuilding(
+        Vector3Int anchorCell,
+        Vector2Int footprintSize,
+        int storyCount,
+        out uint buildingInstanceId,
+        out string error)
+    {
+        return TryCreateBuilding(
+            anchorCell,
+            footprintSize,
+            storyCount,
+            System.Array.Empty<BuildingRecord.DoorPlacement>(),
+            out buildingInstanceId,
+            out error);
+    }
+
+    public bool TryCreateBuilding(
+        Vector2Int anchorCell,
+        Vector2Int footprintSize,
+        int storyCount,
+        IEnumerable<BuildingRecord.DoorPlacement> doorPlacements,
+        out uint buildingInstanceId,
+        out string error)
+    {
+        return TryCreateBuilding(
+            new Vector3Int(anchorCell.x, anchorCell.y, 0),
+            footprintSize,
+            storyCount,
+            doorPlacements,
+            out buildingInstanceId,
+            out error);
+    }
+
+    public bool TryCreateBuilding(
+        Vector3Int anchorCell,
+        Vector2Int footprintSize,
+        int storyCount,
+        IEnumerable<TestBuildingLayout.DoorPlacement> doorPlacements,
+        out uint buildingInstanceId,
+        out string error)
+    {
+        var convertedDoors = new List<BuildingRecord.DoorPlacement>();
+        if (doorPlacements is not null)
+        {
+            foreach (var door in doorPlacements)
+            {
+                if (door is not null)
+                {
+                    convertedDoors.Add(new BuildingRecord.DoorPlacement(
+                        door.WallId,
+                        door.NormalizedOffset));
+                }
+            }
+        }
+
+        return TryCreateBuilding(
+            anchorCell,
+            footprintSize,
+            storyCount,
+            convertedDoors,
+            out buildingInstanceId,
+            out error);
+    }
+
     public bool IsValidOutsideTestFloor(
         uint buildingInstanceId,
         int floorIndex)
@@ -405,69 +671,251 @@ public sealed class GameSceneManager : MonoBehaviour
             && floorIndex < info.StoryCount;
     }
 
-    private void RegisterOutsideTestLayouts()
+    private bool ReconcileOutsideTestWorld(
+        bool importSceneLayouts,
+        out string error)
     {
-        var worldScene = UnitySceneManager.GetSceneByName(worldSceneName);
-        if (!worldScene.IsValid()
-            || !worldScene.isLoaded
-            || worldScene.GetRawHandle() == registeredOutsideTestSceneHandle)
+        error = string.Empty;
+        var worldScene = GetOutsideTestWorldScene();
+        if (!worldScene.IsValid() || !worldScene.isLoaded)
         {
-            return;
+            error = $"World scene '{worldSceneName}' is not loaded.";
+            return false;
         }
 
-        var layouts = FindObjectsByType<TestBuildingLayout>(
-            FindObjectsInactive.Include,
-            FindObjectsSortMode.None);
+        var creator = FindOutsideTestCreator();
+        if (creator is null || !creator)
+        {
+            error = $"World scene '{worldSceneName}' has no TestBuildingCreator.";
+            return false;
+        }
+
+        var layouts = creator.GeneratedBuildings.GetComponentsInChildren<TestBuildingLayout>(true);
         var layoutsById = new Dictionary<uint, TestBuildingLayout>();
         foreach (var layout in layouts)
         {
-            if (layout.gameObject.scene.name != worldSceneName
-                || layout.BuildingInstanceId == 0)
+            if (layout.BuildingInstanceId == 0)
             {
                 continue;
             }
 
             if (layoutsById.ContainsKey(layout.BuildingInstanceId))
             {
-                if (duplicateOutsideTestBuildingWarnings.Add(layout.BuildingInstanceId))
-                {
-                    Debug.LogError(
-                        $"OutsideTest contains duplicate building ID {layout.BuildingInstanceId}; duplicate layout rejected.",
-                        layout);
-                }
-
-                continue;
+                error = $"OutsideTest contains duplicate building ID {layout.BuildingInstanceId}; duplicate layout rejected.";
+                return false;
             }
 
             layoutsById.Add(layout.BuildingInstanceId, layout);
         }
 
+        var layoutRecords = new List<BuildingRecord>();
         foreach (var layout in layoutsById.Values)
         {
-            if (!outsideTestStateOwner.TryRegisterBuilding(
-                    layout.BuildingInstanceId,
-                    layout.StoryCount,
-                    layout.Size,
-                    out var error))
+            layoutRecords.Add(layout.ExportBuildingRecord());
+        }
+
+        if (importSceneLayouts
+            && !BuildingShellValidation.TryValidateRecords(
+                layoutRecords,
+                creator.DoorCornerExclusionDistance,
+                out error))
+        {
+            return false;
+        }
+
+        if (importSceneLayouts)
+        {
+            foreach (var record in layoutRecords)
             {
-                if (!string.IsNullOrEmpty(error))
+                if (outsideTestStateOwner.TryGetBuildingRecord(
+                        record.BuildingInstanceId,
+                        out var existingRecord))
                 {
-                    Debug.LogError(error, layout);
+                    if (!existingRecord.HasSameTopology(record))
+                    {
+                        error = $"Duplicate building ID {record.BuildingInstanceId} has conflicting layout data.";
+                        return false;
+                    }
+
+                    continue;
+                }
+
+                if (!outsideTestStateOwner.TryRegisterBuilding(record, out error))
+                {
+                    return false;
+                }
+            }
+        }
+
+        if (!BuildingShellValidation.TryValidateRecords(
+                outsideTestStateOwner.BuildingRecords,
+                creator.DoorCornerExclusionDistance,
+                out error))
+        {
+            return false;
+        }
+
+        var assembler = new BuildingShellAssembler();
+        var retainedLayoutIds = new HashSet<uint>();
+        foreach (var record in outsideTestStateOwner.BuildingRecords)
+        {
+            if (layoutsById.TryGetValue(
+                    record.BuildingInstanceId,
+                    out var layout))
+            {
+                retainedLayoutIds.Add(record.BuildingInstanceId);
+                var topologyChanged = !layout.ExportBuildingRecord().HasSameTopology(record);
+                if (topologyChanged)
+                {
+                    layout.ApplyBuildingRecord(record);
+                }
+
+                var needsRebuild = topologyChanged
+                    || BuildingShellAssembler.NeedsRebuild(
+                        record,
+                        creator,
+                        layout.transform);
+                if (needsRebuild
+                    && !assembler.RebuildShell(record, creator, layout.transform))
+                {
+                    error = $"Could not rebuild shell for building {record.BuildingInstanceId}.";
+                    return false;
                 }
 
                 continue;
             }
 
-            outsideTestStateNeedsSave = true;
+            var shell = assembler.CreateShell(
+                record,
+                creator,
+                creator.GeneratedBuildings);
+            if (shell is null || !shell)
+            {
+                error = $"Could not create shell for building {record.BuildingInstanceId}.";
+                return false;
+            }
         }
 
-        registeredOutsideTestSceneHandle = worldScene.GetRawHandle();
+        if (!importSceneLayouts)
+        {
+            foreach (var layout in layoutsById.Values)
+            {
+                if (retainedLayoutIds.Contains(layout.BuildingInstanceId))
+                {
+                    continue;
+                }
+
+                Object.DestroyImmediate(layout.transform.gameObject);
+            }
+        }
+
+        return true;
+    }
+
+    private TestBuildingCreator FindOutsideTestCreator()
+    {
+        var creators = FindObjectsByType<TestBuildingCreator>(
+            FindObjectsInactive.Include,
+            FindObjectsSortMode.None);
+        foreach (var candidate in creators)
+        {
+            if (candidate.gameObject.scene.name == worldSceneName)
+            {
+                return candidate;
+            }
+        }
+
+        return null!;
+    }
+
+    private Scene GetOutsideTestWorldScene()
+    {
+        var worldScene = UnitySceneManager.GetSceneByName(worldSceneName);
+        if (worldScene.IsValid() && worldScene.isLoaded)
+        {
+            return worldScene;
+        }
+
+        var creator = FindOutsideTestCreator();
+        return creator is null || !creator
+            ? default
+            : creator.gameObject.scene;
+    }
+
+    private IEnumerable<uint> GetAuthoredOutsideTestBuildingIds()
+    {
+        var creator = FindOutsideTestCreator();
+        if (creator is null || !creator || creator.GeneratedBuildings is null || !creator.GeneratedBuildings)
+        {
+            yield break;
+        }
+
+        foreach (var layout in creator.GeneratedBuildings.GetComponentsInChildren<TestBuildingLayout>(true))
+        {
+            if (layout.BuildingInstanceId != 0)
+            {
+                yield return layout.BuildingInstanceId;
+            }
+        }
+    }
+
+    private bool CanLoadOutsideTestState(out string error)
+    {
+        foreach (var pendingTransition in pendingTransitions.Values)
+        {
+            if (pendingTransition.Player is null || !pendingTransition.Player)
+            {
+                continue;
+            }
+
+            var pendingPlayer = pendingTransition.Player.GetComponent<PlayerSceneTransition>();
+            if (pendingPlayer is not null
+                && pendingPlayer
+                && !pendingPlayer.IsTransitioning
+                && pendingTransition.Player.gameObject.scene.name == worldSceneName)
+            {
+                continue;
+            }
+
+            error = "Cannot load OutsideTest state while a scene transition is pending.";
+            return false;
+        }
+
+        foreach (var playerObject in players.Values)
+        {
+            if (playerObject is null || !playerObject)
+            {
+                continue;
+            }
+
+            var player = playerObject.GetComponent<PlayerSceneTransition>();
+            if (player is null || !player)
+            {
+                continue;
+            }
+
+            if (player.IsTransitioning)
+            {
+                error = "Cannot load OutsideTest state while a player is transitioning.";
+                return false;
+            }
+
+            if (player.TryGetCurrentOutsideTestFloor(out var buildingInstanceId, out var floorIndex))
+            {
+                error = $"Cannot load OutsideTest state while a player is inside building "
+                    + $"{buildingInstanceId}, floor {floorIndex}.";
+                return false;
+            }
+        }
+
+        error = string.Empty;
+        return true;
     }
 
     private string GetOutsideTestStatePath()
     {
         return string.IsNullOrWhiteSpace(outsideTestStatePath)
-            ? Path.Combine(Application.persistentDataPath, OutsideTestStateFileName)
+            ? GetDefaultOutsideTestStatePath()
             : outsideTestStatePath;
     }
 
@@ -723,6 +1171,7 @@ public sealed class GameSceneManager : MonoBehaviour
         }
 
         var targetPosition = grid.LogicalToWorld(pendingTransition.ArrivalLogicalPosition);
+        pendingTransitions.Remove(args.Connection.ClientId);
         pendingTransition.Player.GetComponent<PlayerSceneTransition>().CompleteTransition(
             pendingTransition.Connection,
             targetPosition,
@@ -734,7 +1183,6 @@ public sealed class GameSceneManager : MonoBehaviour
             pendingTransition.BuildingInstanceId,
             pendingTransition.StoryCount,
             pendingTransition.FloorIndex);
-        pendingTransitions.Remove(args.Connection.ClientId);
     }
 
     private void SpawnInitialPlayer(NetworkConnection connection, Scene scene)

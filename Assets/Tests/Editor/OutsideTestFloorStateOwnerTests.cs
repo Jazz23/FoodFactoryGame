@@ -62,6 +62,86 @@ public sealed class OutsideTestFloorStateOwnerTests
     }
 
     [Test]
+    public void VersionFourRoundTripPreservesBuildingTopologyAndMultipleDoors()
+    {
+        var spans = new List<TestBuildingCreator.ExteriorWallSpan>();
+        TestBuildingCreator.GetExteriorWallSpans(
+            new Vector3Int(4, -2, 0),
+            new Vector2Int(5, 4),
+            spans);
+        var straightSpans = new List<TestBuildingCreator.ExteriorWallSpan>();
+        foreach (var span in spans)
+        {
+            if (!span.IsCorner)
+            {
+                straightSpans.Add(span);
+            }
+        }
+
+        var record = new BuildingRecord(
+            7,
+            new Vector3Int(4, -2, 0),
+            new Vector2Int(5, 4),
+            3,
+            new[]
+            {
+                new BuildingRecord.DoorPlacement(straightSpans[0].StableId, 0.25f),
+                new BuildingRecord.DoorPlacement(straightSpans[1].StableId, 0.75f)
+            });
+        var source = new OutsideTestFloorStateOwner(1);
+        Assert.That(source.TryRegisterBuilding(record, out var registrationError), Is.True);
+        Assert.That(registrationError, Is.Empty);
+
+        var restored = new OutsideTestFloorStateOwner(1);
+        Assert.That(restored.LoadFromJson(source.ToJson()), Is.True);
+        Assert.That(restored.TryGetBuildingRecord(7, out var restoredRecord), Is.True);
+        Assert.That(restoredRecord.HasSameTopology(record), Is.True);
+        Assert.That(new List<OutsideTestBuildingInfo>(restored.Buildings), Has.Count.EqualTo(1));
+        Assert.That(new List<OutsideTestFloorRecord>(restored.FloorStates), Has.Count.EqualTo(3));
+    }
+
+    [Test]
+    public void InvalidVersionFourRecordsDoNotReplaceLiveState()
+    {
+        var owner = new OutsideTestFloorStateOwner(1);
+        owner.TryRegisterBuilding(2, 1, new Vector2Int(4, 4), out _);
+        owner.TrySetFloorState(2, 0, "Preserved", 6f, new Vector2(2f, 2f));
+        var invalidData = new OutsideTestFloorSaveData
+        {
+            Version = OutsideTestFloorStateOwner.CurrentSaveVersion,
+            Buildings = new List<BuildingRecord>
+            {
+                new BuildingRecord(9, Vector3Int.zero, new Vector2Int(4, 4), 1),
+                new BuildingRecord(9, new Vector3Int(8, 0, 0), new Vector2Int(4, 4), 1)
+            },
+            Floors = new List<OutsideTestFloorRecord>()
+        };
+
+        Assert.That(owner.LoadFromJson(JsonUtility.ToJson(invalidData)), Is.False);
+        Assert.That(owner.TryGetFloorState(2, 0, out var state), Is.True);
+        Assert.That(state.Label, Is.EqualTo("Preserved"));
+        Assert.That(state.ProductionRate, Is.EqualTo(6f));
+    }
+
+    [Test]
+    public void NextBuildingIdIncludesUnregisteredLegacyFloorIds()
+    {
+        var owner = new OutsideTestFloorStateOwner(1);
+        Assert.That(
+            owner.ApplySnapshot(
+                11,
+                0,
+                "Legacy floor",
+                1f,
+                0f,
+                new Vector2(1f, 1f),
+                Array.Empty<FactoryEntitySnapshot>()),
+            Is.True);
+
+        Assert.That(owner.GetNextBuildingId(), Is.EqualTo(12u));
+    }
+
+    [Test]
     public void VersionOneSaveMigratesLegacyRecordsAndAddsMissingBuildings()
     {
         var legacyData = new OutsideTestFloorSaveData

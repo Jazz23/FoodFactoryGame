@@ -372,6 +372,10 @@ public sealed class OutsideTestFloorTransitionTests
         alteredGround.SetEntities(Array.Empty<FactoryEntityRecord>());
         Assert.That(sceneManager.TryGetOutsideTestFloorState(2, 1, out var alteredUpper), Is.True);
         alteredUpper.SetEntities(Array.Empty<FactoryEntityRecord>());
+        yield return WaitForCondition(
+            () => SceneManager.GetSceneByName("OutsideTest").isLoaded,
+            3f,
+            "OutsideTest was not loaded before the explicit state reload.");
         Assert.That(sceneManager.LoadOutsideTestFloorState(), Is.True);
         AssertFloorExact(sceneManager, savedGround);
         AssertFloorExact(sceneManager, savedUpper);

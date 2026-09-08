@@ -48,7 +48,7 @@ public sealed class TestBuildingLayout : MonoBehaviour
         get
         {
             MigrateLegacyDoor();
-            return doors;
+            return GetDoors();
         }
     }
 
@@ -72,14 +72,74 @@ public sealed class TestBuildingLayout : MonoBehaviour
         storyCount = Mathf.Max(1, newStoryCount);
     }
 
-    public bool MigrateLegacyDoor()
+    public BuildingRecord ExportBuildingRecord()
     {
-        if (doors.Count > 0 || string.IsNullOrEmpty(doorWallId))
+        MigrateLegacyDoor();
+        var recordDoors = new List<BuildingRecord.DoorPlacement>(Doors.Count);
+        foreach (var door in Doors)
+        {
+            if (door is not null)
+            {
+                recordDoors.Add(new BuildingRecord.DoorPlacement(
+                    door.WallId,
+                    door.NormalizedOffset));
+            }
+        }
+
+        return new BuildingRecord(
+            buildingInstanceId,
+            anchorCell,
+            size,
+            StoryCount,
+            recordDoors);
+    }
+
+    public BuildingRecord GetBuildingRecord()
+    {
+        return ExportBuildingRecord();
+    }
+
+    public bool ApplyBuildingRecord(BuildingRecord record)
+    {
+        if (record is null)
         {
             return false;
         }
 
-        doors.Add(new DoorPlacement(doorWallId, doorOffset));
+        Configure(record.AnchorCell, record.FootprintSize);
+        SetBuildingInstanceId(record.BuildingInstanceId);
+        SetStoryCount(record.StoryCount);
+        var layoutDoors = GetDoors();
+        layoutDoors.Clear();
+        foreach (var door in record.Doors)
+        {
+            if (door is not null)
+            {
+                layoutDoors.Add(new DoorPlacement(
+                    door.WallId,
+                    door.NormalizedOffset));
+            }
+        }
+
+        doorWallId = string.Empty;
+        doorOffset = 0.5f;
+        return true;
+    }
+
+    public bool TryApplyBuildingRecord(BuildingRecord record)
+    {
+        return ApplyBuildingRecord(record);
+    }
+
+    public bool MigrateLegacyDoor()
+    {
+        var layoutDoors = GetDoors();
+        if (layoutDoors.Count > 0 || string.IsNullOrEmpty(doorWallId))
+        {
+            return false;
+        }
+
+        layoutDoors.Add(new DoorPlacement(doorWallId, doorOffset));
         doorWallId = string.Empty;
         doorOffset = 0.5f;
         return true;
@@ -134,7 +194,8 @@ public sealed class TestBuildingLayout : MonoBehaviour
     {
         MigrateLegacyDoor();
         var clampedOffset = Mathf.Clamp01(normalizedOffset);
-        foreach (var door in doors)
+        var layoutDoors = GetDoors();
+        foreach (var door in layoutDoors)
         {
             if (door.WallId == wall.StableId
                 && Mathf.Approximately(door.NormalizedOffset, clampedOffset))
@@ -143,7 +204,7 @@ public sealed class TestBuildingLayout : MonoBehaviour
             }
         }
 
-        doors.Add(new DoorPlacement(wall.StableId, clampedOffset));
+        layoutDoors.Add(new DoorPlacement(wall.StableId, clampedOffset));
         return true;
     }
 
@@ -168,7 +229,7 @@ public sealed class TestBuildingLayout : MonoBehaviour
 
     public void ClearDoors()
     {
-        doors.Clear();
+        GetDoors().Clear();
         doorWallId = string.Empty;
         doorOffset = 0.5f;
     }
@@ -178,13 +239,13 @@ public sealed class TestBuildingLayout : MonoBehaviour
         out TestBuildingCreator.ExteriorWallSpan wall)
     {
         MigrateLegacyDoor();
-        if (doors.Count == 0)
+        if (GetDoors().Count == 0)
         {
             wall = default;
             return false;
         }
 
-        return TryGetDoor(spans, doors[0].WallId, out wall);
+        return TryGetDoor(spans, GetDoors()[0].WallId, out wall);
     }
 
     public bool TryGetDoor(
@@ -205,6 +266,16 @@ public sealed class TestBuildingLayout : MonoBehaviour
 
         wall = default;
         return false;
+    }
+
+    private List<DoorPlacement> GetDoors()
+    {
+        if (doors is null)
+        {
+            doors = new List<DoorPlacement>();
+        }
+
+        return doors;
     }
 
 }

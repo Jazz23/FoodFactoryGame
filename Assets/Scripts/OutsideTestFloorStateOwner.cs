@@ -1,4 +1,4 @@
-// Owns persistent OutsideTest building/floor state, registration, migration, and server-side simulation.
+// Owns persistent OutsideTest topology and floor state, registration, migration, and simulation.
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -51,20 +51,35 @@ public readonly struct OutsideTestBuildingInfo
         BuildingInstanceId = newBuildingInstanceId;
         StoryCount = newStoryCount;
         InteriorSize = newInteriorSize;
+        AnchorCell = Vector3Int.zero;
+        FootprintSize = newInteriorSize;
+    }
+
+    public OutsideTestBuildingInfo(BuildingRecord record)
+    {
+        BuildingInstanceId = record.BuildingInstanceId;
+        StoryCount = record.StoryCount;
+        InteriorSize = record.FootprintSize;
+        AnchorCell = record.AnchorCell;
+        FootprintSize = record.FootprintSize;
     }
 
     public uint BuildingInstanceId { get; }
     public int StoryCount { get; }
     public Vector2Int InteriorSize { get; }
+    public Vector3Int AnchorCell { get; }
+    public Vector2Int FootprintSize { get; }
 }
 
 public sealed class OutsideTestFloorStateOwner
 {
-    public const int CurrentSaveVersion = 3;
+    public const int CurrentSaveVersion = 4;
 
     private readonly uint legacyBuildingInstanceId;
     private readonly Dictionary<OutsideTestFloorKey, OutsideTestFloorRecord> floorStates = new();
-    private readonly Dictionary<uint, OutsideTestBuildingInfo> buildings = new();
+    private readonly Dictionary<uint, BuildingRecord> buildingRecords = new();
+    private int lastLoadedVersion;
+    private bool lastLoadHadBuildingRecords;
 
     public OutsideTestFloorStateOwner(uint newLegacyBuildingInstanceId)
     {
@@ -72,7 +87,56 @@ public sealed class OutsideTestFloorStateOwner
     }
 
     public IEnumerable<OutsideTestFloorRecord> FloorStates => floorStates.Values;
-    public IEnumerable<OutsideTestBuildingInfo> Buildings => buildings.Values;
+    public IEnumerable<BuildingRecord> BuildingRecords => buildingRecords.Values;
+    public IEnumerable<OutsideTestBuildingInfo> Buildings => GetBuildingInfos();
+    public int LastLoadedVersion => lastLoadedVersion;
+    public bool LastLoadHadBuildingRecords => lastLoadHadBuildingRecords;
+
+    public void MarkCurrentStateAsAuthoritative()
+    {
+        lastLoadedVersion = CurrentSaveVersion;
+        lastLoadHadBuildingRecords = true;
+    }
+
+    public bool TryRegisterBuilding(
+        BuildingRecord record,
+        out string error)
+    {
+        error = string.Empty;
+        if (record is null)
+        {
+            error = "Building record is required.";
+            return false;
+        }
+
+        if (buildingRecords.TryGetValue(
+                record.BuildingInstanceId,
+                out var existingRecord))
+        {
+            if (!existingRecord.HasSameTopology(record))
+            {
+                error = $"Duplicate building ID {record.BuildingInstanceId} has conflicting layout data.";
+                return false;
+            }
+
+            NormalizeBuildingFloorStates(existingRecord);
+            return false;
+        }
+
+        if (!BuildingShellValidation.TryValidate(
+                record,
+                buildingRecords.Values,
+                TestBuildingCreator.DefaultDoorCornerExclusionDistance,
+                out error))
+        {
+            return false;
+        }
+
+        var ownedRecord = record.Clone();
+        buildingRecords.Add(ownedRecord.BuildingInstanceId, ownedRecord);
+        NormalizeBuildingFloorStates(ownedRecord);
+        return true;
+    }
 
     public bool TryRegisterBuilding(
         uint buildingInstanceId,
@@ -99,25 +163,78 @@ public sealed class OutsideTestFloorStateOwner
             return false;
         }
 
-        var registration = new OutsideTestBuildingInfo(
-            buildingInstanceId,
-            storyCount,
-            interiorSize);
-        if (buildings.TryGetValue(buildingInstanceId, out var existingRegistration))
+        if (buildingRecords.TryGetValue(
+                buildingInstanceId,
+                out var existingRecord))
         {
-            if (existingRegistration.StoryCount != registration.StoryCount
-                || existingRegistration.InteriorSize != registration.InteriorSize)
+            if (existingRecord.StoryCount != storyCount
+                || existingRecord.FootprintSize != interiorSize)
             {
                 error = $"Duplicate building ID {buildingInstanceId} has conflicting layout data.";
                 return false;
             }
 
-            NormalizeBuildingFloorStates(registration);
+            NormalizeBuildingFloorStates(existingRecord);
             return false;
         }
 
-        buildings.Add(buildingInstanceId, registration);
-        NormalizeBuildingFloorStates(registration);
+        var legacyRecord = new BuildingRecord(
+            buildingInstanceId,
+            Vector3Int.zero,
+            interiorSize,
+            storyCount);
+        buildingRecords.Add(buildingInstanceId, legacyRecord);
+        NormalizeBuildingFloorStates(legacyRecord);
+        return true;
+    }
+
+    public bool TryUpdateBuildingRecord(
+        BuildingRecord record,
+        float doorCornerExclusionDistance,
+        out string error)
+    {
+        error = string.Empty;
+        if (record is null)
+        {
+            error = "Building record is required.";
+            return false;
+        }
+
+        var otherRecords = new List<BuildingRecord>();
+        foreach (var existingRecord in buildingRecords.Values)
+        {
+            if (existingRecord.BuildingInstanceId != record.BuildingInstanceId)
+            {
+                otherRecords.Add(existingRecord);
+            }
+        }
+
+        if (!BuildingShellValidation.TryValidate(
+                record,
+                otherRecords,
+                doorCornerExclusionDistance,
+                out error))
+        {
+            return false;
+        }
+
+        buildingRecords[record.BuildingInstanceId] = record.Clone();
+        var staleKeys = new List<OutsideTestFloorKey>();
+        foreach (var pair in floorStates)
+        {
+            if (pair.Key.BuildingInstanceId == record.BuildingInstanceId
+                && pair.Key.FloorIndex >= record.StoryCount)
+            {
+                staleKeys.Add(pair.Key);
+            }
+        }
+
+        foreach (var key in staleKeys)
+        {
+            floorStates.Remove(key);
+        }
+
+        NormalizeBuildingFloorStates(buildingRecords[record.BuildingInstanceId]);
         return true;
     }
 
@@ -125,7 +242,91 @@ public sealed class OutsideTestFloorStateOwner
         uint buildingInstanceId,
         out OutsideTestBuildingInfo info)
     {
-        return buildings.TryGetValue(buildingInstanceId, out info);
+        if (buildingRecords.TryGetValue(buildingInstanceId, out var record))
+        {
+            info = new OutsideTestBuildingInfo(record);
+            return true;
+        }
+
+        info = default;
+        return false;
+    }
+
+    public bool TryGetBuildingRecord(
+        uint buildingInstanceId,
+        out BuildingRecord record)
+    {
+        if (buildingRecords.TryGetValue(buildingInstanceId, out var existingRecord))
+        {
+            record = existingRecord.Clone();
+            return true;
+        }
+
+        record = null!;
+        return false;
+    }
+
+    public uint GetNextBuildingId()
+    {
+        return GetNextBuildingId(Array.Empty<uint>());
+    }
+
+    public uint GetNextBuildingId(IEnumerable<uint> additionalIds)
+    {
+        var maximumId = 0u;
+        foreach (var buildingId in buildingRecords.Keys)
+        {
+            if (buildingId > maximumId)
+            {
+                maximumId = buildingId;
+            }
+        }
+
+        foreach (var floor in floorStates.Values)
+        {
+            if (floor.BuildingInstanceId > maximumId)
+            {
+                maximumId = floor.BuildingInstanceId;
+            }
+        }
+
+        if (additionalIds is not null)
+        {
+            foreach (var buildingId in additionalIds)
+            {
+                if (buildingId > maximumId)
+                {
+                    maximumId = buildingId;
+                }
+            }
+        }
+
+        return maximumId == uint.MaxValue ? 0u : maximumId + 1u;
+    }
+
+    public bool RemoveBuilding(uint buildingInstanceId)
+    {
+        var removed = buildingRecords.Remove(buildingInstanceId);
+        var staleKeys = new List<OutsideTestFloorKey>();
+        foreach (var pair in floorStates)
+        {
+            if (pair.Key.BuildingInstanceId == buildingInstanceId)
+            {
+                staleKeys.Add(pair.Key);
+            }
+        }
+
+        foreach (var key in staleKeys)
+        {
+            removed |= floorStates.Remove(key);
+        }
+
+        return removed;
+    }
+
+    public bool RemoveBuildingAndFloors(uint buildingInstanceId)
+    {
+        return RemoveBuilding(buildingInstanceId);
     }
 
     public bool TryGetFloorState(
@@ -161,14 +362,14 @@ public sealed class OutsideTestFloorStateOwner
 
     public Vector2 ClampMarkerPosition(uint buildingInstanceId, Vector2 markerPosition)
     {
-        if (!buildings.TryGetValue(buildingInstanceId, out var registration))
+        if (!buildingRecords.TryGetValue(buildingInstanceId, out var registration))
         {
             return OutsideTestFloorRecord.SanitizeMarkerPosition(markerPosition);
         }
 
         return OutsideTestFloorRecord.ClampMarkerPosition(
             markerPosition,
-            registration.InteriorSize);
+            registration.FootprintSize);
     }
 
     public void AdvanceProduction(float deltaTime)
@@ -193,7 +394,7 @@ public sealed class OutsideTestFloorStateOwner
             return false;
         }
 
-        var hasRegistration = buildings.TryGetValue(
+        var hasRegistration = buildingRecords.TryGetValue(
             buildingInstanceId,
             out var registration);
         if (hasRegistration
@@ -235,6 +436,13 @@ public sealed class OutsideTestFloorStateOwner
 
     public bool LoadFromFile(string path)
     {
+        return LoadFromFile(
+            path,
+            TestBuildingCreator.DefaultDoorCornerExclusionDistance);
+    }
+
+    public bool LoadFromFile(string path, float doorCornerExclusionDistance)
+    {
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
         {
             return false;
@@ -242,7 +450,9 @@ public sealed class OutsideTestFloorStateOwner
 
         try
         {
-            return LoadFromJson(File.ReadAllText(path));
+            return LoadFromJson(
+                File.ReadAllText(path),
+                doorCornerExclusionDistance);
         }
         catch (Exception)
         {
@@ -251,6 +461,13 @@ public sealed class OutsideTestFloorStateOwner
     }
 
     public bool LoadFromJson(string json)
+    {
+        return LoadFromJson(
+            json,
+            TestBuildingCreator.DefaultDoorCornerExclusionDistance);
+    }
+
+    public bool LoadFromJson(string json, float doorCornerExclusionDistance)
     {
         if (string.IsNullOrWhiteSpace(json)
             || !HasJsonArrayProperty(json, "Floors"))
@@ -272,6 +489,38 @@ public sealed class OutsideTestFloorStateOwner
                 return false;
             }
 
+            var loadedBuildingRecords = new Dictionary<uint, BuildingRecord>();
+            if (version >= CurrentSaveVersion)
+            {
+                if (!HasJsonArrayProperty(json, "Buildings")
+                    || data.Buildings is null
+                    || !BuildingShellValidation.TryValidateRecords(
+                        data.Buildings,
+                        doorCornerExclusionDistance,
+                        out _))
+                {
+                    return false;
+                }
+
+                foreach (var savedRecord in data.Buildings)
+                {
+                    if (savedRecord is null
+                        || !loadedBuildingRecords.TryAdd(
+                            savedRecord.BuildingInstanceId,
+                            savedRecord.Clone()))
+                    {
+                        return false;
+                    }
+                }
+            }
+            else
+            {
+                foreach (var pair in buildingRecords)
+                {
+                    loadedBuildingRecords.Add(pair.Key, pair.Value.Clone());
+                }
+            }
+
             var loadedFloorStates = new Dictionary<OutsideTestFloorKey, OutsideTestFloorRecord>();
             foreach (var savedState in data.Floors)
             {
@@ -291,7 +540,7 @@ public sealed class OutsideTestFloorStateOwner
                     return false;
                 }
 
-                if (buildings.TryGetValue(
+                if (loadedBuildingRecords.TryGetValue(
                         buildingInstanceId,
                         out var registration)
                     && savedState.FloorIndex >= registration.StoryCount)
@@ -307,13 +556,12 @@ public sealed class OutsideTestFloorStateOwner
                     savedState.AccumulatedProduction,
                     savedState.MarkerPosition);
                 migratedState.SetEntities(savedState.Entities);
-                if (version < CurrentSaveVersion
-                    && migratedState.Entities.Count == 0)
+                if (version < 3 && migratedState.Entities.Count == 0)
                 {
                     migratedState.EnsureDefaultEntity();
                 }
 
-                if (buildings.TryGetValue(
+                if (loadedBuildingRecords.TryGetValue(
                         buildingInstanceId,
                         out registration))
                 {
@@ -329,7 +577,7 @@ public sealed class OutsideTestFloorStateOwner
                 }
             }
 
-            foreach (var registration in buildings.Values)
+            foreach (var registration in loadedBuildingRecords.Values)
             {
                 for (var floorIndex = 0;
                     floorIndex < registration.StoryCount;
@@ -350,12 +598,20 @@ public sealed class OutsideTestFloorStateOwner
                 }
             }
 
+            buildingRecords.Clear();
+            foreach (var pair in loadedBuildingRecords)
+            {
+                buildingRecords.Add(pair.Key, pair.Value);
+            }
+
             floorStates.Clear();
             foreach (var pair in loadedFloorStates)
             {
                 floorStates.Add(pair.Key, pair.Value);
             }
 
+            lastLoadedVersion = version;
+            lastLoadHadBuildingRecords = version >= CurrentSaveVersion;
             return true;
         }
         catch (Exception)
@@ -379,14 +635,24 @@ public sealed class OutsideTestFloorStateOwner
 
     public string ToJson()
     {
-        var data = new OutsideTestFloorSaveData(GetSortedFloorStates())
+        var data = new OutsideTestFloorSaveData(
+            GetSortedBuildingRecords(),
+            GetSortedFloorStates())
         {
             Version = CurrentSaveVersion
         };
         return JsonUtility.ToJson(data, true);
     }
 
-    private void NormalizeBuildingFloorStates(OutsideTestBuildingInfo registration)
+    private IEnumerable<OutsideTestBuildingInfo> GetBuildingInfos()
+    {
+        foreach (var record in buildingRecords.Values)
+        {
+            yield return new OutsideTestBuildingInfo(record);
+        }
+    }
+
+    private void NormalizeBuildingFloorStates(BuildingRecord registration)
     {
         for (var floorIndex = 0; floorIndex < registration.StoryCount; floorIndex++)
         {
@@ -406,17 +672,24 @@ public sealed class OutsideTestFloorStateOwner
     }
 
     private void NormalizeFloorState(
-        OutsideTestBuildingInfo registration,
+        BuildingRecord registration,
         OutsideTestFloorRecord state)
     {
         state.SetState(
             state.Label,
             state.ProductionRate,
             state.AccumulatedProduction,
-            ClampMarkerPosition(
-                registration.BuildingInstanceId,
-                state.MarkerPosition));
-        state.ClampEntityPositions(registration.InteriorSize);
+            OutsideTestFloorRecord.ClampMarkerPosition(
+                state.MarkerPosition,
+                registration.FootprintSize));
+        state.ClampEntityPositions(registration.FootprintSize);
+    }
+
+    private List<BuildingRecord> GetSortedBuildingRecords()
+    {
+        var result = new List<BuildingRecord>(buildingRecords.Values);
+        result.Sort((left, right) => left.BuildingInstanceId.CompareTo(right.BuildingInstanceId));
+        return result;
     }
 
     private List<OutsideTestFloorRecord> GetSortedFloorStates()

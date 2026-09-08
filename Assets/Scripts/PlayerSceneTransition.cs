@@ -251,6 +251,20 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         }
     }
 
+    public void RequestCreateOutsideTestBuilding(
+        Vector3Int anchorCell,
+        Vector2Int footprintSize,
+        int storyCount)
+    {
+        if (IsOwner)
+        {
+            RequestCreateOutsideTestBuildingServerRpc(
+                anchorCell,
+                footprintSize,
+                storyCount);
+        }
+    }
+
     public void ServerSendOutsideTestFloorState(
         OutsideTestFloorRecord floor,
         int loadedInteriorCount)
@@ -301,6 +315,26 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         GameSceneManager.Instance.LoadOutsideTestFloorState();
     }
 
+    [ServerRpc]
+    private void RequestCreateOutsideTestBuildingServerRpc(
+        Vector3Int anchorCell,
+        Vector2Int footprintSize,
+        int storyCount,
+        NetworkConnection sender = null)
+    {
+        var created = GameSceneManager.Instance.TryCreateBuilding(
+            anchorCell,
+            footprintSize,
+            storyCount,
+            out var buildingInstanceId,
+            out var error);
+        TargetReceiveOutsideTestBuildingCreation(
+            sender,
+            created,
+            buildingInstanceId,
+            error);
+    }
+
     [TargetRpc]
     private void TargetReceiveOutsideTestFloorState(
         NetworkConnection connection,
@@ -322,6 +356,22 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
             markerPosition,
             entitySnapshots,
             loadedInteriorCount);
+    }
+
+    [TargetRpc]
+    private void TargetReceiveOutsideTestBuildingCreation(
+        NetworkConnection connection,
+        bool created,
+        uint buildingInstanceId,
+        string error)
+    {
+        if (debugPanel is not null && debugPanel)
+        {
+            debugPanel.SetBuildingCreationResult(
+                created,
+                buildingInstanceId,
+                error);
+        }
     }
 
     public void CompleteTransition(

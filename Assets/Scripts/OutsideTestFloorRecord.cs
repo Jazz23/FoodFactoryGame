@@ -216,6 +216,7 @@ public sealed class OutsideTestFloorRecord
 public sealed class OutsideTestFloorSaveData
 {
     public int Version = OutsideTestFloorStateOwner.CurrentSaveVersion;
+    public List<BuildingRecord> Buildings = new();
     public List<OutsideTestFloorRecord> Floors = new();
 
     public OutsideTestFloorSaveData()
@@ -224,6 +225,24 @@ public sealed class OutsideTestFloorSaveData
 
     public OutsideTestFloorSaveData(IEnumerable<OutsideTestFloorRecord> records)
     {
-        Floors.AddRange(records);
+        if (records is not null)
+        {
+            Floors.AddRange(records);
+        }
+    }
+
+    public OutsideTestFloorSaveData(
+        IEnumerable<BuildingRecord> buildingRecords,
+        IEnumerable<OutsideTestFloorRecord> floorRecords)
+    {
+        if (buildingRecords is not null)
+        {
+            Buildings.AddRange(buildingRecords);
+        }
+
+        if (floorRecords is not null)
+        {
+            Floors.AddRange(floorRecords);
+        }
     }
 }

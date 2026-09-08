@@ -8,6 +8,8 @@ public sealed class OutsideTestFactoryDoor : MonoBehaviour
 {
     [SerializeField, HideInInspector] private string wallId = string.Empty;
     [SerializeField, HideInInspector, Range(0f, 1f)] private float normalizedOffset = 0.5f;
+    [SerializeField, HideInInspector] private bool hasConfiguredState;
+    [SerializeField, HideInInspector] private bool hasInteriorDestination = true;
 
     public string WallId => wallId;
     public float NormalizedOffset => normalizedOffset;
@@ -20,13 +22,34 @@ public sealed class OutsideTestFactoryDoor : MonoBehaviour
 
     public void Configure(string newWallId, float newNormalizedOffset)
     {
+        Configure(newWallId, newNormalizedOffset, true);
+    }
+
+    public void Configure(
+        string newWallId,
+        float newNormalizedOffset,
+        bool newHasInteriorDestination)
+    {
         wallId = newWallId;
         normalizedOffset = Mathf.Clamp01(newNormalizedOffset);
+        hasConfiguredState = true;
+        hasInteriorDestination = newHasInteriorDestination;
     }
 
     private void Awake()
     {
+        Initialize();
+    }
+
+    public void Initialize()
+    {
         var portal = GetComponent<ScenePortal>();
+        if (hasConfiguredState && !hasInteriorDestination)
+        {
+            portal.enabled = false;
+            return;
+        }
+
         var layout = GetComponentInParent<TestBuildingLayout>();
         layout.MigrateLegacyDoor();
         if (layout.BuildingInstanceId == 0)
@@ -66,15 +89,25 @@ public sealed class OutsideTestFactoryDoor : MonoBehaviour
 
         var creator = layout.GetComponentInParent<TestBuildingCreator>();
         var grid = creator.Grid;
+        var interiorSceneName = TestBuildingFloorScenes.GetSceneName(
+            layout.BuildingInstanceId,
+            0);
+        if (!Application.CanStreamedLevelBeLoaded(interiorSceneName))
+        {
+            portal.enabled = false;
+            return;
+        }
+
         portal.ConfigureBuilding(
             layout.BuildingInstanceId,
             layout.Size,
             grid.LogicalToWorld(exteriorDoorLogicalPosition),
-            TestBuildingFloorScenes.GetSceneName(layout.BuildingInstanceId, 0),
+            interiorSceneName,
             interiorArrivalLogicalPosition,
             exteriorArrivalLogicalPosition,
             wall.Direction,
             layout.StoryCount,
             0);
+        portal.enabled = true;
     }
 }

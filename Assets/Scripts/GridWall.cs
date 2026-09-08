@@ -64,6 +64,25 @@ public sealed class GridWall : MonoBehaviour
     public float BaseHeight => baseHeight;
     public int StoryIndex => storyIndex;
     public float ThicknessInCells => WallCellGeometry.ThicknessInCells;
+    public Material Material => material;
+
+    public void Configure(
+        WallKind newKind,
+        Vector2Int newCell,
+        float newWallHeight,
+        float newBaseHeight,
+        int newStoryIndex,
+        Material newMaterial)
+    {
+        kind = newKind;
+        cell = newCell;
+        wallHeight = Mathf.Max(0f, newWallHeight);
+        baseHeight = Mathf.Max(0f, newBaseHeight);
+        storyIndex = Mathf.Max(0, newStoryIndex);
+        material = newMaterial;
+        rebuildRequested = true;
+        RebuildIfRequired();
+    }
 
     private void OnEnable()
     {
@@ -197,12 +216,16 @@ public sealed class GridWall : MonoBehaviour
     {
         if (!TryGetGrid(out var grid))
         {
+            rebuildRequested = true;
             return;
         }
 
-        if (Application.isPlaying)
+        if (Application.isPlaying && transform.childCount > 0)
         {
             ReleaseGeneratedSurfaces();
+            ReleaseMesh();
+            rebuildRequested = true;
+            return;
         }
 
         ReleaseGeneratedSurfaces();

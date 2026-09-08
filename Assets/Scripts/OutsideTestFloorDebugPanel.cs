@@ -18,6 +18,11 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
     private Text statusText = null!;
     private InputField labelInput = null!;
     private InputField rateInput = null!;
+    private InputField anchorXInput = null!;
+    private InputField anchorYInput = null!;
+    private InputField widthInput = null!;
+    private InputField heightInput = null!;
+    private InputField storyCountInput = null!;
     private Transform selectorRoot = null!;
     private InputAction toggle = null!;
     private InputAction cancel = null!;
@@ -68,6 +73,25 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
         selectedBuildingInstanceId = buildingInstanceId;
         selectedFloor = floorIndex;
         statusMessage = $"Selected building {buildingInstanceId}, floor {selectedFloor}";
+        Refresh();
+    }
+
+    public void SetBuildingCreationResult(
+        bool created,
+        uint buildingInstanceId,
+        string error)
+    {
+        statusMessage = created
+            ? $"Created building {buildingInstanceId}."
+            : string.IsNullOrWhiteSpace(error)
+                ? "Building creation failed."
+                : error;
+        if (created)
+        {
+            SelectBuilding(buildingInstanceId);
+            return;
+        }
+
         Refresh();
     }
 
@@ -317,7 +341,10 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
         }
 
         summaryText.text = summary.TrimEnd();
-        statusText.text = $"{statusMessage}\nLoaded interiors: {GameSceneManager.Instance.OutsideTestLoadedInteriorCount}";
+        var authoritativeError = GameSceneManager.Instance.LastOutsideTestError;
+        statusText.text = string.IsNullOrEmpty(authoritativeError)
+            ? $"{statusMessage}\nLoaded interiors: {GameSceneManager.Instance.OutsideTestLoadedInteriorCount}"
+            : $"{statusMessage}\n{authoritativeError}";
     }
 
     private void CreateEventSystem()
@@ -353,7 +380,7 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             "OutsideTest Debug Panel",
             canvasObject.transform,
             new Color(0.025f, 0.055f, 0.075f, 0.94f));
-        SetTopRect(root.GetComponent<RectTransform>(), 16f, 16f, 420f, 560f);
+        SetTopRect(root.GetComponent<RectTransform>(), 16f, 16f, 420f, 700f);
 
         titleText = CreateText(
             "Title",
@@ -457,12 +484,72 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             84f,
             32f,
             ApplyEditsClicked);
+
+        CreateTextLabel(root.transform, "Create Anchor X", "ANCHOR X", 14f, 494f);
+        anchorXInput = CreateInputField(
+            root.transform,
+            "Anchor X Input",
+            "0",
+            90f,
+            488f,
+            62f,
+            32f,
+            InputField.ContentType.IntegerNumber);
+        CreateTextLabel(root.transform, "Create Anchor Y", "ANCHOR Y", 164f, 494f);
+        anchorYInput = CreateInputField(
+            root.transform,
+            "Anchor Y Input",
+            "0",
+            240f,
+            488f,
+            62f,
+            32f,
+            InputField.ContentType.IntegerNumber);
+        CreateTextLabel(root.transform, "Create Width", "WIDTH", 14f, 532f);
+        widthInput = CreateInputField(
+            root.transform,
+            "Width Input",
+            "4",
+            90f,
+            526f,
+            62f,
+            32f,
+            InputField.ContentType.IntegerNumber);
+        CreateTextLabel(root.transform, "Create Height", "HEIGHT", 164f, 532f);
+        heightInput = CreateInputField(
+            root.transform,
+            "Height Input",
+            "4",
+            240f,
+            526f,
+            62f,
+            32f,
+            InputField.ContentType.IntegerNumber);
+        CreateTextLabel(root.transform, "Create Stories", "STORIES", 314f, 532f);
+        storyCountInput = CreateInputField(
+            root.transform,
+            "Story Count Input",
+            "2",
+            350f,
+            526f,
+            56f,
+            32f,
+            InputField.ContentType.IntegerNumber);
+        CreateButton(
+            "Create Building",
+            "CREATE BUILDING",
+            root.transform,
+            14f,
+            566f,
+            392f,
+            34f,
+            CreateBuildingClicked);
         CreateButton(
             "Save State",
             "SAVE",
             root.transform,
             14f,
-            452f,
+            608f,
             188f,
             34f,
             SaveClicked);
@@ -471,7 +558,7 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             "LOAD",
             root.transform,
             218f,
-            452f,
+            608f,
             188f,
             34f,
             LoadClicked);
@@ -483,8 +570,27 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             11,
             TextAnchor.UpperLeft,
             new Color(0.6f, 0.78f, 0.76f));
-        SetTopRect(statusText.rectTransform, 14f, 494f, 392f, 44f);
+        SetTopRect(statusText.rectTransform, 14f, 650f, 392f, 44f);
         root.SetActive(true);
+    }
+
+    private void CreateBuildingClicked()
+    {
+        if (!int.TryParse(anchorXInput.text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var anchorX)
+            || !int.TryParse(anchorYInput.text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var anchorY)
+            || !int.TryParse(widthInput.text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var width)
+            || !int.TryParse(heightInput.text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var height)
+            || !int.TryParse(storyCountInput.text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var storyCount))
+        {
+            statusMessage = "Anchor, footprint, and story values must be integers.";
+            return;
+        }
+
+        owner.RequestCreateOutsideTestBuilding(
+            new Vector3Int(anchorX, anchorY, 0),
+            new Vector2Int(width, height),
+            storyCount);
+        statusMessage = "Building creation requested";
     }
 
     private void RefreshSelectionButtons()

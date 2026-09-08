@@ -1,5 +1,6 @@
-// Provides the Scene View two-corner workflow for generating multi-story wall-and-slab test buildings.
+// Provides the Scene View authoring workflow for persistent multi-story test-building shells.
 using System.Collections.Generic;
+using System.IO;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -11,8 +12,8 @@ public sealed class TestBuildingCreatorEditor : Editor
     private static readonly Color PreviewFillColor = new(0.35f, 1f, 0.45f, 0.18f);
     private static readonly Color PreviewLineColor = new(0.35f, 1f, 0.45f, 1f);
 
-    private readonly List<TestBuildingCreator.WallPlacement> wallPlacements = new();
     private readonly List<TestBuildingCreator.ExteriorWallSpan> wallSpans = new();
+    private readonly List<BuildingRecord> buildingRecords = new();
     private Vector3Int firstCorner;
     private Vector3Int hoveredCell;
     private TestBuildingCreator.ExteriorWallSpan hoveredDoorWall;
@@ -33,16 +34,19 @@ public sealed class TestBuildingCreatorEditor : Editor
             return;
         }
 
+        Undo.undoRedoPerformed += UndoRedoPerformed;
         MigrateLegacySettings();
         EnsureBuildingInstanceIds();
+        MigrateLegacyDoors();
         EnsureFloorScenes();
-        RefreshGeneratedBuildingWalls();
-        RefreshGeneratedRoofs();
+        RefreshGeneratedBuildings();
+        PersistAuthoredBuildings();
         SceneView.RepaintAll();
     }
 
     private void OnDisable()
     {
+        Undo.undoRedoPerformed -= UndoRedoPerformed;
         hasFirstCorner = false;
         hasHoveredCell = false;
         hasHoveredDoorWall = false;
@@ -61,8 +65,7 @@ public sealed class TestBuildingCreatorEditor : Editor
         DrawPropertiesExcluding(serializedObject, "m_Script");
         serializedObject.ApplyModifiedProperties();
         EnsureFloorScenes();
-        RefreshGeneratedBuildingWalls();
-        RefreshGeneratedRoofs();
+        RefreshGeneratedBuildings();
 
         EditorGUILayout.HelpBox(
             "Select the creator, then click two opposite ground cells in Scene View. "
@@ -138,10 +141,11 @@ public sealed class TestBuildingCreatorEditor : Editor
                 $"{layout.StoryCount} {((layout.StoryCount == 1) ? "story" : "stories")}");
             if (GUILayout.Button("Add Story", GUILayout.Width(80f)))
             {
+                Undo.RegisterCompleteObjectUndo(layout, "Add test building story");
                 if (TestBuildingFloorSceneUtility.AddStory(layout))
                 {
-                    RefreshGeneratedBuildingWalls();
-                    RefreshGeneratedRoofs();
+                    RefreshGeneratedBuildings();
+                    PersistAuthoredBuildings();
                     EditorSceneManager.MarkSceneDirty(Creator.gameObject.scene);
                     statusMessage = $"Added story {layout.StoryCount - 1} to building {layout.BuildingInstanceId}.";
                 }
@@ -163,10 +167,11 @@ public sealed class TestBuildingCreatorEditor : Editor
                         GUIUtility.ExitGUI();
                     }
 
+                    Undo.RegisterCompleteObjectUndo(layout, "Delete test building story");
                     if (TestBuildingFloorSceneUtility.DeleteTopStory(layout))
                     {
-                        RefreshGeneratedBuildingWalls();
-                        RefreshGeneratedRoofs();
+                        RefreshGeneratedBuildings();
+                        PersistAuthoredBuildings();
                         EditorSceneManager.MarkSceneDirty(Creator.gameObject.scene);
                         statusMessage = $"Deleted the top story from building {layout.BuildingInstanceId}.";
                     }
@@ -547,189 +552,78 @@ public sealed class TestBuildingCreatorEditor : Editor
         TestBuildingCreator.ExteriorWallSpan wall,
         float normalizedOffset)
     {
-        var visualDoors = layout.transform.Find(TestBuildingLayout.VisualDoorsName)!;
-        Undo.RecordObject(layout, "Place test building door");
+        var previousRecord = layout.ExportBuildingRecord();
+        Undo.RegisterCompleteObjectUndo(layout, "Place test building door");
         if (!layout.AddDoor(wall, normalizedOffset))
         {
             statusMessage = "A door is already placed at that position.";
             return;
         }
 
-        RebuildDoors(layout, visualDoors);
+        var record = layout.ExportBuildingRecord();
+        if (!TryValidateEditorRecord(record, layout, out var error))
+        {
+            layout.ApplyBuildingRecord(previousRecord);
+            statusMessage = error;
+            return;
+        }
+
+        var assembler = new BuildingShellAssembler();
+        assembler.RebuildShell(record, Creator, layout.transform);
         EditorUtility.SetDirty(layout);
         EditorSceneManager.MarkSceneDirty(Creator.gameObject.scene);
+        PersistAuthoredBuildings();
         statusMessage = $"Placed a door on the {wall.Direction} exterior wall.";
-    }
-
-    private Vector3[] GetBoundaryWorldPoints(Vector3Int anchor, Vector2Int size)
-    {
-        return new[]
-        {
-            ToWorld(new Vector2(anchor.x, anchor.y)),
-            ToWorld(new Vector2(anchor.x + size.x, anchor.y)),
-            ToWorld(new Vector2(anchor.x + size.x, anchor.y + size.y)),
-            ToWorld(new Vector2(anchor.x, anchor.y + size.y))
-        };
-    }
-
-    private Vector3 ToWorld(Vector2 logicalPosition)
-    {
-        var worldPosition = Creator.Grid.LogicalToWorld(logicalPosition);
-        return new Vector3(worldPosition.x, worldPosition.y, Creator.Grid.transform.position.z - 0.02f);
     }
 
     private void CreateBuilding(Vector3Int first, Vector3Int second)
     {
         var anchor = TestBuildingCreator.GetAnchorCell(first, second);
         var size = TestBuildingCreator.GetSize(first, second);
-        if (!TestBuildingCreator.IsSupportedSize(size))
+        EnsureBuildingInstanceIds();
+        var buildingInstanceId = Creator.GetNextBuildingInstanceId();
+        if (buildingInstanceId == 0)
         {
-            statusMessage = "Test buildings must be at least 2 x 2 cells.";
+            statusMessage = "No building IDs are available.";
+            return;
+        }
+
+        var record = new BuildingRecord(
+            buildingInstanceId,
+            anchor,
+            size,
+            1);
+        if (!TryValidateEditorRecord(record, null!, out var error))
+        {
+            statusMessage = error;
             return;
         }
 
         var undoGroup = Undo.GetCurrentGroup();
         Undo.SetCurrentGroupName("Create test building");
-        EnsureBuildingInstanceIds();
-        var buildingInstanceId = Creator.GetNextBuildingInstanceId();
-        var buildingObject = new GameObject(
-            $"Test Building ({anchor.x}, {anchor.y}) {size.x}x{size.y}");
-        buildingObject.transform.SetParent(Creator.GeneratedBuildings, false);
+        var assembler = new BuildingShellAssembler();
+        var buildingObject = assembler.CreateShell(
+            record,
+            Creator,
+            Creator.GeneratedBuildings);
+        if (buildingObject is null || !buildingObject)
+        {
+            statusMessage = "The building shell could not be assembled.";
+            return;
+        }
+
         Undo.RegisterCreatedObjectUndo(buildingObject, "Create test building");
-
-        var layout = Undo.AddComponent<TestBuildingLayout>(buildingObject);
-        layout.Configure(anchor, size);
-        layout.SetBuildingInstanceId(buildingInstanceId);
-        EditorUtility.SetDirty(layout);
-
-        var generatedVisuals = CreateGeneratedRoot(
-            buildingObject.transform,
-            TestBuildingLayout.GeneratedVisualsName);
-        var generatedCollision = CreateGeneratedRoot(
-            buildingObject.transform,
-            TestBuildingLayout.GeneratedCollisionName);
-        CreateGeneratedRoot(buildingObject.transform, TestBuildingLayout.VisualDoorsName);
-
-        TestBuildingCreator.GetWallPlacements(first, second, wallPlacements);
-        for (var storyIndex = 0; storyIndex < layout.StoryCount; storyIndex++)
-        {
-            foreach (var placement in wallPlacements)
-            {
-                CreateWall(generatedVisuals, placement, storyIndex);
-            }
-        }
-
-        for (var storyIndex = 0; storyIndex < layout.StoryCount; storyIndex++)
-        {
-            CreateRoof(generatedVisuals, first, second, storyIndex);
-        }
-
-        RebuildCollision(layout, generatedCollision, wallPlacements);
-        Undo.AddComponent<TestBuildingPresentation>(buildingObject);
+        var layout = buildingObject.GetComponent<TestBuildingLayout>();
         TestBuildingFloorSceneUtility.EnsureFloorScenes(layout);
+        EditorUtility.SetDirty(layout);
         EditorSceneManager.MarkSceneDirty(Creator.gameObject.scene);
+        PersistAuthoredBuildings();
         Undo.CollapseUndoOperations(undoGroup);
         Selection.activeGameObject = Creator.gameObject;
-        statusMessage = $"Created {size.x} x {size.y} test building.";
+        statusMessage = $"Created {size.x} x {size.y} test building {buildingInstanceId}.";
     }
 
-    private Transform CreateGeneratedRoot(Transform parent, string rootName)
-    {
-        var rootObject = new GameObject(rootName);
-        rootObject.transform.SetParent(parent, false);
-        Undo.RegisterCreatedObjectUndo(rootObject, "Create test building output");
-        return rootObject.transform;
-    }
-
-    private void CreateWall(
-        Transform buildingTransform,
-        TestBuildingCreator.WallPlacement placement,
-        int storyIndex)
-    {
-        var wallObject = new GameObject(
-            $"Story {storyIndex} Wall {placement.Kind} ({placement.Cell.x},{placement.Cell.y})");
-        wallObject.transform.SetParent(buildingTransform, false);
-        Undo.RegisterCreatedObjectUndo(wallObject, "Create test building wall");
-        var wall = Undo.AddComponent<GridWall>(wallObject);
-        ConfigureWall(wall, placement, storyIndex);
-    }
-
-    private void CreateRoof(
-        Transform buildingTransform,
-        Vector3Int first,
-        Vector3Int second,
-        int storyIndex)
-    {
-        var roofObject = new GameObject($"Grid Floor Ceiling {storyIndex}");
-        roofObject.transform.SetParent(buildingTransform, false);
-        Undo.RegisterCreatedObjectUndo(roofObject, "Create test building roof");
-        var roof = Undo.AddComponent<GridRoof>(roofObject);
-        ConfigureRoof(roof, first, second, storyIndex);
-    }
-
-    private bool ConfigureRoof(
-        GridRoof roof,
-        Vector3Int first,
-        Vector3Int second,
-        int storyIndex)
-    {
-        var desiredLogicalMin = TestBuildingCreator.GetRoofLogicalMin(first, second);
-        var desiredLogicalMax = TestBuildingCreator.GetRoofLogicalMax(first, second);
-        var desiredBaseHeight = TestBuildingCreator.GetStoryBaseHeight(
-            Creator.WallHeight,
-            storyIndex);
-        var desiredTopHeight = TestBuildingCreator.GetStoryTopHeight(
-            Creator.WallHeight,
-            storyIndex);
-        var desiredSortingOrder = Creator.RoofSortingOrder;
-        if (roof.LogicalMin == desiredLogicalMin
-            && roof.LogicalMax == desiredLogicalMax
-            && Mathf.Approximately(roof.BaseHeight, desiredBaseHeight)
-            && Mathf.Approximately(roof.TopHeight, desiredTopHeight)
-            && Mathf.Approximately(roof.Thickness, Creator.RoofThickness)
-            && roof.SortingOrder == desiredSortingOrder)
-        {
-            return false;
-        }
-
-        var serializedRoof = new SerializedObject(roof);
-        serializedRoof.FindProperty("logicalMin").vector2Value = desiredLogicalMin;
-        serializedRoof.FindProperty("logicalMax").vector2Value = desiredLogicalMax;
-        serializedRoof.FindProperty("baseHeight").floatValue = desiredBaseHeight;
-        serializedRoof.FindProperty("topHeight").floatValue = desiredTopHeight;
-        serializedRoof.FindProperty("thickness").floatValue = Creator.RoofThickness;
-        serializedRoof.FindProperty("topColor").colorValue = Creator.RoofTopColor;
-        serializedRoof.FindProperty("sideColor").colorValue = Creator.RoofSideColor;
-        serializedRoof.FindProperty("material").objectReferenceValue = Creator.Material;
-        serializedRoof.FindProperty("sortingOrder").intValue = desiredSortingOrder;
-        serializedRoof.ApplyModifiedPropertiesWithoutUndo();
-        roof.enabled = false;
-        roof.enabled = true;
-        EditorUtility.SetDirty(roof);
-        return true;
-    }
-
-    private void ConfigureWall(
-        GridWall wall,
-        TestBuildingCreator.WallPlacement placement,
-        int storyIndex)
-    {
-        wall.gameObject.name = $"Story {storyIndex} Wall {placement.Kind} ({placement.Cell.x},{placement.Cell.y})";
-        var serializedWall = new SerializedObject(wall);
-        serializedWall.FindProperty("kind").enumValueIndex = (int)placement.Kind;
-        serializedWall.FindProperty("cell").vector2IntValue = placement.Cell;
-        serializedWall.FindProperty("wallHeight").floatValue = Creator.WallHeight;
-        serializedWall.FindProperty("baseHeight").floatValue =
-            TestBuildingCreator.GetStoryBaseHeight(Creator.WallHeight, storyIndex);
-        serializedWall.FindProperty("storyIndex").intValue = storyIndex;
-        serializedWall.FindProperty("material").objectReferenceValue = Creator.Material;
-        serializedWall.ApplyModifiedPropertiesWithoutUndo();
-        wall.enabled = false;
-        wall.enabled = true;
-        EditorUtility.SetDirty(wall);
-    }
-
-    private void RefreshGeneratedBuildingWalls()
+    private void RefreshGeneratedBuildings()
     {
         if (Creator.GeneratedBuildings is null || !Creator.GeneratedBuildings)
         {
@@ -737,329 +631,56 @@ public sealed class TestBuildingCreatorEditor : Editor
         }
 
         MigrateLegacyDoors();
-
-        foreach (var layout in Creator.GeneratedBuildings.GetComponentsInChildren<TestBuildingLayout>(true))
+        var layouts = Creator.GeneratedBuildings.GetComponentsInChildren<TestBuildingLayout>(true);
+        buildingRecords.Clear();
+        foreach (var layout in layouts)
         {
-            var hierarchyChanged = EnsureGeneratedHierarchy(
-                layout,
-                out var generatedVisuals,
-                out var generatedCollision,
-                out var visualDoors);
-            var secondCorner = layout.AnchorCell + new Vector3Int(layout.Size.x - 1, layout.Size.y - 1);
-            TestBuildingCreator.GetWallPlacements(layout.AnchorCell, secondCorner, wallPlacements);
-            var walls = generatedVisuals.GetComponentsInChildren<GridWall>(true);
-            var expectedWallCount = wallPlacements.Count * layout.StoryCount;
-            var needsRefresh = walls.Length != expectedWallCount;
-            var sharedCount = Mathf.Min(walls.Length, expectedWallCount);
-            for (var index = 0; index < sharedCount && !needsRefresh; index++)
-            {
-                var storyIndex = index / wallPlacements.Count;
-                var placement = wallPlacements[index % wallPlacements.Count];
-                needsRefresh = walls[index].Kind != placement.Kind
-                    || walls[index].Cell != placement.Cell
-                    || walls[index].StoryIndex != storyIndex
-                    || !Mathf.Approximately(
-                        walls[index].BaseHeight,
-                        TestBuildingCreator.GetStoryBaseHeight(Creator.WallHeight, storyIndex))
-                    || !Mathf.Approximately(walls[index].WallHeight, Creator.WallHeight);
-            }
-
-            if (needsRefresh)
-            {
-                for (var index = walls.Length - 1; index >= expectedWallCount; index--)
-                {
-                    Undo.DestroyObjectImmediate(walls[index].gameObject);
-                }
-
-                sharedCount = Mathf.Min(walls.Length, expectedWallCount);
-                for (var index = 0; index < sharedCount; index++)
-                {
-                    var storyIndex = index / wallPlacements.Count;
-                    ConfigureWall(
-                        walls[index],
-                        wallPlacements[index % wallPlacements.Count],
-                        storyIndex);
-                }
-
-                for (var index = sharedCount; index < expectedWallCount; index++)
-                {
-                    var storyIndex = index / wallPlacements.Count;
-                    CreateWall(
-                        generatedVisuals,
-                        wallPlacements[index % wallPlacements.Count],
-                        storyIndex);
-                }
-            }
-
-            var outputsNeedRefresh = hierarchyChanged
-                || needsRefresh
-                || generatedCollision.childCount != wallPlacements.Count
-                || DoorNeedsRefresh(layout, visualDoors);
-            if (!outputsNeedRefresh)
-            {
-                continue;
-            }
-
-            RebuildCollision(layout, generatedCollision, wallPlacements);
-            RebuildDoors(layout, visualDoors);
-            EditorSceneManager.MarkSceneDirty(Creator.gameObject.scene);
-        }
-    }
-
-    private bool EnsureGeneratedHierarchy(
-        TestBuildingLayout layout,
-        out Transform generatedVisuals,
-        out Transform generatedCollision,
-        out Transform visualDoors)
-    {
-        var hierarchyChanged = false;
-        generatedVisuals = layout.transform.Find(TestBuildingLayout.GeneratedVisualsName)!;
-        if (generatedVisuals is null || !generatedVisuals)
-        {
-            generatedVisuals = CreateGeneratedRoot(
-                layout.transform,
-                TestBuildingLayout.GeneratedVisualsName);
-            hierarchyChanged = true;
+            buildingRecords.Add(layout.ExportBuildingRecord());
         }
 
-        generatedCollision = layout.transform.Find(TestBuildingLayout.GeneratedCollisionName)!;
-        if (generatedCollision is null || !generatedCollision)
+        if (!BuildingShellValidation.TryValidateRecords(
+                buildingRecords,
+                Creator.DoorCornerExclusionDistance,
+                out var validationError))
         {
-            generatedCollision = CreateGeneratedRoot(
-                layout.transform,
-                TestBuildingLayout.GeneratedCollisionName);
-            hierarchyChanged = true;
-        }
-
-        visualDoors = layout.transform.Find(TestBuildingLayout.VisualDoorsName)!;
-        if (visualDoors is null || !visualDoors)
-        {
-            visualDoors = CreateGeneratedRoot(layout.transform, TestBuildingLayout.VisualDoorsName);
-            hierarchyChanged = true;
-        }
-
-        if (!layout.TryGetComponent<TestBuildingPresentation>(out _))
-        {
-            Undo.AddComponent<TestBuildingPresentation>(layout.gameObject);
-            hierarchyChanged = true;
-        }
-
-        for (var index = layout.transform.childCount - 1; index >= 0; index--)
-        {
-            var child = layout.transform.GetChild(index);
-            if (child == generatedVisuals
-                || child == generatedCollision
-                || child == visualDoors
-                || (child.GetComponent<GridWall>() is null && child.GetComponent<GridRoof>() is null))
-            {
-                continue;
-            }
-
-            Undo.SetTransformParent(child, generatedVisuals, "Organize test building output");
-            hierarchyChanged = true;
-        }
-
-        return hierarchyChanged;
-    }
-
-    private bool DoorNeedsRefresh(TestBuildingLayout layout, Transform visualDoors)
-    {
-        if (!layout.HasDoor)
-        {
-            return visualDoors.childCount != 0;
-        }
-
-        if (visualDoors.childCount != layout.Doors.Count)
-        {
-            return true;
-        }
-
-        layout.GetExteriorWallSpans(wallSpans);
-
-        for (var index = 0; index < layout.Doors.Count; index++)
-        {
-            var door = layout.Doors[index];
-            if (!layout.TryGetDoor(wallSpans, door.WallId, out var wall) || wall.IsCorner)
-            {
-                return true;
-            }
-
-            var doorObject = visualDoors.GetChild(index);
-            var doorRenderer = doorObject.GetComponent<SpriteRenderer>();
-            var depthSurface = doorObject.GetComponent<DepthOcclusionSurface>();
-            var portal = doorObject.GetComponent<ScenePortal>();
-            var factoryDoor = doorObject.GetComponent<OutsideTestFactoryDoor>();
-            if (doorRenderer is null
-                || !doorRenderer
-                || depthSurface is null
-                || !depthSurface
-                || !depthSurface.IsConfigured
-                || portal is null
-                || !portal
-                || factoryDoor is null
-                || !factoryDoor
-                || !factoryDoor.Matches(door.WallId, door.NormalizedOffset)
-                || doorRenderer.flipX != Creator.VisualStyle.ShouldFlipEntranceX(wall.Direction))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private void RebuildCollision(
-        TestBuildingLayout layout,
-        Transform generatedCollision,
-        IReadOnlyList<TestBuildingCreator.WallPlacement> placements)
-    {
-        for (var index = generatedCollision.childCount - 1; index >= 0; index--)
-        {
-            Object.DestroyImmediate(generatedCollision.GetChild(index).gameObject);
-        }
-
-        foreach (var placement in placements)
-        {
-            var collisionObject = new GameObject(
-                $"Wall Collision {placement.Kind} ({placement.Cell.x},{placement.Cell.y})");
-            collisionObject.transform.SetParent(generatedCollision, false);
-            var collider = collisionObject.AddComponent<PolygonCollider2D>();
-            var logicalFootprint = GridWall.GetLogicalFootprint(placement.Kind, placement.Cell);
-            var points = new Vector2[logicalFootprint.Count];
-            for (var index = 0; index < logicalFootprint.Count; index++)
-            {
-                var worldPoint = Creator.Grid.LogicalToWorld(logicalFootprint[index]);
-                points[index] = generatedCollision.InverseTransformPoint(worldPoint);
-            }
-
-            collider.pathCount = 1;
-            collider.SetPath(0, points);
-        }
-    }
-
-    private void RebuildDoors(TestBuildingLayout layout, Transform visualDoors)
-    {
-        for (var index = visualDoors.childCount - 1; index >= 0; index--)
-        {
-            Object.DestroyImmediate(visualDoors.GetChild(index).gameObject);
-        }
-
-        if (!layout.HasDoor || Creator.VisualStyle is null || !Creator.VisualStyle)
-        {
+            statusMessage = validationError;
             return;
         }
 
-        layout.GetExteriorWallSpans(wallSpans);
-        foreach (var door in layout.Doors)
+        var assembler = new BuildingShellAssembler();
+        foreach (var layout in layouts)
         {
-            if (!layout.TryGetDoor(wallSpans, door.WallId, out var wall) || wall.IsCorner)
+            var record = layout.ExportBuildingRecord();
+            if (!assembler.RebuildShell(record, Creator, layout.transform))
             {
                 continue;
             }
 
-            CreateDoorVisual(layout, visualDoors, wall, door.NormalizedOffset);
+            EditorUtility.SetDirty(layout);
         }
     }
 
-    private void CreateDoorVisual(
-        TestBuildingLayout layout,
-        Transform visualDoors,
-        TestBuildingCreator.ExteriorWallSpan wall,
-        float normalizedOffset)
+    private bool TryValidateEditorRecord(
+        BuildingRecord record,
+        TestBuildingLayout ignoredLayout,
+        out string error)
     {
-        var doorObject = new GameObject($"Door {wall.StableId} {normalizedOffset:0.###}");
-        doorObject.transform.SetParent(visualDoors, false);
-        var logicalPosition = Vector2.Lerp(
-            wall.LogicalStart,
-            wall.LogicalEnd,
-            normalizedOffset);
-        var worldPosition = Creator.Grid.LogicalToWorld(logicalPosition);
-        doorObject.transform.position = new Vector3(
-            worldPosition.x,
-            worldPosition.y,
-            layout.transform.position.z);
-
-        var renderer = doorObject.AddComponent<SpriteRenderer>();
-        renderer.sprite = Creator.VisualStyle.EntranceSprite;
-        renderer.color = Creator.VisualStyle.EntranceColor;
-        renderer.flipX = Creator.VisualStyle.ShouldFlipEntranceX(wall.Direction);
-        renderer.sortingOrder = GetDoorSortingOrder(wall);
-        doorObject.transform.localScale = Vector3.one * (
-            Creator.VisualStyle.EntranceHeight / GetVisibleSpriteHeight(renderer.sprite));
-
-        var logicalFootprint = GridWall.GetLogicalFootprint(wall.Kind, wall.Cell);
-        var groundPolygon = new List<Vector3>(logicalFootprint.Count);
-        foreach (var logicalPoint in logicalFootprint)
+        var existingRecords = new List<BuildingRecord>();
+        foreach (var layout in Creator.GeneratedBuildings.GetComponentsInChildren<TestBuildingLayout>(true))
         {
-            var groundPoint = Creator.Grid.LogicalToWorld(logicalPoint);
-            groundPolygon.Add(new Vector3(
-                groundPoint.x,
-                groundPoint.y,
-                layout.transform.position.z));
-        }
-
-        var depthSurface = doorObject.AddComponent<DepthOcclusionSurface>();
-        depthSurface.Configure(
-            GetVisibleSpritePolygon(renderer),
-            groundPolygon,
-            new Vector3(worldPosition.x, worldPosition.y, layout.transform.position.z),
-            wall.LogicalStart,
-            wall.LogicalEnd);
-
-        Undo.AddComponent<ScenePortal>(doorObject);
-        var factoryDoor = Undo.AddComponent<OutsideTestFactoryDoor>(doorObject);
-        factoryDoor.Configure(wall.StableId, normalizedOffset);
-        EditorUtility.SetDirty(factoryDoor);
-    }
-
-    private static int GetDoorSortingOrder(TestBuildingCreator.ExteriorWallSpan wall)
-    {
-        var depth = (wall.LogicalStart.x + wall.LogicalStart.y
-            + wall.LogicalEnd.x + wall.LogicalEnd.y) * 0.5f;
-        return 1005 - Mathf.RoundToInt(depth * 10f);
-    }
-
-    private static List<Vector3> GetVisibleSpritePolygon(SpriteRenderer renderer)
-    {
-        var minimum = new Vector2(float.PositiveInfinity, float.PositiveInfinity);
-        var maximum = new Vector2(float.NegativeInfinity, float.NegativeInfinity);
-        foreach (var vertex in renderer.sprite.vertices)
-        {
-            var point = new Vector2(vertex.x, vertex.y);
-            if (renderer.flipX)
+            if (layout == ignoredLayout)
             {
-                point.x = -point.x;
+                continue;
             }
 
-            if (renderer.flipY)
-            {
-                point.y = -point.y;
-            }
-
-            minimum = Vector2.Min(minimum, point);
-            maximum = Vector2.Max(maximum, point);
+            existingRecords.Add(layout.ExportBuildingRecord());
         }
 
-        return new List<Vector3>
-        {
-            renderer.transform.TransformPoint(new Vector3(minimum.x, minimum.y, 0f)),
-            renderer.transform.TransformPoint(new Vector3(maximum.x, minimum.y, 0f)),
-            renderer.transform.TransformPoint(new Vector3(maximum.x, maximum.y, 0f)),
-            renderer.transform.TransformPoint(new Vector3(minimum.x, maximum.y, 0f))
-        };
-    }
-
-    private static float GetVisibleSpriteHeight(Sprite sprite)
-    {
-        var minimum = float.PositiveInfinity;
-        var maximum = float.NegativeInfinity;
-        foreach (var vertex in sprite.vertices)
-        {
-            minimum = Mathf.Min(minimum, vertex.y);
-            maximum = Mathf.Max(maximum, vertex.y);
-        }
-
-        return maximum - minimum;
+        return BuildingShellValidation.TryValidate(
+            record,
+            existingRecords,
+            Creator.DoorCornerExclusionDistance,
+            out error);
     }
 
     private void ClearGeneratedBuildings()
@@ -1067,6 +688,15 @@ public sealed class TestBuildingCreatorEditor : Editor
         if (Creator.GeneratedBuildings is null || !Creator.GeneratedBuildings)
         {
             return;
+        }
+
+        var authoredBuildingIds = new List<uint>();
+        foreach (var layout in Creator.GeneratedBuildings.GetComponentsInChildren<TestBuildingLayout>(true))
+        {
+            if (layout.BuildingInstanceId != 0)
+            {
+                authoredBuildingIds.Add(layout.BuildingInstanceId);
+            }
         }
 
         var deletedSceneCount = 0;
@@ -1085,6 +715,7 @@ public sealed class TestBuildingCreatorEditor : Editor
             Undo.DestroyObjectImmediate(Creator.GeneratedBuildings.GetChild(index).gameObject);
         }
 
+        RemoveAuthoredBuildingsFromSave(authoredBuildingIds);
         EditorSceneManager.MarkSceneDirty(Creator.gameObject.scene);
         Undo.CollapseUndoOperations(undoGroup);
         statusMessage = deletedSceneCount > 0
@@ -1092,6 +723,61 @@ public sealed class TestBuildingCreatorEditor : Editor
             : "Cleared generated test buildings.";
         Repaint();
         SceneView.RepaintAll();
+    }
+
+    private void PersistAuthoredBuildings()
+    {
+        var path = GameSceneManager.GetDefaultOutsideTestStatePath();
+        var owner = new OutsideTestFloorStateOwner(GameSceneManager.LegacyOutsideTestBuildingId);
+        if (File.Exists(path)
+            && !owner.LoadFromFile(path, Creator.DoorCornerExclusionDistance))
+        {
+            statusMessage = "Could not update the OutsideTest save because its existing state is invalid.";
+            return;
+        }
+
+        foreach (var layout in Creator.GeneratedBuildings.GetComponentsInChildren<TestBuildingLayout>(true))
+        {
+            if (!owner.TryUpdateBuildingRecord(
+                    layout.ExportBuildingRecord(),
+                    Creator.DoorCornerExclusionDistance,
+                    out var error))
+            {
+                statusMessage = error;
+                return;
+            }
+        }
+
+        if (!owner.SaveToFile(path))
+        {
+            statusMessage = "Could not persist authored OutsideTest building records.";
+        }
+    }
+
+    private void RemoveAuthoredBuildingsFromSave(IEnumerable<uint> buildingIds)
+    {
+        var path = GameSceneManager.GetDefaultOutsideTestStatePath();
+        if (!File.Exists(path))
+        {
+            return;
+        }
+
+        var owner = new OutsideTestFloorStateOwner(GameSceneManager.LegacyOutsideTestBuildingId);
+        if (!owner.LoadFromFile(path, Creator.DoorCornerExclusionDistance))
+        {
+            statusMessage = "Could not update the OutsideTest save because its existing state is invalid.";
+            return;
+        }
+
+        foreach (var buildingId in buildingIds)
+        {
+            owner.RemoveBuildingAndFloors(buildingId);
+        }
+
+        if (!owner.SaveToFile(path))
+        {
+            statusMessage = "Could not remove authored OutsideTest building records.";
+        }
     }
 
     private void EnsureBuildingInstanceIds()
@@ -1102,30 +788,31 @@ public sealed class TestBuildingCreatorEditor : Editor
         }
 
         var usedIds = new HashSet<uint>();
-        var nextId = 1u;
+        var layouts = Creator.GeneratedBuildings.GetComponentsInChildren<TestBuildingLayout>(true);
+        var nextId = Creator.GetNextBuildingInstanceId();
         var changed = false;
-        foreach (var layout in Creator.GeneratedBuildings.GetComponentsInChildren<TestBuildingLayout>(true))
+        foreach (var layout in layouts)
         {
-            if (layout.BuildingInstanceId != 0 && usedIds.Add(layout.BuildingInstanceId))
+            if (layout.BuildingInstanceId == 0)
             {
-                if (layout.BuildingInstanceId >= nextId)
+                if (nextId == 0)
                 {
-                    nextId = layout.BuildingInstanceId + 1u;
+                    statusMessage = "No building IDs are available for authored layouts.";
+                    continue;
                 }
 
+                layout.SetBuildingInstanceId(nextId);
+                usedIds.Add(nextId);
+                nextId = nextId == uint.MaxValue ? 0u : nextId + 1u;
+                EditorUtility.SetDirty(layout);
+                changed = true;
                 continue;
             }
 
-            while (usedIds.Contains(nextId))
+            if (!usedIds.Add(layout.BuildingInstanceId))
             {
-                nextId++;
+                statusMessage = $"Duplicate authored building ID {layout.BuildingInstanceId} was rejected.";
             }
-
-            layout.SetBuildingInstanceId(nextId);
-            usedIds.Add(nextId);
-            nextId++;
-            EditorUtility.SetDirty(layout);
-            changed = true;
         }
 
         if (changed)
@@ -1151,55 +838,6 @@ public sealed class TestBuildingCreatorEditor : Editor
         if (changed)
         {
             EditorSceneManager.MarkSceneDirty(Creator.gameObject.scene);
-        }
-    }
-
-    private void RefreshGeneratedRoofs()
-    {
-        if (Creator.GeneratedBuildings is null || !Creator.GeneratedBuildings)
-        {
-            return;
-        }
-
-        foreach (var layout in Creator.GeneratedBuildings.GetComponentsInChildren<TestBuildingLayout>(true))
-        {
-            var generatedVisuals = layout.transform.Find(TestBuildingLayout.GeneratedVisualsName);
-            if (generatedVisuals is null || !generatedVisuals)
-            {
-                continue;
-            }
-
-            var roofs = generatedVisuals.GetComponentsInChildren<GridRoof>(true);
-            var expectedRoofCount = layout.StoryCount;
-            var roofsChanged = roofs.Length != expectedRoofCount;
-            var secondCorner = layout.AnchorCell + new Vector3Int(
-                layout.Size.x - 1,
-                layout.Size.y - 1);
-            for (var index = roofs.Length - 1; index >= expectedRoofCount; index--)
-            {
-                Undo.DestroyObjectImmediate(roofs[index].gameObject);
-            }
-
-            var sharedCount = Mathf.Min(roofs.Length, expectedRoofCount);
-            var configurationChanged = false;
-            for (var storyIndex = 0; storyIndex < sharedCount; storyIndex++)
-            {
-                configurationChanged |= ConfigureRoof(
-                    roofs[storyIndex],
-                    layout.AnchorCell,
-                    secondCorner,
-                    storyIndex);
-            }
-
-            for (var storyIndex = sharedCount; storyIndex < expectedRoofCount; storyIndex++)
-            {
-                CreateRoof(generatedVisuals, layout.AnchorCell, secondCorner, storyIndex);
-            }
-
-            if (roofsChanged || configurationChanged)
-            {
-                EditorSceneManager.MarkSceneDirty(Creator.gameObject.scene);
-            }
         }
     }
 
@@ -1233,6 +871,38 @@ public sealed class TestBuildingCreatorEditor : Editor
         serializedCreator.ApplyModifiedPropertiesWithoutUndo();
         EditorUtility.SetDirty(Creator);
         EditorSceneManager.MarkSceneDirty(Creator.gameObject.scene);
+    }
+
+    private void UndoRedoPerformed()
+    {
+        if (target is not TestBuildingCreator || !target)
+        {
+            return;
+        }
+
+        RefreshGeneratedBuildings();
+        SceneView.RepaintAll();
+        Repaint();
+    }
+
+    private Vector3[] GetBoundaryWorldPoints(Vector3Int anchor, Vector2Int size)
+    {
+        return new[]
+        {
+            ToWorld(new Vector2(anchor.x, anchor.y)),
+            ToWorld(new Vector2(anchor.x + size.x, anchor.y)),
+            ToWorld(new Vector2(anchor.x + size.x, anchor.y + size.y)),
+            ToWorld(new Vector2(anchor.x, anchor.y + size.y))
+        };
+    }
+
+    private Vector3 ToWorld(Vector2 logicalPosition)
+    {
+        var worldPosition = Creator.Grid.LogicalToWorld(logicalPosition);
+        return new Vector3(
+            worldPosition.x,
+            worldPosition.y,
+            Creator.Grid.transform.position.z - 0.02f);
     }
 
     private void ResetPlacement()

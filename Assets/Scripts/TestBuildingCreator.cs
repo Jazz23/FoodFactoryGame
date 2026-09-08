@@ -7,6 +7,7 @@ public sealed class TestBuildingCreator : MonoBehaviour
 {
     public const int CurrentSettingsVersion = 4;
     public const int DefaultRoofSortingOrder = 1000;
+    public const float DefaultDoorCornerExclusionDistance = 0.15f;
     public const float RoofBoundaryInset = 0.5f + WallCellGeometry.ThicknessInCells * 0.5f;
 
     public readonly struct WallPlacement
@@ -58,7 +59,7 @@ public sealed class TestBuildingCreator : MonoBehaviour
     [SerializeField] private Color roofSideColor = new(0.16f, 0.21f, 0.26f, 1f);
     [SerializeField] private int roofSortingOrder = DefaultRoofSortingOrder;
     [SerializeField] private BuildingVisualStyle visualStyle = null!;
-    [SerializeField, Min(0.01f)] private float doorCornerExclusionDistance = 0.15f;
+    [SerializeField, Min(0.01f)] private float doorCornerExclusionDistance = DefaultDoorCornerExclusionDistance;
     [SerializeField, HideInInspector] private int settingsVersion;
 
     public SceneGrid Grid => grid;
@@ -75,22 +76,25 @@ public sealed class TestBuildingCreator : MonoBehaviour
 
     public uint GetNextBuildingInstanceId()
     {
-        var usedIds = new HashSet<uint>();
+        var maximumId = 0u;
         foreach (var layout in generatedBuildings.GetComponentsInChildren<TestBuildingLayout>(true))
         {
-            if (layout.BuildingInstanceId != 0)
+            if (layout.BuildingInstanceId > maximumId)
             {
-                usedIds.Add(layout.BuildingInstanceId);
+                maximumId = layout.BuildingInstanceId;
             }
         }
 
-        var nextId = 1u;
-        while (usedIds.Contains(nextId))
+        if (GameSceneManager.Instance is not null)
         {
-            nextId++;
+            var stateNextId = GameSceneManager.Instance.GetNextOutsideTestBuildingId();
+            if (stateNextId > maximumId)
+            {
+                maximumId = stateNextId - 1u;
+            }
         }
 
-        return nextId;
+        return maximumId == uint.MaxValue ? 0u : maximumId + 1u;
     }
 
     public static Vector3Int GetAnchorCell(Vector3Int firstCorner, Vector3Int secondCorner)
