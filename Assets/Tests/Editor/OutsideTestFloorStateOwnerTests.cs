@@ -1,4 +1,4 @@
-// Verifies independent OutsideTest floor identity, registration, migration, and simulation.
+// Verifies independent OutsideTest floor identity, SQLite persistence, migration, and simulation.
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -28,7 +28,7 @@ public sealed class OutsideTestFloorStateOwnerTests
         Assert.That(floor.Entities[0].CycleProgress, Is.EqualTo(0.5f).Within(0.0001f));
         Assert.That(owner.TryRemoveTestMachine(2, 0, secondId, out error), Is.True, error);
         var restored = new OutsideTestFloorStateOwner(1);
-        Assert.That(restored.LoadFromJson(owner.ToJson()), Is.True);
+        Assert.That(restored.LoadState(owner.CaptureState()), Is.True);
         restored.TryRegisterBuilding(2, 2, new Vector2Int(5, 3), out _);
         restored.TryGetFloorState(2, 0, out var empty);
         Assert.That(empty.Entities, Is.Empty);
@@ -49,11 +49,11 @@ public sealed class OutsideTestFloorStateOwnerTests
     {
         var owner = new OutsideTestFloorStateOwner(1);
         owner.TryRegisterBuilding(2, 2, new Vector2Int(5, 3), out _);
-        var before = owner.ToJson();
+        var before = owner.CaptureState();
         Assert.That(owner.TryAddTestMachine(2, 0, new Vector2(x, y), out var id, out var error), Is.False);
         Assert.That(id, Is.Zero);
         Assert.That(error, Is.Not.Empty);
-        Assert.That(owner.ToJson(), Is.EqualTo(before));
+        Assert.That(StatesMatch(owner.CaptureState(), before), Is.True);
     }
 
     [Test]
@@ -63,13 +63,13 @@ public sealed class OutsideTestFloorStateOwnerTests
         owner.TryRegisterBuilding(2, 2, new Vector2Int(5, 3), out _);
         owner.TryGetFloorState(2, 0, out var floor);
         floor.SetEntities(new[] { new FactoryEntityRecord(uint.MaxValue, "test-machine", Vector2.one, 1f, 0f, 0) });
-        var before = owner.ToJson();
+        var before = owner.CaptureState();
         Assert.That(owner.TryAddTestMachine(2, 0, Vector2.one, out _, out _), Is.False);
         Assert.That(owner.TryAddTestMachine(2, 9, Vector2.one, out _, out _), Is.False);
         Assert.That(owner.TryAddTestMachine(99, 0, Vector2.one, out _, out _), Is.False);
         Assert.That(owner.TryRemoveTestMachine(2, 0, 44u, out _), Is.False);
         Assert.That(owner.TryRemoveTestMachine(2, 9, 1u, out _), Is.False);
-        Assert.That(owner.ToJson(), Is.EqualTo(before));
+        Assert.That(StatesMatch(owner.CaptureState(), before), Is.True);
     }
 
     [Test]
@@ -158,7 +158,7 @@ public sealed class OutsideTestFloorStateOwnerTests
         Assert.That(registrationError, Is.Empty);
 
         var restored = new OutsideTestFloorStateOwner(1);
-        Assert.That(restored.LoadFromJson(source.ToJson()), Is.True);
+        Assert.That(restored.LoadState(source.CaptureState()), Is.True);
         Assert.That(restored.TryGetBuildingRecord(7, out var restoredRecord), Is.True);
         Assert.That(restoredRecord.HasSameTopology(record), Is.True);
         Assert.That(new List<OutsideTestBuildingInfo>(restored.Buildings), Has.Count.EqualTo(1));
@@ -182,7 +182,7 @@ public sealed class OutsideTestFloorStateOwnerTests
             Floors = new List<OutsideTestFloorRecord>()
         };
 
-        Assert.That(owner.LoadFromJson(JsonUtility.ToJson(invalidData)), Is.False);
+        Assert.That(owner.LoadState(invalidData), Is.False);
         Assert.That(owner.TryGetFloorState(2, 0, out var state), Is.True);
         Assert.That(state.Label, Is.EqualTo("Preserved"));
         Assert.That(state.ProductionRate, Is.EqualTo(6f));
@@ -232,7 +232,7 @@ public sealed class OutsideTestFloorStateOwnerTests
         };
         var owner = new OutsideTestFloorStateOwner(1);
 
-        Assert.That(owner.LoadFromJson(JsonUtility.ToJson(legacyData)), Is.True);
+        Assert.That(owner.LoadState(legacyData), Is.True);
         owner.TryRegisterBuilding(1, 3, new Vector2Int(5, 5), out _);
         owner.TryRegisterBuilding(2, 2, new Vector2Int(5, 3), out _);
         owner.TryRegisterBuilding(3, 3, new Vector2Int(4, 4), out _);
@@ -246,7 +246,7 @@ public sealed class OutsideTestFloorStateOwnerTests
         Assert.That(migratedUpper.Label, Is.EqualTo("Migrated Upper"));
         Assert.That(migratedUpper.Entities, Has.Count.EqualTo(1));
         Assert.That(newBuildingFloor.BuildingInstanceId, Is.EqualTo(2u));
-        Assert.That(JsonUtility.FromJson<OutsideTestFloorSaveData>(owner.ToJson()).Version,
+        Assert.That(owner.CaptureState().Version,
             Is.EqualTo(OutsideTestFloorStateOwner.CurrentSaveVersion));
         Assert.That(new List<OutsideTestFloorRecord>(owner.FloorStates), Has.Count.EqualTo(8));
     }
@@ -386,7 +386,7 @@ public sealed class OutsideTestFloorStateOwnerTests
         simulation.Advance(1.25f);
         var path = Path.Combine(
             Application.temporaryCachePath,
-            $"outside-test-two-floor-{Guid.NewGuid():N}.json");
+            $"outside-test-two-floor-{Guid.NewGuid():N}.db");
 
         try
         {
@@ -462,7 +462,7 @@ public sealed class OutsideTestFloorStateOwnerTests
         });
         var path = Path.Combine(
             Application.temporaryCachePath,
-            $"outside-test-exact-fields-{Guid.NewGuid():N}.json");
+            $"outside-test-exact-fields-{Guid.NewGuid():N}.db");
 
         try
         {
@@ -508,7 +508,7 @@ public sealed class OutsideTestFloorStateOwnerTests
 
         var restored = new OutsideTestFloorStateOwner(1);
         restored.TryRegisterBuilding(2, 2, new Vector2Int(5, 3), out _);
-        Assert.That(restored.LoadFromJson(source.ToJson()), Is.True);
+        Assert.That(restored.LoadState(source.CaptureState()), Is.True);
         Assert.That(restored.TryGetFloorState(2, 0, out var restoredGround), Is.True);
         Assert.That(restored.TryGetFloorState(2, 1, out var restoredUpper), Is.True);
         Assert.That(restoredGround.Entities, Is.Empty);
@@ -550,15 +550,15 @@ public sealed class OutsideTestFloorStateOwnerTests
         owner.TrySetFloorState(2, 0, "Before Failure", 3f, new Vector2(1f, 1f));
         var path = Path.Combine(
             Application.temporaryCachePath,
-            $"outside-test-failed-load-{Guid.NewGuid():N}.json");
+            $"outside-test-failed-load-{Guid.NewGuid():N}.db");
         var failedSource = "this is not a save";
 
         try
         {
             File.WriteAllText(path, failedSource);
             owner.TrySetFloorState(2, 0, "Current State", 9f, new Vector2(4f, 2f));
-            owner.TryGetFloorState(2, 0, out var currentState);
-            currentState.SetEntities(new[]
+            owner.TryGetFloorState(2, 0, out var currentFloor);
+            currentFloor.SetEntities(new[]
             {
                 new FactoryEntityRecord(
                     301u,
@@ -568,11 +568,11 @@ public sealed class OutsideTestFloorStateOwnerTests
                     0.7f,
                     8)
             });
-            var currentJson = owner.ToJson();
+            var currentState = owner.CaptureState();
 
             Assert.That(owner.LoadFromFile(path), Is.False);
             Assert.That(File.ReadAllText(path), Is.EqualTo(failedSource));
-            Assert.That(owner.ToJson(), Is.EqualTo(currentJson));
+            Assert.That(StatesMatch(owner.CaptureState(), currentState), Is.True);
             Assert.That(owner.TryGetFloorState(2, 0, out var state), Is.True);
             Assert.That(state.Label, Is.EqualTo("Current State"));
             Assert.That(state.Entities[0].EntityId, Is.EqualTo(301u));
@@ -678,14 +678,14 @@ public sealed class OutsideTestFloorStateOwnerTests
             0.3f,
             8,
             0);
-        var before = owner.ToJson();
+        var before = owner.CaptureState();
 
         Assert.That(owner.TryDrainTestMachine(2, 0, 44u, out var removed, out _), Is.False);
         Assert.That(removed, Is.Zero);
-        Assert.That(owner.ToJson(), Is.EqualTo(before));
+        Assert.That(StatesMatch(owner.CaptureState(), before), Is.True);
         Assert.That(owner.TryDrainTestMachine(2, 0, 17u, out removed, out _), Is.True);
         Assert.That(removed, Is.Zero);
-        Assert.That(owner.ToJson(), Is.EqualTo(before));
+        Assert.That(StatesMatch(owner.CaptureState(), before), Is.True);
         Assert.That(floor.Entities[0].ProducedCount, Is.EqualTo(8));
         Assert.That(floor.Entities[0].CycleProgress, Is.EqualTo(0.3f).Within(0.0001f));
     }
@@ -713,7 +713,7 @@ public sealed class OutsideTestFloorStateOwnerTests
             Is.EqualTo(FactoryEntityRecord.OutputCapacity));
 
         var restored = new OutsideTestFloorStateOwner(1);
-        Assert.That(restored.LoadFromJson(source.ToJson()), Is.True);
+        Assert.That(restored.LoadState(source.CaptureState()), Is.True);
         Assert.That(restored.LastLoadedVersion, Is.EqualTo(OutsideTestFloorStateOwner.CurrentSaveVersion));
         Assert.That(restored.TryGetFloorState(2, 0, out var restoredGround), Is.True);
         Assert.That(restored.TryGetFloorState(2, 1, out var restoredUpper), Is.True);
@@ -765,7 +765,7 @@ public sealed class OutsideTestFloorStateOwnerTests
         };
 
         var restored = new OutsideTestFloorStateOwner(1);
-        Assert.That(restored.LoadFromJson(JsonUtility.ToJson(data)), Is.True);
+        Assert.That(restored.LoadState(data), Is.True);
         Assert.That(restored.LastLoadHadBuildingRecords, Is.True);
         Assert.That(restored.TryGetBuildingRecord(71, out var restoredBuilding), Is.True);
         Assert.That(restoredBuilding.HasSameTopology(building), Is.True);
@@ -868,7 +868,7 @@ public sealed class OutsideTestFloorStateOwnerTests
         });
         var source = new FactoryEntityEndpoint(2, 0, 1);
         var destination = new FactoryEntityEndpoint(2, 1, 9);
-        var beforeInvalid = owner.ToJson();
+        var beforeInvalid = owner.CaptureState();
 
         Assert.That(owner.TryAddConnection(
                 new FactoryEntityEndpoint(3, 0, 7),
@@ -879,14 +879,14 @@ public sealed class OutsideTestFloorStateOwnerTests
                 new FactoryEntityEndpoint(2, 0, 9),
                 out _), Is.False);
         Assert.That(owner.TryAddConnection(source, destination, out _), Is.True);
-        var connected = owner.ToJson();
+        var connected = owner.CaptureState();
         Assert.That(owner.TryAddConnection(source, destination, out _), Is.False);
-        Assert.That(owner.ToJson(), Is.EqualTo(connected));
+        Assert.That(StatesMatch(owner.CaptureState(), connected), Is.True);
         Assert.That(owner.TryRemoveTestMachine(2, 0, 1, out _), Is.True);
         Assert.That(owner.Connections, Is.Empty);
         Assert.That(owner.TryAddTestMachine(2, 0, Vector2.one, out var reusedId, out _), Is.True);
         Assert.That(reusedId, Is.EqualTo(1u));
-        Assert.That(owner.ToJson(), Is.Not.EqualTo(beforeInvalid));
+        Assert.That(StatesMatch(owner.CaptureState(), beforeInvalid), Is.False);
     }
 
     [Test]
@@ -917,7 +917,7 @@ public sealed class OutsideTestFloorStateOwnerTests
             out _);
 
         var restored = new OutsideTestFloorStateOwner(1);
-        Assert.That(restored.LoadFromJson(source.ToJson()), Is.True);
+        Assert.That(restored.LoadState(source.CaptureState()), Is.True);
         Assert.That(restored.Connections, Has.Count.EqualTo(1));
         Assert.That(restored.Connections[0].Source, Is.EqualTo(new FactoryEntityEndpoint(2, 0, 41)));
         Assert.That(restored.TryGetFloorState(2, 0, out var restoredGround), Is.True);
@@ -936,7 +936,7 @@ public sealed class OutsideTestFloorStateOwnerTests
             Floors = new List<OutsideTestFloorRecord> { ground, upper }
         };
         var migrated = new OutsideTestFloorStateOwner(1);
-        Assert.That(migrated.LoadFromJson(JsonUtility.ToJson(versionFiveData)), Is.True);
+        Assert.That(migrated.LoadState(versionFiveData), Is.True);
         Assert.That(migrated.TryGetFloorState(2, 0, out var migratedGround), Is.True);
         Assert.That(migratedGround.Entities[0].OutputCount, Is.EqualTo(7));
         Assert.That(migrated.Connections, Is.Empty);
@@ -948,7 +948,7 @@ public sealed class OutsideTestFloorStateOwnerTests
         var owner = new OutsideTestFloorStateOwner(1);
         owner.TryRegisterBuilding(2, 1, new Vector2Int(5, 3), out _);
         owner.TrySetFloorState(2, 0, "Live", 3f, Vector2.one);
-        var before = owner.ToJson();
+        var before = owner.CaptureState();
         var invalid = new OutsideTestFloorSaveData
         {
             Version = OutsideTestFloorStateOwner.CurrentSaveVersion,
@@ -968,8 +968,83 @@ public sealed class OutsideTestFloorStateOwnerTests
             }
         };
 
-        Assert.That(owner.LoadFromJson(JsonUtility.ToJson(invalid)), Is.False);
-        Assert.That(owner.ToJson(), Is.EqualTo(before));
+        Assert.That(owner.LoadState(invalid), Is.False);
+        Assert.That(StatesMatch(owner.CaptureState(), before), Is.True);
+    }
+
+    private static bool StatesMatch(
+        OutsideTestFloorSaveData left,
+        OutsideTestFloorSaveData right)
+    {
+        if (left.Version != right.Version
+            || left.Buildings.Count != right.Buildings.Count
+            || left.Floors.Count != right.Floors.Count
+            || left.Connections.Count != right.Connections.Count)
+        {
+            return false;
+        }
+
+        for (var index = 0; index < left.Buildings.Count; index++)
+        {
+            if (!left.Buildings[index].HasSameTopology(right.Buildings[index]))
+            {
+                return false;
+            }
+        }
+
+        for (var index = 0; index < left.Floors.Count; index++)
+        {
+            var leftFloor = left.Floors[index];
+            var rightFloor = right.Floors[index];
+            if (leftFloor.BuildingInstanceId != rightFloor.BuildingInstanceId
+                || leftFloor.FloorIndex != rightFloor.FloorIndex
+                || leftFloor.Label != rightFloor.Label
+                || !Mathf.Approximately(leftFloor.ProductionRate, rightFloor.ProductionRate)
+                || !Mathf.Approximately(
+                    leftFloor.AccumulatedProduction,
+                    rightFloor.AccumulatedProduction)
+                || leftFloor.MarkerPosition != rightFloor.MarkerPosition
+                || leftFloor.Entities.Count != rightFloor.Entities.Count)
+            {
+                return false;
+            }
+
+            for (var entityIndex = 0;
+                entityIndex < leftFloor.Entities.Count;
+                entityIndex++)
+            {
+                if (!EntitiesMatch(
+                        leftFloor.Entities[entityIndex],
+                        rightFloor.Entities[entityIndex]))
+                {
+                    return false;
+                }
+            }
+        }
+
+        for (var index = 0; index < left.Connections.Count; index++)
+        {
+            if (!left.Connections[index].HasSameEndpoints(right.Connections[index]))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool EntitiesMatch(
+        FactoryEntityRecord left,
+        FactoryEntityRecord right)
+    {
+        return left.EntityId == right.EntityId
+            && left.DefinitionId == right.DefinitionId
+            && left.LogicalPosition == right.LogicalPosition
+            && Mathf.Approximately(left.CycleRate, right.CycleRate)
+            && Mathf.Approximately(left.CycleProgress, right.CycleProgress)
+            && left.ProducedCount == right.ProducedCount
+            && left.OutputCount == right.OutputCount
+            && left.InputCount == right.InputCount;
     }
 
     private static void AssertEntityFields(

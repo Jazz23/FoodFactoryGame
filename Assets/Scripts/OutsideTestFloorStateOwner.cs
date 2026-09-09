@@ -868,9 +868,8 @@ public sealed class OutsideTestFloorStateOwner
 
         try
         {
-            return LoadFromJson(
-                File.ReadAllText(path),
-                doorCornerExclusionDistance);
+            var data = new OutsideTestFloorSqliteStore().Load(path);
+            return LoadState(data, doorCornerExclusionDistance);
         }
         catch (Exception)
         {
@@ -878,48 +877,82 @@ public sealed class OutsideTestFloorStateOwner
         }
     }
 
-    public bool LoadFromJson(string json)
+    public bool LoadState(
+        OutsideTestFloorSaveData data,
+        float doorCornerExclusionDistance)
     {
-        return LoadFromJson(
-            json,
+        try
+        {
+            return ApplyLoadedState(data, doorCornerExclusionDistance);
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    public bool LoadState(OutsideTestFloorSaveData data)
+    {
+        return LoadState(
+            data,
             TestBuildingCreator.DefaultDoorCornerExclusionDistance);
     }
 
-    public bool LoadFromJson(string json, float doorCornerExclusionDistance)
+    public OutsideTestFloorSaveData CaptureState()
     {
-        if (string.IsNullOrWhiteSpace(json)
-            || !HasJsonArrayProperty(json, "Floors"))
+        var buildings = new List<BuildingRecord>();
+        foreach (var building in GetSortedBuildingRecords())
+        {
+            buildings.Add(building.Clone());
+        }
+
+        var floors = new List<OutsideTestFloorRecord>();
+        foreach (var floor in GetSortedFloorStates())
+        {
+            var copy = new OutsideTestFloorRecord(
+                floor.BuildingInstanceId,
+                floor.FloorIndex,
+                floor.Label,
+                floor.ProductionRate,
+                floor.AccumulatedProduction,
+                floor.MarkerPosition);
+            copy.SetEntities(floor.Entities);
+            floors.Add(copy);
+        }
+
+        return new OutsideTestFloorSaveData(
+            buildings,
+            floors,
+            GetSortedConnections())
+        {
+            Version = CurrentSaveVersion
+        };
+    }
+
+    private bool ApplyLoadedState(
+        OutsideTestFloorSaveData data,
+        float doorCornerExclusionDistance)
+    {
+        if (data is null || data.Floors is null)
         {
             return false;
         }
 
-        try
+        var version = data.Version <= 0 ? 1 : data.Version;
+        if (version > CurrentSaveVersion)
         {
-            var data = JsonUtility.FromJson<OutsideTestFloorSaveData>(json);
-            if (data is null || data.Floors is null)
-            {
-                return false;
-            }
+            return false;
+        }
 
-            var version = data.Version <= 0 ? 1 : data.Version;
-            if (version > CurrentSaveVersion)
+        var loadedBuildingRecords = new Dictionary<uint, BuildingRecord>();
+        if (version >= BuildingRecordsSaveVersion)
+        {
+            if (data.Buildings is not null
+                && BuildingShellValidation.TryValidateRecords(
+                    data.Buildings,
+                    doorCornerExclusionDistance,
+                    out _))
             {
-                return false;
-            }
-
-            var loadedBuildingRecords = new Dictionary<uint, BuildingRecord>();
-            if (version >= BuildingRecordsSaveVersion)
-            {
-                if (!HasJsonArrayProperty(json, "Buildings")
-                    || data.Buildings is null
-                    || !BuildingShellValidation.TryValidateRecords(
-                        data.Buildings,
-                        doorCornerExclusionDistance,
-                        out _))
-                {
-                    return false;
-                }
-
                 foreach (var savedRecord in data.Buildings)
                 {
                     if (savedRecord is null
@@ -933,120 +966,121 @@ public sealed class OutsideTestFloorStateOwner
             }
             else
             {
-                foreach (var pair in buildingRecords)
+                return false;
+            }
+        }
+        else
+        {
+            foreach (var pair in buildingRecords)
+            {
+                loadedBuildingRecords.Add(pair.Key, pair.Value.Clone());
+            }
+        }
+
+        var loadedFloorStates = new Dictionary<OutsideTestFloorKey, OutsideTestFloorRecord>();
+        foreach (var savedState in data.Floors)
+        {
+            if (savedState is null || savedState.FloorIndex < 0)
+            {
+                return false;
+            }
+
+            var buildingInstanceId = savedState.BuildingInstanceId;
+            if (version == 1 && buildingInstanceId == 0)
+            {
+                buildingInstanceId = legacyBuildingInstanceId;
+            }
+
+            if (buildingInstanceId == 0)
+            {
+                return false;
+            }
+
+            if (loadedBuildingRecords.TryGetValue(
+                    buildingInstanceId,
+                    out var registration)
+                && savedState.FloorIndex >= registration.StoryCount)
+            {
+                return false;
+            }
+
+            var migratedState = new OutsideTestFloorRecord(
+                buildingInstanceId,
+                savedState.FloorIndex,
+                savedState.Label,
+                savedState.ProductionRate,
+                savedState.AccumulatedProduction,
+                savedState.MarkerPosition);
+            migratedState.SetEntities(savedState.Entities);
+            if (version < OutputBuffersSaveVersion)
+            {
+                foreach (var entity in migratedState.Entities)
                 {
-                    loadedBuildingRecords.Add(pair.Key, pair.Value.Clone());
+                    if (entity is not null)
+                    {
+                        entity.DrainOutput();
+                    }
                 }
             }
 
-            var loadedFloorStates = new Dictionary<OutsideTestFloorKey, OutsideTestFloorRecord>();
-            foreach (var savedState in data.Floors)
+            if (version < InputBuffersSaveVersion)
             {
-                if (savedState is null || savedState.FloorIndex < 0)
+                foreach (var entity in migratedState.Entities)
                 {
-                    return false;
+                    if (entity is not null)
+                    {
+                        entity.SetInputCount(0);
+                    }
                 }
+            }
 
-                var buildingInstanceId = savedState.BuildingInstanceId;
-                if (version == 1 && buildingInstanceId == 0)
-                {
-                    buildingInstanceId = legacyBuildingInstanceId;
-                }
+            if (version < 3 && migratedState.Entities.Count == 0)
+            {
+                migratedState.EnsureDefaultEntity();
+            }
 
-                if (buildingInstanceId == 0)
-                {
-                    return false;
-                }
-
-                if (loadedBuildingRecords.TryGetValue(
-                        buildingInstanceId,
-                        out var registration)
-                    && savedState.FloorIndex >= registration.StoryCount)
-                {
-                    return false;
-                }
-
-                var migratedState = new OutsideTestFloorRecord(
+            if (loadedBuildingRecords.TryGetValue(
                     buildingInstanceId,
-                    savedState.FloorIndex,
-                    savedState.Label,
-                    savedState.ProductionRate,
-                    savedState.AccumulatedProduction,
-                    savedState.MarkerPosition);
-                migratedState.SetEntities(savedState.Entities);
-                if (version < OutputBuffersSaveVersion)
-                {
-                    foreach (var entity in migratedState.Entities)
-                    {
-                        if (entity is not null)
-                        {
-                            entity.DrainOutput();
-                        }
-                    }
-                }
+                    out registration))
+            {
+                NormalizeFloorState(registration, migratedState);
+            }
 
-                if (version < InputBuffersSaveVersion)
-                {
-                    foreach (var entity in migratedState.Entities)
-                    {
-                        if (entity is not null)
-                        {
-                            entity.SetInputCount(0);
-                        }
-                    }
-                }
+            var key = new OutsideTestFloorKey(
+                buildingInstanceId,
+                savedState.FloorIndex);
+            if (!loadedFloorStates.TryAdd(key, migratedState))
+            {
+                return false;
+            }
+        }
 
-                if (version < 3 && migratedState.Entities.Count == 0)
-                {
-                    migratedState.EnsureDefaultEntity();
-                }
-
-                if (loadedBuildingRecords.TryGetValue(
-                        buildingInstanceId,
-                        out registration))
-                {
-                    NormalizeFloorState(registration, migratedState);
-                }
-
+        foreach (var registration in loadedBuildingRecords.Values)
+        {
+            for (var floorIndex = 0;
+                floorIndex < registration.StoryCount;
+                floorIndex++)
+            {
                 var key = new OutsideTestFloorKey(
-                    buildingInstanceId,
-                    savedState.FloorIndex);
-                if (!loadedFloorStates.TryAdd(key, migratedState))
+                    registration.BuildingInstanceId,
+                    floorIndex);
+                if (!loadedFloorStates.TryGetValue(key, out var state))
                 {
-                    return false;
-                }
-            }
-
-            foreach (var registration in loadedBuildingRecords.Values)
-            {
-                for (var floorIndex = 0;
-                    floorIndex < registration.StoryCount;
-                    floorIndex++)
-                {
-                    var key = new OutsideTestFloorKey(
+                    state = OutsideTestFloorRecord.CreateDefault(
                         registration.BuildingInstanceId,
                         floorIndex);
-                    if (!loadedFloorStates.TryGetValue(key, out var state))
-                    {
-                        state = OutsideTestFloorRecord.CreateDefault(
-                            registration.BuildingInstanceId,
-                            floorIndex);
-                        loadedFloorStates.Add(key, state);
-                    }
-
-                    NormalizeFloorState(registration, state);
+                    loadedFloorStates.Add(key, state);
                 }
+
+                NormalizeFloorState(registration, state);
             }
+        }
 
-            var loadedConnections = new List<FactoryEntityConnectionRecord>();
-            if (version >= ConnectionsSaveVersion)
+        var loadedConnections = new List<FactoryEntityConnectionRecord>();
+        if (version >= ConnectionsSaveVersion)
+        {
+            if (data.Connections is not null)
             {
-                if (!HasJsonArrayProperty(json, "Connections")
-                    || data.Connections is null)
-                {
-                    return false;
-                }
-
                 foreach (var connection in data.Connections)
                 {
                     if (connection is null
@@ -1065,55 +1099,47 @@ public sealed class OutsideTestFloorStateOwner
 
                 loadedConnections.Sort(CompareConnections);
             }
-
-            buildingRecords.Clear();
-            foreach (var pair in loadedBuildingRecords)
+            else
             {
-                buildingRecords.Add(pair.Key, pair.Value);
+                return false;
             }
-
-            floorStates.Clear();
-            foreach (var pair in loadedFloorStates)
-            {
-                floorStates.Add(pair.Key, pair.Value);
-            }
-
-            connections.Clear();
-            connections.AddRange(loadedConnections);
-
-            lastLoadedVersion = version;
-            lastLoadHadBuildingRecords = version >= BuildingRecordsSaveVersion;
-            return true;
         }
-        catch (Exception)
+
+        buildingRecords.Clear();
+        foreach (var pair in loadedBuildingRecords)
         {
-            return false;
+            buildingRecords.Add(pair.Key, pair.Value);
         }
+
+        floorStates.Clear();
+        foreach (var pair in loadedFloorStates)
+        {
+            floorStates.Add(pair.Key, pair.Value);
+        }
+
+        connections.Clear();
+        connections.AddRange(loadedConnections);
+
+        lastLoadedVersion = version;
+        lastLoadHadBuildingRecords = version >= BuildingRecordsSaveVersion;
+        return true;
     }
 
     public bool SaveToFile(string path)
     {
         try
         {
-            File.WriteAllText(path, ToJson());
+            new OutsideTestFloorSqliteStore().Save(
+                path,
+                GetSortedBuildingRecords(),
+                GetSortedFloorStates(),
+                GetSortedConnections());
             return true;
         }
         catch (Exception)
         {
             return false;
         }
-    }
-
-    public string ToJson()
-    {
-        var data = new OutsideTestFloorSaveData(
-            GetSortedBuildingRecords(),
-            GetSortedFloorStates(),
-            GetSortedConnections())
-        {
-            Version = CurrentSaveVersion
-        };
-        return JsonUtility.ToJson(data, true);
     }
 
     private IEnumerable<OutsideTestBuildingInfo> GetBuildingInfos()
@@ -1412,30 +1438,4 @@ public sealed class OutsideTestFloorStateOwner
             && floor.TryGetEntity(endpoint.EntityId, out entity);
     }
 
-    private static bool HasJsonArrayProperty(string json, string propertyName)
-    {
-        var propertyToken = $"\"{propertyName}\"";
-        var propertyIndex = json.IndexOf(propertyToken, StringComparison.Ordinal);
-        if (propertyIndex < 0)
-        {
-            return false;
-        }
-
-        var valueIndex = json.IndexOf(
-            ':',
-            propertyIndex + propertyToken.Length);
-        if (valueIndex < 0)
-        {
-            return false;
-        }
-
-        valueIndex++;
-        while (valueIndex < json.Length
-            && char.IsWhiteSpace(json[valueIndex]))
-        {
-            valueIndex++;
-        }
-
-        return valueIndex < json.Length && json[valueIndex] == '[';
-    }
 }

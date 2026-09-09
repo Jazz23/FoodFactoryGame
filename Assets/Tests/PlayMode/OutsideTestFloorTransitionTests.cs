@@ -3,6 +3,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using FishNet.Managing;
 using NUnit.Framework;
 using UnityEngine;
@@ -53,7 +54,7 @@ public sealed class OutsideTestFloorTransitionTests
         Application.logMessageReceived += CaptureUnexpectedUnityError;
         savePath = Path.Combine(
             Application.temporaryCachePath,
-            $"outside-test-floor-{Guid.NewGuid():N}.json");
+            $"outside-test-floor-{Guid.NewGuid():N}.db");
         yield return SceneManager.LoadSceneAsync("Bootstrap", LoadSceneMode.Single);
         yield return null;
 
@@ -315,7 +316,7 @@ public sealed class OutsideTestFloorTransitionTests
         Assert.That(destinationFloor.Entities[0].ProducedCount, Is.Zero);
         Assert.That(manager.SaveOutsideTestFloorState(), Is.True);
 
-        var savedData = JsonUtility.FromJson<OutsideTestFloorSaveData>(File.ReadAllText(savePath));
+        var savedData = new OutsideTestFloorSqliteStore().Load(savePath);
         Assert.That(savedData.Version, Is.EqualTo(OutsideTestFloorStateOwner.CurrentSaveVersion));
         Assert.That(savedData.Connections, Has.Count.EqualTo(1));
         Assert.That(savedData.Connections[0].Source,
@@ -750,11 +751,16 @@ public sealed class OutsideTestFloorTransitionTests
             "The player did not return outside before saving.");
 
         Assert.That(sceneManager.SaveOutsideTestFloorState(), Is.True);
-        var savedFileContents = File.ReadAllText(savePath);
+        var savedData = new OutsideTestFloorSqliteStore().Load(savePath);
         var savedGround = CaptureFloor(sceneManager, groundProof);
         var savedUpper = CaptureFloor(sceneManager, upperProof);
-        Assert.That(savedFileContents, Does.Contain("Building 2 Ground Proof"));
-        Assert.That(savedFileContents, Does.Contain("ground-proof-machine"));
+        Assert.That(
+            savedData.Floors.Exists(record => record.Label == "Building 2 Ground Proof"),
+            Is.True);
+        Assert.That(
+            savedData.Floors.Exists(record =>
+                record.Entities.Any(entity => entity.DefinitionId == "ground-proof-machine")),
+            Is.True);
 
         Assert.That(
             sceneManager.TrySetOutsideTestFloorState(
@@ -775,16 +781,20 @@ public sealed class OutsideTestFloorTransitionTests
         Assert.That(sceneManager.LoadOutsideTestFloorState(), Is.True);
         AssertFloorExact(sceneManager, savedGround);
         AssertFloorExact(sceneManager, savedUpper);
-        Assert.That(File.ReadAllText(savePath), Is.EqualTo(savedFileContents));
+        var reloadedData = new OutsideTestFloorSqliteStore().Load(savePath);
+        Assert.That(reloadedData.Version, Is.EqualTo(savedData.Version));
+        Assert.That(reloadedData.Buildings.Count, Is.EqualTo(savedData.Buildings.Count));
+        Assert.That(reloadedData.Floors.Count, Is.EqualTo(savedData.Floors.Count));
+        Assert.That(reloadedData.Connections.Count, Is.EqualTo(savedData.Connections.Count));
 
         yield return StopNetworking();
         Assert.That(File.Exists(savePath), Is.True);
-        var restartedFileContents = File.ReadAllText(savePath);
-        var restartedGround = JsonUtility.FromJson<OutsideTestFloorSaveData>(restartedFileContents)
-            .Floors.Find(record => record.BuildingInstanceId == groundProof.BuildingInstanceId
+        var restartedData = new OutsideTestFloorSqliteStore().Load(savePath);
+        var restartedGround = restartedData.Floors.Find(
+            record => record.BuildingInstanceId == groundProof.BuildingInstanceId
                 && record.FloorIndex == groundProof.FloorIndex);
-        var restartedUpper = JsonUtility.FromJson<OutsideTestFloorSaveData>(restartedFileContents)
-            .Floors.Find(record => record.BuildingInstanceId == upperProof.BuildingInstanceId
+        var restartedUpper = restartedData.Floors.Find(
+            record => record.BuildingInstanceId == upperProof.BuildingInstanceId
                 && record.FloorIndex == upperProof.FloorIndex);
         Assert.That(restartedGround, Is.Not.Null);
         Assert.That(restartedUpper, Is.Not.Null);

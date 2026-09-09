@@ -220,7 +220,7 @@ public sealed class FactoryRecipeSimulationTests
         sourceFloor.SetEntities(new[] { processor });
 
         var restored = new OutsideTestFloorStateOwner(1);
-        Assert.That(restored.LoadFromJson(source.ToJson()), Is.True);
+        Assert.That(restored.LoadState(source.CaptureState()), Is.True);
         restored.TryGetFloorState(10, 0, out var restoredFloor);
         Assert.That(restoredFloor.Entities[0].InputCount, Is.EqualTo(1));
         Assert.That(restoredFloor.Entities[0].CycleProgress, Is.EqualTo(0.4f).Within(0.0001f));
@@ -237,7 +237,7 @@ public sealed class FactoryRecipeSimulationTests
             Connections = new List<FactoryEntityConnectionRecord>()
         };
         var migrated = new OutsideTestFloorStateOwner(1);
-        Assert.That(migrated.LoadFromJson(JsonUtility.ToJson(versionSixData)), Is.True);
+        Assert.That(migrated.LoadState(versionSixData), Is.True);
         migrated.TryGetFloorState(10, 0, out var migratedFloor);
         Assert.That(migratedFloor.Entities[0].InputCount, Is.Zero);
     }

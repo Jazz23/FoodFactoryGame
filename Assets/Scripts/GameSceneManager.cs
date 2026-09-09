@@ -20,7 +20,7 @@ using SceneHandle = System.Int32;
 public sealed class GameSceneManager : MonoBehaviour
 {
     public const uint LegacyOutsideTestBuildingId = 1;
-    public const string OutsideTestStateFileName = "outsidetest-floor-state.json";
+    public const string OutsideTestStateFileName = "outsidetest-floor-state.db";
 
     private const float OutsideTestBroadcastInterval = 0.25f;
 
@@ -580,7 +580,7 @@ public sealed class GameSceneManager : MonoBehaviour
             return false;
         }
 
-        var previousState = outsideTestStateOwner.ToJson();
+        var previousState = outsideTestStateOwner.CaptureState();
         var creator = FindOutsideTestCreator();
         var doorCornerExclusionDistance = creator is null || !creator
             ? TestBuildingCreator.DefaultDoorCornerExclusionDistance
@@ -604,7 +604,7 @@ public sealed class GameSceneManager : MonoBehaviour
                 !outsideTestStateOwner.LastLoadHadBuildingRecords,
                 out var reconciliationError))
         {
-            outsideTestStateOwner.LoadFromJson(
+            outsideTestStateOwner.LoadState(
                 previousState,
                 doorCornerExclusionDistance);
             outsideTestWorldReconciled = false;
