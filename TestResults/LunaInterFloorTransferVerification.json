@@ -1,0 +1,29 @@
+{
+  "feature": "inter-floor-item-transfer",
+  "verifiedAt": "2026-09-08",
+  "unityVersion": "6000.5.9f1",
+  "editMode": {
+    "focusedOwnerTests": {
+      "total": 29,
+      "passed": 29,
+      "failed": 0
+    },
+    "fullRegression": {
+      "total": 125,
+      "passed": 125,
+      "failed": 0
+    }
+  },
+  "playMode": {
+    "status": "not_completed",
+    "reason": "Unity MCP test runner failed to initialize after 120 seconds with zero tests started; the Unity console reported no compilation errors."
+  },
+  "coverage": [
+    "one-item fixed-tick transfer and conservation",
+    "empty and full destination stop/resume without catch-up",
+    "lifetime production and storage invariants",
+    "connection validation, duplicate rejection, and endpoint cleanup",
+    "version-5 output migration and version-6 connection round trip",
+    "transactional rejection of invalid saved connections"
+  ]
+}

@@ -776,6 +776,202 @@ public sealed class OutsideTestFloorStateOwnerTests
         Assert.That(restoredUpper.Entities, Is.Empty);
     }
 
+    [Test]
+    public void OneFixedTickTransfersExactlyOneItemAndConservesBuffers()
+    {
+        var owner = new OutsideTestFloorStateOwner(1);
+        owner.TryRegisterBuilding(2, 2, new Vector2Int(5, 3), out _);
+        owner.TryGetFloorState(2, 0, out var sourceFloor);
+        owner.TryGetFloorState(2, 1, out var destinationFloor);
+        sourceFloor.SetEntities(Array.Empty<FactoryEntityRecord>());
+        destinationFloor.SetEntities(Array.Empty<FactoryEntityRecord>());
+        owner.TryAddTestMachine(2, 0, Vector2.one, out var sourceId, out _);
+        owner.TryAddTestStorage(2, 1, Vector2.one, out var destinationId, out _);
+        sourceFloor.Entities[0].SetState(
+            sourceId,
+            "test-machine",
+            Vector2.one,
+            0f,
+            0f,
+            11,
+            3);
+
+        Assert.That(owner.TryAddConnection(
+                new FactoryEntityEndpoint(2, 0, sourceId),
+                new FactoryEntityEndpoint(2, 1, destinationId),
+                out var error), Is.True, error);
+
+        new FactorySimulation(owner.AdvanceProduction).Advance(0.1f);
+
+        Assert.That(sourceFloor.Entities[0].OutputCount, Is.EqualTo(2));
+        Assert.That(destinationFloor.Entities[0].OutputCount, Is.EqualTo(1));
+        Assert.That(
+            sourceFloor.Entities[0].OutputCount + destinationFloor.Entities[0].OutputCount,
+            Is.EqualTo(3));
+        Assert.That(sourceFloor.Entities[0].ProducedCount, Is.EqualTo(11));
+        Assert.That(destinationFloor.Entities[0].ProducedCount, Is.Zero);
+    }
+
+    [Test]
+    public void EmptyAndFullDestinationsStopAndResumeWithoutCatchUp()
+    {
+        var owner = new OutsideTestFloorStateOwner(1);
+        owner.TryRegisterBuilding(2, 2, new Vector2Int(5, 3), out _);
+        owner.TryGetFloorState(2, 0, out var sourceFloor);
+        owner.TryGetFloorState(2, 1, out var destinationFloor);
+        sourceFloor.SetEntities(new[]
+        {
+            new FactoryEntityRecord(1, "test-machine", Vector2.one, 0f, 0f, 4, 2)
+        });
+        destinationFloor.SetEntities(new[]
+        {
+            new FactoryEntityRecord(
+                1,
+                FactoryEntityRecord.StorageDefinitionId,
+                Vector2.one,
+                10f,
+                0.8f,
+                9,
+                FactoryEntityRecord.OutputCapacity)
+        });
+        owner.TryAddConnection(
+            new FactoryEntityEndpoint(2, 0, 1),
+            new FactoryEntityEndpoint(2, 1, 1),
+            out _);
+
+        new FactorySimulation(owner.AdvanceProduction).Advance(0.1f);
+        Assert.That(sourceFloor.Entities[0].OutputCount, Is.EqualTo(2));
+        Assert.That(destinationFloor.Entities[0].OutputCount,
+            Is.EqualTo(FactoryEntityRecord.OutputCapacity));
+
+        destinationFloor.Entities[0].DrainOutput();
+        new FactorySimulation(owner.AdvanceProduction).Advance(0.1f);
+        Assert.That(sourceFloor.Entities[0].OutputCount, Is.EqualTo(1));
+        Assert.That(destinationFloor.Entities[0].OutputCount, Is.EqualTo(1));
+        Assert.That(destinationFloor.Entities[0].ProducedCount, Is.Zero);
+    }
+
+    [Test]
+    public void ConnectionValidationAndEndpointRemovalLeaveStateUnchangedOrClean()
+    {
+        var owner = new OutsideTestFloorStateOwner(1);
+        owner.TryRegisterBuilding(2, 2, new Vector2Int(5, 3), out _);
+        owner.TryGetFloorState(2, 0, out var ground);
+        owner.TryGetFloorState(2, 1, out var upper);
+        ground.SetEntities(new[]
+        {
+            new FactoryEntityRecord(1, "test-machine", Vector2.one, 0f, 0f, 2, 5)
+        });
+        upper.SetEntities(new[]
+        {
+            new FactoryEntityRecord(9, FactoryEntityRecord.StorageDefinitionId, Vector2.one, 0f, 0f, 0, 4)
+        });
+        var source = new FactoryEntityEndpoint(2, 0, 1);
+        var destination = new FactoryEntityEndpoint(2, 1, 9);
+        var beforeInvalid = owner.ToJson();
+
+        Assert.That(owner.TryAddConnection(
+                new FactoryEntityEndpoint(3, 0, 7),
+                destination,
+                out _), Is.False);
+        Assert.That(owner.TryAddConnection(
+                source,
+                new FactoryEntityEndpoint(2, 0, 9),
+                out _), Is.False);
+        Assert.That(owner.TryAddConnection(source, destination, out _), Is.True);
+        var connected = owner.ToJson();
+        Assert.That(owner.TryAddConnection(source, destination, out _), Is.False);
+        Assert.That(owner.ToJson(), Is.EqualTo(connected));
+        Assert.That(owner.TryRemoveTestMachine(2, 0, 1, out _), Is.True);
+        Assert.That(owner.Connections, Is.Empty);
+        Assert.That(owner.TryAddTestMachine(2, 0, Vector2.one, out var reusedId, out _), Is.True);
+        Assert.That(reusedId, Is.EqualTo(1u));
+        Assert.That(owner.ToJson(), Is.Not.EqualTo(beforeInvalid));
+    }
+
+    [Test]
+    public void VersionFivePreservesOutputAndVersionSixRoundTripPreservesConnection()
+    {
+        var source = new OutsideTestFloorStateOwner(1);
+        source.TryRegisterBuilding(2, 2, new Vector2Int(5, 3), out _);
+        source.TryGetFloorState(2, 0, out var ground);
+        source.TryGetFloorState(2, 1, out var upper);
+        ground.SetEntities(new[]
+        {
+            new FactoryEntityRecord(41, "test-machine", Vector2.one, 0f, 0f, 22, 7)
+        });
+        upper.SetEntities(new[]
+        {
+            new FactoryEntityRecord(
+                42,
+                FactoryEntityRecord.StorageDefinitionId,
+                Vector2.one,
+                4f,
+                0.5f,
+                9,
+                6)
+        });
+        source.TryAddConnection(
+            new FactoryEntityEndpoint(2, 0, 41),
+            new FactoryEntityEndpoint(2, 1, 42),
+            out _);
+
+        var restored = new OutsideTestFloorStateOwner(1);
+        Assert.That(restored.LoadFromJson(source.ToJson()), Is.True);
+        Assert.That(restored.Connections, Has.Count.EqualTo(1));
+        Assert.That(restored.Connections[0].Source, Is.EqualTo(new FactoryEntityEndpoint(2, 0, 41)));
+        Assert.That(restored.TryGetFloorState(2, 0, out var restoredGround), Is.True);
+        Assert.That(restored.TryGetFloorState(2, 1, out var restoredUpper), Is.True);
+        Assert.That(restoredGround.Entities[0].OutputCount, Is.EqualTo(7));
+        Assert.That(restoredUpper.Entities[0].OutputCount, Is.EqualTo(6));
+        Assert.That(restoredUpper.Entities[0].ProducedCount, Is.Zero);
+
+        var versionFiveData = new OutsideTestFloorSaveData
+        {
+            Version = OutsideTestFloorStateOwner.OutputBuffersSaveVersion,
+            Buildings = new List<BuildingRecord>
+            {
+                new BuildingRecord(2, Vector3Int.zero, new Vector2Int(5, 3), 2)
+            },
+            Floors = new List<OutsideTestFloorRecord> { ground, upper }
+        };
+        var migrated = new OutsideTestFloorStateOwner(1);
+        Assert.That(migrated.LoadFromJson(JsonUtility.ToJson(versionFiveData)), Is.True);
+        Assert.That(migrated.TryGetFloorState(2, 0, out var migratedGround), Is.True);
+        Assert.That(migratedGround.Entities[0].OutputCount, Is.EqualTo(7));
+        Assert.That(migrated.Connections, Is.Empty);
+    }
+
+    [Test]
+    public void InvalidSavedConnectionDoesNotReplaceLiveState()
+    {
+        var owner = new OutsideTestFloorStateOwner(1);
+        owner.TryRegisterBuilding(2, 1, new Vector2Int(5, 3), out _);
+        owner.TrySetFloorState(2, 0, "Live", 3f, Vector2.one);
+        var before = owner.ToJson();
+        var invalid = new OutsideTestFloorSaveData
+        {
+            Version = OutsideTestFloorStateOwner.CurrentSaveVersion,
+            Buildings = new List<BuildingRecord>
+            {
+                new BuildingRecord(2, Vector3Int.zero, new Vector2Int(5, 3), 1)
+            },
+            Floors = new List<OutsideTestFloorRecord>
+            {
+                new OutsideTestFloorRecord(2, 0, "Replacement", 9f, 0f, Vector2.one)
+            },
+            Connections = new List<FactoryEntityConnectionRecord>
+            {
+                new FactoryEntityConnectionRecord(
+                    new FactoryEntityEndpoint(2, 0, 999),
+                    new FactoryEntityEndpoint(2, 0, 1000))
+            }
+        };
+
+        Assert.That(owner.LoadFromJson(JsonUtility.ToJson(invalid)), Is.False);
+        Assert.That(owner.ToJson(), Is.EqualTo(before));
+    }
+
     private static void AssertEntityFields(
         FactoryEntityRecord actual,
         FactoryEntityRecord expected)

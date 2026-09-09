@@ -3,3 +3,4 @@
 - Always assume references exist, that means no null checks. Use ! if there are compiler warnings. If the reference could actuall be null as intended behavior, then you can perform null checks.
 - Add a comment at the top of each file that describes the purpose of the file. Do not comment every little thing, only very important stuff should receive large abstract comments.
 - Use null pattern matching instead of != null, such as `player is not null`
+- Use Unity CLI in MCP mode (`unity mcp --project-path E:\Projects\Unity\FoodFactoryGame`) for Unity Editor operations. This project preference supersedes the unity-mcp-efficient skill; do not use the efficient facade or the direct HTTP MCP for Unity connection unless explicitly requested.

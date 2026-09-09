@@ -221,6 +221,199 @@ public sealed class OutsideTestFloorTransitionTests
         Assert.That(HasMachineView(PlayerSceneTransition.LocalOwner.gameObject.scene, survivorId), Is.False);
     }
 
+    [UnityTest]
+    public IEnumerator InterFloorTransferPersistsWhenInteriorsUnloadAndRestart()
+    {
+        yield return WaitForCondition(
+            () => PlayerSceneTransition.LocalOwner.gameObject.scene.name == "OutsideTest",
+            10f,
+            "Player did not reach the world.");
+        var player = PlayerSceneTransition.LocalOwner;
+        var manager = GameSceneManager.Instance;
+        Assert.That(manager.TryGetOutsideTestFloorState(2, 0, out var sourceFloor), Is.True);
+        Assert.That(manager.TryGetOutsideTestFloorState(2, 1, out var destinationFloor), Is.True);
+        sourceFloor.SetEntities(Array.Empty<FactoryEntityRecord>());
+        destinationFloor.SetEntities(Array.Empty<FactoryEntityRecord>());
+
+        yield return EnterMachineTestBuilding();
+        FindMachineButton(player, "Add Test Machine").onClick.Invoke();
+        yield return WaitForCondition(
+            () => sourceFloor.Entities.Count == 1,
+            3f,
+            "The source machine request failed.");
+        var sourceId = sourceFloor.Entities[0].EntityId;
+
+        yield return WaitForCondition(
+            () => manager.RequestFloorTransition(player.NetworkObject, 1),
+            3f,
+            "The destination floor transition was rejected.");
+        yield return WaitForCondition(
+            () => player.TryGetCurrentOutsideTestFloor(out var building, out var floor)
+                && building == 2
+                && floor == 1
+                && !player.IsTransitioning,
+            10f,
+            "The player did not reach the destination floor.");
+        FindMachineButton(player, "Add Test Storage").onClick.Invoke();
+        yield return WaitForCondition(
+            () => destinationFloor.Entities.Count == 1,
+            3f,
+            "The destination storage request failed.");
+        var destinationId = destinationFloor.Entities[0].EntityId;
+
+        yield return WaitForCondition(
+            () => manager.RequestFloorTransition(player.NetworkObject, 0),
+            3f,
+            "The source floor transition was rejected.");
+        yield return WaitForCondition(
+            () => player.TryGetCurrentOutsideTestFloor(out var building, out var floor)
+                && building == 2
+                && floor == 0
+                && !player.IsTransitioning,
+            10f,
+            "The player did not return to the source floor.");
+
+        sourceFloor.Entities[0].SetState(
+            sourceId,
+            "test-machine",
+            Vector2.one,
+            0f,
+            0f,
+            17,
+            3);
+        destinationFloor.Entities[0].SetState(
+            destinationId,
+            FactoryEntityRecord.StorageDefinitionId,
+            Vector2.one,
+            0f,
+            0f,
+            0,
+            0);
+
+        FindMachineButton(player, "Next Machine").onClick.Invoke();
+        yield return null;
+        FindMachineButton(player, "Destination Floor 1 Button").onClick.Invoke();
+        yield return null;
+        FindMachineButton(player, $"Destination Storage {destinationId} Button").onClick.Invoke();
+        yield return null;
+        var connectButton = FindMachineButton(player, "Connect");
+        Assert.That(connectButton.interactable, Is.True);
+        connectButton.onClick.Invoke();
+        yield return WaitForCondition(
+            () => manager.GetOutsideTestConnections().Length == 1,
+            3f,
+            "The source and destination were not connected.");
+
+        yield return ExitMachineTestBuilding();
+        yield return WaitForCondition(
+            () => manager.OutsideTestLoadedInteriorCount == 0
+                && sourceFloor.Entities[0].OutputCount == 0
+                && destinationFloor.Entities[0].OutputCount == 3,
+            3f,
+            "The unloaded inter-floor transfer did not conserve all three items.");
+        Assert.That(sourceFloor.Entities[0].ProducedCount, Is.EqualTo(17));
+        Assert.That(destinationFloor.Entities[0].ProducedCount, Is.Zero);
+        Assert.That(manager.SaveOutsideTestFloorState(), Is.True);
+
+        var savedData = JsonUtility.FromJson<OutsideTestFloorSaveData>(File.ReadAllText(savePath));
+        Assert.That(savedData.Version, Is.EqualTo(OutsideTestFloorStateOwner.CurrentSaveVersion));
+        Assert.That(savedData.Connections, Has.Count.EqualTo(1));
+        Assert.That(savedData.Connections[0].Source,
+            Is.EqualTo(new FactoryEntityEndpoint(2, 0, sourceId)));
+        Assert.That(savedData.Connections[0].Destination,
+            Is.EqualTo(new FactoryEntityEndpoint(2, 1, destinationId)));
+
+        yield return RestartMachineTestHost();
+        manager = GameSceneManager.Instance;
+        player = PlayerSceneTransition.LocalOwner;
+        Assert.That(manager.GetOutsideTestConnections(), Has.Length.EqualTo(1));
+        Assert.That(manager.TryGetOutsideTestFloorState(2, 0, out sourceFloor), Is.True);
+        Assert.That(manager.TryGetOutsideTestFloorState(2, 1, out destinationFloor), Is.True);
+        Assert.That(sourceFloor.Entities[0].OutputCount, Is.Zero);
+        Assert.That(destinationFloor.Entities[0].OutputCount, Is.EqualTo(3));
+
+        yield return EnterMachineTestBuilding();
+        yield return WaitForCondition(
+            () => HasEntityLabelText(
+                player.gameObject.scene,
+                sourceId,
+                "0/100 test-product"),
+            3f,
+            "The restored source output label did not hydrate.");
+        yield return WaitForCondition(
+            () => manager.RequestFloorTransition(player.NetworkObject, 1),
+            3f,
+            "The restored destination floor transition was rejected.");
+        yield return WaitForCondition(
+            () => player.TryGetCurrentOutsideTestFloor(out var building, out var floor)
+                && building == 2
+                && floor == 1
+                && !player.IsTransitioning,
+            10f,
+            "The player did not revisit the destination floor.");
+        yield return WaitForCondition(
+            () => HasEntityLabelText(
+                player.gameObject.scene,
+                destinationId,
+                "Stored 3/100 test-product"),
+            3f,
+            "The restored storage label did not hydrate.");
+
+        FindMachineButton(player, "Next Machine").onClick.Invoke();
+        yield return null;
+        var disconnectButton = FindMachineButton(player, "Disconnect");
+        Assert.That(disconnectButton.interactable, Is.True);
+        disconnectButton.onClick.Invoke();
+        yield return WaitForCondition(
+            () => manager.GetOutsideTestConnections().Length == 0,
+            3f,
+            "Disconnect did not remove the connection.");
+        Assert.That(destinationFloor.Entities[0].OutputCount, Is.EqualTo(3));
+
+        yield return WaitForCondition(
+            () => manager.RequestFloorTransition(player.NetworkObject, 0),
+            3f,
+            "The source floor transition after disconnect was rejected.");
+        yield return WaitForCondition(
+            () => player.TryGetCurrentOutsideTestFloor(out var building, out var floor)
+                && building == 2
+                && floor == 0
+                && !player.IsTransitioning,
+            10f,
+            "The player did not return to the source floor after disconnect.");
+        FindMachineButton(player, "Next Machine").onClick.Invoke();
+        yield return null;
+        FindMachineButton(player, "Destination Floor 1 Button").onClick.Invoke();
+        yield return null;
+        FindMachineButton(player, $"Destination Storage {destinationId} Button").onClick.Invoke();
+        yield return null;
+        FindMachineButton(player, "Connect").onClick.Invoke();
+        yield return WaitForCondition(
+            () => manager.GetOutsideTestConnections().Length == 1,
+            3f,
+            "Reconnect did not restore the connection.");
+
+        yield return WaitForCondition(
+            () => manager.RequestFloorTransition(player.NetworkObject, 1),
+            3f,
+            "The destination floor transition before endpoint removal was rejected.");
+        yield return WaitForCondition(
+            () => player.TryGetCurrentOutsideTestFloor(out var building, out var floor)
+                && building == 2
+                && floor == 1
+                && !player.IsTransitioning,
+            10f,
+            "The player did not reach the destination before endpoint removal.");
+        FindMachineButton(player, "Next Machine").onClick.Invoke();
+        yield return null;
+        FindMachineButton(player, "Remove Machine").onClick.Invoke();
+        yield return WaitForCondition(
+            () => destinationFloor.Entities.Count == 0
+                && manager.GetOutsideTestConnections().Length == 0,
+            3f,
+            "Removing the storage endpoint did not clean up the connection.");
+    }
+
     private IEnumerator EnterMachineTestBuilding()
     {
         var player = PlayerSceneTransition.LocalOwner;
@@ -280,6 +473,20 @@ public sealed class OutsideTestFloorTransitionTests
         foreach (var renderer in UnityEngine.Object.FindObjectsByType<SpriteRenderer>(FindObjectsSortMode.None))
         {
             if (renderer.gameObject.scene == scene && renderer.gameObject.name == $"Factory Entity {entityId}")
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool HasEntityLabelText(Scene scene, uint entityId, string expectedText)
+    {
+        var entityObject = FindEntityObject(scene, entityId);
+        foreach (var label in entityObject.GetComponentsInChildren<TextMesh>(true))
+        {
+            if (label.text.Contains(expectedText, StringComparison.Ordinal))
             {
                 return true;
             }

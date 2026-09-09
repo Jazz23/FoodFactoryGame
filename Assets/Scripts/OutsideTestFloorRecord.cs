@@ -151,6 +151,21 @@ public sealed class OutsideTestFloorRecord
         return true;
     }
 
+    public bool TryGetEntity(uint entityId, out FactoryEntityRecord entity)
+    {
+        foreach (var candidate in GetEntities())
+        {
+            if (candidate is not null && candidate.EntityId == entityId)
+            {
+                entity = candidate;
+                return true;
+            }
+        }
+
+        entity = null!;
+        return false;
+    }
+
     public void SetEntities(IEnumerable<FactoryEntityRecord> newEntities)
     {
         var entityList = GetEntities();
@@ -235,6 +250,7 @@ public sealed class OutsideTestFloorSaveData
     public int Version = OutsideTestFloorStateOwner.CurrentSaveVersion;
     public List<BuildingRecord> Buildings = new();
     public List<OutsideTestFloorRecord> Floors = new();
+    public List<FactoryEntityConnectionRecord> Connections = new();
 
     public OutsideTestFloorSaveData()
     {
@@ -250,7 +266,8 @@ public sealed class OutsideTestFloorSaveData
 
     public OutsideTestFloorSaveData(
         IEnumerable<BuildingRecord> buildingRecords,
-        IEnumerable<OutsideTestFloorRecord> floorRecords)
+        IEnumerable<OutsideTestFloorRecord> floorRecords,
+        IEnumerable<FactoryEntityConnectionRecord> connectionRecords = null)
     {
         if (buildingRecords is not null)
         {
@@ -260,6 +277,11 @@ public sealed class OutsideTestFloorSaveData
         if (floorRecords is not null)
         {
             Floors.AddRange(floorRecords);
+        }
+
+        if (connectionRecords is not null)
+        {
+            Connections.AddRange(connectionRecords);
         }
     }
 }

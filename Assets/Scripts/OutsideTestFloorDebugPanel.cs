@@ -30,19 +30,28 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
     private Text machineDetailsText = null!;
     private Text machineStatusText = null!;
     private Button addMachineButton = null!;
+    private Button addStorageButton = null!;
     private Button removeMachineButton = null!;
     private Button drainOutputButton = null!;
     private Button nextMachineButton = null!;
+    private Button connectButton = null!;
+    private Button disconnectButton = null!;
+    private Text connectionText = null!;
     private uint machineBuildingId;
     private int machineFloorIndex = -1;
     private uint selectedMachineId;
+    private int destinationFloorIndex = -1;
+    private uint selectedStorageId;
     private Transform selectorRoot = null!;
+    private Transform destinationFloorRoot = null!;
+    private Transform destinationStorageRoot = null!;
     private InputAction toggle = null!;
     private InputAction cancel = null!;
     private InputAction moveMarker = null!;
     private GameObject createdEventSystem = null!;
     private string statusMessage = "Waiting for server state";
     private string selectorFingerprint = string.Empty;
+    private string destinationFingerprint = string.Empty;
     private uint selectedBuildingInstanceId;
     private int selectedFloor;
     private bool initialized;
@@ -69,6 +78,19 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
         owner.RequestAddCurrentFloorMachine(new Vector2(x, y));
     }
 
+    private void AddStorageClicked()
+    {
+        if (!float.TryParse(machineXInput.text, NumberStyles.Float, CultureInfo.InvariantCulture, out var x)
+            || !float.TryParse(machineYInput.text, NumberStyles.Float, CultureInfo.InvariantCulture, out var y))
+        {
+            machineStatusText.text = "X and Y must be finite numbers.";
+            return;
+        }
+
+        machineStatusText.text = "Adding storage...";
+        owner.RequestAddCurrentFloorStorage(new Vector2(x, y));
+    }
+
     private void RemoveMachineClicked()
     {
         machineStatusText.text = "Removing machine...";
@@ -79,6 +101,21 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
     {
         machineStatusText.text = "Draining output; buffered test-product will be discarded...";
         owner.RequestDrainCurrentFloorMachine(selectedMachineId);
+    }
+
+    private void ConnectClicked()
+    {
+        machineStatusText.text = "Connecting...";
+        owner.RequestConnectCurrentFloorEntity(
+            selectedMachineId,
+            destinationFloorIndex,
+            selectedStorageId);
+    }
+
+    private void DisconnectClicked()
+    {
+        machineStatusText.text = "Disconnecting...";
+        owner.RequestDisconnectCurrentFloorEntity(selectedMachineId);
     }
 
     private void NextMachineClicked()
@@ -107,7 +144,7 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
 
     private void RefreshMachines()
     {
-        var canEdit = GameSceneManager.Instance.CanEditCurrentFloorMachines(owner);
+        var canEdit = GameSceneManager.Instance.CanEditCurrentFloorEntities(owner);
         var hasCurrentFloor = owner.TryGetCurrentOutsideTestFloor(
             out var buildingId,
             out var floorIndex);
@@ -117,16 +154,18 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             selectedMachineId = 0;
             machineBuildingId = buildingId;
             machineFloorIndex = floorIndex;
+            destinationFloorIndex = -1;
+            selectedStorageId = 0;
         }
 
         var selected = false;
         var count = 0;
         machineSelectionText.text = hasCurrentFloor
-            ? "No machine selected"
-            : "Enter a floor as host to edit machines";
+            ? "No entity selected"
+            : "Enter a floor as host to edit entities";
         machineDetailsText.text = hasCurrentFloor
-            ? "Select a machine to inspect its output."
-            : "Machine editing is unavailable outside a floor.";
+            ? "Select a machine or storage to inspect it."
+            : "Entity editing is unavailable outside a floor.";
         if (hasCurrentFloor
             && GameSceneManager.Instance.TryGetOutsideTestFloorState(
                 buildingId,
@@ -139,13 +178,15 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
                 if (entity.EntityId == selectedMachineId)
                 {
                     selected = true;
-                    var outputStatus = entity.OutputCount >= FactoryEntityRecord.OutputCapacity
-                        ? "Output full"
-                        : "Producing";
-                    machineDetailsText.text = $"OUTPUT: {entity.OutputCount}/{FactoryEntityRecord.OutputCapacity} "
-                        + $"{FactoryEntityRecord.OutputProductId}\n"
-                        + $"LIFETIME: {entity.ProducedCount}\n"
-                        + outputStatus;
+                    machineDetailsText.text = entity.IsStorage
+                        ? $"STORED: {entity.OutputCount}/{FactoryEntityRecord.OutputCapacity} "
+                            + $"{FactoryEntityRecord.OutputProductId}\nLIFETIME: 0\nStorage"
+                        : $"OUTPUT: {entity.OutputCount}/{FactoryEntityRecord.OutputCapacity} "
+                            + $"{FactoryEntityRecord.OutputProductId}\n"
+                            + $"LIFETIME: {entity.ProducedCount}\n"
+                            + (entity.OutputCount >= FactoryEntityRecord.OutputCapacity
+                                ? "Output full"
+                                : "Producing");
                     machineSelectionText.text = $"B{buildingId}/F{floorIndex} — {entity.EntityId}: {entity.DefinitionId}";
                     break;
                 }
@@ -160,9 +201,216 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
         machineXInput.interactable = canEdit;
         machineYInput.interactable = canEdit;
         addMachineButton.interactable = canEdit;
+        addStorageButton.interactable = canEdit;
         nextMachineButton.interactable = canEdit && count > 0;
         removeMachineButton.interactable = canEdit && selected;
         drainOutputButton.interactable = canEdit && selected;
+        RefreshConnectionControls(
+            canEdit,
+            hasCurrentFloor,
+            buildingId,
+            floorIndex,
+            selected);
+    }
+
+    private void RefreshConnectionControls(
+        bool canEdit,
+        bool hasCurrentFloor,
+        uint buildingId,
+        int floorIndex,
+        bool selected)
+    {
+        var selectedEntity = default(FactoryEntityRecord);
+        var selectedConnection = null as FactoryEntityConnectionRecord;
+        var hasConnection = false;
+        if (hasCurrentFloor
+            && GameSceneManager.Instance.TryGetOutsideTestFloorState(
+                buildingId,
+                floorIndex,
+                out var floor)
+            && floor.TryGetEntity(selectedMachineId, out var currentEntity))
+        {
+            selectedEntity = currentEntity;
+            foreach (var connection in GameSceneManager.Instance.GetOutsideTestConnections())
+            {
+                if (connection.Source.Equals(new FactoryEntityEndpoint(
+                        buildingId,
+                        floorIndex,
+                        selectedMachineId))
+                    || connection.Destination.Equals(new FactoryEntityEndpoint(
+                        buildingId,
+                        floorIndex,
+                        selectedMachineId)))
+                {
+                    selectedConnection = connection;
+                    hasConnection = true;
+                    break;
+                }
+            }
+        }
+
+        if (!selected || selectedEntity is null)
+        {
+            connectionText.text = "CONNECTION: select an entity";
+            destinationFloorIndex = -1;
+            selectedStorageId = 0;
+            destinationFingerprint = string.Empty;
+            ClearDynamicRoot(destinationFloorRoot);
+            ClearDynamicRoot(destinationStorageRoot);
+            connectButton.interactable = false;
+            disconnectButton.interactable = false;
+            return;
+        }
+
+        connectionText.text = hasConnection
+            ? selectedConnection.Source.Equals(new FactoryEntityEndpoint(
+                buildingId,
+                floorIndex,
+                selectedMachineId))
+                ? $"DESTINATION: B{selectedConnection.Destination.BuildingInstanceId}/"
+                    + $"F{selectedConnection.Destination.FloorIndex}/E{selectedConnection.Destination.EntityId}"
+                : $"INCOMING: B{selectedConnection.Source.BuildingInstanceId}/"
+                    + $"F{selectedConnection.Source.FloorIndex}/E{selectedConnection.Source.EntityId}"
+            : "CONNECTION: not connected";
+
+        var eligibleFloorIndices = new System.Collections.Generic.List<int>();
+        if (selectedEntity.IsProducingMachine
+            && GameSceneManager.Instance.TryGetOutsideTestBuildingInfo(
+                buildingId,
+                out var buildingInfo))
+        {
+            for (var candidateFloorIndex = 0;
+                candidateFloorIndex < buildingInfo.StoryCount;
+                candidateFloorIndex++)
+            {
+                if (candidateFloorIndex == floorIndex
+                    || !GameSceneManager.Instance.TryGetOutsideTestFloorState(
+                        buildingId,
+                        candidateFloorIndex,
+                        out var candidateFloor))
+                {
+                    continue;
+                }
+
+                foreach (var candidateEntity in candidateFloor.Entities)
+                {
+                    if (candidateEntity is not null && candidateEntity.IsStorage)
+                    {
+                        eligibleFloorIndices.Add(candidateFloorIndex);
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (hasConnection)
+        {
+            destinationFloorIndex = selectedConnection.Destination.FloorIndex;
+            selectedStorageId = selectedConnection.Destination.EntityId;
+        }
+        else if (!eligibleFloorIndices.Contains(destinationFloorIndex))
+        {
+            destinationFloorIndex = eligibleFloorIndices.Count > 0
+                ? eligibleFloorIndices[0]
+                : -1;
+            selectedStorageId = 0;
+        }
+
+        var fingerprint = $"{buildingId}:{floorIndex}:{selectedMachineId}:{destinationFloorIndex}:"
+            + $"{selectedStorageId}:{hasConnection}";
+        foreach (var candidateFloorIndex in eligibleFloorIndices)
+        {
+            fingerprint += $"|F{candidateFloorIndex}";
+            if (!GameSceneManager.Instance.TryGetOutsideTestFloorState(
+                    buildingId,
+                    candidateFloorIndex,
+                    out var candidateFloor))
+            {
+                continue;
+            }
+
+            foreach (var candidateEntity in candidateFloor.Entities)
+            {
+                if (candidateEntity is not null && candidateEntity.IsStorage)
+                {
+                    fingerprint += $"/E{candidateEntity.EntityId}";
+                }
+            }
+        }
+
+        if (fingerprint != destinationFingerprint)
+        {
+            destinationFingerprint = fingerprint;
+            ClearDynamicRoot(destinationFloorRoot);
+            ClearDynamicRoot(destinationStorageRoot);
+            for (var index = 0; index < eligibleFloorIndices.Count; index++)
+            {
+                var capturedFloorIndex = eligibleFloorIndices[index];
+                var floorButton = CreateButton(
+                    $"Destination Floor {capturedFloorIndex} Button",
+                    $"DEST F{capturedFloorIndex}",
+                    destinationFloorRoot,
+                    index * 95f,
+                    0f,
+                    90f,
+                    28f,
+                    () =>
+                    {
+                        destinationFloorIndex = capturedFloorIndex;
+                        selectedStorageId = 0;
+                        RefreshMachines();
+                    });
+                floorButton.GetComponent<Image>().color = new Color(0.16f, 0.3f, 0.32f, 1f);
+            }
+
+            if (destinationFloorIndex >= 0
+                && GameSceneManager.Instance.TryGetOutsideTestFloorState(
+                    buildingId,
+                    destinationFloorIndex,
+                    out var storageFloor))
+            {
+                var storageIndex = 0;
+                foreach (var candidateEntity in storageFloor.Entities)
+                {
+                    if (candidateEntity is null || !candidateEntity.IsStorage)
+                    {
+                        continue;
+                    }
+
+                    var capturedStorageId = candidateEntity.EntityId;
+                    var storageButton = CreateButton(
+                        $"Destination Storage {capturedStorageId} Button",
+                        $"STORAGE {capturedStorageId}",
+                        destinationStorageRoot,
+                        storageIndex * 95f,
+                        0f,
+                        90f,
+                        28f,
+                        () =>
+                        {
+                            selectedStorageId = capturedStorageId;
+                            RefreshMachines();
+                        });
+                    storageButton.GetComponent<Image>().color = new Color(0.12f, 0.25f, 0.28f, 1f);
+                    storageIndex++;
+                }
+            }
+        }
+
+        connectButton.interactable = canEdit
+            && selectedEntity.IsProducingMachine
+            && !hasConnection
+            && destinationFloorIndex >= 0
+            && selectedStorageId != 0;
+        disconnectButton.interactable = canEdit && hasConnection;
+    }
+
+    private static void ClearDynamicRoot(Transform rootTransform)
+    {
+        for (var index = rootTransform.childCount - 1; index >= 0; index--)
+        {
+            Destroy(rootTransform.GetChild(index).gameObject);
+        }
     }
 
     public void Initialize(PlayerSceneTransition newOwner)
@@ -470,6 +718,20 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             }
         }
 
+        summary += "\nCONNECTIONS\n";
+        var connections = GameSceneManager.Instance.GetOutsideTestConnections();
+        if (connections.Length == 0)
+        {
+            summary += "none\n";
+        }
+        else
+        {
+            foreach (var connection in connections)
+            {
+                summary += $"{connection.Source} -> {connection.Destination}\n";
+            }
+        }
+
         summaryText.text = summary.TrimEnd();
         var authoritativeError = GameSceneManager.Instance.LastOutsideTestError;
         statusText.text = string.IsNullOrEmpty(authoritativeError)
@@ -711,33 +973,54 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
         SetTopRect(statusText.rectTransform, 14f, 446f, 392f, 40f);
         var machines = CreateImage("Current Floor Machines", root.transform,
             new Color(0.025f, 0.055f, 0.075f, 0.94f));
-        SetTopRect(machines.GetComponent<RectTransform>(), 434f, 0f, 310f, 344f);
+        SetTopRect(machines.GetComponent<RectTransform>(), 434f, 0f, 420f, 520f);
         var machineTitle = CreateText("Machine Title", machines.transform, "CURRENT FLOOR MACHINES", 16,
             TextAnchor.MiddleLeft, new Color(0.78f, 1f, 0.9f));
-        SetTopRect(machineTitle.rectTransform, 12f, 10f, 286f, 28f);
+        SetTopRect(machineTitle.rectTransform, 12f, 10f, 396f, 28f);
         CreateTextLabel(machines.transform, "Machine X Label", "X", 12f, 46f);
-        machineXInput = CreateInputField(machines.transform, "Machine X Input", "1", 38f, 42f, 95f, 32f,
+        machineXInput = CreateInputField(machines.transform, "Machine X Input", "1", 38f, 42f, 120f, 32f,
             InputField.ContentType.DecimalNumber);
-        CreateTextLabel(machines.transform, "Machine Y Label", "Y", 157f, 46f);
-        machineYInput = CreateInputField(machines.transform, "Machine Y Input", "1", 183f, 42f, 115f, 32f,
+        CreateTextLabel(machines.transform, "Machine Y Label", "Y", 178f, 46f);
+        machineYInput = CreateInputField(machines.transform, "Machine Y Input", "1", 204f, 42f, 120f, 32f,
             InputField.ContentType.DecimalNumber);
         addMachineButton = CreateButton("Add Test Machine", "ADD TEST MACHINE", machines.transform,
-            12f, 84f, 286f, 32f, AddMachineClicked);
+            12f, 84f, 190f, 32f, AddMachineClicked);
+        addStorageButton = CreateButton("Add Test Storage", "ADD STORAGE", machines.transform,
+            208f, 84f, 190f, 32f, AddStorageClicked);
         machineSelectionText = CreateText("Machine Selection", machines.transform, string.Empty, 13,
             TextAnchor.MiddleLeft, Color.white);
-        SetTopRect(machineSelectionText.rectTransform, 12f, 122f, 286f, 38f);
+        SetTopRect(machineSelectionText.rectTransform, 12f, 122f, 396f, 38f);
         machineDetailsText = CreateText("Machine Details", machines.transform, string.Empty, 12,
             TextAnchor.UpperLeft, new Color(0.9f, 0.94f, 0.96f));
-        SetTopRect(machineDetailsText.rectTransform, 12f, 160f, 286f, 48f);
+        SetTopRect(machineDetailsText.rectTransform, 12f, 160f, 396f, 52f);
         nextMachineButton = CreateButton("Next Machine", "SELECT NEXT", machines.transform,
-            12f, 212f, 134f, 32f, NextMachineClicked);
+            12f, 218f, 190f, 32f, NextMachineClicked);
         removeMachineButton = CreateButton("Remove Machine", "REMOVE SELECTED", machines.transform,
-            152f, 212f, 146f, 32f, RemoveMachineClicked);
+            208f, 218f, 190f, 32f, RemoveMachineClicked);
         drainOutputButton = CreateButton("Drain Output", "DRAIN OUTPUT", machines.transform,
-            12f, 252f, 286f, 32f, DrainOutputClicked);
-        machineStatusText = CreateText("Machine Status", machines.transform, "Select a machine to drain or remove it.", 12,
+            12f, 256f, 396f, 32f, DrainOutputClicked);
+        connectionText = CreateText("Connection Text", machines.transform, "CONNECTION: select an entity", 12,
+            TextAnchor.UpperLeft, new Color(0.78f, 0.9f, 0.88f));
+        SetTopRect(connectionText.rectTransform, 12f, 296f, 396f, 38f);
+        CreateTextLabel(machines.transform, "Destination Floor Label", "DEST FLOOR", 12f, 336f);
+        destinationFloorRoot = new GameObject(
+            "Destination Floor Selectors",
+            typeof(RectTransform)).transform;
+        destinationFloorRoot.SetParent(machines.transform, false);
+        SetTopRect(destinationFloorRoot.GetComponent<RectTransform>(), 104f, 334f, 294f, 30f);
+        CreateTextLabel(machines.transform, "Destination Storage Label", "STORAGE", 12f, 370f);
+        destinationStorageRoot = new GameObject(
+            "Destination Storage Selectors",
+            typeof(RectTransform)).transform;
+        destinationStorageRoot.SetParent(machines.transform, false);
+        SetTopRect(destinationStorageRoot.GetComponent<RectTransform>(), 104f, 368f, 294f, 30f);
+        connectButton = CreateButton("Connect", "CONNECT", machines.transform,
+            12f, 404f, 190f, 32f, ConnectClicked);
+        disconnectButton = CreateButton("Disconnect", "DISCONNECT", machines.transform,
+            208f, 404f, 190f, 32f, DisconnectClicked);
+        machineStatusText = CreateText("Machine Status", machines.transform, "Select an entity to drain or remove it.", 12,
             TextAnchor.UpperLeft, new Color(0.6f, 0.78f, 0.76f));
-        SetTopRect(machineStatusText.rectTransform, 12f, 294f, 286f, 44f);
+        SetTopRect(machineStatusText.rectTransform, 12f, 442f, 396f, 62f);
         root.SetActive(true);
     }
 

@@ -39,6 +39,7 @@ public sealed class FactoryEntityRecord
 {
     public const int OutputCapacity = 100;
     public const string OutputProductId = "test-product";
+    public const string StorageDefinitionId = "test-storage";
 
     private const string DefaultDefinitionId = "test-machine";
 
@@ -80,6 +81,8 @@ public sealed class FactoryEntityRecord
     public float CycleProgress => cycleProgress;
     public int ProducedCount => producedCount;
     public int OutputCount => outputCount;
+    public bool IsStorage => definitionId == StorageDefinitionId;
+    public bool IsProducingMachine => !IsStorage;
 
     public static FactoryEntityRecord CreateDefault(
         uint newEntityId,
@@ -156,6 +159,12 @@ public sealed class FactoryEntityRecord
             : Mathf.Clamp01(newCycleProgress);
         producedCount = Mathf.Max(0, newProducedCount);
         outputCount = Mathf.Clamp(newOutputCount, 0, OutputCapacity);
+        if (IsStorage)
+        {
+            cycleRate = 0f;
+            cycleProgress = 0f;
+            producedCount = 0;
+        }
     }
 
     public void ClampPosition(Vector2Int interiorSize)
@@ -171,6 +180,11 @@ public sealed class FactoryEntityRecord
 
     public void Advance(float deltaTime)
     {
+        if (IsStorage)
+        {
+            return;
+        }
+
         if (float.IsNaN(deltaTime)
             || float.IsInfinity(deltaTime)
             || deltaTime <= 0f
@@ -210,6 +224,52 @@ public sealed class FactoryEntityRecord
         var removed = outputCount;
         outputCount = 0;
         return removed;
+    }
+
+    public bool TryRemoveOutput(int quantity)
+    {
+        return TryRemoveOutput(quantity, out _);
+    }
+
+    public bool RemoveOutput(int quantity)
+    {
+        return TryRemoveOutput(quantity);
+    }
+
+    public bool TryRemoveOutput(int quantity, out int removed)
+    {
+        removed = 0;
+        if (quantity <= 0 || outputCount < quantity)
+        {
+            return false;
+        }
+
+        outputCount -= quantity;
+        removed = quantity;
+        return true;
+    }
+
+    public int AddOutput(int quantity)
+    {
+        if (quantity <= 0)
+        {
+            return 0;
+        }
+
+        var accepted = Mathf.Min(quantity, OutputCapacity - outputCount);
+        outputCount += accepted;
+        return accepted;
+    }
+
+    public int AcceptOutput(int quantity)
+    {
+        return AddOutput(quantity);
+    }
+
+    public bool TryAddOutput(int quantity, out int accepted)
+    {
+        accepted = AddOutput(quantity);
+        return quantity > 0 && accepted == quantity;
     }
 
     public FactoryEntityRecord Clone()

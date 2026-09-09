@@ -74,11 +74,15 @@ public readonly struct OutsideTestBuildingInfo
 public sealed class OutsideTestFloorStateOwner
 {
     public const int BuildingRecordsSaveVersion = 4;
-    public const int CurrentSaveVersion = 5;
+    public const int OutputBuffersSaveVersion = 5;
+    public const int OutputBufferSaveVersion = OutputBuffersSaveVersion;
+    public const int ConnectionsSaveVersion = 6;
+    public const int CurrentSaveVersion = 6;
 
     private readonly uint legacyBuildingInstanceId;
     private readonly Dictionary<OutsideTestFloorKey, OutsideTestFloorRecord> floorStates = new();
     private readonly Dictionary<uint, BuildingRecord> buildingRecords = new();
+    private readonly List<FactoryEntityConnectionRecord> connections = new();
     private int lastLoadedVersion;
     private bool lastLoadHadBuildingRecords;
 
@@ -90,6 +94,8 @@ public sealed class OutsideTestFloorStateOwner
     public IEnumerable<OutsideTestFloorRecord> FloorStates => floorStates.Values;
     public IEnumerable<BuildingRecord> BuildingRecords => buildingRecords.Values;
     public IEnumerable<OutsideTestBuildingInfo> Buildings => GetBuildingInfos();
+    public IReadOnlyList<FactoryEntityConnectionRecord> Connections => connections;
+    public int ConnectionCount => connections.Count;
     public int LastLoadedVersion => lastLoadedVersion;
     public bool LastLoadHadBuildingRecords => lastLoadHadBuildingRecords;
 
@@ -232,6 +238,7 @@ public sealed class OutsideTestFloorStateOwner
 
         foreach (var key in staleKeys)
         {
+            RemoveConnectionsForFloor(key.BuildingInstanceId, key.FloorIndex);
             floorStates.Remove(key);
         }
 
@@ -307,6 +314,7 @@ public sealed class OutsideTestFloorStateOwner
 
     public bool RemoveBuilding(uint buildingInstanceId)
     {
+        RemoveConnectionsForBuilding(buildingInstanceId);
         var removed = buildingRecords.Remove(buildingInstanceId);
         var staleKeys = new List<OutsideTestFloorKey>();
         foreach (var pair in floorStates)
@@ -340,8 +348,13 @@ public sealed class OutsideTestFloorStateOwner
             out state);
     }
 
-    public bool TryAddTestMachine(uint buildingInstanceId, int floorIndex,
-        Vector2 position, out uint entityId, out string error)
+    public bool TryAddTestEntity(
+        uint buildingInstanceId,
+        int floorIndex,
+        string definitionId,
+        Vector2 position,
+        out uint entityId,
+        out string error)
     {
         entityId = 0;
         error = string.Empty;
@@ -358,14 +371,14 @@ public sealed class OutsideTestFloorStateOwner
             || position.x > building.FootprintSize.x - 0.5f
             || position.y > building.FootprintSize.y - 0.5f)
         {
-            error = "Machine position must be finite and inside the floor bounds.";
+            error = "Machine/entity position must be finite and inside the floor bounds.";
             return false;
         }
 
         var maximumId = 0u;
         foreach (var entity in floor.Entities)
         {
-            if (entity.EntityId > maximumId)
+            if (entity is not null && entity.EntityId > maximumId)
             {
                 maximumId = entity.EntityId;
             }
@@ -373,17 +386,63 @@ public sealed class OutsideTestFloorStateOwner
 
         if (maximumId == uint.MaxValue)
         {
-            error = "No machine IDs are available on this floor.";
+            error = "No entity IDs are available on this floor.";
             return false;
         }
 
         entityId = maximumId + 1;
-        floor.AddEntity(new FactoryEntityRecord(entityId, "test-machine", position, 1f, 0f, 0));
+        var safeDefinitionId = string.IsNullOrWhiteSpace(definitionId)
+            ? "test-machine"
+            : definitionId.Trim();
+        floor.AddEntity(new FactoryEntityRecord(
+            entityId,
+            safeDefinitionId,
+            position,
+            safeDefinitionId == FactoryEntityRecord.StorageDefinitionId ? 0f : 1f,
+            0f,
+            0));
         return true;
+    }
+
+    public bool TryAddTestMachine(uint buildingInstanceId, int floorIndex,
+        Vector2 position, out uint entityId, out string error)
+    {
+        return TryAddTestEntity(
+            buildingInstanceId,
+            floorIndex,
+            "test-machine",
+            position,
+            out entityId,
+            out error);
+    }
+
+    public bool TryAddTestStorage(
+        uint buildingInstanceId,
+        int floorIndex,
+        Vector2 position,
+        out uint entityId,
+        out string error)
+    {
+        return TryAddTestEntity(
+            buildingInstanceId,
+            floorIndex,
+            FactoryEntityRecord.StorageDefinitionId,
+            position,
+            out entityId,
+            out error);
     }
 
     public bool TryRemoveTestMachine(uint buildingInstanceId, int floorIndex,
         uint entityId, out string error)
+    {
+        return TryRemoveTestEntity(buildingInstanceId, floorIndex, entityId, out error);
+    }
+
+    public bool TryRemoveTestEntity(
+        uint buildingInstanceId,
+        int floorIndex,
+        uint entityId,
+        out string error)
     {
         error = string.Empty;
         if (!buildingRecords.ContainsKey(buildingInstanceId)
@@ -393,16 +452,36 @@ public sealed class OutsideTestFloorStateOwner
             return false;
         }
 
-        if (entityId == 0 || !floor.RemoveEntity(entityId))
+        if (entityId == 0 || !floor.TryGetEntity(entityId, out _))
         {
-            error = "The selected machine no longer exists.";
+            error = "The selected entity no longer exists.";
             return false;
         }
 
+        RemoveConnectionsForEndpoint(new FactoryEntityEndpoint(
+            buildingInstanceId,
+            floorIndex,
+            entityId));
+        floor.RemoveEntity(entityId);
         return true;
     }
 
     public bool TryDrainTestMachine(
+        uint buildingInstanceId,
+        int floorIndex,
+        uint entityId,
+        out int removed,
+        out string error)
+    {
+        return TryDrainTestEntity(
+            buildingInstanceId,
+            floorIndex,
+            entityId,
+            out removed,
+            out error);
+    }
+
+    public bool TryDrainTestEntity(
         uint buildingInstanceId,
         int floorIndex,
         uint entityId,
@@ -420,7 +499,7 @@ public sealed class OutsideTestFloorStateOwner
 
         if (entityId == 0)
         {
-            error = "The selected machine no longer exists.";
+            error = "The selected entity no longer exists.";
             return false;
         }
 
@@ -433,8 +512,169 @@ public sealed class OutsideTestFloorStateOwner
             }
         }
 
-        error = "The selected machine no longer exists.";
+        error = "The selected entity no longer exists.";
         return false;
+    }
+
+    public bool TryAddConnection(
+        FactoryEntityEndpoint source,
+        FactoryEntityEndpoint destination,
+        out string error)
+    {
+        return TryAddConnection(
+            new FactoryEntityConnectionRecord(source, destination),
+            out error);
+    }
+
+    public bool TryConnect(
+        FactoryEntityEndpoint source,
+        FactoryEntityEndpoint destination,
+        out string error)
+    {
+        return TryAddConnection(source, destination, out error);
+    }
+
+    public bool TryAddConnection(
+        FactoryEntityConnectionRecord connection,
+        out string error)
+    {
+        error = string.Empty;
+        if (connection is null)
+        {
+            error = "Connection is required.";
+            return false;
+        }
+
+        if (!TryValidateConnection(
+                connection,
+                buildingRecords,
+                floorStates,
+                connections,
+                out error))
+        {
+            return false;
+        }
+
+        connections.Add(connection.Clone());
+        connections.Sort(CompareConnections);
+        return true;
+    }
+
+    public bool TryRemoveConnection(
+        FactoryEntityEndpoint source,
+        FactoryEntityEndpoint destination,
+        out string error)
+    {
+        error = string.Empty;
+        for (var index = 0; index < connections.Count; index++)
+        {
+            var connection = connections[index];
+            if (connection.Source.Equals(source)
+                && connection.Destination.Equals(destination))
+            {
+                connections.RemoveAt(index);
+                return true;
+            }
+        }
+
+        error = "The connection does not exist.";
+        return false;
+    }
+
+    public bool TryRemoveConnection(
+        FactoryEntityEndpoint source,
+        FactoryEntityEndpoint destination)
+    {
+        return TryRemoveConnection(source, destination, out _);
+    }
+
+    public bool TryDisconnect(
+        FactoryEntityEndpoint endpoint,
+        out FactoryEntityConnectionRecord removedConnection,
+        out string error)
+    {
+        return TryRemoveConnectionForEndpoint(endpoint, out removedConnection, out error);
+    }
+
+    public bool TryRemoveConnectionForEndpoint(
+        FactoryEntityEndpoint endpoint,
+        out FactoryEntityConnectionRecord removedConnection,
+        out string error)
+    {
+        error = string.Empty;
+        for (var index = 0; index < connections.Count; index++)
+        {
+            var connection = connections[index];
+            if (!connection.Source.Equals(endpoint)
+                && !connection.Destination.Equals(endpoint))
+            {
+                continue;
+            }
+
+            removedConnection = connection.Clone();
+            connections.RemoveAt(index);
+            return true;
+        }
+
+        removedConnection = null!;
+        error = "The selected entity has no connection.";
+        return false;
+    }
+
+    public bool TryGetConnectionForSource(
+        FactoryEntityEndpoint source,
+        out FactoryEntityConnectionRecord connection)
+    {
+        foreach (var candidate in connections)
+        {
+            if (candidate.Source.Equals(source))
+            {
+                connection = candidate;
+                return true;
+            }
+        }
+
+        connection = null!;
+        return false;
+    }
+
+    public bool TryGetConnectionForDestination(
+        FactoryEntityEndpoint destination,
+        out FactoryEntityConnectionRecord connection)
+    {
+        foreach (var candidate in connections)
+        {
+            if (candidate.Destination.Equals(destination))
+            {
+                connection = candidate;
+                return true;
+            }
+        }
+
+        connection = null!;
+        return false;
+    }
+
+    public bool TryValidateConnections(out string error)
+    {
+        var seenConnections = new List<FactoryEntityConnectionRecord>();
+        foreach (var connection in connections)
+        {
+            if (!TryValidateConnection(
+                    connection,
+                    buildingRecords,
+                    floorStates,
+                    seenConnections,
+                    out error))
+            {
+                return false;
+            }
+
+            seenConnections.Add(connection);
+        }
+
+        error = string.Empty;
+        return true;
     }
 
     public bool TrySetFloorState(
@@ -476,6 +716,8 @@ public sealed class OutsideTestFloorStateOwner
         {
             state.Advance(deltaTime);
         }
+
+        TransferOneItemPerConnection();
     }
 
     public bool ApplySnapshot(
@@ -654,7 +896,7 @@ public sealed class OutsideTestFloorStateOwner
                     savedState.AccumulatedProduction,
                     savedState.MarkerPosition);
                 migratedState.SetEntities(savedState.Entities);
-                if (version < CurrentSaveVersion)
+                if (version < OutputBuffersSaveVersion)
                 {
                     foreach (var entity in migratedState.Entities)
                     {
@@ -707,6 +949,34 @@ public sealed class OutsideTestFloorStateOwner
                 }
             }
 
+            var loadedConnections = new List<FactoryEntityConnectionRecord>();
+            if (version >= ConnectionsSaveVersion)
+            {
+                if (!HasJsonArrayProperty(json, "Connections")
+                    || data.Connections is null)
+                {
+                    return false;
+                }
+
+                foreach (var connection in data.Connections)
+                {
+                    if (connection is null
+                        || !TryValidateConnection(
+                            connection,
+                            loadedBuildingRecords,
+                            loadedFloorStates,
+                            loadedConnections,
+                            out _))
+                    {
+                        return false;
+                    }
+
+                    loadedConnections.Add(connection.Clone());
+                }
+
+                loadedConnections.Sort(CompareConnections);
+            }
+
             buildingRecords.Clear();
             foreach (var pair in loadedBuildingRecords)
             {
@@ -718,6 +988,9 @@ public sealed class OutsideTestFloorStateOwner
             {
                 floorStates.Add(pair.Key, pair.Value);
             }
+
+            connections.Clear();
+            connections.AddRange(loadedConnections);
 
             lastLoadedVersion = version;
             lastLoadHadBuildingRecords = version >= BuildingRecordsSaveVersion;
@@ -746,7 +1019,8 @@ public sealed class OutsideTestFloorStateOwner
     {
         var data = new OutsideTestFloorSaveData(
             GetSortedBuildingRecords(),
-            GetSortedFloorStates())
+            GetSortedFloorStates(),
+            GetSortedConnections())
         {
             Version = CurrentSaveVersion
         };
@@ -812,6 +1086,230 @@ public sealed class OutsideTestFloorStateOwner
                 : left.FloorIndex.CompareTo(right.FloorIndex);
         });
         return result;
+    }
+
+    private List<FactoryEntityConnectionRecord> GetSortedConnections()
+    {
+        var result = new List<FactoryEntityConnectionRecord>(connections.Count);
+        foreach (var connection in connections)
+        {
+            result.Add(connection.Clone());
+        }
+
+        result.Sort(CompareConnections);
+        return result;
+    }
+
+    private static int CompareConnections(
+        FactoryEntityConnectionRecord left,
+        FactoryEntityConnectionRecord right)
+    {
+        var sourceBuildingComparison = left.Source.BuildingInstanceId.CompareTo(
+            right.Source.BuildingInstanceId);
+        if (sourceBuildingComparison != 0)
+        {
+            return sourceBuildingComparison;
+        }
+
+        var sourceFloorComparison = left.Source.FloorIndex.CompareTo(right.Source.FloorIndex);
+        if (sourceFloorComparison != 0)
+        {
+            return sourceFloorComparison;
+        }
+
+        var sourceEntityComparison = left.Source.EntityId.CompareTo(right.Source.EntityId);
+        if (sourceEntityComparison != 0)
+        {
+            return sourceEntityComparison;
+        }
+
+        var destinationBuildingComparison = left.Destination.BuildingInstanceId.CompareTo(
+            right.Destination.BuildingInstanceId);
+        if (destinationBuildingComparison != 0)
+        {
+            return destinationBuildingComparison;
+        }
+
+        var destinationFloorComparison = left.Destination.FloorIndex.CompareTo(
+            right.Destination.FloorIndex);
+        return destinationFloorComparison != 0
+            ? destinationFloorComparison
+            : left.Destination.EntityId.CompareTo(right.Destination.EntityId);
+    }
+
+    private static bool TryValidateConnection(
+        FactoryEntityConnectionRecord connection,
+        IReadOnlyDictionary<uint, BuildingRecord> availableBuildings,
+        IReadOnlyDictionary<OutsideTestFloorKey, OutsideTestFloorRecord> availableFloors,
+        IReadOnlyList<FactoryEntityConnectionRecord> existingConnections,
+        out string error)
+    {
+        error = string.Empty;
+        if (connection is null)
+        {
+            error = "Connection is required.";
+            return false;
+        }
+
+        var source = connection.Source;
+        var destination = connection.Destination;
+        if (source.BuildingInstanceId == 0
+            || destination.BuildingInstanceId == 0
+            || source.EntityId == 0
+            || destination.EntityId == 0
+            || source.FloorIndex < 0
+            || destination.FloorIndex < 0)
+        {
+            error = "Connection endpoints must contain valid building, floor, and entity IDs.";
+            return false;
+        }
+
+        if (source.BuildingInstanceId != destination.BuildingInstanceId)
+        {
+            error = "Connection endpoints must belong to the same building.";
+            return false;
+        }
+
+        if (source.FloorIndex == destination.FloorIndex)
+        {
+            error = "Connection endpoints must be on different floors.";
+            return false;
+        }
+
+        if (availableBuildings is not null
+            && !availableBuildings.ContainsKey(source.BuildingInstanceId))
+        {
+            error = $"Building {source.BuildingInstanceId} does not exist.";
+            return false;
+        }
+
+        var sourceKey = new OutsideTestFloorKey(source.BuildingInstanceId, source.FloorIndex);
+        var destinationKey = new OutsideTestFloorKey(
+            destination.BuildingInstanceId,
+            destination.FloorIndex);
+        if (!availableFloors.TryGetValue(sourceKey, out var sourceFloor)
+            || !availableFloors.TryGetValue(destinationKey, out var destinationFloor))
+        {
+            error = "Connection endpoints must refer to existing floors.";
+            return false;
+        }
+
+        if (!sourceFloor.TryGetEntity(source.EntityId, out var sourceEntity)
+            || !destinationFloor.TryGetEntity(destination.EntityId, out var destinationEntity))
+        {
+            error = "Connection endpoints must refer to existing entities.";
+            return false;
+        }
+
+        if (!sourceEntity.IsProducingMachine)
+        {
+            error = "The connection source must be a producing machine.";
+            return false;
+        }
+
+        if (!destinationEntity.IsStorage)
+        {
+            error = "The connection destination must be test-storage.";
+            return false;
+        }
+
+        foreach (var existingConnection in existingConnections)
+        {
+            if (existingConnection.Source.Equals(source))
+            {
+                error = $"Source endpoint {source} is already connected.";
+                return false;
+            }
+
+            if (existingConnection.Destination.Equals(destination))
+            {
+                error = $"Destination endpoint {destination} is already connected.";
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private void RemoveConnectionsForEndpoint(FactoryEntityEndpoint endpoint)
+    {
+        for (var index = connections.Count - 1; index >= 0; index--)
+        {
+            var connection = connections[index];
+            if (connection.Source.Equals(endpoint)
+                || connection.Destination.Equals(endpoint))
+            {
+                connections.RemoveAt(index);
+            }
+        }
+    }
+
+    private void RemoveConnectionsForFloor(uint buildingInstanceId, int floorIndex)
+    {
+        for (var index = connections.Count - 1; index >= 0; index--)
+        {
+            var connection = connections[index];
+            if ((connection.Source.BuildingInstanceId == buildingInstanceId
+                    && connection.Source.FloorIndex == floorIndex)
+                || (connection.Destination.BuildingInstanceId == buildingInstanceId
+                    && connection.Destination.FloorIndex == floorIndex))
+            {
+                connections.RemoveAt(index);
+            }
+        }
+    }
+
+    private void RemoveConnectionsForBuilding(uint buildingInstanceId)
+    {
+        for (var index = connections.Count - 1; index >= 0; index--)
+        {
+            var connection = connections[index];
+            if (connection.Source.BuildingInstanceId == buildingInstanceId
+                || connection.Destination.BuildingInstanceId == buildingInstanceId)
+            {
+                connections.RemoveAt(index);
+            }
+        }
+    }
+
+    private void TransferOneItemPerConnection()
+    {
+        foreach (var connection in connections)
+        {
+            if (!TryGetEntity(connection.Source, out var sourceEntity)
+                || !TryGetEntity(connection.Destination, out var destinationEntity)
+                || !sourceEntity.IsProducingMachine
+                || !destinationEntity.IsStorage
+                || sourceEntity.OutputCount <= 0
+                || destinationEntity.OutputCount >= FactoryEntityRecord.OutputCapacity)
+            {
+                continue;
+            }
+
+            if (!sourceEntity.TryRemoveOutput(1, out var removed)
+                || removed != 1)
+            {
+                continue;
+            }
+
+            var accepted = destinationEntity.AddOutput(1);
+            if (accepted != 1)
+            {
+                sourceEntity.AddOutput(removed);
+            }
+        }
+    }
+
+    private bool TryGetEntity(
+        FactoryEntityEndpoint endpoint,
+        out FactoryEntityRecord entity)
+    {
+        entity = null!;
+        var key = new OutsideTestFloorKey(
+            endpoint.BuildingInstanceId,
+            endpoint.FloorIndex);
+        return floorStates.TryGetValue(key, out var floor)
+            && floor.TryGetEntity(endpoint.EntityId, out entity);
     }
 
     private static bool HasJsonArrayProperty(string json, string propertyName)
