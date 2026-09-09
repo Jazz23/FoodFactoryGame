@@ -309,7 +309,7 @@ public sealed class TestBuildingCreator : MonoBehaviour
 
     public static float GetStoryBaseHeight(float wallHeight, int storyIndex)
     {
-        return Mathf.Max(0f, storyIndex) * Mathf.Max(0f, wallHeight);
+        return BuildingCoordinates.GetFloorElevation(storyIndex, wallHeight);
     }
 
     public static float GetStoryTopHeight(float wallHeight, int storyIndex)

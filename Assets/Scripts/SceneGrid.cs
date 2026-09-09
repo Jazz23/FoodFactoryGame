@@ -1,4 +1,4 @@
-// Converts continuous logical positions to world positions for each scene's grid projection.
+// Converts continuous saved logical positions to presentation/world positions for each scene's grid projection. cellSize scales presentation coordinates only; it does not change saved logical cell units.
 using System.Collections.Generic;
 using FishNet.Utility.Extension;
 using UnityEngine;

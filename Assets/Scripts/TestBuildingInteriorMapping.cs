@@ -1,4 +1,4 @@
-// Maps authored OutsideTest door positions onto matching edges inside insidefactory.
+// Maps authored OutsideTest door positions onto matching local edges inside insidefactory.
 using UnityEngine;
 
 public static class TestBuildingInteriorMapping
@@ -15,12 +15,33 @@ public static class TestBuildingInteriorMapping
         out Vector2 interiorArrivalLogicalPosition,
         out float normalizedWallPosition)
     {
+        return TryGetMapping(
+            layout.AnchorCell,
+            layout.Size,
+            wall,
+            doorOffset,
+            out exteriorDoorLogicalPosition,
+            out exteriorArrivalLogicalPosition,
+            out interiorArrivalLogicalPosition,
+            out normalizedWallPosition);
+    }
+
+    public static bool TryGetMapping(
+        Vector3Int anchorCell,
+        Vector2Int size,
+        TestBuildingCreator.ExteriorWallSpan wall,
+        float doorOffset,
+        out Vector2 exteriorDoorLogicalPosition,
+        out Vector2 exteriorArrivalLogicalPosition,
+        out Vector2 interiorArrivalLogicalPosition,
+        out float normalizedWallPosition)
+    {
         exteriorDoorLogicalPosition = default;
         exteriorArrivalLogicalPosition = default;
         interiorArrivalLogicalPosition = default;
         normalizedWallPosition = 0f;
 
-        if (!TestBuildingCreator.IsSupportedSize(layout.Size) || wall.IsCorner)
+        if (!TestBuildingCreator.IsSupportedSize(size) || wall.IsCorner)
         {
             return false;
         }
@@ -30,21 +51,22 @@ public static class TestBuildingInteriorMapping
             wall.LogicalEnd,
             Mathf.Clamp01(doorOffset));
 
+        var localExteriorDoorLogicalPosition = BuildingCoordinates.ExteriorLogicalToLocal(
+            anchorCell,
+            exteriorDoorLogicalPosition);
         var isHorizontal = wall.Direction is GridEdgeDirection.South or GridEdgeDirection.North;
-        var wallStart = isHorizontal
-            ? layout.AnchorCell.x + InteriorInset
-            : layout.AnchorCell.y + InteriorInset;
+        var wallStart = InteriorInset;
         var wallLength = isHorizontal
-            ? layout.Size.x - 1f
-            : layout.Size.y - 1f;
+            ? size.x - 1f
+            : size.y - 1f;
         var wallPosition = isHorizontal
-            ? exteriorDoorLogicalPosition.x
-            : exteriorDoorLogicalPosition.y;
+            ? localExteriorDoorLogicalPosition.x
+            : localExteriorDoorLogicalPosition.y;
         normalizedWallPosition = Mathf.Clamp01((wallPosition - wallStart) / wallLength);
 
         var interiorLength = isHorizontal
-            ? layout.Size.x - 1f
-            : layout.Size.y - 1f;
+            ? size.x - 1f
+            : size.y - 1f;
         var interiorWallPosition = InteriorInset + normalizedWallPosition * interiorLength;
         interiorArrivalLogicalPosition = wall.Direction switch
         {
@@ -52,9 +74,9 @@ public static class TestBuildingInteriorMapping
             GridEdgeDirection.West => new Vector2(InteriorInset, interiorWallPosition),
             GridEdgeDirection.North => new Vector2(
                 interiorWallPosition,
-                layout.Size.y - InteriorInset),
+                size.y - InteriorInset),
             GridEdgeDirection.East => new Vector2(
-                layout.Size.x - InteriorInset,
+                size.x - InteriorInset,
                 interiorWallPosition),
             _ => default
         };

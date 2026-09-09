@@ -1,0 +1,62 @@
+{
+  "verification": "centralize-building-coordinate-mapping",
+  "verifiedAt": "2026-09-08",
+  "unityVersion": "6000.5.9f1",
+  "editor": {
+    "BuildingCoordinatesTests": {
+      "total": 8,
+      "passed": 8,
+      "failed": 0
+    },
+    "SceneGridTests": {
+      "total": 9,
+      "passed": 9,
+      "failed": 0
+    },
+    "TestBuildingCreatorTests": {
+      "total": 29,
+      "passed": 29,
+      "failed": 0
+    },
+    "InteriorSizingTests": {
+      "total": 7,
+      "passed": 7,
+      "failed": 0
+    },
+    "shellGeometrySuites": {
+      "total": 32,
+      "passed": 32,
+      "failed": 0,
+      "suites": [
+        "GridWallTests",
+        "GridRoofTests",
+        "GridEdgeTests",
+        "DirectionalWallSegmentTests",
+        "WallPlacementRulesTests"
+      ]
+    },
+    "fullEditor": {
+      "total": 141,
+      "passed": 141,
+      "failed": 0
+    }
+  },
+  "playMode": {
+    "suite": "OutsideTestFloorTransitionTests",
+    "total": 3,
+    "passed": 1,
+    "failed": 2,
+    "failures": [
+      {
+        "test": "InterFloorTransferPersistsWhenInteriorsUnloadAndRestart",
+        "message": "The destination storage request failed."
+      },
+      {
+        "test": "TwoFloorSceneLifecycleKeepsRecordsProducing",
+        "message": "State reload assertion found the transient test edit instead of the saved ground-floor label."
+      }
+    ],
+    "passedTest": "MachineRequestsPersistAcrossTravelAndRestart"
+  },
+  "scope": "No scene, save-version, entity-position, connection-endpoint, simulation, or interior-scene-coordinate changes were made."
+}
