@@ -222,6 +222,22 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         }
     }
 
+    public void RequestAddCurrentFloorProcessor(Vector2 position)
+    {
+        if (IsOwner)
+        {
+            RequestAddCurrentFloorProcessorServerRpc(position);
+        }
+    }
+
+    public void RequestAddCurrentFloorPackedStorage(Vector2 position)
+    {
+        if (IsOwner)
+        {
+            RequestAddCurrentFloorPackedStorageServerRpc(position);
+        }
+    }
+
     public void RequestRemoveCurrentFloorMachine(uint entityId)
     {
         if (IsOwner)
@@ -270,6 +286,16 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         }
     }
 
+    public void RequestDisconnectCurrentFloorEntity(
+        uint entityId,
+        FactoryEntityConnectionDirection direction)
+    {
+        if (IsOwner)
+        {
+            RequestDisconnectCurrentFloorEntityDirectionServerRpc(entityId, direction);
+        }
+    }
+
     [ServerRpc]
     private void RequestAddCurrentFloorMachineServerRpc(Vector2 position)
     {
@@ -287,6 +313,28 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
             out var entityId,
             out var error);
         TargetReceiveMachineEditResult(Owner, added ? $"Added storage {entityId}." : error);
+    }
+
+    [ServerRpc]
+    private void RequestAddCurrentFloorProcessorServerRpc(Vector2 position)
+    {
+        var added = GameSceneManager.Instance.TryAddCurrentFloorProcessor(
+            this,
+            position,
+            out var entityId,
+            out var error);
+        TargetReceiveMachineEditResult(Owner, added ? $"Added processor {entityId}." : error);
+    }
+
+    [ServerRpc]
+    private void RequestAddCurrentFloorPackedStorageServerRpc(Vector2 position)
+    {
+        var added = GameSceneManager.Instance.TryAddCurrentFloorPackedStorage(
+            this,
+            position,
+            out var entityId,
+            out var error);
+        TargetReceiveMachineEditResult(Owner, added ? $"Added packed storage {entityId}." : error);
     }
 
     [ServerRpc]
@@ -325,7 +373,7 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         TargetReceiveMachineEditResult(
             Owner,
             connected
-                ? $"Connected entity {sourceEntityId} to storage {destinationStorageEntityId}."
+                ? $"Connected entity {sourceEntityId} to receiver {destinationStorageEntityId}."
                 : error);
     }
 
@@ -339,6 +387,21 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         TargetReceiveMachineEditResult(
             Owner,
             disconnected ? $"Disconnected entity {entityId}." : error);
+    }
+
+    [ServerRpc]
+    private void RequestDisconnectCurrentFloorEntityDirectionServerRpc(
+        uint entityId,
+        FactoryEntityConnectionDirection direction)
+    {
+        var disconnected = GameSceneManager.Instance.TryDisconnectCurrentFloorEntity(
+            this,
+            entityId,
+            direction,
+            out var error);
+        TargetReceiveMachineEditResult(
+            Owner,
+            disconnected ? $"Disconnected {direction.ToString().ToLowerInvariant()} connection for entity {entityId}." : error);
     }
 
     [TargetRpc]

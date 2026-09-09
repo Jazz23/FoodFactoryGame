@@ -14,7 +14,8 @@ public struct FactoryEntitySnapshot
         float newCycleRate,
         float newCycleProgress,
         int newProducedCount,
-        int newOutputCount = 0)
+        int newOutputCount = 0,
+        int newInputCount = 0)
     {
         EntityId = newEntityId;
         DefinitionId = newDefinitionId;
@@ -23,6 +24,7 @@ public struct FactoryEntitySnapshot
         CycleProgress = newCycleProgress;
         ProducedCount = newProducedCount;
         OutputCount = newOutputCount;
+        InputCount = newInputCount;
     }
 
     public uint EntityId;
@@ -32,14 +34,19 @@ public struct FactoryEntitySnapshot
     public float CycleProgress;
     public int ProducedCount;
     public int OutputCount;
+    public int InputCount;
 }
 
 [Serializable]
 public sealed class FactoryEntityRecord
 {
+    public const int InputCapacity = 100;
     public const int OutputCapacity = 100;
-    public const string OutputProductId = "test-product";
-    public const string StorageDefinitionId = "test-storage";
+    public const string OutputProductId = FactoryEntityDefinitions.TestProductId;
+    public const string StorageDefinitionId = FactoryEntityDefinitions.TestStorageDefinitionId;
+    public const string ProcessorDefinitionId = FactoryEntityDefinitions.ProcessorDefinitionId;
+    public const string PackedStorageDefinitionId = FactoryEntityDefinitions.PackedStorageDefinitionId;
+    public const string PackedProductId = FactoryEntityDefinitions.PackedProductId;
 
     private const string DefaultDefinitionId = "test-machine";
 
@@ -50,6 +57,7 @@ public sealed class FactoryEntityRecord
     [SerializeField] private float cycleProgress;
     [SerializeField] private int producedCount;
     [SerializeField] private int outputCount;
+    [SerializeField] private int inputCount;
 
     public FactoryEntityRecord()
     {
@@ -62,7 +70,8 @@ public sealed class FactoryEntityRecord
         float newCycleRate,
         float newCycleProgress,
         int newProducedCount,
-        int newOutputCount = 0)
+        int newOutputCount = 0,
+        int newInputCount = 0)
     {
         SetState(
             newEntityId,
@@ -71,7 +80,8 @@ public sealed class FactoryEntityRecord
             newCycleRate,
             newCycleProgress,
             newProducedCount,
-            newOutputCount);
+            newOutputCount,
+            newInputCount);
     }
 
     public uint EntityId => entityId;
@@ -81,8 +91,16 @@ public sealed class FactoryEntityRecord
     public float CycleProgress => cycleProgress;
     public int ProducedCount => producedCount;
     public int OutputCount => outputCount;
-    public bool IsStorage => definitionId == StorageDefinitionId;
-    public bool IsProducingMachine => !IsStorage;
+    public int InputCount => inputCount;
+    public string AcceptedItemId => FactoryEntityDefinitions.Get(definitionId).AcceptedItemId;
+    public string ProducedItemId => FactoryEntityDefinitions.Get(definitionId).ProducedItemId;
+    public int InputQuantity => FactoryEntityDefinitions.Get(definitionId).InputQuantity;
+    public int OutputQuantity => FactoryEntityDefinitions.Get(definitionId).OutputQuantity;
+    public bool IsReceiver => FactoryEntityDefinitions.Get(definitionId).IsReceiver;
+    public bool IsProducer => FactoryEntityDefinitions.Get(definitionId).IsProducer;
+    public bool IsProcessor => FactoryEntityDefinitions.Get(definitionId).IsProcessor;
+    public bool IsStorage => FactoryEntityDefinitions.Get(definitionId).IsStorage;
+    public bool IsProducingMachine => IsProducer;
 
     public static FactoryEntityRecord CreateDefault(
         uint newEntityId,
@@ -132,7 +150,8 @@ public sealed class FactoryEntityRecord
             snapshot.CycleRate,
             snapshot.CycleProgress,
             snapshot.ProducedCount,
-            snapshot.OutputCount);
+            snapshot.OutputCount,
+            snapshot.InputCount);
     }
 
     public void SetState(
@@ -142,7 +161,8 @@ public sealed class FactoryEntityRecord
         float newCycleRate,
         float newCycleProgress,
         int newProducedCount,
-        int newOutputCount = 0)
+        int newOutputCount = 0,
+        int newInputCount = 0)
     {
         entityId = newEntityId;
         definitionId = string.IsNullOrWhiteSpace(newDefinitionId)
@@ -159,11 +179,19 @@ public sealed class FactoryEntityRecord
             : Mathf.Clamp01(newCycleProgress);
         producedCount = Mathf.Max(0, newProducedCount);
         outputCount = Mathf.Clamp(newOutputCount, 0, OutputCapacity);
+        inputCount = Mathf.Clamp(newInputCount, 0, InputCapacity);
+        var definition = FactoryEntityDefinitions.Get(definitionId);
+        if (definition.IsProcessor)
+        {
+            cycleRate = 1f;
+        }
+
         if (IsStorage)
         {
             cycleRate = 0f;
             cycleProgress = 0f;
             producedCount = 0;
+            inputCount = 0;
         }
     }
 
@@ -182,6 +210,12 @@ public sealed class FactoryEntityRecord
     {
         if (IsStorage)
         {
+            return;
+        }
+
+        if (IsProcessor)
+        {
+            AdvanceProcessor(deltaTime);
             return;
         }
 
@@ -217,6 +251,54 @@ public sealed class FactoryEntityRecord
                 producedCount++;
             }
         }
+    }
+
+    public bool CanAcceptItem(string itemId)
+    {
+        return IsReceiver
+            && !string.IsNullOrWhiteSpace(itemId)
+            && AcceptedItemId == itemId;
+    }
+
+    public int AddInput(int quantity)
+    {
+        if (!IsProcessor || quantity <= 0)
+        {
+            return 0;
+        }
+
+        var accepted = Mathf.Min(quantity, InputCapacity - inputCount);
+        inputCount += accepted;
+        return accepted;
+    }
+
+    public bool TryAddInput(int quantity, out int accepted)
+    {
+        accepted = AddInput(quantity);
+        return quantity > 0 && accepted == quantity;
+    }
+
+    public void SetInputCount(int quantity)
+    {
+        inputCount = IsProcessor
+            ? Mathf.Clamp(quantity, 0, InputCapacity)
+            : 0;
+    }
+
+    public int TryAcceptItem(string itemId, int quantity)
+    {
+        if (!CanAcceptItem(itemId))
+        {
+            return 0;
+        }
+
+        return IsProcessor ? AddInput(quantity) : AddOutput(quantity);
+    }
+
+    public bool TryAcceptItem(string itemId, int quantity, out int accepted)
+    {
+        accepted = TryAcceptItem(itemId, quantity);
+        return quantity > 0 && accepted == quantity;
     }
 
     public int DrainOutput()
@@ -281,7 +363,8 @@ public sealed class FactoryEntityRecord
             cycleRate,
             cycleProgress,
             producedCount,
-            outputCount);
+            outputCount,
+            inputCount);
     }
 
     public FactoryEntitySnapshot ToSnapshot()
@@ -293,7 +376,48 @@ public sealed class FactoryEntityRecord
             cycleRate,
             cycleProgress,
             producedCount,
-            outputCount);
+            outputCount,
+            inputCount);
+    }
+
+    private void AdvanceProcessor(float deltaTime)
+    {
+        var definition = FactoryEntityDefinitions.Get(definitionId);
+        if (float.IsNaN(deltaTime)
+            || float.IsInfinity(deltaTime)
+            || deltaTime <= 0f
+            || !definition.IsProcessor
+            || definition.CycleDuration <= 0f
+            || outputCount >= OutputCapacity
+            || inputCount < definition.InputQuantity)
+        {
+            return;
+        }
+
+        var remainingTime = (double)deltaTime;
+        var cycleDuration = (double)definition.CycleDuration;
+        while (remainingTime > 0d
+            && outputCount < OutputCapacity
+            && inputCount >= definition.InputQuantity)
+        {
+            var timeToComplete = (1d - cycleProgress) * cycleDuration;
+            if (timeToComplete > remainingTime)
+            {
+                cycleProgress += (float)(remainingTime / cycleDuration);
+                return;
+            }
+
+            cycleProgress = 0f;
+            remainingTime -= timeToComplete;
+            inputCount -= definition.InputQuantity;
+            outputCount = Mathf.Min(
+                OutputCapacity,
+                outputCount + definition.OutputQuantity);
+            if (producedCount < int.MaxValue)
+            {
+                producedCount++;
+            }
+        }
     }
 
     private static Vector2 SanitizeLogicalPosition(Vector2 position)

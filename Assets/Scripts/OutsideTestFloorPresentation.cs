@@ -146,18 +146,30 @@ public sealed class OutsideTestFloorPresentation : MonoBehaviour
             view.Object.transform.position = position;
             view.Label.transform.position = position + Vector3.up * 0.45f;
             view.Renderer.color = GetEntityColor(entity.DefinitionId);
-            view.Label.text = entity.IsStorage
+            view.Label.text = entity.IsProcessor
                 ? $"{entity.DefinitionId}\n"
-                    + $"Stored {entity.OutputCount}/{FactoryEntityRecord.OutputCapacity} "
-                    + $"{FactoryEntityRecord.OutputProductId}\n"
-                    + "Lifetime 0\nStorage"
-                : $"{entity.DefinitionId}\n"
-                    + $"{entity.OutputCount}/{FactoryEntityRecord.OutputCapacity} "
-                    + $"{FactoryEntityRecord.OutputProductId}\n"
+                    + $"Input {entity.InputCount}/{FactoryEntityRecord.InputCapacity} "
+                    + $"{entity.AcceptedItemId}\n"
+                    + $"Output {entity.OutputCount}/{FactoryEntityRecord.OutputCapacity} "
+                    + $"{entity.ProducedItemId}\n"
                     + $"Lifetime {entity.ProducedCount} @ {entity.CycleProgress:0.00}\n"
                     + (entity.OutputCount >= FactoryEntityRecord.OutputCapacity
                         ? "Output full"
-                        : "Producing");
+                        : entity.InputCount < entity.InputQuantity
+                            ? "Waiting for input"
+                            : "Processing")
+                : entity.IsStorage
+                    ? $"{entity.DefinitionId}\n"
+                        + $"Stored {entity.OutputCount}/{FactoryEntityRecord.OutputCapacity} "
+                        + $"{entity.AcceptedItemId}\n"
+                        + "Lifetime 0\nStorage"
+                    : $"{entity.DefinitionId}\n"
+                        + $"{entity.OutputCount}/{FactoryEntityRecord.OutputCapacity} "
+                        + $"{entity.ProducedItemId}\n"
+                        + $"Lifetime {entity.ProducedCount} @ {entity.CycleProgress:0.00}\n"
+                        + (entity.OutputCount >= FactoryEntityRecord.OutputCapacity
+                            ? "Output full"
+                            : "Producing");
         }
 
         staleEntityIds.Clear();

@@ -31,11 +31,15 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
     private Text machineStatusText = null!;
     private Button addMachineButton = null!;
     private Button addStorageButton = null!;
+    private Button addProcessorButton = null!;
+    private Button addPackedStorageButton = null!;
     private Button removeMachineButton = null!;
     private Button drainOutputButton = null!;
     private Button nextMachineButton = null!;
     private Button connectButton = null!;
     private Button disconnectButton = null!;
+    private Button disconnectIncomingButton = null!;
+    private Button disconnectOutgoingButton = null!;
     private Text connectionText = null!;
     private uint machineBuildingId;
     private int machineFloorIndex = -1;
@@ -91,6 +95,32 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
         owner.RequestAddCurrentFloorStorage(new Vector2(x, y));
     }
 
+    private void AddProcessorClicked()
+    {
+        if (!float.TryParse(machineXInput.text, NumberStyles.Float, CultureInfo.InvariantCulture, out var x)
+            || !float.TryParse(machineYInput.text, NumberStyles.Float, CultureInfo.InvariantCulture, out var y))
+        {
+            machineStatusText.text = "X and Y must be finite numbers.";
+            return;
+        }
+
+        machineStatusText.text = "Adding processor...";
+        owner.RequestAddCurrentFloorProcessor(new Vector2(x, y));
+    }
+
+    private void AddPackedStorageClicked()
+    {
+        if (!float.TryParse(machineXInput.text, NumberStyles.Float, CultureInfo.InvariantCulture, out var x)
+            || !float.TryParse(machineYInput.text, NumberStyles.Float, CultureInfo.InvariantCulture, out var y))
+        {
+            machineStatusText.text = "X and Y must be finite numbers.";
+            return;
+        }
+
+        machineStatusText.text = "Adding packed storage...";
+        owner.RequestAddCurrentFloorPackedStorage(new Vector2(x, y));
+    }
+
     private void RemoveMachineClicked()
     {
         machineStatusText.text = "Removing machine...";
@@ -116,6 +146,22 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
     {
         machineStatusText.text = "Disconnecting...";
         owner.RequestDisconnectCurrentFloorEntity(selectedMachineId);
+    }
+
+    private void DisconnectIncomingClicked()
+    {
+        machineStatusText.text = "Disconnecting incoming...";
+        owner.RequestDisconnectCurrentFloorEntity(
+            selectedMachineId,
+            FactoryEntityConnectionDirection.Incoming);
+    }
+
+    private void DisconnectOutgoingClicked()
+    {
+        machineStatusText.text = "Disconnecting outgoing...";
+        owner.RequestDisconnectCurrentFloorEntity(
+            selectedMachineId,
+            FactoryEntityConnectionDirection.Outgoing);
     }
 
     private void NextMachineClicked()
@@ -178,11 +224,22 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
                 if (entity.EntityId == selectedMachineId)
                 {
                     selected = true;
-                    machineDetailsText.text = entity.IsStorage
+                    machineDetailsText.text = entity.IsProcessor
+                        ? $"INPUT: {entity.InputCount}/{FactoryEntityRecord.InputCapacity} "
+                            + $"{entity.AcceptedItemId}\n"
+                            + $"OUTPUT: {entity.OutputCount}/{FactoryEntityRecord.OutputCapacity} "
+                            + $"{entity.ProducedItemId}\n"
+                            + $"PROGRESS: {entity.CycleProgress:0.00}\n"
+                            + (entity.OutputCount >= FactoryEntityRecord.OutputCapacity
+                                ? "STATUS: Output full"
+                                : entity.InputCount < entity.InputQuantity
+                                    ? "STATUS: Waiting for input"
+                                    : "STATUS: Processing")
+                        : entity.IsStorage
                         ? $"STORED: {entity.OutputCount}/{FactoryEntityRecord.OutputCapacity} "
-                            + $"{FactoryEntityRecord.OutputProductId}\nLIFETIME: 0\nStorage"
+                            + $"{entity.AcceptedItemId}\nLIFETIME: 0\nStorage"
                         : $"OUTPUT: {entity.OutputCount}/{FactoryEntityRecord.OutputCapacity} "
-                            + $"{FactoryEntityRecord.OutputProductId}\n"
+                            + $"{entity.ProducedItemId}\n"
                             + $"LIFETIME: {entity.ProducedCount}\n"
                             + (entity.OutputCount >= FactoryEntityRecord.OutputCapacity
                                 ? "Output full"
@@ -202,6 +259,8 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
         machineYInput.interactable = canEdit;
         addMachineButton.interactable = canEdit;
         addStorageButton.interactable = canEdit;
+        addProcessorButton.interactable = canEdit;
+        addPackedStorageButton.interactable = canEdit;
         nextMachineButton.interactable = canEdit && count > 0;
         removeMachineButton.interactable = canEdit && selected;
         drainOutputButton.interactable = canEdit && selected;
@@ -221,8 +280,8 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
         bool selected)
     {
         var selectedEntity = default(FactoryEntityRecord);
-        var selectedConnection = null as FactoryEntityConnectionRecord;
-        var hasConnection = false;
+        var incomingConnection = null as FactoryEntityConnectionRecord;
+        var outgoingConnection = null as FactoryEntityConnectionRecord;
         if (hasCurrentFloor
             && GameSceneManager.Instance.TryGetOutsideTestFloorState(
                 buildingId,
@@ -236,15 +295,17 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
                 if (connection.Source.Equals(new FactoryEntityEndpoint(
                         buildingId,
                         floorIndex,
-                        selectedMachineId))
-                    || connection.Destination.Equals(new FactoryEntityEndpoint(
+                        selectedMachineId)))
+                {
+                    outgoingConnection = connection;
+                }
+
+                if (connection.Destination.Equals(new FactoryEntityEndpoint(
                         buildingId,
                         floorIndex,
                         selectedMachineId)))
                 {
-                    selectedConnection = connection;
-                    hasConnection = true;
-                    break;
+                    incomingConnection = connection;
                 }
             }
         }
@@ -259,22 +320,35 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             ClearDynamicRoot(destinationStorageRoot);
             connectButton.interactable = false;
             disconnectButton.interactable = false;
+            disconnectIncomingButton.interactable = false;
+            disconnectOutgoingButton.interactable = false;
             return;
         }
 
-        connectionText.text = hasConnection
-            ? selectedConnection.Source.Equals(new FactoryEntityEndpoint(
-                buildingId,
-                floorIndex,
-                selectedMachineId))
-                ? $"DESTINATION: B{selectedConnection.Destination.BuildingInstanceId}/"
-                    + $"F{selectedConnection.Destination.FloorIndex}/E{selectedConnection.Destination.EntityId}"
-                : $"INCOMING: B{selectedConnection.Source.BuildingInstanceId}/"
-                    + $"F{selectedConnection.Source.FloorIndex}/E{selectedConnection.Source.EntityId}"
+        var connectionLines = string.Empty;
+        if (outgoingConnection is not null)
+        {
+            connectionLines += $"OUTGOING: B{outgoingConnection.Destination.BuildingInstanceId}/"
+                + $"F{outgoingConnection.Destination.FloorIndex}/E{outgoingConnection.Destination.EntityId}";
+        }
+
+        if (incomingConnection is not null)
+        {
+            if (connectionLines.Length > 0)
+            {
+                connectionLines += "\n";
+            }
+
+            connectionLines += $"INCOMING: B{incomingConnection.Source.BuildingInstanceId}/"
+                + $"F{incomingConnection.Source.FloorIndex}/E{incomingConnection.Source.EntityId}";
+        }
+
+        connectionText.text = connectionLines.Length > 0
+            ? connectionLines
             : "CONNECTION: not connected";
 
         var eligibleFloorIndices = new System.Collections.Generic.List<int>();
-        if (selectedEntity.IsProducingMachine
+        if (selectedEntity.IsProducer
             && GameSceneManager.Instance.TryGetOutsideTestBuildingInfo(
                 buildingId,
                 out var buildingInfo))
@@ -294,7 +368,9 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
 
                 foreach (var candidateEntity in candidateFloor.Entities)
                 {
-                    if (candidateEntity is not null && candidateEntity.IsStorage)
+                    if (candidateEntity is not null
+                        && candidateEntity.IsReceiver
+                        && candidateEntity.AcceptedItemId == selectedEntity.ProducedItemId)
                     {
                         eligibleFloorIndices.Add(candidateFloorIndex);
                         break;
@@ -303,10 +379,10 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             }
         }
 
-        if (hasConnection)
+        if (outgoingConnection is not null)
         {
-            destinationFloorIndex = selectedConnection.Destination.FloorIndex;
-            selectedStorageId = selectedConnection.Destination.EntityId;
+            destinationFloorIndex = outgoingConnection.Destination.FloorIndex;
+            selectedStorageId = outgoingConnection.Destination.EntityId;
         }
         else if (!eligibleFloorIndices.Contains(destinationFloorIndex))
         {
@@ -317,7 +393,7 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
         }
 
         var fingerprint = $"{buildingId}:{floorIndex}:{selectedMachineId}:{destinationFloorIndex}:"
-            + $"{selectedStorageId}:{hasConnection}";
+            + $"{selectedStorageId}:{outgoingConnection is not null}:{incomingConnection is not null}";
         foreach (var candidateFloorIndex in eligibleFloorIndices)
         {
             fingerprint += $"|F{candidateFloorIndex}";
@@ -331,9 +407,11 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
 
             foreach (var candidateEntity in candidateFloor.Entities)
             {
-                if (candidateEntity is not null && candidateEntity.IsStorage)
+                if (candidateEntity is not null
+                    && candidateEntity.IsReceiver
+                    && candidateEntity.AcceptedItemId == selectedEntity.ProducedItemId)
                 {
-                    fingerprint += $"/E{candidateEntity.EntityId}";
+                    fingerprint += $"/E{candidateEntity.EntityId}:{candidateEntity.DefinitionId}";
                 }
             }
         }
@@ -372,15 +450,20 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
                 var storageIndex = 0;
                 foreach (var candidateEntity in storageFloor.Entities)
                 {
-                    if (candidateEntity is null || !candidateEntity.IsStorage)
+                    if (candidateEntity is null
+                        || !candidateEntity.IsReceiver
+                        || candidateEntity.AcceptedItemId != selectedEntity.ProducedItemId)
                     {
                         continue;
                     }
 
                     var capturedStorageId = candidateEntity.EntityId;
+                    var receiverButtonName = candidateEntity.IsStorage
+                        ? $"Destination Storage {capturedStorageId} Button"
+                        : $"Destination Receiver {capturedStorageId} Button";
                     var storageButton = CreateButton(
-                        $"Destination Storage {capturedStorageId} Button",
-                        $"STORAGE {capturedStorageId}",
+                        receiverButtonName,
+                        $"{candidateEntity.AcceptedItemId} {capturedStorageId}",
                         destinationStorageRoot,
                         storageIndex * 95f,
                         0f,
@@ -398,11 +481,14 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
         }
 
         connectButton.interactable = canEdit
-            && selectedEntity.IsProducingMachine
-            && !hasConnection
+            && selectedEntity.IsProducer
+            && outgoingConnection is null
             && destinationFloorIndex >= 0
             && selectedStorageId != 0;
-        disconnectButton.interactable = canEdit && hasConnection;
+        disconnectButton.interactable = canEdit
+            && (incomingConnection is not null || outgoingConnection is not null);
+        disconnectIncomingButton.interactable = canEdit && incomingConnection is not null;
+        disconnectOutgoingButton.interactable = canEdit && outgoingConnection is not null;
     }
 
     private static void ClearDynamicRoot(Transform rootTransform)
@@ -973,54 +1059,102 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
         SetTopRect(statusText.rectTransform, 14f, 446f, 392f, 40f);
         var machines = CreateImage("Current Floor Machines", root.transform,
             new Color(0.025f, 0.055f, 0.075f, 0.94f));
-        SetTopRect(machines.GetComponent<RectTransform>(), 434f, 0f, 420f, 520f);
+        SetTopRect(machines.GetComponent<RectTransform>(), 434f, 0f, 420f, 270f);
         var machineTitle = CreateText("Machine Title", machines.transform, "CURRENT FLOOR MACHINES", 16,
             TextAnchor.MiddleLeft, new Color(0.78f, 1f, 0.9f));
         SetTopRect(machineTitle.rectTransform, 12f, 10f, 396f, 28f);
-        CreateTextLabel(machines.transform, "Machine X Label", "X", 12f, 46f);
-        machineXInput = CreateInputField(machines.transform, "Machine X Input", "1", 38f, 42f, 120f, 32f,
+        var machineScrollRect = machines.AddComponent<ScrollRect>();
+        machineScrollRect.horizontal = false;
+        machineScrollRect.vertical = true;
+        var machineViewport = new GameObject(
+            "Current Floor Machines Viewport",
+            typeof(RectTransform),
+            typeof(RectMask2D));
+        machineViewport.transform.SetParent(machines.transform, false);
+        SetTopRect(
+            machineViewport.GetComponent<RectTransform>(),
+            0f,
+            42f,
+            420f,
+            228f);
+        var machineContent = new GameObject(
+            "Current Floor Machines Content",
+            typeof(RectTransform)).transform;
+        machineContent.SetParent(machineViewport.transform, false);
+        SetTopRect(
+            machineContent.GetComponent<RectTransform>(),
+            0f,
+            0f,
+            420f,
+            560f);
+        machineScrollRect.viewport = machineViewport.GetComponent<RectTransform>();
+        machineScrollRect.content = machineContent.GetComponent<RectTransform>();
+        CreateTextLabel(machineContent, "Machine X Label", "X", 12f, 4f);
+        machineXInput = CreateInputField(machineContent, "Machine X Input", "1", 38f, 0f, 120f, 32f,
             InputField.ContentType.DecimalNumber);
-        CreateTextLabel(machines.transform, "Machine Y Label", "Y", 178f, 46f);
-        machineYInput = CreateInputField(machines.transform, "Machine Y Input", "1", 204f, 42f, 120f, 32f,
+        CreateTextLabel(machineContent, "Machine Y Label", "Y", 178f, 4f);
+        machineYInput = CreateInputField(machineContent, "Machine Y Input", "1", 204f, 0f, 120f, 32f,
             InputField.ContentType.DecimalNumber);
-        addMachineButton = CreateButton("Add Test Machine", "ADD TEST MACHINE", machines.transform,
-            12f, 84f, 190f, 32f, AddMachineClicked);
-        addStorageButton = CreateButton("Add Test Storage", "ADD STORAGE", machines.transform,
-            208f, 84f, 190f, 32f, AddStorageClicked);
-        machineSelectionText = CreateText("Machine Selection", machines.transform, string.Empty, 13,
+        addMachineButton = CreateButton("Add Test Machine", "ADD TEST MACHINE", machineContent,
+            12f, 42f, 190f, 32f, AddMachineClicked);
+        addStorageButton = CreateButton("Add Test Storage", "ADD STORAGE", machineContent,
+            208f, 42f, 190f, 32f, AddStorageClicked);
+        addProcessorButton = CreateButton("Add Test Processor", "ADD PROCESSOR", machineContent,
+            12f, 80f, 190f, 32f, AddProcessorClicked);
+        addPackedStorageButton = CreateButton("Add Packed Storage", "ADD PACKED STORAGE", machineContent,
+            208f, 80f, 190f, 32f, AddPackedStorageClicked);
+        machineSelectionText = CreateText("Machine Selection", machineContent, string.Empty, 13,
             TextAnchor.MiddleLeft, Color.white);
-        SetTopRect(machineSelectionText.rectTransform, 12f, 122f, 396f, 38f);
-        machineDetailsText = CreateText("Machine Details", machines.transform, string.Empty, 12,
+        SetTopRect(machineSelectionText.rectTransform, 12f, 118f, 396f, 38f);
+        machineDetailsText = CreateText("Machine Details", machineContent, string.Empty, 12,
             TextAnchor.UpperLeft, new Color(0.9f, 0.94f, 0.96f));
-        SetTopRect(machineDetailsText.rectTransform, 12f, 160f, 396f, 52f);
-        nextMachineButton = CreateButton("Next Machine", "SELECT NEXT", machines.transform,
-            12f, 218f, 190f, 32f, NextMachineClicked);
-        removeMachineButton = CreateButton("Remove Machine", "REMOVE SELECTED", machines.transform,
-            208f, 218f, 190f, 32f, RemoveMachineClicked);
-        drainOutputButton = CreateButton("Drain Output", "DRAIN OUTPUT", machines.transform,
-            12f, 256f, 396f, 32f, DrainOutputClicked);
-        connectionText = CreateText("Connection Text", machines.transform, "CONNECTION: select an entity", 12,
+        SetTopRect(machineDetailsText.rectTransform, 12f, 156f, 396f, 52f);
+        nextMachineButton = CreateButton("Next Machine", "SELECT NEXT", machineContent,
+            12f, 214f, 190f, 32f, NextMachineClicked);
+        removeMachineButton = CreateButton("Remove Machine", "REMOVE SELECTED", machineContent,
+            208f, 214f, 190f, 32f, RemoveMachineClicked);
+        drainOutputButton = CreateButton("Drain Output", "DRAIN OUTPUT", machineContent,
+            12f, 252f, 396f, 32f, DrainOutputClicked);
+        connectionText = CreateText("Connection Text", machineContent, "CONNECTION: select an entity", 12,
             TextAnchor.UpperLeft, new Color(0.78f, 0.9f, 0.88f));
-        SetTopRect(connectionText.rectTransform, 12f, 296f, 396f, 38f);
-        CreateTextLabel(machines.transform, "Destination Floor Label", "DEST FLOOR", 12f, 336f);
+        SetTopRect(connectionText.rectTransform, 12f, 290f, 396f, 38f);
+        CreateTextLabel(machineContent, "Destination Floor Label", "DEST FLOOR", 12f, 330f);
         destinationFloorRoot = new GameObject(
             "Destination Floor Selectors",
             typeof(RectTransform)).transform;
-        destinationFloorRoot.SetParent(machines.transform, false);
-        SetTopRect(destinationFloorRoot.GetComponent<RectTransform>(), 104f, 334f, 294f, 30f);
-        CreateTextLabel(machines.transform, "Destination Storage Label", "STORAGE", 12f, 370f);
+        destinationFloorRoot.SetParent(machineContent, false);
+        SetTopRect(destinationFloorRoot.GetComponent<RectTransform>(), 104f, 328f, 294f, 30f);
+        CreateTextLabel(machineContent, "Destination Storage Label", "RECEIVER", 12f, 366f);
         destinationStorageRoot = new GameObject(
             "Destination Storage Selectors",
             typeof(RectTransform)).transform;
-        destinationStorageRoot.SetParent(machines.transform, false);
-        SetTopRect(destinationStorageRoot.GetComponent<RectTransform>(), 104f, 368f, 294f, 30f);
-        connectButton = CreateButton("Connect", "CONNECT", machines.transform,
-            12f, 404f, 190f, 32f, ConnectClicked);
-        disconnectButton = CreateButton("Disconnect", "DISCONNECT", machines.transform,
-            208f, 404f, 190f, 32f, DisconnectClicked);
-        machineStatusText = CreateText("Machine Status", machines.transform, "Select an entity to drain or remove it.", 12,
+        destinationStorageRoot.SetParent(machineContent, false);
+        SetTopRect(destinationStorageRoot.GetComponent<RectTransform>(), 104f, 364f, 294f, 30f);
+        connectButton = CreateButton("Connect", "CONNECT", machineContent,
+            12f, 400f, 94f, 32f, ConnectClicked);
+        disconnectButton = CreateButton("Disconnect", "DISCONNECT", machineContent,
+            112f, 400f, 98f, 32f, DisconnectClicked);
+        disconnectIncomingButton = CreateButton(
+            "Disconnect Incoming",
+            "DISCONNECT IN",
+            machineContent,
+            216f,
+            400f,
+            98f,
+            32f,
+            DisconnectIncomingClicked);
+        disconnectOutgoingButton = CreateButton(
+            "Disconnect Outgoing",
+            "DISCONNECT OUT",
+            machineContent,
+            320f,
+            400f,
+            78f,
+            32f,
+            DisconnectOutgoingClicked);
+        machineStatusText = CreateText("Machine Status", machineContent, "Select an entity to drain or remove it.", 12,
             TextAnchor.UpperLeft, new Color(0.6f, 0.78f, 0.76f));
-        SetTopRect(machineStatusText.rectTransform, 12f, 442f, 396f, 62f);
+        SetTopRect(machineStatusText.rectTransform, 12f, 438f, 396f, 62f);
         root.SetActive(true);
     }
 

@@ -285,6 +285,64 @@ public sealed class GameSceneManager : MonoBehaviour
         return true;
     }
 
+    public bool TryAddCurrentFloorProcessor(
+        PlayerSceneTransition player,
+        Vector2 position,
+        out uint entityId,
+        out string error)
+    {
+        entityId = 0;
+        error = "Only the local host inside a floor can edit entities; wait for travel to finish.";
+        if (!CanEditCurrentFloorEntities(player))
+        {
+            return false;
+        }
+
+        player.TryGetCurrentOutsideTestFloor(out var buildingId, out var floorIndex);
+        if (!outsideTestStateOwner.TryAddTestProcessor(
+                buildingId,
+                floorIndex,
+                position,
+                out entityId,
+                out error))
+        {
+            return false;
+        }
+
+        BroadcastOutsideTestFloorState(buildingId, floorIndex);
+        outsideTestStateNeedsSave = true;
+        return true;
+    }
+
+    public bool TryAddCurrentFloorPackedStorage(
+        PlayerSceneTransition player,
+        Vector2 position,
+        out uint entityId,
+        out string error)
+    {
+        entityId = 0;
+        error = "Only the local host inside a floor can edit entities; wait for travel to finish.";
+        if (!CanEditCurrentFloorEntities(player))
+        {
+            return false;
+        }
+
+        player.TryGetCurrentOutsideTestFloor(out var buildingId, out var floorIndex);
+        if (!outsideTestStateOwner.TryAddPackedStorage(
+                buildingId,
+                floorIndex,
+                position,
+                out entityId,
+                out error))
+        {
+            return false;
+        }
+
+        BroadcastOutsideTestFloorState(buildingId, floorIndex);
+        outsideTestStateNeedsSave = true;
+        return true;
+    }
+
     public bool TryRemoveCurrentFloorMachine(PlayerSceneTransition player, uint entityId,
         out string error)
     {
@@ -407,6 +465,41 @@ public sealed class GameSceneManager : MonoBehaviour
         var endpoint = new FactoryEntityEndpoint(buildingId, floorIndex, entityId);
         if (!outsideTestStateOwner.TryRemoveConnectionForEndpoint(
                 endpoint,
+                out var removedConnection,
+                out error))
+        {
+            return false;
+        }
+
+        BroadcastOutsideTestFloorState(
+            removedConnection.Source.BuildingInstanceId,
+            removedConnection.Source.FloorIndex);
+        BroadcastOutsideTestFloorState(
+            removedConnection.Destination.BuildingInstanceId,
+            removedConnection.Destination.FloorIndex);
+        outsideTestStateNeedsSave = true;
+        return true;
+    }
+
+    public bool TryDisconnectCurrentFloorEntity(
+        PlayerSceneTransition player,
+        uint entityId,
+        FactoryEntityConnectionDirection direction,
+        out string error)
+    {
+        error = "Only the local host inside a floor can edit connections; wait for travel to finish.";
+        if (!CanEditCurrentFloorEntities(player)
+            || !player.TryGetCurrentOutsideTestFloor(
+                out var buildingId,
+                out var floorIndex))
+        {
+            return false;
+        }
+
+        var endpoint = new FactoryEntityEndpoint(buildingId, floorIndex, entityId);
+        if (!outsideTestStateOwner.TryRemoveConnectionForEndpoint(
+                endpoint,
+                direction,
                 out var removedConnection,
                 out error))
         {

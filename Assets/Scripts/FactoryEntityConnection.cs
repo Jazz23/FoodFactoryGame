@@ -48,6 +48,12 @@ public struct FactoryEntityEndpoint : IEquatable<FactoryEntityEndpoint>
     }
 }
 
+public enum FactoryEntityConnectionDirection
+{
+    Incoming,
+    Outgoing
+}
+
 [Serializable]
 public sealed class FactoryEntityConnectionRecord
 {

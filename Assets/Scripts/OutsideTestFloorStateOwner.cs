@@ -77,7 +77,9 @@ public sealed class OutsideTestFloorStateOwner
     public const int OutputBuffersSaveVersion = 5;
     public const int OutputBufferSaveVersion = OutputBuffersSaveVersion;
     public const int ConnectionsSaveVersion = 6;
-    public const int CurrentSaveVersion = 6;
+    public const int InputBuffersSaveVersion = 7;
+    public const int InputBufferSaveVersion = InputBuffersSaveVersion;
+    public const int CurrentSaveVersion = 7;
 
     private readonly uint legacyBuildingInstanceId;
     private readonly Dictionary<OutsideTestFloorKey, OutsideTestFloorRecord> floorStates = new();
@@ -394,11 +396,12 @@ public sealed class OutsideTestFloorStateOwner
         var safeDefinitionId = string.IsNullOrWhiteSpace(definitionId)
             ? "test-machine"
             : definitionId.Trim();
+        var definition = FactoryEntityDefinitions.Get(safeDefinitionId);
         floor.AddEntity(new FactoryEntityRecord(
             entityId,
             safeDefinitionId,
             position,
-            safeDefinitionId == FactoryEntityRecord.StorageDefinitionId ? 0f : 1f,
+            definition.IsStorage ? 0f : 1f,
             0f,
             0));
         return true;
@@ -427,6 +430,38 @@ public sealed class OutsideTestFloorStateOwner
             buildingInstanceId,
             floorIndex,
             FactoryEntityRecord.StorageDefinitionId,
+            position,
+            out entityId,
+            out error);
+    }
+
+    public bool TryAddTestProcessor(
+        uint buildingInstanceId,
+        int floorIndex,
+        Vector2 position,
+        out uint entityId,
+        out string error)
+    {
+        return TryAddTestEntity(
+            buildingInstanceId,
+            floorIndex,
+            FactoryEntityRecord.ProcessorDefinitionId,
+            position,
+            out entityId,
+            out error);
+    }
+
+    public bool TryAddPackedStorage(
+        uint buildingInstanceId,
+        int floorIndex,
+        Vector2 position,
+        out uint entityId,
+        out string error)
+    {
+        return TryAddTestEntity(
+            buildingInstanceId,
+            floorIndex,
+            FactoryEntityRecord.PackedStorageDefinitionId,
             position,
             out entityId,
             out error);
@@ -618,6 +653,49 @@ public sealed class OutsideTestFloorStateOwner
 
         removedConnection = null!;
         error = "The selected entity has no connection.";
+        return false;
+    }
+
+    public bool TryDisconnect(
+        FactoryEntityEndpoint endpoint,
+        FactoryEntityConnectionDirection direction,
+        out FactoryEntityConnectionRecord removedConnection,
+        out string error)
+    {
+        return TryRemoveConnectionForEndpoint(
+            endpoint,
+            direction,
+            out removedConnection,
+            out error);
+    }
+
+    public bool TryRemoveConnectionForEndpoint(
+        FactoryEntityEndpoint endpoint,
+        FactoryEntityConnectionDirection direction,
+        out FactoryEntityConnectionRecord removedConnection,
+        out string error)
+    {
+        error = string.Empty;
+        for (var index = 0; index < connections.Count; index++)
+        {
+            var connection = connections[index];
+            var matches = direction == FactoryEntityConnectionDirection.Outgoing
+                ? connection.Source.Equals(endpoint)
+                : connection.Destination.Equals(endpoint);
+            if (!matches)
+            {
+                continue;
+            }
+
+            removedConnection = connection.Clone();
+            connections.RemoveAt(index);
+            return true;
+        }
+
+        removedConnection = null!;
+        error = direction == FactoryEntityConnectionDirection.Outgoing
+            ? "The selected entity has no outgoing connection."
+            : "The selected entity has no incoming connection.";
         return false;
     }
 
@@ -903,6 +981,17 @@ public sealed class OutsideTestFloorStateOwner
                         if (entity is not null)
                         {
                             entity.DrainOutput();
+                        }
+                    }
+                }
+
+                if (version < InputBuffersSaveVersion)
+                {
+                    foreach (var entity in migratedState.Entities)
+                    {
+                        if (entity is not null)
+                        {
+                            entity.SetInputCount(0);
                         }
                     }
                 }
@@ -1201,15 +1290,21 @@ public sealed class OutsideTestFloorStateOwner
             return false;
         }
 
-        if (!sourceEntity.IsProducingMachine)
+        if (!sourceEntity.IsProducer)
         {
-            error = "The connection source must be a producing machine.";
+            error = "The connection source must produce an item.";
             return false;
         }
 
-        if (!destinationEntity.IsStorage)
+        if (!destinationEntity.IsReceiver)
         {
-            error = "The connection destination must be test-storage.";
+            error = "The connection destination must accept an item.";
+            return false;
+        }
+
+        if (sourceEntity.ProducedItemId != destinationEntity.AcceptedItemId)
+        {
+            error = $"The connection item types do not match: {sourceEntity.ProducedItemId} -> {destinationEntity.AcceptedItemId}.";
             return false;
         }
 
@@ -1278,10 +1373,13 @@ public sealed class OutsideTestFloorStateOwner
         {
             if (!TryGetEntity(connection.Source, out var sourceEntity)
                 || !TryGetEntity(connection.Destination, out var destinationEntity)
-                || !sourceEntity.IsProducingMachine
-                || !destinationEntity.IsStorage
+                || !sourceEntity.IsProducer
+                || !destinationEntity.IsReceiver
+                || sourceEntity.ProducedItemId != destinationEntity.AcceptedItemId
                 || sourceEntity.OutputCount <= 0
-                || destinationEntity.OutputCount >= FactoryEntityRecord.OutputCapacity)
+                || (destinationEntity.IsProcessor
+                    ? destinationEntity.InputCount >= FactoryEntityRecord.InputCapacity
+                    : destinationEntity.OutputCount >= FactoryEntityRecord.OutputCapacity))
             {
                 continue;
             }
@@ -1292,7 +1390,9 @@ public sealed class OutsideTestFloorStateOwner
                 continue;
             }
 
-            var accepted = destinationEntity.AddOutput(1);
+            var accepted = destinationEntity.TryAcceptItem(
+                sourceEntity.ProducedItemId,
+                1);
             if (accepted != 1)
             {
                 sourceEntity.AddOutput(removed);
