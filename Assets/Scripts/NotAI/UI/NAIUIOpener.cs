@@ -38,9 +38,9 @@ namespace NotAI.UI
         private void OnSelectButton(InputAction.CallbackContext ctx)
         {
             var cellPos = NAIExtensions.GetPointerCellPos2D();
-            if (!NAIStateManager.OccupiedTiles.TryGetValue(cellPos, out var guid)) return;
-            
-            var buildable = NAIStateManager.Buildables[guid];
+            if (!NAIStateManager.OccupiedTiles.TryGetValue(cellPos, out var guid)
+                || !NAIStateManager.Instance.TryGetBuildableView(guid, out var buildable)) return;
+
             if (!buildable.TryGetComponent(out NAIOpenableUI openableUI)) return;
             
             _openUI = openableUI.OpenUI(transform);

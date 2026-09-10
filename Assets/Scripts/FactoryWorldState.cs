@@ -71,7 +71,7 @@ public readonly struct OutsideTestBuildingInfo
     public Vector2Int FootprintSize { get; }
 }
 
-public sealed class OutsideTestFloorStateOwner
+public sealed class FactoryWorldState
 {
     public const int BuildingRecordsSaveVersion = 4;
     public const int OutputBuffersSaveVersion = 5;
@@ -88,7 +88,7 @@ public sealed class OutsideTestFloorStateOwner
     private int lastLoadedVersion;
     private bool lastLoadHadBuildingRecords;
 
-    public OutsideTestFloorStateOwner(uint newLegacyBuildingInstanceId)
+    public FactoryWorldState(uint newLegacyBuildingInstanceId)
     {
         legacyBuildingInstanceId = newLegacyBuildingInstanceId;
     }

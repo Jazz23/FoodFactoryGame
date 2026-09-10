@@ -10,6 +10,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using UnityEngine.UI;
+using OutsideTestFloorStateOwner = FactoryWorldState;
 
 public sealed class OutsideTestFloorTransitionTests
 {

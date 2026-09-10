@@ -5,6 +5,7 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using OutsideTestFloorStateOwner = FactoryWorldState;
 
 [CustomEditor(typeof(TestBuildingCreator))]
 public sealed class TestBuildingCreatorEditor : Editor

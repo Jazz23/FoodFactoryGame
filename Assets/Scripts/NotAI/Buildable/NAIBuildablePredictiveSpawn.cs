@@ -29,15 +29,21 @@ namespace NotAI
         public override bool OnTrySpawnServer(NetworkConnection spawner, NetworkConnection owner = null)
         {
             var size = GetComponent<UnityEngine.SpriteRenderer>().bounds.size;
-            if (!_buildableManager.CanBuildHere(transform.position, size)) return false;
+            if (!NAIStateManager.Instance.TryAcceptNaiPlacement(
+                    _buildingId,
+                    transform.position,
+                    transform.rotation,
+                    size,
+                    out var guid,
+                    out _))
+            {
+                return false;
+            }
 
-            // Spawn the buildable on the server
-            var guid = System.Guid.NewGuid();
             var buildable = GetComponent<NAIBuildable>();
             buildable.guid = guid;
             buildable.buildableId = _buildingId;
-            _buildableManager.UpdateGrid(transform.position, size, guid);
-            NAIStateManager.Buildables[guid] = buildable;
+            NAIStateManager.Instance.RegisterBuildableView(buildable);
             return true;
         }
     }

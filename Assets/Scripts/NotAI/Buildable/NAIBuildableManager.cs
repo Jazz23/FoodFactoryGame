@@ -32,6 +32,7 @@ namespace NotAI
         private NAIGhostBuildable _ghost;
         private SpriteRenderer _ghostRenderer;
         private Grid _grid;
+        private readonly Dictionary<Vector2, Guid> _provisionalOccupiedTiles = new();
 
         [Client]
         public void SetGhost(NAIGhostBuildable ghost)
@@ -73,6 +74,7 @@ namespace NotAI
 
         public override void OnStopClient()
         {
+            _provisionalOccupiedTiles.Clear();
             if (!IsOwner) return;
             _buildAction.Disable();
             _buildAction.performed -= OnBuildButton;
@@ -142,13 +144,18 @@ namespace NotAI
         // Ran on client and server to update the occupancy grid when a building is placed
         public void UpdateGrid(Vector3 position, Vector2 size, Guid guid)
         {
-            GetOccupiedCells(position, size).ForEach(cell => NAIStateManager.OccupiedTiles[cell] = guid);
+            foreach (var cell in GetOccupiedCells(position, size))
+            {
+                _provisionalOccupiedTiles[cell] = guid;
+            }
         }
 
         public bool CanBuildHere(Vector3 position, Vector2 size)
         {
             var occupiedCells = GetOccupiedCells(position, size);
-            return occupiedCells.All(cell => !NAIStateManager.OccupiedTiles.ContainsKey(cell));
+            return NAIStateManager.Instance.IsAcceptingMutations
+                && occupiedCells.All(cell => !NAIStateManager.OccupiedTiles.ContainsKey(cell)
+                    && !_provisionalOccupiedTiles.ContainsKey(cell));
         }
 
         // Get the world pos cells that the ghost building occupies based on its position and size.
@@ -158,21 +165,7 @@ namespace NotAI
             size.x = Mathf.RoundToInt(size.x * 1000f) / 1000f;
             size.y = Mathf.RoundToInt(size.y * 1000f) / 1000f;
             
-            var cellSize = _grid.cellSize;
-            
-            var cellsX = Mathf.CeilToInt(size.x / cellSize.x);
-            var cellsY = Mathf.CeilToInt(size.y / cellSize.y);
-
-            var occupiedCells = new List<Vector2>();
-            for (var x = 0; x < cellsX; x++)
-            {
-                for (var y = 0; y < cellsY; y++)
-                {
-                    occupiedCells.Add(new Vector2(Mathf.FloorToInt(position.x) + x * cellSize.x, Mathf.FloorToInt(position.y) + y * cellSize.y));
-                }
-            }
-            
-            return occupiedCells;
+            return NAIStateManager.GetOccupiedCells(position, size, _grid.cellSize);
         }
     }
 }

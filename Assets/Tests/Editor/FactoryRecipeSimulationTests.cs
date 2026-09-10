@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEngine;
+using OutsideTestFloorStateOwner = FactoryWorldState;
 
 public sealed class FactoryRecipeSimulationTests
 {

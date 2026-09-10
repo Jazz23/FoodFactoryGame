@@ -5,6 +5,10 @@ using UnityEngine;
 [Serializable]
 public struct FactoryEntityEndpoint : IEquatable<FactoryEntityEndpoint>
 {
+    [SerializeField] private string buildingGuidString;
+    [SerializeField] private string floorGuidString;
+    [SerializeField] private string entityGuidString;
+
     public FactoryEntityEndpoint(
         uint newBuildingInstanceId,
         int newFloorIndex,
@@ -13,6 +17,29 @@ public struct FactoryEntityEndpoint : IEquatable<FactoryEntityEndpoint>
         BuildingInstanceId = newBuildingInstanceId;
         FloorIndex = newFloorIndex;
         EntityId = newEntityId;
+        buildingGuidString = newBuildingInstanceId == 0
+            ? string.Empty
+            : FactoryGuidMigration.ForBuilding(newBuildingInstanceId).ToString("D");
+        floorGuidString = newBuildingInstanceId == 0 || newFloorIndex < 0
+            ? string.Empty
+            : FactoryGuidMigration.ForFloor(newBuildingInstanceId, newFloorIndex).ToString("D");
+        entityGuidString = newBuildingInstanceId == 0 || newFloorIndex < 0 || newEntityId == 0
+            ? string.Empty
+            : FactoryGuidMigration.ForEntity(newBuildingInstanceId, newFloorIndex, newEntityId).ToString("D");
+    }
+
+    public FactoryEntityEndpoint(
+        Guid newBuildingGuid,
+        Guid newFloorGuid,
+        Guid newEntityGuid,
+        int newFloorIndex)
+    {
+        BuildingInstanceId = 0;
+        FloorIndex = newFloorIndex;
+        EntityId = 0;
+        buildingGuidString = newBuildingGuid == Guid.Empty ? string.Empty : newBuildingGuid.ToString("D");
+        floorGuidString = newFloorGuid == Guid.Empty ? string.Empty : newFloorGuid.ToString("D");
+        entityGuidString = newEntityGuid == Guid.Empty ? string.Empty : newEntityGuid.ToString("D");
     }
 
     public uint BuildingInstanceId;
@@ -20,12 +47,15 @@ public struct FactoryEntityEndpoint : IEquatable<FactoryEntityEndpoint>
     public uint EntityId;
     public uint BuildingId => BuildingInstanceId;
     public int Floor => FloorIndex;
+    public Guid BuildingGuid => GetGuid(buildingGuidString);
+    public Guid FloorGuid => GetGuid(floorGuidString);
+    public Guid EntityGuid => GetGuid(entityGuidString);
 
     public bool Equals(FactoryEntityEndpoint other)
     {
-        return BuildingInstanceId == other.BuildingInstanceId
-            && FloorIndex == other.FloorIndex
-            && EntityId == other.EntityId;
+        return BuildingGuid == other.BuildingGuid
+            && FloorGuid == other.FloorGuid
+            && EntityGuid == other.EntityGuid;
     }
 
     public override bool Equals(object obj)
@@ -35,16 +65,19 @@ public struct FactoryEntityEndpoint : IEquatable<FactoryEntityEndpoint>
 
     public override int GetHashCode()
     {
-        unchecked
-        {
-            var hash = ((int)BuildingInstanceId * 397) ^ FloorIndex;
-            return (hash * 397) ^ (int)EntityId;
-        }
+        return HashCode.Combine(BuildingGuid, FloorGuid, EntityGuid);
     }
 
     public override string ToString()
     {
-        return $"B{BuildingInstanceId}/F{FloorIndex}/E{EntityId}";
+        return $"B{BuildingGuid:D}/F{FloorIndex}:{FloorGuid:D}/E{EntityGuid:D}";
+    }
+
+    private static Guid GetGuid(string value)
+    {
+        return FactoryGuidMigration.TryParseCanonical(value, out var result)
+            ? result
+            : Guid.Empty;
     }
 }
 

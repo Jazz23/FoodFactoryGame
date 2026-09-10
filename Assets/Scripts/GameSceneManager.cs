@@ -1,4 +1,5 @@
 // Loads building-specific interior scenes and returns players to their source building.
+using System;
 using System.Collections.Generic;
 using System.IO;
 using FishNet.Connection;
@@ -10,6 +11,7 @@ using FishNet.Utility.Extension;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnitySceneManager = UnityEngine.SceneManagement.SceneManager;
+using NotAI;
 #if UNITY_6000_5_OR_NEWER
 using SceneHandle = System.UInt64;
 #else
@@ -57,6 +59,7 @@ public sealed class GameSceneManager : MonoBehaviour
     }
 
     [SerializeField] private NetworkObject playerPrefab = null!;
+    [SerializeField] private NetworkObject stateManagerPrefab = null!;
     [SerializeField] private string worldSceneName = "World";
     [SerializeField] private string insideSceneName = "Inside";
     [SerializeField] private string outsideTestStatePath = string.Empty;
@@ -68,8 +71,7 @@ public sealed class GameSceneManager : MonoBehaviour
     private readonly OutsideTestFloorInstanceRegistry outsideTestFloorInstances = new();
     private readonly HashSet<uint> duplicateOutsideTestBuildingWarnings = new();
     private NetworkManager networkManager = null!;
-    private OutsideTestFloorStateOwner outsideTestStateOwner = null!;
-    private FactorySimulation outsideTestSimulation = null!;
+    private NAIStateManager stateManager = null!;
     private bool outsideTestStateLoaded;
     private bool outsideTestStateLoadedFromDisk;
     private bool outsideTestStateLoadFailed;
@@ -89,6 +91,7 @@ public sealed class GameSceneManager : MonoBehaviour
 
     public string OutsideTestStatePath => GetOutsideTestStatePath();
     public string LastOutsideTestError => lastOutsideTestError;
+    public NAIStateManager StateManager => stateManager;
 
     public bool TryGetOutsideTestFloorScene(
         uint buildingInstanceId,
@@ -130,10 +133,10 @@ public sealed class GameSceneManager : MonoBehaviour
         outsideTestFloorInstances.Clear();
         registeredOutsideTestSceneHandle = default;
         lastOutsideTestError = string.Empty;
-        outsideTestStateOwner = new OutsideTestFloorStateOwner(
-            LegacyOutsideTestBuildingId);
-        outsideTestSimulation = new FactorySimulation(
-            outsideTestStateOwner.AdvanceProduction);
+        stateManager.ConfigureLegacyPaths(
+            outsideTestStatePath,
+            FactoryWorldPaths.GetLegacyNaiWorldPath());
+        NAIStateManager.ConfigureDatabasePath(outsideTestStatePath);
         return true;
     }
 
@@ -141,10 +144,8 @@ public sealed class GameSceneManager : MonoBehaviour
     {
         Instance = this;
         networkManager = GetComponent<NetworkManager>();
-        outsideTestStateOwner = new OutsideTestFloorStateOwner(
-            LegacyOutsideTestBuildingId);
-        outsideTestSimulation = new FactorySimulation(
-            outsideTestStateOwner.AdvanceProduction);
+        stateManager = FindFirstObjectByType<NAIStateManager>(FindObjectsInactive.Include);
+        EnsureStateManagerReference();
     }
 
     private void OnEnable()
@@ -165,21 +166,12 @@ public sealed class GameSceneManager : MonoBehaviour
         networkManager.SceneManager.OnLoadEnd -= SceneLoadEnd;
         networkManager.SceneManager.OnUnloadEnd -= SceneUnloadEnd;
         networkManager.SceneManager.OnClientPresenceChangeEnd -= ClientPresenceChangeEnd;
-        if (networkManager.IsServerStarted && !outsideTestStateLoadFailed)
-        {
-            SaveOutsideTestFloorState();
-        }
 
         outsideTestFloorInstances.Clear();
     }
 
     private void OnApplicationQuit()
     {
-        if (networkManager.IsServerStarted && !outsideTestStateLoadFailed)
-        {
-            SaveOutsideTestFloorState();
-        }
-
         outsideTestFloorInstances.Clear();
     }
 
@@ -190,12 +182,6 @@ public sealed class GameSceneManager : MonoBehaviour
         if (!networkManager.IsServerStarted)
         {
             return;
-        }
-
-        outsideTestSimulation.Advance(Time.deltaTime);
-        if (outsideTestStateNeedsSave && !outsideTestStateLoadFailed)
-        {
-            SaveOutsideTestFloorState();
         }
 
         if (Time.unscaledTime < nextOutsideTestBroadcastTime)
@@ -213,7 +199,7 @@ public sealed class GameSceneManager : MonoBehaviour
         out OutsideTestFloorRecord state)
     {
         EnsureOutsideTestStateLoaded();
-        return outsideTestStateOwner.TryGetFloorState(
+        return stateManager.TryGetFloorState(
             buildingInstanceId,
             floorIndex,
             out state);
@@ -221,12 +207,36 @@ public sealed class GameSceneManager : MonoBehaviour
 
     public bool CanEditCurrentFloorMachines(PlayerSceneTransition player)
     {
-        return networkManager.IsServerStarted && networkManager.IsClientStarted
-            && player.IsOwner && player.Owner == networkManager.ClientManager.Connection
-            && !player.IsTransitioning
-            && !pendingTransitions.ContainsKey(player.Owner.ClientId)
-            && player.TryGetCurrentOutsideTestFloor(out var buildingId, out var floorIndex)
-            && IsValidOutsideTestFloor(buildingId, floorIndex);
+        if (!networkManager.IsServerStarted
+            || !networkManager.IsClientStarted
+            || !player.IsOwner
+            || player.Owner != networkManager.ClientManager.Connection
+            || player.IsTransitioning
+            || !player.TryGetCurrentOutsideTestFloor(out var buildingId, out var floorIndex)
+            || !IsValidOutsideTestFloor(buildingId, floorIndex))
+        {
+            return false;
+        }
+
+        if (!pendingTransitions.TryGetValue(player.Owner.ClientId, out var pendingTransition))
+        {
+            return true;
+        }
+
+        if (pendingTransition.TargetScene.IsValid()
+            && pendingTransition.TargetScene.GetRawHandle() == player.gameObject.scene.GetRawHandle())
+        {
+            pendingTransitions.Remove(player.Owner.ClientId);
+            if (pendingTransition.BuildingInstanceId != 0
+                && buildingReturns.TryGetValue(player.Owner.ClientId, out var buildingReturn))
+            {
+                buildingReturn.CurrentFloor = floorIndex;
+            }
+
+            return true;
+        }
+
+        return false;
     }
 
     public bool CanEditCurrentFloorEntities(PlayerSceneTransition player)
@@ -245,7 +255,7 @@ public sealed class GameSceneManager : MonoBehaviour
         }
 
         player.TryGetCurrentOutsideTestFloor(out var buildingId, out var floorIndex);
-        if (!outsideTestStateOwner.TryAddTestMachine(buildingId, floorIndex, position,
+        if (!stateManager.TryAddTestMachine(buildingId, floorIndex, position,
                 out entityId, out error))
         {
             return false;
@@ -270,7 +280,7 @@ public sealed class GameSceneManager : MonoBehaviour
         }
 
         player.TryGetCurrentOutsideTestFloor(out var buildingId, out var floorIndex);
-        if (!outsideTestStateOwner.TryAddTestStorage(
+        if (!stateManager.TryAddTestStorage(
                 buildingId,
                 floorIndex,
                 position,
@@ -299,7 +309,7 @@ public sealed class GameSceneManager : MonoBehaviour
         }
 
         player.TryGetCurrentOutsideTestFloor(out var buildingId, out var floorIndex);
-        if (!outsideTestStateOwner.TryAddTestProcessor(
+        if (!stateManager.TryAddTestProcessor(
                 buildingId,
                 floorIndex,
                 position,
@@ -328,7 +338,7 @@ public sealed class GameSceneManager : MonoBehaviour
         }
 
         player.TryGetCurrentOutsideTestFloor(out var buildingId, out var floorIndex);
-        if (!outsideTestStateOwner.TryAddPackedStorage(
+        if (!stateManager.TryAddPackedStorage(
                 buildingId,
                 floorIndex,
                 position,
@@ -353,7 +363,7 @@ public sealed class GameSceneManager : MonoBehaviour
         }
 
         player.TryGetCurrentOutsideTestFloor(out var buildingId, out var floorIndex);
-        if (!outsideTestStateOwner.TryRemoveTestMachine(buildingId, floorIndex, entityId, out error))
+        if (!stateManager.TryRemoveTestMachine(buildingId, floorIndex, entityId, out error))
         {
             return false;
         }
@@ -385,7 +395,7 @@ public sealed class GameSceneManager : MonoBehaviour
         }
 
         player.TryGetCurrentOutsideTestFloor(out var buildingId, out var floorIndex);
-        if (!outsideTestStateOwner.TryDrainTestMachine(
+        if (!stateManager.TryDrainTestMachine(
                 buildingId,
                 floorIndex,
                 entityId,
@@ -437,7 +447,7 @@ public sealed class GameSceneManager : MonoBehaviour
             buildingId,
             destinationFloorIndex,
             destinationStorageEntityId);
-        if (!outsideTestStateOwner.TryAddConnection(source, destination, out error))
+        if (!stateManager.TryAddConnection(source, destination, out error))
         {
             return false;
         }
@@ -463,7 +473,7 @@ public sealed class GameSceneManager : MonoBehaviour
         }
 
         var endpoint = new FactoryEntityEndpoint(buildingId, floorIndex, entityId);
-        if (!outsideTestStateOwner.TryRemoveConnectionForEndpoint(
+        if (!stateManager.TryRemoveConnectionForEndpoint(
                 endpoint,
                 out var removedConnection,
                 out error))
@@ -497,7 +507,7 @@ public sealed class GameSceneManager : MonoBehaviour
         }
 
         var endpoint = new FactoryEntityEndpoint(buildingId, floorIndex, entityId);
-        if (!outsideTestStateOwner.TryRemoveConnectionForEndpoint(
+        if (!stateManager.TryRemoveConnectionForEndpoint(
                 endpoint,
                 direction,
                 out var removedConnection,
@@ -525,7 +535,7 @@ public sealed class GameSceneManager : MonoBehaviour
     {
         EnsureOutsideTestStateLoaded();
         if (!networkManager.IsServerStarted
-            || !outsideTestStateOwner.TrySetFloorState(
+            || !stateManager.TrySetFloorState(
                 buildingInstanceId,
                 floorIndex,
                 label,
@@ -548,7 +558,7 @@ public sealed class GameSceneManager : MonoBehaviour
             return false;
         }
 
-        if (!outsideTestStateOwner.SaveToFile(GetOutsideTestStatePath()))
+        if (!stateManager.SaveWorld())
         {
             lastOutsideTestError = "Could not save OutsideTest building and floor state.";
             return false;
@@ -558,7 +568,7 @@ public sealed class GameSceneManager : MonoBehaviour
         if (outsideTestWorldReconciled)
         {
             outsideTestStateLoadedFromDisk = true;
-            outsideTestStateOwner.MarkCurrentStateAsAuthoritative();
+            stateManager.MarkCurrentStateAsAuthoritative();
         }
         outsideTestStateLoadFailed = false;
         lastOutsideTestError = string.Empty;
@@ -580,14 +590,12 @@ public sealed class GameSceneManager : MonoBehaviour
             return false;
         }
 
-        var previousState = outsideTestStateOwner.CaptureState();
+        var previousState = stateManager.CaptureState();
         var creator = FindOutsideTestCreator();
         var doorCornerExclusionDistance = creator is null || !creator
             ? TestBuildingCreator.DefaultDoorCornerExclusionDistance
             : creator.DoorCornerExclusionDistance;
-        if (!outsideTestStateOwner.LoadFromFile(
-                GetOutsideTestStatePath(),
-                doorCornerExclusionDistance))
+        if (!stateManager.LoadWorld())
         {
             outsideTestStateLoadFailed = true;
             outsideTestStateNeedsSave = false;
@@ -601,10 +609,10 @@ public sealed class GameSceneManager : MonoBehaviour
         outsideTestStateNeedsSave = false;
         outsideTestWorldReconciled = false;
         if (!ReconcileOutsideTestWorld(
-                !outsideTestStateOwner.LastLoadHadBuildingRecords,
+                !stateManager.LoadedFactoryBuildingRecords,
                 out var reconciliationError))
         {
-            outsideTestStateOwner.LoadState(
+            stateManager.LoadState(
                 previousState,
                 doorCornerExclusionDistance);
             outsideTestWorldReconciled = false;
@@ -615,7 +623,6 @@ public sealed class GameSceneManager : MonoBehaviour
             return false;
         }
 
-        outsideTestSimulation.Reset();
         nextOutsideTestBroadcastTime = 0f;
         BroadcastOutsideTestFloorStates();
         lastOutsideTestError = string.Empty;
@@ -630,7 +637,7 @@ public sealed class GameSceneManager : MonoBehaviour
         }
 
         var loadedInteriorCount = OutsideTestLoadedInteriorCount;
-        foreach (var floor in outsideTestStateOwner.FloorStates)
+        foreach (var floor in stateManager.FloorStates)
         {
             player.ServerSendOutsideTestFloorState(floor, loadedInteriorCount);
         }
@@ -652,7 +659,7 @@ public sealed class GameSceneManager : MonoBehaviour
             return;
         }
 
-        outsideTestStateOwner.ApplySnapshot(
+            stateManager.ApplySnapshot(
             buildingInstanceId,
             floorIndex,
             label,
@@ -667,29 +674,21 @@ public sealed class GameSceneManager : MonoBehaviour
     {
         if (args.ConnectionState == LocalConnectionState.Started)
         {
+            EnsureStateManagerSpawned();
             EnsureOutsideTestStateLoaded();
-            if (!outsideTestStateLoadFailed)
-            {
-                SaveOutsideTestFloorState();
-            }
             BroadcastOutsideTestFloorStates();
             return;
         }
 
         if (args.ConnectionState == LocalConnectionState.Stopped)
         {
-            if (!outsideTestStateLoadFailed)
-            {
-                SaveOutsideTestFloorState();
-            }
-
             outsideTestFloorInstances.Clear();
         }
     }
 
     private void BroadcastOutsideTestFloorStates()
     {
-        foreach (var floor in outsideTestStateOwner.FloorStates)
+        foreach (var floor in stateManager.FloorStates)
         {
             BroadcastOutsideTestFloorState(
                 floor.BuildingInstanceId,
@@ -701,7 +700,7 @@ public sealed class GameSceneManager : MonoBehaviour
         uint buildingInstanceId,
         int floorIndex)
     {
-        if (!outsideTestStateOwner.TryGetFloorState(
+        if (!stateManager.TryGetFloorState(
                 buildingInstanceId,
                 floorIndex,
                 out var floor))
@@ -729,26 +728,14 @@ public sealed class GameSceneManager : MonoBehaviour
 
     private void EnsureOutsideTestStateLoaded()
     {
-        var path = GetOutsideTestStatePath();
         if (networkManager.IsServerStarted && !outsideTestStateLoadedFromDisk)
         {
             outsideTestStateLoadFailed = false;
-            if (File.Exists(path))
+            if (!stateManager.EnsureInitialized())
             {
-                var creator = FindOutsideTestCreator();
-                var doorCornerExclusionDistance = creator is null || !creator
-                    ? TestBuildingCreator.DefaultDoorCornerExclusionDistance
-                    : creator.DoorCornerExclusionDistance;
-                if (!outsideTestStateOwner.LoadFromFile(
-                        path,
-                        doorCornerExclusionDistance))
-                {
-                    outsideTestStateLoadFailed = true;
-                    lastOutsideTestError = "Could not read OutsideTest building and floor state.";
-                    Debug.LogWarning(
-                        lastOutsideTestError,
-                        this);
-                }
+                outsideTestStateLoadFailed = true;
+                lastOutsideTestError = stateManager.InitializationError;
+                Debug.LogWarning(lastOutsideTestError, this);
             }
 
             outsideTestStateLoadedFromDisk = true;
@@ -771,8 +758,7 @@ public sealed class GameSceneManager : MonoBehaviour
             return;
         }
 
-        var importSceneLayouts = !outsideTestStateLoadedFromDisk
-            || !outsideTestStateOwner.LastLoadHadBuildingRecords;
+        var importSceneLayouts = !stateManager.LoadedFactoryBuildingRecords;
         if (!ReconcileOutsideTestWorld(
                 importSceneLayouts,
                 out var reconciliationError))
@@ -783,6 +769,8 @@ public sealed class GameSceneManager : MonoBehaviour
             return;
         }
 
+        stateManager.HydrateInsideTestScene(worldScene);
+
         outsideTestStateLoaded = true;
         outsideTestWorldReconciled = true;
         registeredOutsideTestSceneHandle = worldScene.GetRawHandle();
@@ -792,11 +780,44 @@ public sealed class GameSceneManager : MonoBehaviour
         }
     }
 
+    private void EnsureStateManagerSpawned()
+    {
+        if (!networkManager.IsServerStarted)
+        {
+            return;
+        }
+
+        EnsureStateManagerReference();
+        var networkObject = stateManager.GetComponent<NetworkObject>();
+        if (networkObject is null || networkObject.IsSpawned)
+        {
+            return;
+        }
+
+        networkManager.ServerManager.Spawn(networkObject);
+    }
+
+    private void EnsureStateManagerReference()
+    {
+        if (stateManager is not null && stateManager)
+        {
+            return;
+        }
+
+        stateManager = FindFirstObjectByType<NAIStateManager>(FindObjectsInactive.Include);
+        if (stateManager is not null && stateManager)
+        {
+            return;
+        }
+
+        stateManager = Instantiate(stateManagerPrefab).GetComponent<NAIStateManager>();
+    }
+
     public uint[] GetRegisteredOutsideTestBuildingIds()
     {
         EnsureOutsideTestStateLoaded();
         var result = new List<uint>();
-        foreach (var building in outsideTestStateOwner.Buildings)
+        foreach (var building in stateManager.Buildings)
         {
             result.Add(building.BuildingInstanceId);
         }
@@ -810,7 +831,7 @@ public sealed class GameSceneManager : MonoBehaviour
         out OutsideTestBuildingInfo info)
     {
         EnsureOutsideTestStateLoaded();
-        return outsideTestStateOwner.TryGetBuildingInfo(
+        return stateManager.TryGetBuildingInfo(
             buildingInstanceId,
             out info);
     }
@@ -820,7 +841,7 @@ public sealed class GameSceneManager : MonoBehaviour
         out BuildingRecord record)
     {
         EnsureOutsideTestStateLoaded();
-        return outsideTestStateOwner.TryGetBuildingRecord(
+        return stateManager.TryGetBuildingRecord(
             buildingInstanceId,
             out record);
     }
@@ -828,10 +849,10 @@ public sealed class GameSceneManager : MonoBehaviour
     public FactoryEntityConnectionRecord[] GetOutsideTestConnections()
     {
         EnsureOutsideTestStateLoaded();
-        var result = new FactoryEntityConnectionRecord[outsideTestStateOwner.Connections.Count];
+        var result = new FactoryEntityConnectionRecord[stateManager.Connections.Count];
         for (var index = 0; index < result.Length; index++)
         {
-            result[index] = outsideTestStateOwner.Connections[index].Clone();
+            result[index] = stateManager.Connections[index].Clone();
         }
 
         return result;
@@ -840,7 +861,7 @@ public sealed class GameSceneManager : MonoBehaviour
     public uint GetNextOutsideTestBuildingId()
     {
         EnsureOutsideTestStateLoaded();
-        return outsideTestStateOwner.GetNextBuildingId(
+        return stateManager.GetNextBuildingId(
             GetAuthoredOutsideTestBuildingIds());
     }
 
@@ -912,7 +933,7 @@ public sealed class GameSceneManager : MonoBehaviour
             return false;
         }
 
-        buildingInstanceId = outsideTestStateOwner.GetNextBuildingId(
+        buildingInstanceId = stateManager.GetNextBuildingId(
             GetAuthoredOutsideTestBuildingIds());
         if (buildingInstanceId == 0)
         {
@@ -930,7 +951,7 @@ public sealed class GameSceneManager : MonoBehaviour
             doorPlacements);
         if (!BuildingShellValidation.TryValidate(
                 record,
-                outsideTestStateOwner.BuildingRecords,
+                stateManager.BuildingRecords,
                 creator.DoorCornerExclusionDistance,
                 out error))
         {
@@ -939,7 +960,7 @@ public sealed class GameSceneManager : MonoBehaviour
             return false;
         }
 
-        if (!outsideTestStateOwner.TryRegisterBuilding(record, out error))
+        if (!stateManager.TryRegisterBuilding(record, out error))
         {
             if (string.IsNullOrEmpty(error))
             {
@@ -958,7 +979,7 @@ public sealed class GameSceneManager : MonoBehaviour
             creator.GeneratedBuildings);
         if (shell is null || !shell)
         {
-            outsideTestStateOwner.RemoveBuildingAndFloors(record.BuildingInstanceId);
+            stateManager.RemoveBuildingAndFloors(record.BuildingInstanceId);
             error = "The building shell could not be assembled; creation was rolled back.";
             lastOutsideTestError = error;
             buildingInstanceId = 0;
@@ -1105,7 +1126,7 @@ public sealed class GameSceneManager : MonoBehaviour
         {
             foreach (var record in layoutRecords)
             {
-                if (outsideTestStateOwner.TryGetBuildingRecord(
+                if (stateManager.TryGetBuildingRecord(
                         record.BuildingInstanceId,
                         out var existingRecord))
                 {
@@ -1118,7 +1139,7 @@ public sealed class GameSceneManager : MonoBehaviour
                     continue;
                 }
 
-                if (!outsideTestStateOwner.TryRegisterBuilding(record, out error))
+                if (!stateManager.TryRegisterBuilding(record, out error))
                 {
                     return false;
                 }
@@ -1126,7 +1147,7 @@ public sealed class GameSceneManager : MonoBehaviour
         }
 
         if (!BuildingShellValidation.TryValidateRecords(
-                outsideTestStateOwner.BuildingRecords,
+                stateManager.BuildingRecords,
                 creator.DoorCornerExclusionDistance,
                 out error))
         {
@@ -1135,7 +1156,7 @@ public sealed class GameSceneManager : MonoBehaviour
 
         var assembler = new BuildingShellAssembler();
         var retainedLayoutIds = new HashSet<uint>();
-        foreach (var record in outsideTestStateOwner.BuildingRecords)
+        foreach (var record in stateManager.BuildingRecords)
         {
             if (layoutsById.TryGetValue(
                     record.BuildingInstanceId,
@@ -1183,7 +1204,7 @@ public sealed class GameSceneManager : MonoBehaviour
                     continue;
                 }
 
-                Object.DestroyImmediate(layout.transform.gameObject);
+                UnityEngine.Object.DestroyImmediate(layout.transform.gameObject);
             }
         }
 

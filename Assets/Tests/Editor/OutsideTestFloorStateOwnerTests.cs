@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using NUnit.Framework;
 using UnityEngine;
+using OutsideTestFloorStateOwner = FactoryWorldState;
 
 public sealed class OutsideTestFloorStateOwnerTests
 {

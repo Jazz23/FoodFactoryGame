@@ -1,4 +1,5 @@
 // Persists the active OutsideTest world topology and factory state in normalized SQLite tables.
+using System;
 using System.Collections.Generic;
 using System.IO;
 using SQLite;
@@ -10,8 +11,13 @@ public sealed class OutsideTestFloorSqliteStore
 
     public OutsideTestFloorSaveData Load(string path)
     {
+        if (FactoryWorldSqliteStore.HasSchema(path))
+        {
+            return LoadUnifiedProjection(path);
+        }
+
         using var database = new SQLiteConnection(path);
-        EnsureTables(database);
+        EnsureReadableSchema(database);
 
         var versionRows = database.Query<MetadataRow>(
             "SELECT * FROM outside_test_save_metadata WHERE Name = ?",
@@ -19,7 +25,7 @@ public sealed class OutsideTestFloorSqliteStore
         var data = new OutsideTestFloorSaveData
         {
             Version = versionRows.Count == 0
-                ? OutsideTestFloorStateOwner.CurrentSaveVersion
+                ? FactoryWorldState.CurrentSaveVersion
                 : versionRows[0].Value
         };
 
@@ -117,6 +123,83 @@ public sealed class OutsideTestFloorSqliteStore
         return data;
     }
 
+    private static OutsideTestFloorSaveData LoadUnifiedProjection(string path)
+    {
+        var snapshot = new FactoryWorldSqliteStore().Load(path);
+        var data = new OutsideTestFloorSaveData
+        {
+            Version = FactoryWorldState.CurrentSaveVersion
+        };
+        var buildingIds = new Dictionary<Guid, uint>();
+        foreach (var building in snapshot.Buildings)
+        {
+            var buildingId = building.LegacyBuildingId;
+            buildingIds.Add(building.Guid, buildingId);
+            data.Buildings.Add(new BuildingRecord(
+                buildingId,
+                building.AnchorCell,
+                building.FootprintSize,
+                building.StoryCount,
+                building.Doors));
+        }
+
+        var entityIds = new Dictionary<Guid, uint>();
+        foreach (var floor in snapshot.Floors)
+        {
+            if (!buildingIds.TryGetValue(floor.BuildingGuid, out var buildingId))
+            {
+                continue;
+            }
+
+            var legacyFloor = new OutsideTestFloorRecord(
+                buildingId,
+                floor.FloorIndex,
+                floor.Label,
+                floor.ProductionRate,
+                floor.AccumulatedProduction,
+                floor.MarkerPosition);
+            foreach (var entity in floor.Entities)
+            {
+                var entityId = entity.LegacyEntityId;
+                entityIds.Add(entity.Guid, entityId);
+                legacyFloor.AddEntity(new FactoryEntityRecord(
+                    entityId,
+                    entity.DefinitionId,
+                    entity.LocalPosition,
+                    entity.CycleRate,
+                    entity.CycleProgress,
+                    entity.ProducedCount,
+                    entity.OutputCount,
+                    entity.InputCount));
+            }
+
+            data.Floors.Add(legacyFloor);
+        }
+
+        foreach (var connection in snapshot.Connections)
+        {
+            if (!buildingIds.TryGetValue(connection.Source.BuildingGuid, out var sourceBuildingId)
+                || !buildingIds.TryGetValue(connection.Destination.BuildingGuid, out var destinationBuildingId)
+                || !entityIds.TryGetValue(connection.Source.EntityGuid, out var sourceEntityId)
+                || !entityIds.TryGetValue(connection.Destination.EntityGuid, out var destinationEntityId))
+            {
+                continue;
+            }
+
+            data.Connections.Add(new FactoryEntityConnectionRecord(
+                new FactoryEntityEndpoint(
+                    sourceBuildingId,
+                    connection.Source.FloorIndex,
+                    sourceEntityId),
+                new FactoryEntityEndpoint(
+                    destinationBuildingId,
+                    connection.Destination.FloorIndex,
+                    destinationEntityId)));
+        }
+
+        return data;
+    }
+
     public void Save(
         string path,
         IEnumerable<BuildingRecord> buildings,
@@ -138,7 +221,7 @@ public sealed class OutsideTestFloorSqliteStore
             database.Insert(new MetadataRow
             {
                 Name = SaveVersionKey,
-                Value = OutsideTestFloorStateOwner.CurrentSaveVersion
+                Value = FactoryWorldState.CurrentSaveVersion
             });
 
             foreach (var building in buildings)
@@ -224,6 +307,35 @@ public sealed class OutsideTestFloorSqliteStore
         database.CreateTable<FloorRow>();
         database.CreateTable<EntityRow>();
         database.CreateTable<ConnectionRow>();
+    }
+
+    private static void EnsureReadableSchema(SQLiteConnection database)
+    {
+        var rows = database.Query<SchemaRow>(
+            "SELECT name AS Name FROM sqlite_master WHERE type = 'table'");
+        var names = new HashSet<string>();
+        foreach (var row in rows)
+        {
+            names.Add(row.Name);
+        }
+
+        var requiredTables = new[]
+        {
+            "outside_test_save_metadata",
+            "outside_test_buildings",
+            "outside_test_building_doors",
+            "outside_test_floors",
+            "outside_test_entities",
+            "outside_test_connections"
+        };
+        foreach (var table in requiredTables)
+        {
+            if (!names.Contains(table))
+            {
+                throw new InvalidDataException(
+                    $"Legacy OutsideTest database is missing table '{table}'.");
+            }
+        }
     }
 
     private static void EnsureParentDirectory(string path)
@@ -317,5 +429,11 @@ public sealed class OutsideTestFloorSqliteStore
         public long DestinationBuildingInstanceId { get; set; }
         public int DestinationFloorIndex { get; set; }
         public long DestinationEntityId { get; set; }
+    }
+
+    [Table("sqlite_master")]
+    private sealed class SchemaRow
+    {
+        public string Name { get; set; } = string.Empty;
     }
 }

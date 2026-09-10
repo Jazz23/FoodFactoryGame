@@ -247,7 +247,7 @@ public sealed class OutsideTestFloorRecord
 [Serializable]
 public sealed class OutsideTestFloorSaveData
 {
-    public int Version = OutsideTestFloorStateOwner.CurrentSaveVersion;
+    public int Version = FactoryWorldState.CurrentSaveVersion;
     public List<BuildingRecord> Buildings = new();
     public List<OutsideTestFloorRecord> Floors = new();
     public List<FactoryEntityConnectionRecord> Connections = new();
