@@ -214,6 +214,9 @@ MonoBehaviour:
   _componentIndexCache: 255
   _addedNetworkObject: {fileID: 767384404}
   _networkObjectCache: {fileID: 0}
+  buildingPrefabs:
+  - {fileID: 4926852788526257740, guid: 4d7d2bd0c11da2244a910b1df274a3fd, type: 3}
+  - {fileID: 6194095082720127700, guid: d036836a08f4ec148aacd2b5544220db, type: 3}
 --- !u!4 &767384406
 Transform:
   m_ObjectHideFlags: 0

@@ -1,4 +1,5 @@
-﻿using System;
+﻿// Handles local build-mode input and predicted placement for a player.
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using FishNet.Object;
@@ -111,8 +112,10 @@ namespace NotAI
         [Client]
         private void SpawnBuilding()
         {
-            var building = Instantiate(buildingPrefabs[SelectedBuildableId.Value], _ghost.transform.position, _ghost.transform.rotation)
-                .GetComponent<NAIBuildablePredictiveSpawn>();
+            var building = NAIStateManager.SpawnBuilding(
+                buildingPrefabs[SelectedBuildableId.Value],
+                _ghost.transform.position,
+                _ghost.transform.rotation);
             building.SetBuildingManager(this);
             building.SetBuildingId(SelectedBuildableId.Value);
             ServerManager.Spawn(building);
