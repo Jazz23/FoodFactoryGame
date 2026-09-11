@@ -122,6 +122,29 @@ namespace NotAI
             return added;
         }
 
+        public bool TryAddTestEntity(
+            uint buildingInstanceId,
+            int floorIndex,
+            string definitionId,
+            Vector2 position,
+            out uint entityId,
+            out string error)
+        {
+            var added = factoryState.TryAddTestEntity(
+                buildingInstanceId,
+                floorIndex,
+                definitionId,
+                position,
+                out entityId,
+                out error);
+            if (added)
+            {
+                EnsureFactoryEntityGuid(buildingInstanceId, floorIndex, entityId);
+            }
+
+            return added;
+        }
+
         public bool TryAddTestStorage(uint buildingInstanceId, int floorIndex, Vector2 position, out uint entityId, out string error)
         {
             var added = factoryState.TryAddTestStorage(
@@ -170,9 +193,54 @@ namespace NotAI
             return added;
         }
 
+        public bool TryAddSendingTerminal(
+            uint buildingInstanceId,
+            int floorIndex,
+            Vector2 position,
+            out uint entityId,
+            out string error)
+        {
+            return TryAddTestEntity(
+                buildingInstanceId,
+                floorIndex,
+                FactoryEntityRecord.SendingTerminalDefinitionId,
+                position,
+                out entityId,
+                out error);
+        }
+
+        public bool TryAddReceivingTerminal(
+            uint buildingInstanceId,
+            int floorIndex,
+            Vector2 position,
+            out uint entityId,
+            out string error)
+        {
+            return TryAddTestEntity(
+                buildingInstanceId,
+                floorIndex,
+                FactoryEntityRecord.ReceivingTerminalDefinitionId,
+                position,
+                out entityId,
+                out error);
+        }
+
         public bool TryRemoveTestMachine(uint buildingInstanceId, int floorIndex, uint entityId, out string error)
         {
-            var removed = factoryState.TryRemoveTestMachine(
+            return TryRemoveTestEntity(
+                buildingInstanceId,
+                floorIndex,
+                entityId,
+                out error);
+        }
+
+        public bool TryRemoveTestEntity(
+            uint buildingInstanceId,
+            int floorIndex,
+            uint entityId,
+            out string error)
+        {
+            var removed = factoryState.TryRemoveTestEntity(
                 buildingInstanceId,
                 floorIndex,
                 entityId,
@@ -189,7 +257,15 @@ namespace NotAI
         }
 
         public bool TryDrainTestMachine(uint buildingInstanceId, int floorIndex, uint entityId, out int removed, out string error)
-            => factoryState.TryDrainTestMachine(buildingInstanceId, floorIndex, entityId, out removed, out error);
+            => TryDrainTestEntity(buildingInstanceId, floorIndex, entityId, out removed, out error);
+
+        public bool TryDrainTestEntity(
+            uint buildingInstanceId,
+            int floorIndex,
+            uint entityId,
+            out int removed,
+            out string error)
+            => factoryState.TryDrainTestEntity(buildingInstanceId, floorIndex, entityId, out removed, out error);
 
         public bool TryAddConnection(FactoryEntityEndpoint source, FactoryEntityEndpoint destination, out string error)
         {

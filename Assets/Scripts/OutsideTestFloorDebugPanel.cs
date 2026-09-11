@@ -34,6 +34,8 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
     private Button addStorageButton = null!;
     private Button addProcessorButton = null!;
     private Button addPackedStorageButton = null!;
+    private Button addSendingTerminalButton = null!;
+    private Button addReceivingTerminalButton = null!;
     private Button removeMachineButton = null!;
     private Button drainOutputButton = null!;
     private Button nextMachineButton = null!;
@@ -123,6 +125,32 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
 
         machineStatusText.text = "Adding packed storage...";
         owner.RequestAddCurrentFloorPackedStorage(new Vector2(x, y));
+    }
+
+    private void AddSendingTerminalClicked()
+    {
+        if (!float.TryParse(machineXInput.text, NumberStyles.Float, CultureInfo.InvariantCulture, out var x)
+            || !float.TryParse(machineYInput.text, NumberStyles.Float, CultureInfo.InvariantCulture, out var y))
+        {
+            machineStatusText.text = "X and Y must be finite numbers.";
+            return;
+        }
+
+        machineStatusText.text = "Adding sending terminal...";
+        owner.RequestAddCurrentFloorSendingTerminal(new Vector2(x, y));
+    }
+
+    private void AddReceivingTerminalClicked()
+    {
+        if (!float.TryParse(machineXInput.text, NumberStyles.Float, CultureInfo.InvariantCulture, out var x)
+            || !float.TryParse(machineYInput.text, NumberStyles.Float, CultureInfo.InvariantCulture, out var y))
+        {
+            machineStatusText.text = "X and Y must be finite numbers.";
+            return;
+        }
+
+        machineStatusText.text = "Adding receiving terminal...";
+        owner.RequestAddCurrentFloorReceivingTerminal(new Vector2(x, y));
     }
 
     private void RemoveMachineClicked()
@@ -216,7 +244,7 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             ? "No entity selected"
             : "Enter a floor as host to edit entities";
         machineDetailsText.text = hasCurrentFloor
-            ? "Select a machine or storage to inspect it."
+            ? "Select an entity or terminal to inspect it."
             : "Entity editing is unavailable outside a floor.";
         if (hasCurrentFloor
             && GameSceneManager.Instance.TryGetOutsideTestFloorState(
@@ -230,7 +258,11 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
                 if (entity.EntityId == selectedMachineId)
                 {
                     selected = true;
-                    machineDetailsText.text = entity.IsProcessor
+                    machineDetailsText.text = entity.IsTerminal
+                        ? $"INVENTORY: {entity.InventoryCount}/{entity.InventoryCapacity} "
+                            + $"{entity.AcceptedItemId}\n"
+                            + "TERMINAL: receives and supplies test-product"
+                        : entity.IsProcessor
                         ? $"INPUT: {entity.InputCount}/{FactoryEntityRecord.InputCapacity} "
                             + $"{entity.AcceptedItemId}\n"
                             + $"OUTPUT: {entity.OutputCount}/{FactoryEntityRecord.OutputCapacity} "
@@ -277,6 +309,8 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
         addStorageButton.interactable = canEdit;
         addProcessorButton.interactable = canEdit;
         addPackedStorageButton.interactable = canEdit;
+        addSendingTerminalButton.interactable = canEdit;
+        addReceivingTerminalButton.interactable = canEdit;
         nextMachineButton.interactable = canEdit && count > 0;
         removeMachineButton.interactable = canEdit && selected;
         drainOutputButton.interactable = canEdit && selected;
@@ -366,7 +400,7 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             : "CONNECTION: not connected";
 
         var eligibleBuildingIds = new System.Collections.Generic.List<uint>();
-        if (selectedEntity.IsProducer)
+        if (selectedEntity.IsSupplier)
         {
             foreach (var candidateBuildingId in GameSceneManager.Instance.GetRegisteredOutsideTestBuildingIds())
             {
@@ -377,8 +411,9 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
                         buildingId,
                         floorIndex,
                         candidateBuildingId,
-                        selectedEntity.ProducedItemId,
-                        candidateBuildingInfo.StoryCount))
+                        selectedEntity.SuppliedItemId,
+                        candidateBuildingInfo.StoryCount,
+                        selectedEntity))
                 {
                     continue;
                 }
@@ -406,7 +441,8 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             buildingId,
             floorIndex,
             destinationBuildingInstanceId,
-            selectedEntity.ProducedItemId);
+            selectedEntity.SuppliedItemId,
+            selectedEntity);
         if (outgoingConnection is null
             && !eligibleFloorIndices.Contains(destinationFloorIndex))
         {
@@ -419,7 +455,10 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
         var receivers = GetCompatibleReceivers(
             destinationBuildingInstanceId,
             destinationFloorIndex,
-            selectedEntity.ProducedItemId);
+            selectedEntity.SuppliedItemId,
+            buildingId,
+            floorIndex,
+            selectedEntity);
         if (outgoingConnection is null
             && !ContainsEntity(receivers, selectedStorageId))
         {
@@ -438,14 +477,18 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
                 buildingId,
                 floorIndex,
                 candidateBuildingId,
-                selectedEntity.ProducedItemId);
+                selectedEntity.SuppliedItemId,
+                selectedEntity);
             foreach (var candidateFloorIndex in candidateFloors)
             {
                 fingerprint += $"/F{candidateFloorIndex}";
                 foreach (var candidateEntity in GetCompatibleReceivers(
                              candidateBuildingId,
                              candidateFloorIndex,
-                             selectedEntity.ProducedItemId))
+                             selectedEntity.SuppliedItemId,
+                             buildingId,
+                             floorIndex,
+                             selectedEntity))
                 {
                     fingerprint += $"/E{candidateEntity.EntityId}:{candidateEntity.DefinitionId}";
                 }
@@ -531,7 +574,7 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
         }
 
         connectButton.interactable = canEdit
-            && selectedEntity.IsProducer
+            && selectedEntity.IsSupplier
             && outgoingConnection is null
             && destinationBuildingInstanceId != 0
             && destinationFloorIndex >= 0
@@ -562,20 +605,18 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
         int sourceFloorIndex,
         uint destinationBuildingId,
         string itemId,
-        int storyCount)
+        int storyCount,
+        FactoryEntityRecord sourceEntity)
     {
         for (var floorIndex = 0; floorIndex < storyCount; floorIndex++)
         {
-            if (sourceBuildingId == destinationBuildingId
-                && sourceFloorIndex == floorIndex)
-            {
-                continue;
-            }
-
             if (GetCompatibleReceivers(
                     destinationBuildingId,
                     floorIndex,
-                    itemId).Count > 0)
+                    itemId,
+                    sourceBuildingId,
+                    sourceFloorIndex,
+                    sourceEntity).Count > 0)
             {
                 return true;
             }
@@ -588,7 +629,8 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
         uint sourceBuildingId,
         int sourceFloorIndex,
         uint destinationBuildingId,
-        string itemId)
+        string itemId,
+        FactoryEntityRecord sourceEntity)
     {
         var result = new System.Collections.Generic.List<int>();
         if (destinationBuildingId == 0
@@ -603,16 +645,13 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             floorIndex < destinationBuildingInfo.StoryCount;
             floorIndex++)
         {
-            if (sourceBuildingId == destinationBuildingId
-                && sourceFloorIndex == floorIndex)
-            {
-                continue;
-            }
-
             if (GetCompatibleReceivers(
                     destinationBuildingId,
                     floorIndex,
-                    itemId).Count > 0)
+                    itemId,
+                    sourceBuildingId,
+                    sourceFloorIndex,
+                    sourceEntity).Count > 0)
             {
                 result.Add(floorIndex);
             }
@@ -624,7 +663,10 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
     private static System.Collections.Generic.List<FactoryEntityRecord> GetCompatibleReceivers(
         uint buildingId,
         int floorIndex,
-        string itemId)
+        string itemId,
+        uint sourceBuildingId,
+        int sourceFloorIndex,
+        FactoryEntityRecord sourceEntity)
     {
         var result = new System.Collections.Generic.List<FactoryEntityRecord>();
         if (buildingId == 0
@@ -641,7 +683,13 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
         {
             if (entity is not null
                 && entity.IsReceiver
-                && entity.AcceptedItemId == itemId)
+                && entity.AcceptedItemId == itemId
+                && FactoryConnectionRules.TryValidate(
+                    FactoryEntityDefinitions.Get(sourceEntity.DefinitionId),
+                    FactoryEntityDefinitions.Get(entity.DefinitionId),
+                    sourceBuildingId == buildingId,
+                    sourceFloorIndex == floorIndex,
+                    out _))
             {
                 result.Add(entity);
             }
@@ -1245,7 +1293,7 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             0f,
             0f,
             420f,
-            560f);
+            600f);
         machineScrollRect.viewport = machineViewport.GetComponent<RectTransform>();
         machineScrollRect.content = machineContent.GetComponent<RectTransform>();
         CreateTextLabel(machineContent, "Machine X Label", "X", 12f, 4f);
@@ -1262,49 +1310,67 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             12f, 80f, 190f, 32f, AddProcessorClicked);
         addPackedStorageButton = CreateButton("Add Packed Storage", "ADD PACKED STORAGE", machineContent,
             208f, 80f, 190f, 32f, AddPackedStorageClicked);
+        addSendingTerminalButton = CreateButton(
+            "Add Sending Terminal",
+            "ADD SENDING TERMINAL",
+            machineContent,
+            12f,
+            118f,
+            190f,
+            32f,
+            AddSendingTerminalClicked);
+        addReceivingTerminalButton = CreateButton(
+            "Add Receiving Terminal",
+            "ADD RECEIVING TERMINAL",
+            machineContent,
+            208f,
+            118f,
+            190f,
+            32f,
+            AddReceivingTerminalClicked);
         machineSelectionText = CreateText("Machine Selection", machineContent, string.Empty, 13,
             TextAnchor.MiddleLeft, Color.white);
-        SetTopRect(machineSelectionText.rectTransform, 12f, 118f, 396f, 38f);
+        SetTopRect(machineSelectionText.rectTransform, 12f, 156f, 396f, 38f);
         machineDetailsText = CreateText("Machine Details", machineContent, string.Empty, 12,
             TextAnchor.UpperLeft, new Color(0.9f, 0.94f, 0.96f));
-        SetTopRect(machineDetailsText.rectTransform, 12f, 156f, 396f, 52f);
+        SetTopRect(machineDetailsText.rectTransform, 12f, 194f, 396f, 52f);
         nextMachineButton = CreateButton("Next Machine", "SELECT NEXT", machineContent,
-            12f, 214f, 190f, 32f, NextMachineClicked);
+            12f, 252f, 190f, 32f, NextMachineClicked);
         removeMachineButton = CreateButton("Remove Machine", "REMOVE SELECTED", machineContent,
-            208f, 214f, 190f, 32f, RemoveMachineClicked);
+            208f, 252f, 190f, 32f, RemoveMachineClicked);
         drainOutputButton = CreateButton("Drain Output", "DRAIN OUTPUT", machineContent,
-            12f, 252f, 396f, 32f, DrainOutputClicked);
+            12f, 290f, 396f, 32f, DrainOutputClicked);
         connectionText = CreateText("Connection Text", machineContent, "CONNECTION: select an entity", 12,
             TextAnchor.UpperLeft, new Color(0.78f, 0.9f, 0.88f));
-        SetTopRect(connectionText.rectTransform, 12f, 290f, 396f, 38f);
-        CreateTextLabel(machineContent, "Destination Building Label", "DEST BUILDING", 12f, 330f);
+        SetTopRect(connectionText.rectTransform, 12f, 328f, 396f, 38f);
+        CreateTextLabel(machineContent, "Destination Building Label", "DEST BUILDING", 12f, 368f);
         destinationBuildingRoot = new GameObject(
             "Destination Building Selectors",
             typeof(RectTransform)).transform;
         destinationBuildingRoot.SetParent(machineContent, false);
-        SetTopRect(destinationBuildingRoot.GetComponent<RectTransform>(), 104f, 328f, 294f, 30f);
-        CreateTextLabel(machineContent, "Destination Floor Label", "DEST FLOOR", 12f, 366f);
+        SetTopRect(destinationBuildingRoot.GetComponent<RectTransform>(), 104f, 366f, 294f, 30f);
+        CreateTextLabel(machineContent, "Destination Floor Label", "DEST FLOOR", 12f, 404f);
         destinationFloorRoot = new GameObject(
             "Destination Floor Selectors",
             typeof(RectTransform)).transform;
         destinationFloorRoot.SetParent(machineContent, false);
-        SetTopRect(destinationFloorRoot.GetComponent<RectTransform>(), 104f, 328f, 294f, 30f);
-        CreateTextLabel(machineContent, "Destination Storage Label", "RECEIVER", 12f, 402f);
+        SetTopRect(destinationFloorRoot.GetComponent<RectTransform>(), 104f, 402f, 294f, 30f);
+        CreateTextLabel(machineContent, "Destination Storage Label", "RECEIVER", 12f, 440f);
         destinationStorageRoot = new GameObject(
             "Destination Storage Selectors",
             typeof(RectTransform)).transform;
         destinationStorageRoot.SetParent(machineContent, false);
-        SetTopRect(destinationStorageRoot.GetComponent<RectTransform>(), 104f, 400f, 294f, 30f);
+        SetTopRect(destinationStorageRoot.GetComponent<RectTransform>(), 104f, 438f, 294f, 30f);
         connectButton = CreateButton("Connect", "CONNECT", machineContent,
-            12f, 436f, 94f, 32f, ConnectClicked);
+            12f, 474f, 94f, 32f, ConnectClicked);
         disconnectButton = CreateButton("Disconnect", "DISCONNECT", machineContent,
-            112f, 436f, 98f, 32f, DisconnectClicked);
+            112f, 474f, 98f, 32f, DisconnectClicked);
         disconnectIncomingButton = CreateButton(
             "Disconnect Incoming",
             "DISCONNECT IN",
             machineContent,
             216f,
-            436f,
+            474f,
             98f,
             32f,
             DisconnectIncomingClicked);
@@ -1313,13 +1379,13 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             "DISCONNECT OUT",
             machineContent,
             320f,
-            436f,
+            474f,
             78f,
             32f,
             DisconnectOutgoingClicked);
         machineStatusText = CreateText("Machine Status", machineContent, "Select an entity to drain or remove it.", 12,
             TextAnchor.UpperLeft, new Color(0.6f, 0.78f, 0.76f));
-        SetTopRect(machineStatusText.rectTransform, 12f, 474f, 396f, 62f);
+        SetTopRect(machineStatusText.rectTransform, 12f, 512f, 396f, 62f);
         root.SetActive(true);
     }
 

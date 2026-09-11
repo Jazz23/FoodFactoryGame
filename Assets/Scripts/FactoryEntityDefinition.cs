@@ -28,7 +28,16 @@ public readonly struct FactoryEntityDefinition
     public bool IsReceiver => !string.IsNullOrWhiteSpace(AcceptedItemId);
     public bool IsProducer => !string.IsNullOrWhiteSpace(ProducedItemId);
     public bool IsProcessor => InputQuantity > 0;
-    public bool IsStorage => IsReceiver && !IsProducer && !IsProcessor;
+    public bool IsSendingTerminal => DefinitionId == FactoryEntityDefinitions.SendingTerminalDefinitionId;
+    public bool IsReceivingTerminal => DefinitionId == FactoryEntityDefinitions.ReceivingTerminalDefinitionId;
+    public bool IsTerminal => IsSendingTerminal || IsReceivingTerminal;
+    public bool IsSupplier => IsProducer || IsTerminal;
+    public string SuppliedItemId => IsProducer
+        ? ProducedItemId
+        : IsTerminal
+            ? AcceptedItemId
+            : string.Empty;
+    public bool IsStorage => IsReceiver && !IsProducer && !IsProcessor && !IsTerminal;
 }
 
 public static class FactoryEntityDefinitions
@@ -37,6 +46,8 @@ public static class FactoryEntityDefinitions
     public const string ProcessorDefinitionId = "test-processor";
     public const string TestStorageDefinitionId = "test-storage";
     public const string PackedStorageDefinitionId = "packed-storage";
+    public const string SendingTerminalDefinitionId = "sending-terminal";
+    public const string ReceivingTerminalDefinitionId = "receiving-terminal";
     public const string TestProductId = "test-product";
     public const string PackedProductId = "packed-product";
 
@@ -69,6 +80,18 @@ public static class FactoryEntityDefinitions
             return new FactoryEntityDefinition(
                 PackedStorageDefinitionId,
                 PackedProductId,
+                string.Empty,
+                0,
+                0,
+                0f);
+        }
+
+        if (definitionId == SendingTerminalDefinitionId
+            || definitionId == ReceivingTerminalDefinitionId)
+        {
+            return new FactoryEntityDefinition(
+                definitionId,
+                TestProductId,
                 string.Empty,
                 0,
                 0,

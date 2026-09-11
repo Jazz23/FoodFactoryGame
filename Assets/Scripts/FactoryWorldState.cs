@@ -467,6 +467,38 @@ public sealed class FactoryWorldState
             out error);
     }
 
+    public bool TryAddSendingTerminal(
+        uint buildingInstanceId,
+        int floorIndex,
+        Vector2 position,
+        out uint entityId,
+        out string error)
+    {
+        return TryAddTestEntity(
+            buildingInstanceId,
+            floorIndex,
+            FactoryEntityRecord.SendingTerminalDefinitionId,
+            position,
+            out entityId,
+            out error);
+    }
+
+    public bool TryAddReceivingTerminal(
+        uint buildingInstanceId,
+        int floorIndex,
+        Vector2 position,
+        out uint entityId,
+        out string error)
+    {
+        return TryAddTestEntity(
+            buildingInstanceId,
+            floorIndex,
+            FactoryEntityRecord.ReceivingTerminalDefinitionId,
+            position,
+            out entityId,
+            out error);
+    }
+
     public bool TryRemoveTestMachine(uint buildingInstanceId, int floorIndex,
         uint entityId, out string error)
     {
@@ -1287,12 +1319,6 @@ public sealed class FactoryWorldState
             return false;
         }
 
-        if (HasSameFloorIdentity(source, destination))
-        {
-            error = "Connection endpoints must be on different floors.";
-            return false;
-        }
-
         if (availableBuildings is not null
             && (!availableBuildings.ContainsKey(source.BuildingInstanceId)
                 || !availableBuildings.ContainsKey(destination.BuildingInstanceId)))
@@ -1321,21 +1347,21 @@ public sealed class FactoryWorldState
             return false;
         }
 
-        if (!sourceEntity.IsProducer)
+        if (source.BuildingInstanceId == destination.BuildingInstanceId
+            && source.FloorIndex == destination.FloorIndex
+            && source.EntityId == destination.EntityId)
         {
-            error = "The connection source must produce an item.";
+            error = "A connection cannot target its own endpoint.";
             return false;
         }
 
-        if (!destinationEntity.IsReceiver)
+        if (!FactoryConnectionRules.TryValidate(
+                FactoryEntityDefinitions.Get(sourceEntity.DefinitionId),
+                FactoryEntityDefinitions.Get(destinationEntity.DefinitionId),
+                source.BuildingInstanceId == destination.BuildingInstanceId,
+                source.FloorIndex == destination.FloorIndex,
+                out error))
         {
-            error = "The connection destination must accept an item.";
-            return false;
-        }
-
-        if (sourceEntity.ProducedItemId != destinationEntity.AcceptedItemId)
-        {
-            error = $"The connection item types do not match: {sourceEntity.ProducedItemId} -> {destinationEntity.AcceptedItemId}.";
             return false;
         }
 
@@ -1403,31 +1429,12 @@ public sealed class FactoryWorldState
         foreach (var connection in connections)
         {
             if (!TryGetEntity(connection.Source, out var sourceEntity)
-                || !TryGetEntity(connection.Destination, out var destinationEntity)
-                || !sourceEntity.IsProducer
-                || !destinationEntity.IsReceiver
-                || sourceEntity.ProducedItemId != destinationEntity.AcceptedItemId
-                || sourceEntity.OutputCount <= 0
-                || (destinationEntity.IsProcessor
-                    ? destinationEntity.InputCount >= FactoryEntityRecord.InputCapacity
-                    : destinationEntity.OutputCount >= FactoryEntityRecord.OutputCapacity))
+                || !TryGetEntity(connection.Destination, out var destinationEntity))
             {
                 continue;
             }
 
-            if (!sourceEntity.TryRemoveOutput(1, out var removed)
-                || removed != 1)
-            {
-                continue;
-            }
-
-            var accepted = destinationEntity.TryAcceptItem(
-                sourceEntity.ProducedItemId,
-                1);
-            if (accepted != 1)
-            {
-                sourceEntity.AddOutput(removed);
-            }
+            FactoryItemTransfer.TryTransfer(sourceEntity, destinationEntity, 1);
         }
     }
 
@@ -1461,25 +1468,6 @@ public sealed class FactoryWorldState
             && left.BuildingInstanceId == right.BuildingInstanceId
             && left.FloorIndex == right.FloorIndex
             && left.EntityId == right.EntityId;
-    }
-
-    private static bool HasSameFloorIdentity(
-        FactoryEntityEndpoint left,
-        FactoryEntityEndpoint right)
-    {
-        if (left.BuildingGuid != Guid.Empty
-            && right.BuildingGuid != Guid.Empty
-            && left.FloorGuid != Guid.Empty
-            && right.FloorGuid != Guid.Empty)
-        {
-            return left.BuildingGuid == right.BuildingGuid
-                && left.FloorGuid == right.FloorGuid;
-        }
-
-        return left.BuildingInstanceId != 0
-            && right.BuildingInstanceId != 0
-            && left.BuildingInstanceId == right.BuildingInstanceId
-            && left.FloorIndex == right.FloorIndex;
     }
 
 }

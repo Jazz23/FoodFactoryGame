@@ -287,4 +287,275 @@ public sealed class FactoryRecipeSimulationTests
         migrated.TryGetFloorState(10, 0, out var migratedFloor);
         Assert.That(migratedFloor.Entities[0].InputCount, Is.Zero);
     }
+
+    [Test]
+    public void TerminalsUseOneBoundedInventoryAndExposeItToOutgoingTransfers()
+    {
+        var sendingTerminal = new FactoryEntityRecord(
+            1,
+            FactoryEntityRecord.SendingTerminalDefinitionId,
+            Vector2.one,
+            1f,
+            0.5f,
+            9,
+            FactoryEntityRecord.OutputCapacity - 1,
+            11);
+        var receivingTerminal = new FactoryEntityRecord(
+            2,
+            FactoryEntityRecord.ReceivingTerminalDefinitionId,
+            Vector2.one,
+            1f,
+            0.5f,
+            9);
+        var processor = new FactoryEntityRecord(
+            3,
+            FactoryEntityRecord.ProcessorDefinitionId,
+            Vector2.one,
+            1f,
+            0f,
+            0);
+
+        Assert.That(sendingTerminal.IsReceiver, Is.True);
+        Assert.That(sendingTerminal.IsProducer, Is.False);
+        Assert.That(sendingTerminal.IsSupplier, Is.True);
+        Assert.That(sendingTerminal.AcceptedItemId, Is.EqualTo(FactoryEntityDefinitions.TestProductId));
+        Assert.That(sendingTerminal.SuppliedItemId, Is.EqualTo(FactoryEntityDefinitions.TestProductId));
+        Assert.That(sendingTerminal.InputCount, Is.Zero);
+        Assert.That(sendingTerminal.InventoryCount, Is.EqualTo(FactoryEntityRecord.OutputCapacity - 1));
+        Assert.That(sendingTerminal.InventoryCapacity, Is.EqualTo(FactoryEntityRecord.OutputCapacity));
+        Assert.That(sendingTerminal.TryAcceptItem(
+            FactoryEntityDefinitions.PackedProductId,
+            1,
+            out var wrongItemAccepted), Is.False);
+        Assert.That(wrongItemAccepted, Is.Zero);
+        Assert.That(sendingTerminal.TryAcceptItem(
+            FactoryEntityDefinitions.TestProductId,
+            1,
+            out var accepted), Is.True);
+        Assert.That(accepted, Is.EqualTo(1));
+        Assert.That(sendingTerminal.InventoryCount, Is.EqualTo(FactoryEntityRecord.OutputCapacity));
+
+        Assert.That(FactoryItemTransfer.TryTransfer(sendingTerminal, receivingTerminal, 1), Is.EqualTo(1));
+        Assert.That(sendingTerminal.InventoryCount, Is.EqualTo(FactoryEntityRecord.OutputCapacity - 1));
+        Assert.That(receivingTerminal.InventoryCount, Is.EqualTo(1));
+        Assert.That(receivingTerminal.InputCount, Is.Zero);
+        Assert.That(FactoryItemTransfer.TryTransfer(receivingTerminal, processor, 1), Is.EqualTo(1));
+        Assert.That(receivingTerminal.InventoryCount, Is.Zero);
+        Assert.That(processor.InputCount, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void TerminalConnectionRulesAllowMilestoneLinksAndRejectInvalidRoles()
+    {
+        var owner = new OutsideTestFloorStateOwner(1);
+        owner.TryRegisterBuilding(10, 1, new Vector2Int(6, 4), out _);
+        owner.TryRegisterBuilding(20, 2, new Vector2Int(6, 4), out _);
+        owner.TryGetFloorState(10, 0, out var buildingAFloor);
+        owner.TryGetFloorState(20, 0, out var buildingBFloor);
+        owner.TryGetFloorState(20, 1, out var buildingBUpperFloor);
+        buildingAFloor.SetEntities(new[]
+        {
+            new FactoryEntityRecord(1, FactoryEntityDefinitions.TestMachineDefinitionId, Vector2.one, 0f, 0f, 0),
+            new FactoryEntityRecord(2, FactoryEntityRecord.SendingTerminalDefinitionId, Vector2.one, 0f, 0f, 0)
+        });
+        buildingBFloor.SetEntities(new[]
+        {
+            new FactoryEntityRecord(1, FactoryEntityRecord.ReceivingTerminalDefinitionId, Vector2.one, 0f, 0f, 0),
+            new FactoryEntityRecord(2, FactoryEntityRecord.ProcessorDefinitionId, Vector2.one, 1f, 0f, 0)
+        });
+        buildingBUpperFloor.SetEntities(new[]
+        {
+            new FactoryEntityRecord(1, FactoryEntityRecord.PackedStorageDefinitionId, Vector2.one, 0f, 0f, 0)
+        });
+
+        var producer = new FactoryEntityEndpoint(10, 0, 1);
+        var sendingTerminal = new FactoryEntityEndpoint(10, 0, 2);
+        var receivingTerminal = new FactoryEntityEndpoint(20, 0, 1);
+        var processor = new FactoryEntityEndpoint(20, 0, 2);
+        var storage = new FactoryEntityEndpoint(20, 1, 1);
+        Assert.That(owner.TryAddConnection(producer, sendingTerminal, out var error), Is.True, error);
+        Assert.That(owner.TryAddConnection(sendingTerminal, receivingTerminal, out error), Is.True, error);
+        Assert.That(owner.TryAddConnection(receivingTerminal, processor, out error), Is.True, error);
+        Assert.That(owner.TryAddConnection(processor, storage, out error), Is.True, error);
+        Assert.That(owner.ConnectionCount, Is.EqualTo(4));
+
+        var producerDefinition = FactoryEntityDefinitions.Get(FactoryEntityDefinitions.TestMachineDefinitionId);
+        var sendingDefinition = FactoryEntityDefinitions.Get(FactoryEntityRecord.SendingTerminalDefinitionId);
+        var receivingDefinition = FactoryEntityDefinitions.Get(FactoryEntityRecord.ReceivingTerminalDefinitionId);
+        var processorDefinition = FactoryEntityDefinitions.Get(FactoryEntityRecord.ProcessorDefinitionId);
+        var storageDefinition = FactoryEntityDefinitions.Get(FactoryEntityRecord.StorageDefinitionId);
+        Assert.That(FactoryConnectionRules.TryValidate(
+            producerDefinition,
+            receivingDefinition,
+            false,
+            false,
+            out error), Is.False);
+        Assert.That(error, Does.Contain("receiving terminal"));
+        Assert.That(FactoryConnectionRules.TryValidate(
+            sendingDefinition,
+            processorDefinition,
+            true,
+            true,
+            out error), Is.False);
+        Assert.That(error, Does.Contain("sending terminal"));
+        Assert.That(FactoryConnectionRules.TryValidate(
+            receivingDefinition,
+            storageDefinition,
+            false,
+            false,
+            out error), Is.False);
+        Assert.That(error, Does.Contain("receiving terminal"));
+        Assert.That(FactoryConnectionRules.TryValidate(
+            producerDefinition,
+            storageDefinition,
+            true,
+            true,
+            out error), Is.False);
+        Assert.That(error, Does.Contain("different floors"));
+    }
+
+    [Test]
+    public void CompleteTerminalRecipeChainUsesExistingRecipeQuantitiesWithoutScenes()
+    {
+        var owner = new OutsideTestFloorStateOwner(1);
+        owner.TryRegisterBuilding(10, 1, new Vector2Int(6, 4), out _);
+        owner.TryRegisterBuilding(20, 2, new Vector2Int(6, 4), out _);
+        owner.TryGetFloorState(10, 0, out var buildingAFloor);
+        owner.TryGetFloorState(20, 0, out var buildingBFloor);
+        owner.TryGetFloorState(20, 1, out var buildingBUpperFloor);
+        buildingAFloor.SetEntities(new[]
+        {
+            new FactoryEntityRecord(1, FactoryEntityDefinitions.TestMachineDefinitionId, Vector2.one, 10f, 0f, 0),
+            new FactoryEntityRecord(2, FactoryEntityRecord.SendingTerminalDefinitionId, Vector2.one, 0f, 0f, 0)
+        });
+        buildingBFloor.SetEntities(new[]
+        {
+            new FactoryEntityRecord(1, FactoryEntityRecord.ReceivingTerminalDefinitionId, Vector2.one, 0f, 0f, 0),
+            new FactoryEntityRecord(2, FactoryEntityRecord.ProcessorDefinitionId, Vector2.one, 1f, 0f, 0)
+        });
+        buildingBUpperFloor.SetEntities(new[]
+        {
+            new FactoryEntityRecord(1, FactoryEntityRecord.PackedStorageDefinitionId, Vector2.one, 0f, 0f, 0)
+        });
+
+        Assert.That(owner.TryAddConnection(
+            new FactoryEntityEndpoint(10, 0, 1),
+            new FactoryEntityEndpoint(10, 0, 2),
+            out var error), Is.True, error);
+        Assert.That(owner.TryAddConnection(
+            new FactoryEntityEndpoint(10, 0, 2),
+            new FactoryEntityEndpoint(20, 0, 1),
+            out error), Is.True, error);
+        Assert.That(owner.TryAddConnection(
+            new FactoryEntityEndpoint(20, 0, 1),
+            new FactoryEntityEndpoint(20, 0, 2),
+            out error), Is.True, error);
+        Assert.That(owner.TryAddConnection(
+            new FactoryEntityEndpoint(20, 0, 2),
+            new FactoryEntityEndpoint(20, 1, 1),
+            out error), Is.True, error);
+
+        var simulation = new FactorySimulation(owner.AdvanceProduction);
+        Assert.That(simulation.Advance(0.3f), Is.EqualTo(3));
+        Assert.That(buildingAFloor.Entities[0].ProducedCount, Is.EqualTo(3));
+        Assert.That(buildingAFloor.Entities[0].OutputCount, Is.Zero);
+        Assert.That(buildingAFloor.Entities[1].InventoryCount, Is.Zero);
+        Assert.That(buildingBFloor.Entities[0].InventoryCount, Is.Zero);
+        Assert.That(buildingBFloor.Entities[1].InputCount, Is.EqualTo(3));
+        Assert.That(buildingBFloor.Entities[1].OutputCount, Is.Zero);
+        Assert.That(buildingBFloor.Entities[1].ProducedCount, Is.Zero);
+        Assert.That(buildingBUpperFloor.Entities[0].OutputCount, Is.Zero);
+    }
+
+    [Test]
+    public void FullReceivingTerminalBlocksUpstreamAndResumesOneItemPerTick()
+    {
+        var owner = new OutsideTestFloorStateOwner(1);
+        owner.TryRegisterBuilding(10, 1, new Vector2Int(6, 4), out _);
+        owner.TryRegisterBuilding(20, 1, new Vector2Int(6, 4), out _);
+        owner.TryGetFloorState(10, 0, out var sourceFloor);
+        owner.TryGetFloorState(20, 0, out var destinationFloor);
+        sourceFloor.SetEntities(new[]
+        {
+            new FactoryEntityRecord(1, FactoryEntityRecord.SendingTerminalDefinitionId, Vector2.one, 0f, 0f, 0, 2)
+        });
+        destinationFloor.SetEntities(new[]
+        {
+            new FactoryEntityRecord(
+                1,
+                FactoryEntityRecord.ReceivingTerminalDefinitionId,
+                Vector2.one,
+                0f,
+                0f,
+                0,
+                FactoryEntityRecord.OutputCapacity)
+        });
+        Assert.That(owner.TryAddConnection(
+            new FactoryEntityEndpoint(10, 0, 1),
+            new FactoryEntityEndpoint(20, 0, 1),
+            out var error), Is.True, error);
+
+        new FactorySimulation(owner.AdvanceProduction).Advance(0.1f);
+        Assert.That(sourceFloor.Entities[0].InventoryCount, Is.EqualTo(2));
+        Assert.That(destinationFloor.Entities[0].InventoryCount, Is.EqualTo(FactoryEntityRecord.OutputCapacity));
+
+        destinationFloor.Entities[0].DrainOutput();
+        new FactorySimulation(owner.AdvanceProduction).Advance(0.1f);
+        Assert.That(sourceFloor.Entities[0].InventoryCount, Is.EqualTo(1));
+        Assert.That(destinationFloor.Entities[0].InventoryCount, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void RemovingEitherTerminalCleansItsLinksAndDiscardsOnlyItsContents()
+    {
+        var owner = new OutsideTestFloorStateOwner(1);
+        owner.TryRegisterBuilding(10, 1, new Vector2Int(6, 4), out _);
+        owner.TryRegisterBuilding(20, 1, new Vector2Int(6, 4), out _);
+        owner.TryGetFloorState(10, 0, out var sourceFloor);
+        owner.TryGetFloorState(20, 0, out var destinationFloor);
+        sourceFloor.SetEntities(new[]
+        {
+            new FactoryEntityRecord(1, FactoryEntityDefinitions.TestMachineDefinitionId, Vector2.one, 0f, 0f, 0, 4),
+            new FactoryEntityRecord(2, FactoryEntityRecord.SendingTerminalDefinitionId, Vector2.one, 0f, 0f, 0, 3)
+        });
+        destinationFloor.SetEntities(new[]
+        {
+            new FactoryEntityRecord(1, FactoryEntityRecord.ReceivingTerminalDefinitionId, Vector2.one, 0f, 0f, 0, 2)
+        });
+        Assert.That(owner.TryAddConnection(
+            new FactoryEntityEndpoint(10, 0, 1),
+            new FactoryEntityEndpoint(10, 0, 2),
+            out var error), Is.True, error);
+        Assert.That(owner.TryAddConnection(
+            new FactoryEntityEndpoint(10, 0, 2),
+            new FactoryEntityEndpoint(20, 0, 1),
+            out error), Is.True, error);
+
+        Assert.That(owner.TryRemoveTestEntity(10, 0, 2, out error), Is.True, error);
+        Assert.That(owner.ConnectionCount, Is.Zero);
+        Assert.That(sourceFloor.Entities[0].OutputCount, Is.EqualTo(4));
+        Assert.That(destinationFloor.Entities[0].InventoryCount, Is.EqualTo(2));
+        Assert.That(sourceFloor.Entities, Has.Count.EqualTo(1));
+
+        var secondOwner = new OutsideTestFloorStateOwner(1);
+        secondOwner.TryRegisterBuilding(10, 1, new Vector2Int(6, 4), out _);
+        secondOwner.TryRegisterBuilding(20, 1, new Vector2Int(6, 4), out _);
+        secondOwner.TryGetFloorState(10, 0, out var secondSourceFloor);
+        secondOwner.TryGetFloorState(20, 0, out var secondDestinationFloor);
+        secondSourceFloor.SetEntities(new[]
+        {
+            new FactoryEntityRecord(1, FactoryEntityRecord.SendingTerminalDefinitionId, Vector2.one, 0f, 0f, 0, 3)
+        });
+        secondDestinationFloor.SetEntities(new[]
+        {
+            new FactoryEntityRecord(1, FactoryEntityRecord.ReceivingTerminalDefinitionId, Vector2.one, 0f, 0f, 0, 2)
+        });
+        Assert.That(secondOwner.TryAddConnection(
+            new FactoryEntityEndpoint(10, 0, 1),
+            new FactoryEntityEndpoint(20, 0, 1),
+            out error), Is.True, error);
+        Assert.That(secondOwner.TryRemoveTestEntity(20, 0, 1, out error), Is.True, error);
+        Assert.That(secondOwner.ConnectionCount, Is.Zero);
+        Assert.That(secondSourceFloor.Entities[0].InventoryCount, Is.EqualTo(3));
+    }
 }

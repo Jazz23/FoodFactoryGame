@@ -343,6 +343,64 @@ public sealed class GameSceneManager : MonoBehaviour
         return true;
     }
 
+    public bool TryAddCurrentFloorSendingTerminal(
+        PlayerSceneTransition player,
+        Vector2 position,
+        out uint entityId,
+        out string error)
+    {
+        entityId = 0;
+        error = "Only the local host inside a floor can edit entities; wait for travel to finish.";
+        if (!CanEditCurrentFloorEntities(player))
+        {
+            return false;
+        }
+
+        player.TryGetCurrentOutsideTestFloor(out var buildingId, out var floorIndex);
+        if (!stateManager.TryAddSendingTerminal(
+                buildingId,
+                floorIndex,
+                position,
+                out entityId,
+                out error))
+        {
+            return false;
+        }
+
+        BroadcastOutsideTestFloorState(buildingId, floorIndex);
+        outsideTestStateNeedsSave = true;
+        return true;
+    }
+
+    public bool TryAddCurrentFloorReceivingTerminal(
+        PlayerSceneTransition player,
+        Vector2 position,
+        out uint entityId,
+        out string error)
+    {
+        entityId = 0;
+        error = "Only the local host inside a floor can edit entities; wait for travel to finish.";
+        if (!CanEditCurrentFloorEntities(player))
+        {
+            return false;
+        }
+
+        player.TryGetCurrentOutsideTestFloor(out var buildingId, out var floorIndex);
+        if (!stateManager.TryAddReceivingTerminal(
+                buildingId,
+                floorIndex,
+                position,
+                out entityId,
+                out error))
+        {
+            return false;
+        }
+
+        BroadcastOutsideTestFloorState(buildingId, floorIndex);
+        outsideTestStateNeedsSave = true;
+        return true;
+    }
+
     public bool TryRemoveCurrentFloorMachine(PlayerSceneTransition player, uint entityId,
         out string error)
     {

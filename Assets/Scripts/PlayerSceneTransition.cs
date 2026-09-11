@@ -244,6 +244,22 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         }
     }
 
+    public void RequestAddCurrentFloorSendingTerminal(Vector2 position)
+    {
+        if (IsOwner)
+        {
+            RequestAddCurrentFloorSendingTerminalServerRpc(position);
+        }
+    }
+
+    public void RequestAddCurrentFloorReceivingTerminal(Vector2 position)
+    {
+        if (IsOwner)
+        {
+            RequestAddCurrentFloorReceivingTerminalServerRpc(position);
+        }
+    }
+
     public void RequestRemoveCurrentFloorMachine(uint entityId)
     {
         if (IsOwner)
@@ -343,6 +359,28 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
             out var entityId,
             out var error);
         TargetReceiveMachineEditResult(Owner, added ? $"Added packed storage {entityId}." : error);
+    }
+
+    [ServerRpc]
+    private void RequestAddCurrentFloorSendingTerminalServerRpc(Vector2 position)
+    {
+        var added = GameSceneManager.Instance.TryAddCurrentFloorSendingTerminal(
+            this,
+            position,
+            out var entityId,
+            out var error);
+        TargetReceiveMachineEditResult(Owner, added ? $"Added sending terminal {entityId}." : error);
+    }
+
+    [ServerRpc]
+    private void RequestAddCurrentFloorReceivingTerminalServerRpc(Vector2 position)
+    {
+        var added = GameSceneManager.Instance.TryAddCurrentFloorReceivingTerminal(
+            this,
+            position,
+            out var entityId,
+            out var error);
+        TargetReceiveMachineEditResult(Owner, added ? $"Added receiving terminal {entityId}." : error);
     }
 
     [ServerRpc]

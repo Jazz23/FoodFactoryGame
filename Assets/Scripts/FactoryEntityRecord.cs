@@ -46,6 +46,8 @@ public sealed class FactoryEntityRecord
     public const string StorageDefinitionId = FactoryEntityDefinitions.TestStorageDefinitionId;
     public const string ProcessorDefinitionId = FactoryEntityDefinitions.ProcessorDefinitionId;
     public const string PackedStorageDefinitionId = FactoryEntityDefinitions.PackedStorageDefinitionId;
+    public const string SendingTerminalDefinitionId = FactoryEntityDefinitions.SendingTerminalDefinitionId;
+    public const string ReceivingTerminalDefinitionId = FactoryEntityDefinitions.ReceivingTerminalDefinitionId;
     public const string PackedProductId = FactoryEntityDefinitions.PackedProductId;
 
     private const string DefaultDefinitionId = "test-machine";
@@ -98,8 +100,15 @@ public sealed class FactoryEntityRecord
     public int OutputQuantity => FactoryEntityDefinitions.Get(definitionId).OutputQuantity;
     public bool IsReceiver => FactoryEntityDefinitions.Get(definitionId).IsReceiver;
     public bool IsProducer => FactoryEntityDefinitions.Get(definitionId).IsProducer;
+    public bool IsSupplier => FactoryEntityDefinitions.Get(definitionId).IsSupplier;
     public bool IsProcessor => FactoryEntityDefinitions.Get(definitionId).IsProcessor;
     public bool IsStorage => FactoryEntityDefinitions.Get(definitionId).IsStorage;
+    public bool IsSendingTerminal => FactoryEntityDefinitions.Get(definitionId).IsSendingTerminal;
+    public bool IsReceivingTerminal => FactoryEntityDefinitions.Get(definitionId).IsReceivingTerminal;
+    public bool IsTerminal => FactoryEntityDefinitions.Get(definitionId).IsTerminal;
+    public string SuppliedItemId => FactoryEntityDefinitions.Get(definitionId).SuppliedItemId;
+    public int InventoryCount => IsTerminal || IsStorage ? outputCount : 0;
+    public int InventoryCapacity => IsTerminal || IsStorage ? OutputCapacity : 0;
     public bool IsProducingMachine => IsProducer;
 
     public static FactoryEntityRecord CreateDefault(
@@ -186,7 +195,14 @@ public sealed class FactoryEntityRecord
             cycleRate = 1f;
         }
 
-        if (IsStorage)
+        if (definition.IsTerminal)
+        {
+            cycleRate = 0f;
+            cycleProgress = 0f;
+            producedCount = 0;
+            inputCount = 0;
+        }
+        else if (definition.IsStorage)
         {
             cycleRate = 0f;
             cycleProgress = 0f;
@@ -208,7 +224,7 @@ public sealed class FactoryEntityRecord
 
     public void Advance(float deltaTime)
     {
-        if (IsStorage)
+        if (IsStorage || IsTerminal)
         {
             return;
         }
@@ -260,6 +276,30 @@ public sealed class FactoryEntityRecord
             && AcceptedItemId == itemId;
     }
 
+    public bool CanSupplyItem(string itemId)
+    {
+        return IsSupplier
+            && !string.IsNullOrWhiteSpace(itemId)
+            && SuppliedItemId == itemId;
+    }
+
+    public int GetSupplyCapacity(string itemId)
+    {
+        return CanSupplyItem(itemId) ? outputCount : 0;
+    }
+
+    public int GetAcceptCapacity(string itemId)
+    {
+        if (!CanAcceptItem(itemId))
+        {
+            return 0;
+        }
+
+        return IsProcessor
+            ? InputCapacity - inputCount
+            : OutputCapacity - outputCount;
+    }
+
     public int AddInput(int quantity)
     {
         if (!IsProcessor || quantity <= 0)
@@ -299,6 +339,48 @@ public sealed class FactoryEntityRecord
     {
         accepted = TryAcceptItem(itemId, quantity);
         return quantity > 0 && accepted == quantity;
+    }
+
+    public bool TryExtractItem(string itemId, int quantity, out int removed)
+    {
+        removed = 0;
+        if (!CanSupplyItem(itemId) || quantity <= 0 || outputCount < quantity)
+        {
+            return false;
+        }
+
+        outputCount -= quantity;
+        removed = quantity;
+        return true;
+    }
+
+    public bool TryRemoveAcceptedItem(string itemId, int quantity, out int removed)
+    {
+        removed = 0;
+        if (!CanAcceptItem(itemId) || quantity <= 0)
+        {
+            return false;
+        }
+
+        if (IsProcessor)
+        {
+            return TryRemoveInput(quantity, out removed);
+        }
+
+        return TryRemoveOutput(quantity, out removed);
+    }
+
+    public bool TryRemoveInput(int quantity, out int removed)
+    {
+        removed = 0;
+        if (!IsProcessor || quantity <= 0 || inputCount < quantity)
+        {
+            return false;
+        }
+
+        inputCount -= quantity;
+        removed = quantity;
+        return true;
     }
 
     public int DrainOutput()

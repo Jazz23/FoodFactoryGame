@@ -146,7 +146,12 @@ public sealed class OutsideTestFloorPresentation : MonoBehaviour
             view.Object.transform.position = position;
             view.Label.transform.position = position + Vector3.up * 0.45f;
             view.Renderer.color = GetEntityColor(entity.DefinitionId);
-            view.Label.text = entity.IsProcessor
+            view.Label.text = entity.IsTerminal
+                ? $"{entity.DefinitionId}\n"
+                    + $"Inventory {entity.InventoryCount}/{entity.InventoryCapacity} "
+                    + $"{entity.AcceptedItemId}\n"
+                    + "Receives + supplies"
+                : entity.IsProcessor
                 ? $"{entity.DefinitionId}\n"
                     + $"Input {entity.InputCount}/{FactoryEntityRecord.InputCapacity} "
                     + $"{entity.AcceptedItemId}\n"
@@ -236,6 +241,8 @@ public sealed class OutsideTestFloorPresentation : MonoBehaviour
             "test-machine-ground" => new Color(0.95f, 0.58f, 0.2f, 1f),
             "test-machine-upper" => new Color(0.95f, 0.35f, 0.72f, 1f),
             FactoryEntityRecord.StorageDefinitionId => new Color(0.25f, 0.75f, 0.95f, 1f),
+            FactoryEntityRecord.SendingTerminalDefinitionId => new Color(0.25f, 0.95f, 0.55f, 1f),
+            FactoryEntityRecord.ReceivingTerminalDefinitionId => new Color(0.35f, 0.65f, 1f, 1f),
             _ => new Color(0.95f, 0.78f, 0.25f, 1f)
         };
     }

@@ -111,6 +111,12 @@ public static class FactoryWorldValidation
 
                 entityParents.Add(entity.Guid, floor.Guid);
                 entityRecords.Add(entity.Guid, entity);
+                if (FactoryEntityDefinitions.Get(entity.DefinitionId).IsTerminal
+                    && entity.InputCount != 0)
+                {
+                    error = $"Terminal entity {entity.Guid:D} cannot have a separate input buffer.";
+                    return false;
+                }
             }
         }
 
@@ -169,10 +175,9 @@ public static class FactoryWorldValidation
                 return false;
             }
 
-            if (connection.Source.BuildingGuid == connection.Destination.BuildingGuid
-                && connection.Source.FloorGuid == connection.Destination.FloorGuid)
+            if (connection.Source.Equals(connection.Destination))
             {
-                error = $"Connection {connection.Guid:D} endpoints must be on different floors.";
+                error = $"Connection {connection.Guid:D} cannot target its own endpoint.";
                 return false;
             }
 
@@ -180,21 +185,14 @@ public static class FactoryWorldValidation
                 entityRecords[connection.Source.EntityGuid].DefinitionId);
             var destinationDefinition = FactoryEntityDefinitions.Get(
                 entityRecords[connection.Destination.EntityGuid].DefinitionId);
-            if (!sourceDefinition.IsProducer)
+            if (!FactoryConnectionRules.TryValidate(
+                    sourceDefinition,
+                    destinationDefinition,
+                    connection.Source.BuildingGuid == connection.Destination.BuildingGuid,
+                    connection.Source.FloorGuid == connection.Destination.FloorGuid,
+                    out var connectionError))
             {
-                error = $"Connection {connection.Guid:D} source must produce an item.";
-                return false;
-            }
-
-            if (!destinationDefinition.IsReceiver)
-            {
-                error = $"Connection {connection.Guid:D} destination must accept an item.";
-                return false;
-            }
-
-            if (sourceDefinition.ProducedItemId != destinationDefinition.AcceptedItemId)
-            {
-                error = $"Connection {connection.Guid:D} item types do not match.";
+                error = $"Connection {connection.Guid:D}: {connectionError}";
                 return false;
             }
 
