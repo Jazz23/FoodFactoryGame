@@ -46,6 +46,8 @@ public static class FactoryWorldValidation
         }
 
         var entities = new HashSet<Guid>();
+        var entityParents = new Dictionary<Guid, Guid>();
+        var entityRecords = new Dictionary<Guid, FactoryWorldEntityRecord>();
         foreach (var floor in snapshot.Floors)
         {
             if (floor is null || floor.Guid == Guid.Empty || floor.BuildingGuid == Guid.Empty)
@@ -106,10 +108,15 @@ public static class FactoryWorldValidation
                     error = $"Duplicate entity GUID {entity.Guid:D}.";
                     return false;
                 }
+
+                entityParents.Add(entity.Guid, floor.Guid);
+                entityRecords.Add(entity.Guid, entity);
             }
         }
 
         var connections = new HashSet<Guid>();
+        var connectedSources = new HashSet<Guid>();
+        var connectedDestinations = new HashSet<Guid>();
         foreach (var connection in snapshot.Connections)
         {
             if (connection is null || connection.Guid == Guid.Empty)
@@ -152,6 +159,54 @@ public static class FactoryWorldValidation
                 || floorIndexByGuid[connection.Destination.FloorGuid] != connection.Destination.FloorIndex)
             {
                 error = $"Connection {connection.Guid:D} endpoint parent or floor index is inconsistent.";
+                return false;
+            }
+
+            if (entityParents[connection.Source.EntityGuid] != connection.Source.FloorGuid
+                || entityParents[connection.Destination.EntityGuid] != connection.Destination.FloorGuid)
+            {
+                error = $"Connection {connection.Guid:D} endpoint entity ownership is inconsistent.";
+                return false;
+            }
+
+            if (connection.Source.BuildingGuid == connection.Destination.BuildingGuid
+                && connection.Source.FloorGuid == connection.Destination.FloorGuid)
+            {
+                error = $"Connection {connection.Guid:D} endpoints must be on different floors.";
+                return false;
+            }
+
+            var sourceDefinition = FactoryEntityDefinitions.Get(
+                entityRecords[connection.Source.EntityGuid].DefinitionId);
+            var destinationDefinition = FactoryEntityDefinitions.Get(
+                entityRecords[connection.Destination.EntityGuid].DefinitionId);
+            if (!sourceDefinition.IsProducer)
+            {
+                error = $"Connection {connection.Guid:D} source must produce an item.";
+                return false;
+            }
+
+            if (!destinationDefinition.IsReceiver)
+            {
+                error = $"Connection {connection.Guid:D} destination must accept an item.";
+                return false;
+            }
+
+            if (sourceDefinition.ProducedItemId != destinationDefinition.AcceptedItemId)
+            {
+                error = $"Connection {connection.Guid:D} item types do not match.";
+                return false;
+            }
+
+            if (!connectedSources.Add(connection.Source.EntityGuid))
+            {
+                error = $"Connection source {connection.Source.EntityGuid:D} is already connected.";
+                return false;
+            }
+
+            if (!connectedDestinations.Add(connection.Destination.EntityGuid))
+            {
+                error = $"Connection destination {connection.Destination.EntityGuid:D} is already connected.";
                 return false;
             }
         }

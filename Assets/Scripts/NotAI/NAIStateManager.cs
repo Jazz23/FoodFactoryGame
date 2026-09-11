@@ -20,6 +20,40 @@ namespace NotAI
     [DisallowMultipleComponent]
     public sealed class NAIStateManager : NetworkBehaviour
     {
+        private readonly struct RuntimeEntityKey : IEquatable<RuntimeEntityKey>
+        {
+            public RuntimeEntityKey(
+                uint newBuildingInstanceId,
+                int newFloorIndex,
+                uint newEntityId)
+            {
+                BuildingInstanceId = newBuildingInstanceId;
+                FloorIndex = newFloorIndex;
+                EntityId = newEntityId;
+            }
+
+            public uint BuildingInstanceId { get; }
+            public int FloorIndex { get; }
+            public uint EntityId { get; }
+
+            public bool Equals(RuntimeEntityKey other)
+            {
+                return BuildingInstanceId == other.BuildingInstanceId
+                    && FloorIndex == other.FloorIndex
+                    && EntityId == other.EntityId;
+            }
+
+            public override bool Equals(object obj)
+            {
+                return obj is RuntimeEntityKey other && Equals(other);
+            }
+
+            public override int GetHashCode()
+            {
+                return HashCode.Combine(BuildingInstanceId, FloorIndex, EntityId);
+            }
+        }
+
         private const string InsideTestDefinitionId = "nai-inside-test";
 
         [SerializeField] public List<GameObject> buildingPrefabs = new();
@@ -35,6 +69,9 @@ namespace NotAI
         private readonly HashSet<Guid> viewGuids = new();
         private readonly Dictionary<Guid, GameObject> spawnedViews = new();
         private readonly Dictionary<Guid, int> definitionIndices = new();
+        private readonly Dictionary<uint, Guid> factoryBuildingGuids = new();
+        private readonly Dictionary<OutsideTestFloorKey, Guid> factoryFloorGuids = new();
+        private readonly Dictionary<RuntimeEntityKey, Guid> factoryEntityGuids = new();
         private readonly FactoryWorldState factoryState =
             new(GameSceneManager.LegacyOutsideTestBuildingId);
 
@@ -70,31 +107,144 @@ namespace NotAI
             => factoryState.TryGetFloorState(buildingInstanceId, floorIndex, out state);
 
         public bool TryAddTestMachine(uint buildingInstanceId, int floorIndex, Vector2 position, out uint entityId, out string error)
-            => factoryState.TryAddTestMachine(buildingInstanceId, floorIndex, position, out entityId, out error);
+        {
+            var added = factoryState.TryAddTestMachine(
+                buildingInstanceId,
+                floorIndex,
+                position,
+                out entityId,
+                out error);
+            if (added)
+            {
+                EnsureFactoryEntityGuid(buildingInstanceId, floorIndex, entityId);
+            }
+
+            return added;
+        }
 
         public bool TryAddTestStorage(uint buildingInstanceId, int floorIndex, Vector2 position, out uint entityId, out string error)
-            => factoryState.TryAddTestStorage(buildingInstanceId, floorIndex, position, out entityId, out error);
+        {
+            var added = factoryState.TryAddTestStorage(
+                buildingInstanceId,
+                floorIndex,
+                position,
+                out entityId,
+                out error);
+            if (added)
+            {
+                EnsureFactoryEntityGuid(buildingInstanceId, floorIndex, entityId);
+            }
+
+            return added;
+        }
 
         public bool TryAddTestProcessor(uint buildingInstanceId, int floorIndex, Vector2 position, out uint entityId, out string error)
-            => factoryState.TryAddTestProcessor(buildingInstanceId, floorIndex, position, out entityId, out error);
+        {
+            var added = factoryState.TryAddTestProcessor(
+                buildingInstanceId,
+                floorIndex,
+                position,
+                out entityId,
+                out error);
+            if (added)
+            {
+                EnsureFactoryEntityGuid(buildingInstanceId, floorIndex, entityId);
+            }
+
+            return added;
+        }
 
         public bool TryAddPackedStorage(uint buildingInstanceId, int floorIndex, Vector2 position, out uint entityId, out string error)
-            => factoryState.TryAddPackedStorage(buildingInstanceId, floorIndex, position, out entityId, out error);
+        {
+            var added = factoryState.TryAddPackedStorage(
+                buildingInstanceId,
+                floorIndex,
+                position,
+                out entityId,
+                out error);
+            if (added)
+            {
+                EnsureFactoryEntityGuid(buildingInstanceId, floorIndex, entityId);
+            }
+
+            return added;
+        }
 
         public bool TryRemoveTestMachine(uint buildingInstanceId, int floorIndex, uint entityId, out string error)
-            => factoryState.TryRemoveTestMachine(buildingInstanceId, floorIndex, entityId, out error);
+        {
+            var removed = factoryState.TryRemoveTestMachine(
+                buildingInstanceId,
+                floorIndex,
+                entityId,
+                out error);
+            if (removed)
+            {
+                factoryEntityGuids.Remove(new RuntimeEntityKey(
+                    buildingInstanceId,
+                    floorIndex,
+                    entityId));
+            }
+
+            return removed;
+        }
 
         public bool TryDrainTestMachine(uint buildingInstanceId, int floorIndex, uint entityId, out int removed, out string error)
             => factoryState.TryDrainTestMachine(buildingInstanceId, floorIndex, entityId, out removed, out error);
 
         public bool TryAddConnection(FactoryEntityEndpoint source, FactoryEntityEndpoint destination, out string error)
-            => factoryState.TryAddConnection(source, destination, out error);
+        {
+            if (!TryResolveFactoryEndpoint(source, out var resolvedSource, out error)
+                || !TryResolveFactoryEndpoint(destination, out var resolvedDestination, out error))
+            {
+                return false;
+            }
+
+            return factoryState.TryAddConnection(
+                resolvedSource,
+                resolvedDestination,
+                out error);
+        }
 
         public bool TryRemoveConnectionForEndpoint(FactoryEntityEndpoint endpoint, out FactoryEntityConnectionRecord removedConnection, out string error)
-            => factoryState.TryRemoveConnectionForEndpoint(endpoint, out removedConnection, out error);
+        {
+            if (!TryResolveFactoryEndpoint(endpoint, out var resolvedEndpoint, out error))
+            {
+                removedConnection = null!;
+                return false;
+            }
+
+            return factoryState.TryRemoveConnectionForEndpoint(
+                resolvedEndpoint,
+                out removedConnection,
+                out error);
+        }
 
         public bool TryRemoveConnectionForEndpoint(FactoryEntityEndpoint endpoint, FactoryEntityConnectionDirection direction, out FactoryEntityConnectionRecord removedConnection, out string error)
-            => factoryState.TryRemoveConnectionForEndpoint(endpoint, direction, out removedConnection, out error);
+        {
+            if (!TryResolveFactoryEndpoint(endpoint, out var resolvedEndpoint, out error))
+            {
+                removedConnection = null!;
+                return false;
+            }
+
+            return factoryState.TryRemoveConnectionForEndpoint(
+                resolvedEndpoint,
+                direction,
+                out removedConnection,
+                out error);
+        }
+
+        public bool TryGetFactoryEntityEndpoint(
+            uint buildingInstanceId,
+            int floorIndex,
+            uint entityId,
+            out FactoryEntityEndpoint endpoint)
+        {
+            return TryResolveFactoryEndpoint(
+                new FactoryEntityEndpoint(buildingInstanceId, floorIndex, entityId),
+                out endpoint,
+                out _);
+        }
 
         public bool TrySetFloorState(uint buildingInstanceId, int floorIndex, string label, float productionRate, Vector2 markerPosition)
             => factoryState.TrySetFloorState(buildingInstanceId, floorIndex, label, productionRate, markerPosition);
@@ -119,10 +269,56 @@ namespace NotAI
             => factoryState.GetNextBuildingId(additionalIds);
 
         public bool TryRegisterBuilding(BuildingRecord record, out string error)
-            => factoryState.TryRegisterBuilding(record, out error);
+        {
+            var registered = factoryState.TryRegisterBuilding(record, out error);
+            if (registered)
+            {
+                EnsureFactoryBuildingGuid(record.BuildingInstanceId);
+                EnsureFactoryFloorGuids(record.BuildingInstanceId, record.StoryCount);
+            }
+
+            return registered;
+        }
 
         public bool RemoveBuildingAndFloors(uint buildingInstanceId)
-            => factoryState.RemoveBuildingAndFloors(buildingInstanceId);
+        {
+            var removed = factoryState.RemoveBuildingAndFloors(buildingInstanceId);
+            if (!removed)
+            {
+                return false;
+            }
+
+            factoryBuildingGuids.Remove(buildingInstanceId);
+            var floorKeys = new List<OutsideTestFloorKey>();
+            foreach (var key in factoryFloorGuids.Keys)
+            {
+                if (key.BuildingInstanceId == buildingInstanceId)
+                {
+                    floorKeys.Add(key);
+                }
+            }
+
+            foreach (var key in floorKeys)
+            {
+                factoryFloorGuids.Remove(key);
+            }
+
+            var entityKeys = new List<RuntimeEntityKey>();
+            foreach (var key in factoryEntityGuids.Keys)
+            {
+                if (key.BuildingInstanceId == buildingInstanceId)
+                {
+                    entityKeys.Add(key);
+                }
+            }
+
+            foreach (var key in entityKeys)
+            {
+                factoryEntityGuids.Remove(key);
+            }
+
+            return true;
+        }
         public bool LoadedFactoryBuildingRecords
         {
             get
@@ -570,6 +766,9 @@ namespace NotAI
             buildableViews.Clear();
             viewGuids.Clear();
             occupiedTiles.Clear();
+            factoryBuildingGuids.Clear();
+            factoryFloorGuids.Clear();
+            factoryEntityGuids.Clear();
             worldSnapshot = new FactoryWorldSnapshot();
             simulation = null!;
             worldStore = null!;
@@ -579,8 +778,17 @@ namespace NotAI
 
         private void ApplyWorldSnapshot(FactoryWorldSnapshot snapshot)
         {
+            if (!FactoryWorldValidation.TryValidate(snapshot, out var validationError))
+            {
+                throw new InvalidDataException(validationError);
+            }
+
             var factoryData = new OutsideTestFloorSaveData();
             var legacyBuildingIds = new Dictionary<Guid, uint>();
+            var loadedFactoryBuildingGuids = new Dictionary<uint, Guid>();
+            var loadedFactoryFloorGuids = new Dictionary<OutsideTestFloorKey, Guid>();
+            var loadedFactoryEntityGuids = new Dictionary<RuntimeEntityKey, Guid>();
+            var legacyEntityIds = new Dictionary<Guid, uint>();
             foreach (var building in snapshot.Buildings)
             {
                 if (building.InteriorOnly)
@@ -594,7 +802,13 @@ namespace NotAI
                     legacyId = GetNextLegacyBuildingId(legacyBuildingIds.Values);
                 }
 
-                legacyBuildingIds[building.Guid] = legacyId;
+                if (!legacyBuildingIds.TryAdd(building.Guid, legacyId)
+                    || !loadedFactoryBuildingGuids.TryAdd(legacyId, building.Guid))
+                {
+                    throw new InvalidDataException(
+                        $"Factory building {building.Guid:D} has a duplicate runtime building ID {legacyId}.");
+                }
+
                 factoryData.Buildings.Add(new BuildingRecord(
                     legacyId,
                     building.AnchorCell,
@@ -608,6 +822,15 @@ namespace NotAI
                 if (!legacyBuildingIds.TryGetValue(floor.BuildingGuid, out var legacyBuildingId))
                 {
                     continue;
+                }
+
+                var floorKey = new OutsideTestFloorKey(
+                    legacyBuildingId,
+                    floor.FloorIndex);
+                if (!loadedFactoryFloorGuids.TryAdd(floorKey, floor.Guid))
+                {
+                    throw new InvalidDataException(
+                        $"Factory floor {floor.Guid:D} has a duplicate runtime floor identity.");
                 }
 
                 var floorRecord = new OutsideTestFloorRecord(
@@ -628,6 +851,17 @@ namespace NotAI
                     var legacyEntityId = entity.LegacyEntityId == 0
                         ? GetNextLegacyEntityId(entities)
                         : entity.LegacyEntityId;
+                    var entityKey = new RuntimeEntityKey(
+                        legacyBuildingId,
+                        floor.FloorIndex,
+                        legacyEntityId);
+                    if (!loadedFactoryEntityGuids.TryAdd(entityKey, entity.Guid)
+                        || !legacyEntityIds.TryAdd(entity.Guid, legacyEntityId))
+                    {
+                        throw new InvalidDataException(
+                            $"Factory entity {entity.Guid:D} has a duplicate runtime entity ID.");
+                    }
+
                     entities.Add(new FactoryEntityRecord(
                         legacyEntityId,
                         entity.DefinitionId,
@@ -645,21 +879,30 @@ namespace NotAI
 
             foreach (var connection in snapshot.Connections)
             {
-                if (!legacyBuildingIds.TryGetValue(connection.Source.BuildingGuid, out var sourceBuildingId)
-                    || !legacyBuildingIds.TryGetValue(connection.Destination.BuildingGuid, out var destinationBuildingId))
+                var sourceResolved = TryResolveWorldEndpoint(
+                    connection.Source,
+                    snapshot,
+                    legacyBuildingIds,
+                    legacyEntityIds,
+                    out var source,
+                    out var sourceError);
+                var destinationResolved = TryResolveWorldEndpoint(
+                    connection.Destination,
+                    snapshot,
+                    legacyBuildingIds,
+                    legacyEntityIds,
+                    out var destination,
+                    out var destinationError);
+                if (!sourceResolved || !destinationResolved)
                 {
-                    continue;
+                    throw new InvalidDataException(
+                        string.IsNullOrEmpty(sourceError) ? destinationError : sourceError);
                 }
 
                 factoryData.Connections.Add(new FactoryEntityConnectionRecord(
-                    new FactoryEntityEndpoint(
-                        sourceBuildingId,
-                        connection.Source.FloorIndex,
-                        ResolveLegacyEntityId(snapshot, connection.Source)),
-                    new FactoryEntityEndpoint(
-                        destinationBuildingId,
-                        connection.Destination.FloorIndex,
-                        ResolveLegacyEntityId(snapshot, connection.Destination))));
+                    connection.Guid,
+                    source,
+                    destination));
             }
 
             factoryData.Version = FactoryWorldState.CurrentSaveVersion;
@@ -667,6 +910,26 @@ namespace NotAI
             {
                 throw new InvalidDataException("The unified factory snapshot failed factory-state validation.");
             }
+
+            factoryBuildingGuids.Clear();
+            foreach (var pair in loadedFactoryBuildingGuids)
+            {
+                factoryBuildingGuids.Add(pair.Key, pair.Value);
+            }
+
+            factoryFloorGuids.Clear();
+            foreach (var pair in loadedFactoryFloorGuids)
+            {
+                factoryFloorGuids.Add(pair.Key, pair.Value);
+            }
+
+            factoryEntityGuids.Clear();
+            foreach (var pair in loadedFactoryEntityGuids)
+            {
+                factoryEntityGuids.Add(pair.Key, pair.Value);
+            }
+
+            worldSnapshot = snapshot.Clone();
         }
 
         private FactoryWorldSnapshot CaptureWorldSnapshot()
@@ -675,8 +938,9 @@ namespace NotAI
             var factoryData = factoryState.CaptureState();
             foreach (var building in factoryData.Buildings)
             {
+                var buildingGuid = EnsureFactoryBuildingGuid(building.BuildingInstanceId);
                 result.Buildings.Add(new FactoryWorldBuildingRecord(
-                    FactoryGuidMigration.ForBuilding(building.BuildingInstanceId),
+                    buildingGuid,
                     "outside-test-building",
                     building.AnchorCell,
                     building.FootprintSize,
@@ -688,12 +952,13 @@ namespace NotAI
 
             foreach (var floor in factoryData.Floors)
             {
-                var floorGuid = FactoryGuidMigration.ForFloor(
+                var buildingGuid = EnsureFactoryBuildingGuid(floor.BuildingInstanceId);
+                var floorGuid = EnsureFactoryFloorGuid(
                     floor.BuildingInstanceId,
                     floor.FloorIndex);
                 var worldFloor = new FactoryWorldFloorRecord(
                     floorGuid,
-                    FactoryGuidMigration.ForBuilding(floor.BuildingInstanceId),
+                    buildingGuid,
                     floor.FloorIndex,
                     floor.Label,
                     floor.ProductionRate,
@@ -702,11 +967,12 @@ namespace NotAI
                 var worldEntities = new List<FactoryWorldEntityRecord>();
                 foreach (var entity in floor.Entities)
                 {
+                    var entityGuid = EnsureFactoryEntityGuid(
+                        floor.BuildingInstanceId,
+                        floor.FloorIndex,
+                        entity.EntityId);
                     worldEntities.Add(new FactoryWorldEntityRecord(
-                        FactoryGuidMigration.ForEntity(
-                            floor.BuildingInstanceId,
-                            floor.FloorIndex,
-                            entity.EntityId),
+                        entityGuid,
                         floorGuid,
                         entity.DefinitionId,
                         entity.LogicalPosition,
@@ -731,9 +997,19 @@ namespace NotAI
                 var source = CreateWorldEndpoint(connection.Source);
                 var destination = CreateWorldEndpoint(connection.Destination);
                 result.Connections.Add(new FactoryWorldConnectionRecord(
-                    FactoryGuidMigration.ForConnection(connection.Source, connection.Destination),
+                    connection.Guid == Guid.Empty
+                        ? FactoryGuidMigration.ForConnection(connection.Source, connection.Destination)
+                        : connection.Guid,
                     source,
                     destination));
+            }
+
+            foreach (var mapping in worldSnapshot.MigrationMappings)
+            {
+                result.MigrationMappings.Add(new FactoryWorldMigrationMapping(
+                    mapping.Kind,
+                    mapping.LegacyKey,
+                    mapping.Guid));
             }
 
             foreach (var building in worldSnapshot.Buildings)
@@ -901,27 +1177,252 @@ namespace NotAI
             return max == uint.MaxValue ? 1u : max + 1u;
         }
 
-        private static uint ResolveLegacyEntityId(
-            FactoryWorldSnapshot snapshot,
-            FactoryWorldEndpoint endpoint)
+        private bool TryResolveFactoryEndpoint(
+            FactoryEntityEndpoint requested,
+            out FactoryEntityEndpoint resolved,
+            out string error)
         {
-            foreach (var floor in snapshot.Floors)
+            resolved = default;
+            error = string.Empty;
+            if (!IsInitialized)
             {
-                if (floor.Guid != endpoint.FloorGuid)
+                error = "The factory world is not initialized.";
+                return false;
+            }
+
+            var hasRuntimeIdentity = requested.BuildingInstanceId != 0
+                && requested.FloorIndex >= 0
+                && requested.EntityId != 0;
+            if (hasRuntimeIdentity)
+            {
+                if (!factoryState.TryGetFloorState(
+                        requested.BuildingInstanceId,
+                        requested.FloorIndex,
+                        out var floor)
+                    || !floor.TryGetEntity(requested.EntityId, out _))
+                {
+                    error = "Connection endpoints must refer to existing entities.";
+                    return false;
+                }
+
+                var expected = CreateRuntimeEndpoint(
+                    requested.BuildingInstanceId,
+                    requested.FloorIndex,
+                    requested.EntityId);
+                if (!IsLegacyEndpointIdentity(requested, expected))
+                {
+                    error = "The selected endpoint GUID does not match its authoritative record.";
+                    return false;
+                }
+
+                resolved = expected;
+                return true;
+            }
+
+            if (requested.BuildingGuid == Guid.Empty
+                || requested.FloorGuid == Guid.Empty
+                || requested.EntityGuid == Guid.Empty
+                || requested.FloorIndex < 0)
+            {
+                error = "Connection endpoints must contain resolvable GUID and runtime identity.";
+                return false;
+            }
+
+            foreach (var pair in factoryEntityGuids)
+            {
+                if (pair.Value != requested.EntityGuid)
                 {
                     continue;
                 }
 
-                foreach (var entity in floor.Entities)
+                var expected = CreateRuntimeEndpoint(
+                    pair.Key.BuildingInstanceId,
+                    pair.Key.FloorIndex,
+                    pair.Key.EntityId);
+                if (requested.BuildingGuid != expected.BuildingGuid
+                    || requested.FloorGuid != expected.FloorGuid
+                    || requested.FloorIndex != expected.FloorIndex)
                 {
-                    if (entity.Guid == endpoint.EntityGuid)
-                    {
-                        return entity.LegacyEntityId;
-                    }
+                    error = "The selected endpoint GUID does not match its authoritative record.";
+                    return false;
+                }
+
+                resolved = expected;
+                return true;
+            }
+
+            error = $"Entity endpoint {requested.EntityGuid:D} does not exist.";
+            return false;
+        }
+
+        private FactoryEntityEndpoint CreateRuntimeEndpoint(
+            uint buildingInstanceId,
+            int floorIndex,
+            uint entityId)
+        {
+            var buildingGuid = EnsureFactoryBuildingGuid(buildingInstanceId);
+            var floorGuid = EnsureFactoryFloorGuid(buildingInstanceId, floorIndex);
+            var entityGuid = EnsureFactoryEntityGuid(
+                buildingInstanceId,
+                floorIndex,
+                entityId);
+            return new FactoryEntityEndpoint(
+                buildingInstanceId,
+                floorIndex,
+                entityId,
+                buildingGuid,
+                floorGuid,
+                entityGuid);
+        }
+
+        private static bool IsLegacyEndpointIdentity(
+            FactoryEntityEndpoint requested,
+            FactoryEntityEndpoint expected)
+        {
+            return (requested.BuildingGuid == Guid.Empty
+                    || requested.BuildingGuid == expected.BuildingGuid
+                    || requested.BuildingGuid == FactoryGuidMigration.ForBuilding(
+                        requested.BuildingInstanceId))
+                && (requested.FloorGuid == Guid.Empty
+                    || requested.FloorGuid == expected.FloorGuid
+                    || requested.FloorGuid == FactoryGuidMigration.ForFloor(
+                        requested.BuildingInstanceId,
+                        requested.FloorIndex))
+                && (requested.EntityGuid == Guid.Empty
+                    || requested.EntityGuid == expected.EntityGuid
+                    || requested.EntityGuid == FactoryGuidMigration.ForEntity(
+                        requested.BuildingInstanceId,
+                        requested.FloorIndex,
+                        requested.EntityId));
+        }
+
+        private Guid EnsureFactoryBuildingGuid(uint buildingInstanceId)
+        {
+            if (buildingInstanceId == 0)
+            {
+                return Guid.Empty;
+            }
+
+            if (factoryBuildingGuids.TryGetValue(buildingInstanceId, out var existingGuid))
+            {
+                return existingGuid;
+            }
+
+            var newGuid = Guid.NewGuid();
+            factoryBuildingGuids.Add(buildingInstanceId, newGuid);
+            return newGuid;
+        }
+
+        private void EnsureFactoryFloorGuids(
+            uint buildingInstanceId,
+            int storyCount)
+        {
+            for (var floorIndex = 0; floorIndex < storyCount; floorIndex++)
+            {
+                EnsureFactoryFloorGuid(buildingInstanceId, floorIndex);
+            }
+        }
+
+        private Guid EnsureFactoryFloorGuid(
+            uint buildingInstanceId,
+            int floorIndex)
+        {
+            var key = new OutsideTestFloorKey(buildingInstanceId, floorIndex);
+            if (factoryFloorGuids.TryGetValue(key, out var existingGuid))
+            {
+                return existingGuid;
+            }
+
+            var buildingGuid = EnsureFactoryBuildingGuid(buildingInstanceId);
+            var newGuid = Guid.NewGuid();
+            factoryFloorGuids.Add(key, newGuid);
+            return newGuid;
+        }
+
+        private Guid EnsureFactoryEntityGuid(
+            uint buildingInstanceId,
+            int floorIndex,
+            uint entityId)
+        {
+            var key = new RuntimeEntityKey(buildingInstanceId, floorIndex, entityId);
+            if (factoryEntityGuids.TryGetValue(key, out var existingGuid))
+            {
+                return existingGuid;
+            }
+
+            var newGuid = Guid.NewGuid();
+            factoryEntityGuids.Add(key, newGuid);
+            return newGuid;
+        }
+
+        private static bool TryResolveWorldEndpoint(
+            FactoryWorldEndpoint endpoint,
+            FactoryWorldSnapshot snapshot,
+            IReadOnlyDictionary<Guid, uint> legacyBuildingIds,
+            IReadOnlyDictionary<Guid, uint> legacyEntityIds,
+            out FactoryEntityEndpoint resolved,
+            out string error)
+        {
+            resolved = default;
+            error = string.Empty;
+            if (!legacyBuildingIds.TryGetValue(
+                    endpoint.BuildingGuid,
+                    out var buildingId))
+            {
+                error = $"Building endpoint {endpoint.BuildingGuid:D} has no runtime mapping.";
+                return false;
+            }
+
+            FactoryWorldFloorRecord matchingFloor = null!;
+            foreach (var floor in snapshot.Floors)
+            {
+                if (floor.Guid == endpoint.FloorGuid)
+                {
+                    matchingFloor = floor;
+                    break;
                 }
             }
 
-            throw new InvalidDataException($"Entity endpoint {endpoint.EntityGuid:D} has no legacy mapping.");
+            if (matchingFloor is null
+                || matchingFloor.BuildingGuid != endpoint.BuildingGuid
+                || matchingFloor.FloorIndex != endpoint.FloorIndex)
+            {
+                error = $"Floor endpoint {endpoint.FloorGuid:D} has inconsistent building or index.";
+                return false;
+            }
+
+            if (!legacyEntityIds.TryGetValue(endpoint.EntityGuid, out var entityId))
+            {
+                error = $"Entity endpoint {endpoint.EntityGuid:D} has no runtime mapping.";
+                return false;
+            }
+
+            var entityFound = false;
+            foreach (var entity in matchingFloor.Entities)
+            {
+                if (entity.Guid == endpoint.EntityGuid
+                    && entity.FloorGuid == endpoint.FloorGuid
+                    && !entity.IsNaiEntity)
+                {
+                    entityFound = true;
+                    break;
+                }
+            }
+
+            if (!entityFound)
+            {
+                error = $"Entity endpoint {endpoint.EntityGuid:D} does not belong to floor {endpoint.FloorGuid:D}.";
+                return false;
+            }
+
+            resolved = new FactoryEntityEndpoint(
+                buildingId,
+                endpoint.FloorIndex,
+                entityId,
+                endpoint.BuildingGuid,
+                endpoint.FloorGuid,
+                endpoint.EntityGuid);
+            return true;
         }
 
         private static FactoryWorldEndpoint CreateWorldEndpoint(FactoryEntityEndpoint endpoint)

@@ -416,8 +416,9 @@ public sealed class GameSceneManager : MonoBehaviour
     public bool TryConnectCurrentFloorEntity(
         PlayerSceneTransition player,
         uint sourceEntityId,
+        uint destinationBuildingInstanceId,
         int destinationFloorIndex,
-        uint destinationStorageEntityId,
+        uint destinationEntityId,
         out string error)
     {
         error = "Only the local host inside a floor can edit connections; wait for travel to finish.";
@@ -434,18 +435,34 @@ public sealed class GameSceneManager : MonoBehaviour
             sourceFloorIndex,
             sourceEntityId);
         var destination = new FactoryEntityEndpoint(
-            buildingId,
+            destinationBuildingInstanceId,
             destinationFloorIndex,
-            destinationStorageEntityId);
+            destinationEntityId);
         if (!stateManager.TryAddConnection(source, destination, out error))
         {
             return false;
         }
 
         BroadcastOutsideTestFloorState(buildingId, sourceFloorIndex);
-        BroadcastOutsideTestFloorState(buildingId, destinationFloorIndex);
+        BroadcastOutsideTestFloorState(
+            destinationBuildingInstanceId,
+            destinationFloorIndex);
         outsideTestStateNeedsSave = true;
         return true;
+    }
+
+    public bool TryGetOutsideTestEntityEndpoint(
+        uint buildingInstanceId,
+        int floorIndex,
+        uint entityId,
+        out FactoryEntityEndpoint endpoint)
+    {
+        EnsureOutsideTestStateLoaded();
+        return stateManager.TryGetFactoryEntityEndpoint(
+            buildingInstanceId,
+            floorIndex,
+            entityId,
+            out endpoint);
     }
 
     public bool TryDisconnectCurrentFloorEntity(

@@ -590,7 +590,15 @@ public sealed class FactoryWorldState
             return false;
         }
 
-        connections.Add(connection.Clone());
+        var ownedConnection = connection.Clone();
+        if (ownedConnection.Guid == Guid.Empty)
+        {
+            ownedConnection = new FactoryEntityConnectionRecord(
+                ownedConnection.Source,
+                ownedConnection.Destination);
+        }
+
+        connections.Add(ownedConnection);
         connections.Sort(CompareConnections);
         return true;
     }
@@ -604,8 +612,8 @@ public sealed class FactoryWorldState
         for (var index = 0; index < connections.Count; index++)
         {
             var connection = connections[index];
-            if (connection.Source.Equals(source)
-                && connection.Destination.Equals(destination))
+            if (EndpointsMatch(connection.Source, source)
+                && EndpointsMatch(connection.Destination, destination))
             {
                 connections.RemoveAt(index);
                 return true;
@@ -640,8 +648,8 @@ public sealed class FactoryWorldState
         for (var index = 0; index < connections.Count; index++)
         {
             var connection = connections[index];
-            if (!connection.Source.Equals(endpoint)
-                && !connection.Destination.Equals(endpoint))
+            if (!EndpointsMatch(connection.Source, endpoint)
+                && !EndpointsMatch(connection.Destination, endpoint))
             {
                 continue;
             }
@@ -680,8 +688,8 @@ public sealed class FactoryWorldState
         {
             var connection = connections[index];
             var matches = direction == FactoryEntityConnectionDirection.Outgoing
-                ? connection.Source.Equals(endpoint)
-                : connection.Destination.Equals(endpoint);
+                ? EndpointsMatch(connection.Source, endpoint)
+                : EndpointsMatch(connection.Destination, endpoint);
             if (!matches)
             {
                 continue;
@@ -705,7 +713,7 @@ public sealed class FactoryWorldState
     {
         foreach (var candidate in connections)
         {
-            if (candidate.Source.Equals(source))
+            if (EndpointsMatch(candidate.Source, source))
             {
                 connection = candidate;
                 return true;
@@ -722,7 +730,7 @@ public sealed class FactoryWorldState
     {
         foreach (var candidate in connections)
         {
-            if (candidate.Destination.Equals(destination))
+            if (EndpointsMatch(candidate.Destination, destination))
             {
                 connection = candidate;
                 return true;
@@ -1279,22 +1287,19 @@ public sealed class FactoryWorldState
             return false;
         }
 
-        if (source.BuildingInstanceId != destination.BuildingInstanceId)
-        {
-            error = "Connection endpoints must belong to the same building.";
-            return false;
-        }
-
-        if (source.FloorIndex == destination.FloorIndex)
+        if (HasSameFloorIdentity(source, destination))
         {
             error = "Connection endpoints must be on different floors.";
             return false;
         }
 
         if (availableBuildings is not null
-            && !availableBuildings.ContainsKey(source.BuildingInstanceId))
+            && (!availableBuildings.ContainsKey(source.BuildingInstanceId)
+                || !availableBuildings.ContainsKey(destination.BuildingInstanceId)))
         {
-            error = $"Building {source.BuildingInstanceId} does not exist.";
+            error = !availableBuildings.ContainsKey(source.BuildingInstanceId)
+                ? $"Building {source.BuildingInstanceId} does not exist."
+                : $"Building {destination.BuildingInstanceId} does not exist.";
             return false;
         }
 
@@ -1336,13 +1341,13 @@ public sealed class FactoryWorldState
 
         foreach (var existingConnection in existingConnections)
         {
-            if (existingConnection.Source.Equals(source))
+            if (EndpointsMatch(existingConnection.Source, source))
             {
                 error = $"Source endpoint {source} is already connected.";
                 return false;
             }
 
-            if (existingConnection.Destination.Equals(destination))
+            if (EndpointsMatch(existingConnection.Destination, destination))
             {
                 error = $"Destination endpoint {destination} is already connected.";
                 return false;
@@ -1357,8 +1362,8 @@ public sealed class FactoryWorldState
         for (var index = connections.Count - 1; index >= 0; index--)
         {
             var connection = connections[index];
-            if (connection.Source.Equals(endpoint)
-                || connection.Destination.Equals(endpoint))
+            if (EndpointsMatch(connection.Source, endpoint)
+                || EndpointsMatch(connection.Destination, endpoint))
             {
                 connections.RemoveAt(index);
             }
@@ -1435,7 +1440,46 @@ public sealed class FactoryWorldState
             endpoint.BuildingInstanceId,
             endpoint.FloorIndex);
         return floorStates.TryGetValue(key, out var floor)
-            && floor.TryGetEntity(endpoint.EntityId, out entity);
+             && floor.TryGetEntity(endpoint.EntityId, out entity);
+    }
+
+    private static bool EndpointsMatch(
+        FactoryEntityEndpoint left,
+        FactoryEntityEndpoint right)
+    {
+        if (left.Equals(right))
+        {
+            return true;
+        }
+
+        return left.BuildingInstanceId != 0
+            && right.BuildingInstanceId != 0
+            && left.EntityId != 0
+            && right.EntityId != 0
+            && left.FloorIndex >= 0
+            && right.FloorIndex >= 0
+            && left.BuildingInstanceId == right.BuildingInstanceId
+            && left.FloorIndex == right.FloorIndex
+            && left.EntityId == right.EntityId;
+    }
+
+    private static bool HasSameFloorIdentity(
+        FactoryEntityEndpoint left,
+        FactoryEntityEndpoint right)
+    {
+        if (left.BuildingGuid != Guid.Empty
+            && right.BuildingGuid != Guid.Empty
+            && left.FloorGuid != Guid.Empty
+            && right.FloorGuid != Guid.Empty)
+        {
+            return left.BuildingGuid == right.BuildingGuid
+                && left.FloorGuid == right.FloorGuid;
+        }
+
+        return left.BuildingInstanceId != 0
+            && right.BuildingInstanceId != 0
+            && left.BuildingInstanceId == right.BuildingInstanceId
+            && left.FloorIndex == right.FloorIndex;
     }
 
 }

@@ -42,6 +42,22 @@ public struct FactoryEntityEndpoint : IEquatable<FactoryEntityEndpoint>
         entityGuidString = newEntityGuid == Guid.Empty ? string.Empty : newEntityGuid.ToString("D");
     }
 
+    public FactoryEntityEndpoint(
+        uint newBuildingInstanceId,
+        int newFloorIndex,
+        uint newEntityId,
+        Guid newBuildingGuid,
+        Guid newFloorGuid,
+        Guid newEntityGuid)
+    {
+        BuildingInstanceId = newBuildingInstanceId;
+        FloorIndex = newFloorIndex;
+        EntityId = newEntityId;
+        buildingGuidString = newBuildingGuid == Guid.Empty ? string.Empty : newBuildingGuid.ToString("D");
+        floorGuidString = newFloorGuid == Guid.Empty ? string.Empty : newFloorGuid.ToString("D");
+        entityGuidString = newEntityGuid == Guid.Empty ? string.Empty : newEntityGuid.ToString("D");
+    }
+
     public uint BuildingInstanceId;
     public int FloorIndex;
     public uint EntityId;
@@ -90,6 +106,7 @@ public enum FactoryEntityConnectionDirection
 [Serializable]
 public sealed class FactoryEntityConnectionRecord
 {
+    [SerializeField] private string connectionGuidString = string.Empty;
     [SerializeField] private FactoryEntityEndpoint source;
     [SerializeField] private FactoryEntityEndpoint destination;
 
@@ -101,8 +118,27 @@ public sealed class FactoryEntityConnectionRecord
         FactoryEntityEndpoint newSource,
         FactoryEntityEndpoint newDestination)
     {
+        Guid = FactoryGuidMigration.ForConnection(newSource, newDestination);
         source = newSource;
         destination = newDestination;
+    }
+
+    public FactoryEntityConnectionRecord(
+        Guid newGuid,
+        FactoryEntityEndpoint newSource,
+        FactoryEntityEndpoint newDestination)
+    {
+        Guid = newGuid;
+        source = newSource;
+        destination = newDestination;
+    }
+
+    public Guid Guid
+    {
+        get => FactoryGuidMigration.TryParseCanonical(connectionGuidString, out var value)
+            ? value
+            : Guid.Empty;
+        private set => connectionGuidString = value == Guid.Empty ? string.Empty : value.ToString("D");
     }
 
     public FactoryEntityEndpoint Source => source;
@@ -112,7 +148,7 @@ public sealed class FactoryEntityConnectionRecord
 
     public FactoryEntityConnectionRecord Clone()
     {
-        return new FactoryEntityConnectionRecord(source, destination);
+        return new FactoryEntityConnectionRecord(Guid, source, destination);
     }
 
     public bool HasSameEndpoints(FactoryEntityConnectionRecord other)

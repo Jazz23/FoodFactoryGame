@@ -178,6 +178,51 @@ public sealed class FactoryRecipeSimulationTests
     }
 
     [Test]
+    public void CrossBuildingFloorZeroConnectionTransfersWithOverlappingEntityIds()
+    {
+        var owner = new OutsideTestFloorStateOwner(1);
+        owner.TryRegisterBuilding(20, 1, new Vector2Int(5, 3), out _);
+        owner.TryRegisterBuilding(30, 1, new Vector2Int(5, 3), out _);
+        owner.TryGetFloorState(20, 0, out var sourceFloor);
+        owner.TryGetFloorState(30, 0, out var destinationFloor);
+        sourceFloor.SetEntities(new[]
+        {
+            new FactoryEntityRecord(
+                1,
+                FactoryEntityDefinitions.TestMachineDefinitionId,
+                Vector2.one,
+                0f,
+                0f,
+                0,
+                3)
+        });
+        destinationFloor.SetEntities(new[]
+        {
+            new FactoryEntityRecord(
+                1,
+                FactoryEntityRecord.StorageDefinitionId,
+                Vector2.one,
+                0f,
+                0f,
+                0)
+        });
+
+        var sourceEndpoint = new FactoryEntityEndpoint(20, 0, 1);
+        var destinationEndpoint = new FactoryEntityEndpoint(30, 0, 1);
+        Assert.That(owner.TryAddConnection(
+                sourceEndpoint,
+                destinationEndpoint,
+                out var error), Is.True, error);
+
+        owner.AdvanceProduction(0.1f);
+
+        Assert.That(sourceFloor.Entities[0].OutputCount, Is.EqualTo(2));
+        Assert.That(destinationFloor.Entities[0].OutputCount, Is.EqualTo(1));
+        Assert.That(owner.Connections[0].Source, Is.EqualTo(sourceEndpoint));
+        Assert.That(owner.Connections[0].Destination, Is.EqualTo(destinationEndpoint));
+    }
+
+    [Test]
     public void ConnectionsRejectIncompatibleReceiverItems()
     {
         var owner = new OutsideTestFloorStateOwner(1);

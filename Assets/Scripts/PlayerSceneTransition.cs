@@ -272,15 +272,17 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
 
     public void RequestConnectCurrentFloorEntity(
         uint sourceEntityId,
+        uint destinationBuildingInstanceId,
         int destinationFloorIndex,
-        uint destinationStorageEntityId)
+        uint destinationEntityId)
     {
         if (IsOwner)
         {
             RequestConnectCurrentFloorEntityServerRpc(
                 sourceEntityId,
+                destinationBuildingInstanceId,
                 destinationFloorIndex,
-                destinationStorageEntityId);
+                destinationEntityId);
         }
     }
 
@@ -367,19 +369,22 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
     [ServerRpc]
     private void RequestConnectCurrentFloorEntityServerRpc(
         uint sourceEntityId,
+        uint destinationBuildingInstanceId,
         int destinationFloorIndex,
-        uint destinationStorageEntityId)
+        uint destinationEntityId)
     {
         var connected = GameSceneManager.Instance.TryConnectCurrentFloorEntity(
             this,
             sourceEntityId,
+            destinationBuildingInstanceId,
             destinationFloorIndex,
-            destinationStorageEntityId,
+            destinationEntityId,
             out var error);
         TargetReceiveMachineEditResult(
             Owner,
             connected
-                ? $"Connected entity {sourceEntityId} to receiver {destinationStorageEntityId}."
+                ? $"Connected entity {sourceEntityId} to receiver "
+                    + $"B{destinationBuildingInstanceId}/E{destinationEntityId}."
                 : error);
     }
 

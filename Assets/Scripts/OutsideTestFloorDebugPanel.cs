@@ -1,5 +1,6 @@
 // Provides temporary local controls for inspecting and editing the OutsideTest floor proof of concept.
 using System.Globalization;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.EventSystems;
@@ -44,9 +45,11 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
     private uint machineBuildingId;
     private int machineFloorIndex = -1;
     private uint selectedMachineId;
+    private uint destinationBuildingInstanceId;
     private int destinationFloorIndex = -1;
     private uint selectedStorageId;
     private Transform selectorRoot = null!;
+    private Transform destinationBuildingRoot = null!;
     private Transform destinationFloorRoot = null!;
     private Transform destinationStorageRoot = null!;
     private InputAction toggle = null!;
@@ -58,6 +61,7 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
     private string destinationFingerprint = string.Empty;
     private uint selectedBuildingInstanceId;
     private int selectedFloor;
+    private uint connectionSourceMachineId;
     private bool initialized;
     private bool isOpen = true;
 
@@ -138,6 +142,7 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
         machineStatusText.text = "Connecting...";
         owner.RequestConnectCurrentFloorEntity(
             selectedMachineId,
+            destinationBuildingInstanceId,
             destinationFloorIndex,
             selectedStorageId);
     }
@@ -200,6 +205,7 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             selectedMachineId = 0;
             machineBuildingId = buildingId;
             machineFloorIndex = floorIndex;
+            destinationBuildingInstanceId = 0;
             destinationFloorIndex = -1;
             selectedStorageId = 0;
         }
@@ -255,6 +261,16 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             selectedMachineId = 0;
         }
 
+        if (!hasCurrentFloor || connectionSourceMachineId != selectedMachineId)
+        {
+            destinationBuildingInstanceId = 0;
+            destinationFloorIndex = -1;
+            selectedStorageId = 0;
+            destinationFingerprint = string.Empty;
+        }
+
+        connectionSourceMachineId = hasCurrentFloor ? selectedMachineId : 0;
+
         machineXInput.interactable = canEdit;
         machineYInput.interactable = canEdit;
         addMachineButton.interactable = canEdit;
@@ -282,6 +298,7 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
         var selectedEntity = default(FactoryEntityRecord);
         var incomingConnection = null as FactoryEntityConnectionRecord;
         var outgoingConnection = null as FactoryEntityConnectionRecord;
+        var currentEndpoint = default(FactoryEntityEndpoint);
         if (hasCurrentFloor
             && GameSceneManager.Instance.TryGetOutsideTestFloorState(
                 buildingId,
@@ -290,20 +307,19 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             && floor.TryGetEntity(selectedMachineId, out var currentEntity))
         {
             selectedEntity = currentEntity;
+            GameSceneManager.Instance.TryGetOutsideTestEntityEndpoint(
+                buildingId,
+                floorIndex,
+                selectedMachineId,
+                out currentEndpoint);
             foreach (var connection in GameSceneManager.Instance.GetOutsideTestConnections())
             {
-                if (connection.Source.Equals(new FactoryEntityEndpoint(
-                        buildingId,
-                        floorIndex,
-                        selectedMachineId)))
+                if (connection.Source.Equals(currentEndpoint))
                 {
                     outgoingConnection = connection;
                 }
 
-                if (connection.Destination.Equals(new FactoryEntityEndpoint(
-                        buildingId,
-                        floorIndex,
-                        selectedMachineId)))
+                if (connection.Destination.Equals(currentEndpoint))
                 {
                     incomingConnection = connection;
                 }
@@ -313,9 +329,11 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
         if (!selected || selectedEntity is null)
         {
             connectionText.text = "CONNECTION: select an entity";
+            destinationBuildingInstanceId = 0;
             destinationFloorIndex = -1;
             selectedStorageId = 0;
             destinationFingerprint = string.Empty;
+            ClearDynamicRoot(destinationBuildingRoot);
             ClearDynamicRoot(destinationFloorRoot);
             ClearDynamicRoot(destinationStorageRoot);
             connectButton.interactable = false;
@@ -328,8 +346,8 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
         var connectionLines = string.Empty;
         if (outgoingConnection is not null)
         {
-            connectionLines += $"OUTGOING: B{outgoingConnection.Destination.BuildingInstanceId}/"
-                + $"F{outgoingConnection.Destination.FloorIndex}/E{outgoingConnection.Destination.EntityId}";
+            connectionLines += $"OUTGOING: {outgoingConnection.Source} -> "
+                + outgoingConnection.Destination;
         }
 
         if (incomingConnection is not null)
@@ -339,52 +357,58 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
                 connectionLines += "\n";
             }
 
-            connectionLines += $"INCOMING: B{incomingConnection.Source.BuildingInstanceId}/"
-                + $"F{incomingConnection.Source.FloorIndex}/E{incomingConnection.Source.EntityId}";
+            connectionLines += $"INCOMING: {incomingConnection.Source} -> "
+                + incomingConnection.Destination;
         }
 
         connectionText.text = connectionLines.Length > 0
             ? connectionLines
             : "CONNECTION: not connected";
 
-        var eligibleFloorIndices = new System.Collections.Generic.List<int>();
-        if (selectedEntity.IsProducer
-            && GameSceneManager.Instance.TryGetOutsideTestBuildingInfo(
-                buildingId,
-                out var buildingInfo))
+        var eligibleBuildingIds = new System.Collections.Generic.List<uint>();
+        if (selectedEntity.IsProducer)
         {
-            for (var candidateFloorIndex = 0;
-                candidateFloorIndex < buildingInfo.StoryCount;
-                candidateFloorIndex++)
+            foreach (var candidateBuildingId in GameSceneManager.Instance.GetRegisteredOutsideTestBuildingIds())
             {
-                if (candidateFloorIndex == floorIndex
-                    || !GameSceneManager.Instance.TryGetOutsideTestFloorState(
+                if (!GameSceneManager.Instance.TryGetOutsideTestBuildingInfo(
+                        candidateBuildingId,
+                        out var candidateBuildingInfo)
+                    || !HasCompatibleReceiver(
                         buildingId,
-                        candidateFloorIndex,
-                        out var candidateFloor))
+                        floorIndex,
+                        candidateBuildingId,
+                        selectedEntity.ProducedItemId,
+                        candidateBuildingInfo.StoryCount))
                 {
                     continue;
                 }
 
-                foreach (var candidateEntity in candidateFloor.Entities)
-                {
-                    if (candidateEntity is not null
-                        && candidateEntity.IsReceiver
-                        && candidateEntity.AcceptedItemId == selectedEntity.ProducedItemId)
-                    {
-                        eligibleFloorIndices.Add(candidateFloorIndex);
-                        break;
-                    }
-                }
+                eligibleBuildingIds.Add(candidateBuildingId);
             }
         }
 
         if (outgoingConnection is not null)
         {
+            destinationBuildingInstanceId = outgoingConnection.Destination.BuildingInstanceId;
             destinationFloorIndex = outgoingConnection.Destination.FloorIndex;
             selectedStorageId = outgoingConnection.Destination.EntityId;
         }
-        else if (!eligibleFloorIndices.Contains(destinationFloorIndex))
+        else if (!eligibleBuildingIds.Contains(destinationBuildingInstanceId))
+        {
+            destinationBuildingInstanceId = eligibleBuildingIds.Count > 0
+                ? eligibleBuildingIds[0]
+                : 0;
+            destinationFloorIndex = -1;
+            selectedStorageId = 0;
+        }
+
+        var eligibleFloorIndices = GetCompatibleDestinationFloors(
+            buildingId,
+            floorIndex,
+            destinationBuildingInstanceId,
+            selectedEntity.ProducedItemId);
+        if (outgoingConnection is null
+            && !eligibleFloorIndices.Contains(destinationFloorIndex))
         {
             destinationFloorIndex = eligibleFloorIndices.Count > 0
                 ? eligibleFloorIndices[0]
@@ -392,24 +416,36 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             selectedStorageId = 0;
         }
 
-        var fingerprint = $"{buildingId}:{floorIndex}:{selectedMachineId}:{destinationFloorIndex}:"
-            + $"{selectedStorageId}:{outgoingConnection is not null}:{incomingConnection is not null}";
-        foreach (var candidateFloorIndex in eligibleFloorIndices)
+        var receivers = GetCompatibleReceivers(
+            destinationBuildingInstanceId,
+            destinationFloorIndex,
+            selectedEntity.ProducedItemId);
+        if (outgoingConnection is null
+            && !ContainsEntity(receivers, selectedStorageId))
         {
-            fingerprint += $"|F{candidateFloorIndex}";
-            if (!GameSceneManager.Instance.TryGetOutsideTestFloorState(
-                    buildingId,
-                    candidateFloorIndex,
-                    out var candidateFloor))
-            {
-                continue;
-            }
+            selectedStorageId = receivers.Count > 0
+                ? receivers[0].EntityId
+                : 0;
+        }
 
-            foreach (var candidateEntity in candidateFloor.Entities)
+        var fingerprint = $"{buildingId}:{floorIndex}:{selectedMachineId}:"
+            + $"{destinationBuildingInstanceId}:{destinationFloorIndex}:{selectedStorageId}:"
+            + $"{outgoingConnection is not null}:{incomingConnection is not null}";
+        foreach (var candidateBuildingId in eligibleBuildingIds)
+        {
+            fingerprint += $"|B{candidateBuildingId}";
+            var candidateFloors = GetCompatibleDestinationFloors(
+                buildingId,
+                floorIndex,
+                candidateBuildingId,
+                selectedEntity.ProducedItemId);
+            foreach (var candidateFloorIndex in candidateFloors)
             {
-                if (candidateEntity is not null
-                    && candidateEntity.IsReceiver
-                    && candidateEntity.AcceptedItemId == selectedEntity.ProducedItemId)
+                fingerprint += $"/F{candidateFloorIndex}";
+                foreach (var candidateEntity in GetCompatibleReceivers(
+                             candidateBuildingId,
+                             candidateFloorIndex,
+                             selectedEntity.ProducedItemId))
                 {
                     fingerprint += $"/E{candidateEntity.EntityId}:{candidateEntity.DefinitionId}";
                 }
@@ -419,8 +455,31 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
         if (fingerprint != destinationFingerprint)
         {
             destinationFingerprint = fingerprint;
+            ClearDynamicRoot(destinationBuildingRoot);
             ClearDynamicRoot(destinationFloorRoot);
             ClearDynamicRoot(destinationStorageRoot);
+            for (var index = 0; index < eligibleBuildingIds.Count; index++)
+            {
+                var capturedBuildingId = eligibleBuildingIds[index];
+                var buildingButton = CreateButton(
+                    $"Destination Building {capturedBuildingId} Button",
+                    $"DEST B{capturedBuildingId}",
+                    destinationBuildingRoot,
+                    index * 95f,
+                    0f,
+                    90f,
+                    28f,
+                    () =>
+                    {
+                        destinationBuildingInstanceId = capturedBuildingId;
+                        destinationFloorIndex = -1;
+                        selectedStorageId = 0;
+                        destinationFingerprint = string.Empty;
+                        RefreshMachines();
+                    });
+                buildingButton.GetComponent<Image>().color = new Color(0.12f, 0.25f, 0.28f, 1f);
+            }
+
             for (var index = 0; index < eligibleFloorIndices.Count; index++)
             {
                 var capturedFloorIndex = eligibleFloorIndices[index];
@@ -443,21 +502,11 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             }
 
             if (destinationFloorIndex >= 0
-                && GameSceneManager.Instance.TryGetOutsideTestFloorState(
-                    buildingId,
-                    destinationFloorIndex,
-                    out var storageFloor))
+                && destinationBuildingInstanceId != 0)
             {
                 var storageIndex = 0;
-                foreach (var candidateEntity in storageFloor.Entities)
+                foreach (var candidateEntity in receivers)
                 {
-                    if (candidateEntity is null
-                        || !candidateEntity.IsReceiver
-                        || candidateEntity.AcceptedItemId != selectedEntity.ProducedItemId)
-                    {
-                        continue;
-                    }
-
                     var capturedStorageId = candidateEntity.EntityId;
                     var receiverButtonName = candidateEntity.IsStorage
                         ? $"Destination Storage {capturedStorageId} Button"
@@ -484,12 +533,121 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
         connectButton.interactable = canEdit
             && selectedEntity.IsProducer
             && outgoingConnection is null
+            && destinationBuildingInstanceId != 0
             && destinationFloorIndex >= 0
             && selectedStorageId != 0;
         disconnectButton.interactable = canEdit
             && (incomingConnection is not null || outgoingConnection is not null);
         disconnectIncomingButton.interactable = canEdit && incomingConnection is not null;
         disconnectOutgoingButton.interactable = canEdit && outgoingConnection is not null;
+    }
+
+    private static bool ContainsEntity(
+        IReadOnlyList<FactoryEntityRecord> entities,
+        uint entityId)
+    {
+        foreach (var entity in entities)
+        {
+            if (entity.EntityId == entityId)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool HasCompatibleReceiver(
+        uint sourceBuildingId,
+        int sourceFloorIndex,
+        uint destinationBuildingId,
+        string itemId,
+        int storyCount)
+    {
+        for (var floorIndex = 0; floorIndex < storyCount; floorIndex++)
+        {
+            if (sourceBuildingId == destinationBuildingId
+                && sourceFloorIndex == floorIndex)
+            {
+                continue;
+            }
+
+            if (GetCompatibleReceivers(
+                    destinationBuildingId,
+                    floorIndex,
+                    itemId).Count > 0)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static System.Collections.Generic.List<int> GetCompatibleDestinationFloors(
+        uint sourceBuildingId,
+        int sourceFloorIndex,
+        uint destinationBuildingId,
+        string itemId)
+    {
+        var result = new System.Collections.Generic.List<int>();
+        if (destinationBuildingId == 0
+            || !GameSceneManager.Instance.TryGetOutsideTestBuildingInfo(
+                destinationBuildingId,
+                out var destinationBuildingInfo))
+        {
+            return result;
+        }
+
+        for (var floorIndex = 0;
+            floorIndex < destinationBuildingInfo.StoryCount;
+            floorIndex++)
+        {
+            if (sourceBuildingId == destinationBuildingId
+                && sourceFloorIndex == floorIndex)
+            {
+                continue;
+            }
+
+            if (GetCompatibleReceivers(
+                    destinationBuildingId,
+                    floorIndex,
+                    itemId).Count > 0)
+            {
+                result.Add(floorIndex);
+            }
+        }
+
+        return result;
+    }
+
+    private static System.Collections.Generic.List<FactoryEntityRecord> GetCompatibleReceivers(
+        uint buildingId,
+        int floorIndex,
+        string itemId)
+    {
+        var result = new System.Collections.Generic.List<FactoryEntityRecord>();
+        if (buildingId == 0
+            || floorIndex < 0
+            || !GameSceneManager.Instance.TryGetOutsideTestFloorState(
+                buildingId,
+                floorIndex,
+                out var floor))
+        {
+            return result;
+        }
+
+        foreach (var entity in floor.Entities)
+        {
+            if (entity is not null
+                && entity.IsReceiver
+                && entity.AcceptedItemId == itemId)
+            {
+                result.Add(entity);
+            }
+        }
+
+        return result;
     }
 
     private static void ClearDynamicRoot(Transform rootTransform)
@@ -1119,28 +1277,34 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
         connectionText = CreateText("Connection Text", machineContent, "CONNECTION: select an entity", 12,
             TextAnchor.UpperLeft, new Color(0.78f, 0.9f, 0.88f));
         SetTopRect(connectionText.rectTransform, 12f, 290f, 396f, 38f);
-        CreateTextLabel(machineContent, "Destination Floor Label", "DEST FLOOR", 12f, 330f);
+        CreateTextLabel(machineContent, "Destination Building Label", "DEST BUILDING", 12f, 330f);
+        destinationBuildingRoot = new GameObject(
+            "Destination Building Selectors",
+            typeof(RectTransform)).transform;
+        destinationBuildingRoot.SetParent(machineContent, false);
+        SetTopRect(destinationBuildingRoot.GetComponent<RectTransform>(), 104f, 328f, 294f, 30f);
+        CreateTextLabel(machineContent, "Destination Floor Label", "DEST FLOOR", 12f, 366f);
         destinationFloorRoot = new GameObject(
             "Destination Floor Selectors",
             typeof(RectTransform)).transform;
         destinationFloorRoot.SetParent(machineContent, false);
         SetTopRect(destinationFloorRoot.GetComponent<RectTransform>(), 104f, 328f, 294f, 30f);
-        CreateTextLabel(machineContent, "Destination Storage Label", "RECEIVER", 12f, 366f);
+        CreateTextLabel(machineContent, "Destination Storage Label", "RECEIVER", 12f, 402f);
         destinationStorageRoot = new GameObject(
             "Destination Storage Selectors",
             typeof(RectTransform)).transform;
         destinationStorageRoot.SetParent(machineContent, false);
-        SetTopRect(destinationStorageRoot.GetComponent<RectTransform>(), 104f, 364f, 294f, 30f);
+        SetTopRect(destinationStorageRoot.GetComponent<RectTransform>(), 104f, 400f, 294f, 30f);
         connectButton = CreateButton("Connect", "CONNECT", machineContent,
-            12f, 400f, 94f, 32f, ConnectClicked);
+            12f, 436f, 94f, 32f, ConnectClicked);
         disconnectButton = CreateButton("Disconnect", "DISCONNECT", machineContent,
-            112f, 400f, 98f, 32f, DisconnectClicked);
+            112f, 436f, 98f, 32f, DisconnectClicked);
         disconnectIncomingButton = CreateButton(
             "Disconnect Incoming",
             "DISCONNECT IN",
             machineContent,
             216f,
-            400f,
+            436f,
             98f,
             32f,
             DisconnectIncomingClicked);
@@ -1149,13 +1313,13 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             "DISCONNECT OUT",
             machineContent,
             320f,
-            400f,
+            436f,
             78f,
             32f,
             DisconnectOutgoingClicked);
         machineStatusText = CreateText("Machine Status", machineContent, "Select an entity to drain or remove it.", 12,
             TextAnchor.UpperLeft, new Color(0.6f, 0.78f, 0.76f));
-        SetTopRect(machineStatusText.rectTransform, 12f, 438f, 396f, 62f);
+        SetTopRect(machineStatusText.rectTransform, 12f, 474f, 396f, 62f);
         root.SetActive(true);
     }
 
