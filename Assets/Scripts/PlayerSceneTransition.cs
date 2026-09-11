@@ -187,6 +187,12 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         transform.SetPositionAndRotation(position, Quaternion.identity);
     }
 
+    public void ServerBeginTransition()
+    {
+        SetTransitionState(true);
+        TargetSetTransitionState(Owner, true);
+    }
+
     public bool TryGetCurrentOutsideTestFloor(
         out uint buildingInstanceId,
         out int floorIndex)

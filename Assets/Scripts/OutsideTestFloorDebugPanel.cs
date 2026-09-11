@@ -436,6 +436,7 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
                     {
                         destinationFloorIndex = capturedFloorIndex;
                         selectedStorageId = 0;
+                        destinationFingerprint = string.Empty;
                         RefreshMachines();
                     });
                 floorButton.GetComponent<Image>().color = new Color(0.16f, 0.3f, 0.32f, 1f);

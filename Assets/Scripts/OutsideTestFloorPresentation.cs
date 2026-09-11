@@ -215,7 +215,7 @@ public sealed class OutsideTestFloorPresentation : MonoBehaviour
         entityObject.transform.localScale = Vector3.one * 0.5f;
 
         var labelObject = new GameObject("Factory Entity Label");
-        labelObject.transform.SetParent(transform, false);
+        labelObject.transform.SetParent(entityObject.transform, false);
         var label = labelObject.AddComponent<TextMesh>();
         label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         label.anchor = TextAnchor.MiddleCenter;
