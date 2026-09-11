@@ -17,6 +17,8 @@ public sealed class OutsideTestFloorPresentation : MonoBehaviour
     private uint buildingInstanceId;
     private int floorIndex;
     private bool isConfigured;
+    private FactoryEntityRecord lastSnapshotEntity = null!;
+    private float snapshotTime;
 
     public static int LoadedCount { get; private set; }
 
@@ -99,6 +101,8 @@ public sealed class OutsideTestFloorPresentation : MonoBehaviour
 
     private void ApplyState(OutsideTestFloorRecord state)
     {
+        marker.gameObject.SetActive(TestUIVisibility.Visible);
+        markerLabel.gameObject.SetActive(TestUIVisibility.Visible);
         var markerPosition = state.MarkerPosition;
         if (SceneGrid.TryGetForScene(gameObject.scene, out var grid)
             && IndoorGrid.TryGetForScene(gameObject.scene, out var indoorGrid))
@@ -124,6 +128,16 @@ public sealed class OutsideTestFloorPresentation : MonoBehaviour
         SceneGrid grid,
         IndoorGrid indoorGrid)
     {
+        var stateManager = NotAI.NAIStateManager.Instance;
+        var snapshotEntity = state.Entities.Count > 0 ? state.Entities[0] : null;
+        if (!ReferenceEquals(snapshotEntity, lastSnapshotEntity))
+        {
+            lastSnapshotEntity = snapshotEntity;
+            snapshotTime = Time.time;
+        }
+        var elapsed = stateManager is not null && stateManager.IsServerStarted
+            ? stateManager.SimulationRemainder : Time.time - snapshotTime;
+        var queuePositions = FactoryConveyor.PredictQueues(state.Entities, elapsed);
         activeEntityIds.Clear();
         foreach (var entity in state.Entities)
         {
@@ -145,7 +159,15 @@ public sealed class OutsideTestFloorPresentation : MonoBehaviour
                 transform.position.z - 0.2f);
             view.Object.transform.position = position;
             view.Label.transform.position = position + Vector3.up * 0.45f;
-            view.Renderer.color = GetEntityColor(entity.DefinitionId);
+            view.Label.gameObject.SetActive(TestUIVisibility.Visible);
+            view.Renderer.color = entity.IsConveyor ? Color.white : GetEntityColor(entity.DefinitionId);
+            if (entity.IsConveyor)
+            {
+                view.Object.GetComponent<FactoryConveyorView>().Apply(entity, grid, state.Entities, queuePositions[entity.EntityId]);
+                view.Label.transform.rotation = Quaternion.identity;
+                view.Label.text = $"Conveyor {entity.ConveyorPositions.Count}/{FactoryConveyorQueue.Capacity}";
+                continue;
+            }
             view.Label.text = entity.IsTerminal
                 ? $"{entity.DefinitionId}\n"
                     + $"Inventory {entity.InventoryCount}/{entity.InventoryCapacity} "
@@ -216,12 +238,14 @@ public sealed class OutsideTestFloorPresentation : MonoBehaviour
         entityObject.transform.SetParent(transform, false);
         var renderer = entityObject.AddComponent<SpriteRenderer>();
         renderer.sprite = markerSprite;
-        renderer.sortingOrder = 11;
+        renderer.sortingOrder = FactoryConveyor.EquipmentSortingOrder;
         entityObject.transform.localScale = Vector3.one * 0.5f;
+        if (entity.IsConveyor) entityObject.AddComponent<FactoryConveyorView>();
 
         var labelObject = new GameObject("Factory Entity Label");
         labelObject.transform.SetParent(entityObject.transform, false);
         var label = labelObject.AddComponent<TextMesh>();
+        label.GetComponent<MeshRenderer>().sortingOrder = FactoryConveyor.ItemSortingOrder;
         label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         label.anchor = TextAnchor.MiddleCenter;
         label.alignment = TextAlignment.Center;

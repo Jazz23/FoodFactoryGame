@@ -1,3 +1,4 @@
+// Displays the temporary network connection controls when test overlays are visible.
 using FishNet.Managing;
 using UnityEngine;
 
@@ -11,12 +12,12 @@ public class ConnectToIpButton : MonoBehaviour
     private void Start()
     {
         _networkManager = GetComponent<NetworkManager>();
-        if (_networkManager == null)
+        if (_networkManager is null)
             _networkManager = FindFirstObjectByType<NetworkManager>();
 
-        if (_networkManager?.TransportManager?.Transport != null)
+        if (_networkManager?.TransportManager?.Transport is not null)
         {
-            string configuredAddress = _networkManager.TransportManager.Transport.GetClientAddress();
+            var configuredAddress = _networkManager.TransportManager.Transport.GetClientAddress();
             if (!string.IsNullOrEmpty(configuredAddress))
                 _clientAddress = configuredAddress;
         }
@@ -24,18 +25,19 @@ public class ConnectToIpButton : MonoBehaviour
 
     private void OnGUI()
     {
-        if (_networkManager?.TransportManager?.Transport == null)
+        if (!TestUIVisibility.Visible) return;
+        if (_networkManager?.TransportManager?.Transport is null)
             return;
 
-        Matrix4x4 previousMatrix = GUI.matrix;
+        var previousMatrix = GUI.matrix;
         GUI.matrix = Matrix4x4.TRS(
             Vector3.zero,
             Quaternion.identity,
             new Vector3(Screen.width / 1920f, Screen.height / 1080f, 1f));
 
         GUILayout.BeginArea(_area);
-        GUIStyle buttonStyle = GUI.skin.GetStyle("button");
-        int previousFontSize = buttonStyle.fontSize;
+        var buttonStyle = GUI.skin.GetStyle("button");
+        var previousFontSize = buttonStyle.fontSize;
         buttonStyle.fontSize = 26;
 
         GUILayout.Label("Server IP");

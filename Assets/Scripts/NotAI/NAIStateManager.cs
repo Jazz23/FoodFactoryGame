@@ -86,6 +86,7 @@ namespace NotAI
         private string configuredLegacyNaiPath = string.Empty;
 
         public static NAIStateManager Instance => instance;
+        public float SimulationRemainder => simulation.Remainder;
         public static IReadOnlyDictionary<Vector2, Guid> OccupiedTiles => instance.occupiedTiles;
         public static IReadOnlyDictionary<Guid, NAIBuildable> Buildables => instance.buildableViews;
 
@@ -946,7 +947,8 @@ namespace NotAI
                         entity.CycleProgress,
                         entity.ProducedCount,
                         entity.OutputCount,
-                        entity.InputCount));
+                        entity.InputCount,
+                        FactoryConveyor.IsConveyor(entity.DefinitionId) ? FactoryConveyorQueue.Decode(entity.State) : null));
                 }
 
                 floorRecord.SetEntities(entities);
@@ -1054,7 +1056,7 @@ namespace NotAI
                         entity.LogicalPosition,
                         0f,
                         Vector2.one,
-                        Array.Empty<byte>(),
+                        entity.GetConveyorState(),
                         entity.EntityId,
                         false,
                         entity.CycleRate,

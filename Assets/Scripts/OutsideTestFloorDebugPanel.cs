@@ -67,7 +67,7 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
     private bool initialized;
     private bool isOpen = true;
 
-    public bool IsOpen => isOpen;
+    public bool IsOpen => isOpen && TestUIVisibility.Visible;
 
     public void SetMachineEditResult(string message)
     {
@@ -783,6 +783,8 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
     {
         if (initialized)
         {
+            canvasObject.GetComponent<Canvas>().enabled = TestUIVisibility.Visible;
+            root.SetActive(isOpen && TestUIVisibility.Visible);
             Refresh();
         }
     }
@@ -834,7 +836,7 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
 
     private void MoveMarkerPerformed(InputAction.CallbackContext context)
     {
-        if (!isOpen || labelInput.isFocused || rateInput.isFocused
+        if (!IsOpen || labelInput.isFocused || rateInput.isFocused
             || machineXInput.isFocused || machineYInput.isFocused)
         {
             return;

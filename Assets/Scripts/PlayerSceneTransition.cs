@@ -19,6 +19,7 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
     private uint lastCompletedTransitionSequence;
     private InsideFactoryElevator activeElevator = null!;
     private OutsideTestFloorDebugPanel debugPanel = null!;
+    private FactoryBuildController factoryBuilder = null!;
 
     public static PlayerSceneTransition LocalOwner = null!;
     public bool IsTransitioning => isTransitioning;
@@ -49,6 +50,8 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         cancel.performed += CancelPerformed;
         debugPanel = gameObject.AddComponent<OutsideTestFloorDebugPanel>();
         debugPanel.Initialize(this);
+        factoryBuilder = gameObject.AddComponent<FactoryBuildController>();
+        factoryBuilder.Initialize(this);
     }
 
     public override void OnStopClient()
@@ -65,6 +68,7 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         move.Disable();
         cancel.Disable();
         CloseElevatorPrompt();
+        if (factoryBuilder is not null) Destroy(factoryBuilder);
         if (debugPanel is not null && debugPanel)
         {
             Destroy(debugPanel);
@@ -210,6 +214,19 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         buildingInstanceId = controller.BuildingInstanceId;
         floorIndex = controller.CurrentFloor;
         return true;
+    }
+
+    public void RequestPlaceEquipment(string definitionId, Vector2 position)
+    {
+        if (IsOwner) RequestPlaceEquipmentServerRpc(definitionId, position);
+    }
+
+    [ServerRpc]
+    private void RequestPlaceEquipmentServerRpc(string definitionId, Vector2 position)
+    {
+        var placed = GameSceneManager.Instance.TryPlaceCurrentFloorEquipment(
+            this, definitionId, position, out _, out var error);
+        TargetReceiveMachineEditResult(Owner, placed ? "Equipment placed." : error);
     }
 
     public void RequestAddCurrentFloorMachine(Vector2 position)
@@ -457,6 +474,7 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
     private void TargetReceiveMachineEditResult(NetworkConnection connection, string message)
     {
         debugPanel.SetMachineEditResult(message);
+        factoryBuilder.SetStatus(message);
     }
 
     public void RequestOutsideTestFloorSnapshot()

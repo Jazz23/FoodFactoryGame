@@ -134,7 +134,7 @@ public sealed class FactoryWorldMigration
                     entity.LogicalPosition,
                     0f,
                     Vector2.one,
-                    Array.Empty<byte>(),
+                    entity.GetConveyorState(),
                     entity.EntityId,
                     false,
                     entity.CycleRate,

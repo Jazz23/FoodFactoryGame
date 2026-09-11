@@ -53,6 +53,10 @@ public static class FactoryEntityDefinitions
 
     public static FactoryEntityDefinition Get(string definitionId)
     {
+        if (FactoryConveyor.IsConveyor(definitionId))
+        {
+            return new FactoryEntityDefinition(definitionId, TestProductId, TestProductId, 1, 1, 0.6f);
+        }
         if (definitionId == ProcessorDefinitionId)
         {
             return new FactoryEntityDefinition(

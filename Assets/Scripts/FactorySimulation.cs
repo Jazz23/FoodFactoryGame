@@ -24,6 +24,8 @@ public sealed class FactorySimulation
         tickInterval = newTickInterval;
     }
 
+    public float Remainder => (float)accumulatedTime;
+
     public int Advance(float deltaTime)
     {
         if (float.IsNaN(deltaTime)

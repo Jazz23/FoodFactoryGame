@@ -233,6 +233,31 @@ public sealed class GameSceneManager : MonoBehaviour
         return CanEditCurrentFloorMachines(player);
     }
 
+    public bool TryPlaceCurrentFloorEquipment(PlayerSceneTransition player, string definitionId,
+        Vector2 position, out uint entityId, out string error)
+    {
+        entityId = 0;
+        error = "Only the host inside a factory floor can build; wait for travel to finish.";
+        if (!CanEditCurrentFloorEntities(player)) return false;
+        if (!FactoryConveyor.IsPlaceable(definitionId))
+        {
+            error = "Unknown equipment type.";
+            return false;
+        }
+        player.TryGetCurrentOutsideTestFloor(out var buildingId, out var floorIndex);
+        stateManager.TryGetFloorState(buildingId, floorIndex, out var floor);
+        if (FactoryConveyor.IsOccupied(floor.Entities, position))
+        {
+            error = "That cell is occupied.";
+            return false;
+        }
+        if (!stateManager.TryAddTestEntity(buildingId, floorIndex, definitionId, position, out entityId, out error))
+            return false;
+        BroadcastOutsideTestFloorState(buildingId, floorIndex);
+        outsideTestStateNeedsSave = true;
+        return true;
+    }
+
     public bool TryAddCurrentFloorMachine(PlayerSceneTransition player, Vector2 position,
         out uint entityId, out string error)
     {

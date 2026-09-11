@@ -836,6 +836,10 @@ public sealed class FactoryWorldState
         }
 
         TransferOneItemPerConnection();
+        foreach (var state in floorStates.Values)
+        {
+            FactoryConveyor.TransferAdjacent(state.Entities);
+        }
     }
 
     public bool ApplySnapshot(

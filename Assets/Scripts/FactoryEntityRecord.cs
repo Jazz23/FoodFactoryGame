@@ -1,5 +1,6 @@
 // Stores one persistent factory entity and the compact snapshot sent to floor clients.
 using System;
+using System.Collections.Generic;
 using FishNet.CodeGenerating;
 using UnityEngine;
 
@@ -15,7 +16,8 @@ public struct FactoryEntitySnapshot
         float newCycleProgress,
         int newProducedCount,
         int newOutputCount = 0,
-        int newInputCount = 0)
+        int newInputCount = 0,
+        float[] newConveyorPositions = null)
     {
         EntityId = newEntityId;
         DefinitionId = newDefinitionId;
@@ -25,6 +27,7 @@ public struct FactoryEntitySnapshot
         ProducedCount = newProducedCount;
         OutputCount = newOutputCount;
         InputCount = newInputCount;
+        ConveyorPositions = newConveyorPositions is null ? null! : (float[])newConveyorPositions.Clone();
     }
 
     public uint EntityId;
@@ -35,6 +38,7 @@ public struct FactoryEntitySnapshot
     public int ProducedCount;
     public int OutputCount;
     public int InputCount;
+    public float[] ConveyorPositions;
 }
 
 [Serializable]
@@ -60,6 +64,7 @@ public sealed class FactoryEntityRecord
     [SerializeField] private int producedCount;
     [SerializeField] private int outputCount;
     [SerializeField] private int inputCount;
+    [SerializeField] private FactoryConveyorQueue conveyorQueue = new();
 
     public FactoryEntityRecord()
     {
@@ -73,7 +78,8 @@ public sealed class FactoryEntityRecord
         float newCycleProgress,
         int newProducedCount,
         int newOutputCount = 0,
-        int newInputCount = 0)
+        int newInputCount = 0,
+        float[] newConveyorPositions = null)
     {
         SetState(
             newEntityId,
@@ -83,17 +89,22 @@ public sealed class FactoryEntityRecord
             newCycleProgress,
             newProducedCount,
             newOutputCount,
-            newInputCount);
+            newInputCount,
+            newConveyorPositions);
     }
 
+    public bool IsConveyor => FactoryConveyor.IsConveyor(definitionId);
     public uint EntityId => entityId;
     public string DefinitionId => definitionId;
     public Vector2 LogicalPosition => logicalPosition;
     public float CycleRate => cycleRate;
-    public float CycleProgress => cycleProgress;
+    public float CycleProgress => IsConveyor ? (conveyorQueue.Count > 0 ? conveyorQueue.Positions[0] : 0f) : cycleProgress;
     public int ProducedCount => producedCount;
-    public int OutputCount => outputCount;
-    public int InputCount => inputCount;
+    public int OutputCount => IsConveyor ? conveyorQueue.ReadyCount : outputCount;
+    public int InputCount => IsConveyor ? conveyorQueue.Count - conveyorQueue.ReadyCount : inputCount;
+    public IReadOnlyList<float> ConveyorPositions => conveyorQueue.Positions;
+    public void SetConveyorPositions(float[] positions) => conveyorQueue.SetPositions(positions);
+    public byte[] GetConveyorState() => IsConveyor ? FactoryConveyorQueue.Encode(ConveyorPositions) : Array.Empty<byte>();
     public string AcceptedItemId => FactoryEntityDefinitions.Get(definitionId).AcceptedItemId;
     public string ProducedItemId => FactoryEntityDefinitions.Get(definitionId).ProducedItemId;
     public int InputQuantity => FactoryEntityDefinitions.Get(definitionId).InputQuantity;
@@ -160,7 +171,8 @@ public sealed class FactoryEntityRecord
             snapshot.CycleProgress,
             snapshot.ProducedCount,
             snapshot.OutputCount,
-            snapshot.InputCount);
+            snapshot.InputCount,
+            snapshot.ConveyorPositions);
     }
 
     public void SetState(
@@ -171,7 +183,8 @@ public sealed class FactoryEntityRecord
         float newCycleProgress,
         int newProducedCount,
         int newOutputCount = 0,
-        int newInputCount = 0)
+        int newInputCount = 0,
+        float[] newConveyorPositions = null)
     {
         entityId = newEntityId;
         definitionId = string.IsNullOrWhiteSpace(newDefinitionId)
@@ -189,6 +202,7 @@ public sealed class FactoryEntityRecord
         producedCount = Mathf.Max(0, newProducedCount);
         outputCount = Mathf.Clamp(newOutputCount, 0, OutputCapacity);
         inputCount = Mathf.Clamp(newInputCount, 0, InputCapacity);
+        if (IsConveyor) conveyorQueue.Restore(newConveyorPositions, inputCount, outputCount, cycleProgress);
         var definition = FactoryEntityDefinitions.Get(definitionId);
         if (definition.IsProcessor)
         {
@@ -224,6 +238,11 @@ public sealed class FactoryEntityRecord
 
     public void Advance(float deltaTime)
     {
+        if (IsConveyor)
+        {
+            conveyorQueue.Advance(deltaTime);
+            return;
+        }
         if (IsStorage || IsTerminal)
         {
             return;
@@ -285,7 +304,7 @@ public sealed class FactoryEntityRecord
 
     public int GetSupplyCapacity(string itemId)
     {
-        return CanSupplyItem(itemId) ? outputCount : 0;
+        return CanSupplyItem(itemId) ? OutputCount : 0;
     }
 
     public int GetAcceptCapacity(string itemId)
@@ -293,6 +312,11 @@ public sealed class FactoryEntityRecord
         if (!CanAcceptItem(itemId))
         {
             return 0;
+        }
+
+        if (IsConveyor)
+        {
+            return conveyorQueue.HasEntranceSpace ? 1 : 0;
         }
 
         return IsProcessor
@@ -307,6 +331,7 @@ public sealed class FactoryEntityRecord
             return 0;
         }
 
+        if (IsConveyor) return conveyorQueue.Accept(quantity);
         var accepted = Mathf.Min(quantity, InputCapacity - inputCount);
         inputCount += accepted;
         return accepted;
@@ -320,6 +345,12 @@ public sealed class FactoryEntityRecord
 
     public void SetInputCount(int quantity)
     {
+        if (IsConveyor)
+        {
+            if (quantity == 0 && InputCount > 0) conveyorQueue.RemoveInputs(InputCount);
+            else if (quantity > InputCount) conveyorQueue.Accept(quantity - InputCount);
+            return;
+        }
         inputCount = IsProcessor
             ? Mathf.Clamp(quantity, 0, InputCapacity)
             : 0;
@@ -344,11 +375,18 @@ public sealed class FactoryEntityRecord
     public bool TryExtractItem(string itemId, int quantity, out int removed)
     {
         removed = 0;
-        if (!CanSupplyItem(itemId) || quantity <= 0 || outputCount < quantity)
+        if (!CanSupplyItem(itemId) || quantity <= 0 || OutputCount < quantity)
         {
             return false;
         }
 
+        if (IsConveyor)
+        {
+            if (!conveyorQueue.RemoveReady(quantity)) return false;
+            removed = quantity;
+            if (producedCount < int.MaxValue) producedCount++;
+            return true;
+        }
         outputCount -= quantity;
         removed = quantity;
         return true;
@@ -373,6 +411,12 @@ public sealed class FactoryEntityRecord
     public bool TryRemoveInput(int quantity, out int removed)
     {
         removed = 0;
+        if (IsConveyor)
+        {
+            if (!conveyorQueue.RemoveInputs(quantity)) return false;
+            removed = quantity;
+            return true;
+        }
         if (!IsProcessor || quantity <= 0 || inputCount < quantity)
         {
             return false;
@@ -385,6 +429,7 @@ public sealed class FactoryEntityRecord
 
     public int DrainOutput()
     {
+        if (IsConveyor) return conveyorQueue.RemoveReady(1) ? 1 : 0;
         var removed = outputCount;
         outputCount = 0;
         return removed;
@@ -403,6 +448,12 @@ public sealed class FactoryEntityRecord
     public bool TryRemoveOutput(int quantity, out int removed)
     {
         removed = 0;
+        if (IsConveyor)
+        {
+            if (!conveyorQueue.RemoveReady(quantity)) return false;
+            removed = quantity;
+            return true;
+        }
         if (quantity <= 0 || outputCount < quantity)
         {
             return false;
@@ -415,6 +466,7 @@ public sealed class FactoryEntityRecord
 
     public int AddOutput(int quantity)
     {
+        if (IsConveyor) return conveyorQueue.AddReady(quantity);
         if (quantity <= 0)
         {
             return 0;
@@ -443,10 +495,11 @@ public sealed class FactoryEntityRecord
             definitionId,
             logicalPosition,
             cycleRate,
-            cycleProgress,
+            CycleProgress,
             producedCount,
-            outputCount,
-            inputCount);
+            OutputCount,
+            InputCount,
+            IsConveyor ? conveyorQueue.Snapshot() : null);
     }
 
     public FactoryEntitySnapshot ToSnapshot()
@@ -456,10 +509,11 @@ public sealed class FactoryEntityRecord
             definitionId,
             logicalPosition,
             cycleRate,
-            cycleProgress,
+            CycleProgress,
             producedCount,
-            outputCount,
-            inputCount);
+            OutputCount,
+            InputCount,
+            IsConveyor ? conveyorQueue.Snapshot() : null);
     }
 
     private void AdvanceProcessor(float deltaTime)
@@ -483,7 +537,7 @@ public sealed class FactoryEntityRecord
             && inputCount >= definition.InputQuantity)
         {
             var timeToComplete = (1d - cycleProgress) * cycleDuration;
-            if (timeToComplete > remainingTime)
+            if (timeToComplete - remainingTime > 1e-7d)
             {
                 cycleProgress += (float)(remainingTime / cycleDuration);
                 return;

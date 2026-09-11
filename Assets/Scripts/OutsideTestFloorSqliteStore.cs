@@ -80,7 +80,8 @@ public sealed class OutsideTestFloorSqliteStore
                 row.CycleProgress,
                 row.ProducedCount,
                 row.OutputCount,
-                row.InputCount));
+                row.InputCount,
+                FactoryConveyorQueue.Decode(row.ConveyorState)));
         }
 
         var floorRows = database.Query<FloorRow>(
@@ -170,7 +171,8 @@ public sealed class OutsideTestFloorSqliteStore
                     entity.CycleProgress,
                     entity.ProducedCount,
                     entity.OutputCount,
-                    entity.InputCount));
+                    entity.InputCount,
+                    FactoryConveyor.IsConveyor(entity.DefinitionId) ? FactoryConveyorQueue.Decode(entity.State) : null));
             }
 
             data.Floors.Add(legacyFloor);
@@ -277,7 +279,8 @@ public sealed class OutsideTestFloorSqliteStore
                         CycleProgress = entity.CycleProgress,
                         ProducedCount = entity.ProducedCount,
                         OutputCount = entity.OutputCount,
-                        InputCount = entity.InputCount
+                        InputCount = entity.InputCount,
+                        ConveyorState = entity.GetConveyorState()
                     });
                 }
             }
@@ -414,6 +417,7 @@ public sealed class OutsideTestFloorSqliteStore
         public int ProducedCount { get; set; }
         public int OutputCount { get; set; }
         public int InputCount { get; set; }
+        public byte[] ConveyorState { get; set; } = Array.Empty<byte>();
     }
 
     [Table("outside_test_connections")]

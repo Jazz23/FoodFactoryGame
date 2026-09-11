@@ -110,6 +110,108 @@ public sealed class OutsideTestFloorTransitionTests
     }
 
     [UnityTest]
+    public IEnumerator ConveyorBackupsSurviveHostRestartAndResume()
+    {
+        yield return WaitForCondition(() => PlayerSceneTransition.LocalOwner.gameObject.scene.name == "OutsideTest",
+            10f, "Player did not reach the world.");
+        var player = PlayerSceneTransition.LocalOwner;
+        var manager = GameSceneManager.Instance;
+        manager.TryGetOutsideTestFloorState(2, 0, out var floor);
+        floor.SetEntities(Array.Empty<FactoryEntityRecord>());
+        yield return EnterMachineTestBuilding();
+        player.RequestPlaceEquipment(FactoryEntityDefinitions.TestMachineDefinitionId, new Vector2(0.5f, 0.5f));
+        player.RequestPlaceEquipment("conveyor-east", new Vector2(1.5f, 0.5f));
+        player.RequestPlaceEquipment("conveyor-east", new Vector2(2.5f, 0.5f));
+        player.RequestPlaceEquipment(FactoryEntityDefinitions.TestStorageDefinitionId, new Vector2(3.5f, 0.5f));
+        yield return WaitForCondition(() => floor.Entities.Count == 4, 3f, "Equipment placement failed.");
+        var source = floor.Entities[0];
+        source.SetState(source.EntityId, source.DefinitionId, source.LogicalPosition, 0f, 0f, 0, 12);
+        floor.Entities[3].AddOutput(100);
+        yield return WaitForCondition(() => floor.Entities[1].ConveyorPositions.Count == 4
+            && floor.Entities[1].ConveyorPositions[3] >= 0.2499f
+            && floor.Entities[2].ConveyorPositions.Count == 4, 5f, "Belt queues did not fill.");
+        TestUIVisibility.SetVisible(false);
+        yield return null;
+        foreach (var view in UnityEngine.Object.FindObjectsByType<FactoryConveyorView>(FindObjectsSortMode.None))
+        {
+            var visibleDots = 0;
+            foreach (var renderer in view.GetComponentsInChildren<SpriteRenderer>())
+                if (renderer.name.StartsWith("Item Dot", StringComparison.Ordinal)) visibleDots++;
+            Assert.That(visibleDots, Is.EqualTo(4));
+        }
+        ScreenCapture.CaptureScreenshot(Path.GetFullPath("Temp/factory-conveyor-backup.png"));
+        yield return null;
+        var firstId = floor.Entities[1].EntityId;
+        var secondId = floor.Entities[2].EntityId;
+        var storageId = floor.Entities[3].EntityId;
+        Assert.That(NotAI.NAIStateManager.Instance.SaveWorld(), Is.True);
+        yield return ExitMachineTestBuilding();
+        yield return RestartMachineTestHost();
+        yield return EnterMachineTestBuilding();
+        GameSceneManager.Instance.TryGetOutsideTestFloorState(2, 0, out var restored);
+        Assert.That(restored.TryGetEntity(firstId, out var first), Is.True);
+        Assert.That(restored.TryGetEntity(secondId, out var second), Is.True);
+        Assert.That(restored.TryGetEntity(storageId, out var storage), Is.True);
+        Assert.That(restored.TryGetEntity(source.EntityId, out var restoredSource), Is.True);
+        Assert.That(first.ConveyorPositions, Is.EqualTo(new[] { 1f, 0.75f, 0.5f, 0.25f }).Within(0.0001f));
+        Assert.That(second.ConveyorPositions, Is.EqualTo(first.ConveyorPositions));
+        Assert.That(restoredSource.OutputCount, Is.EqualTo(4));
+        storage.DrainOutput();
+        yield return WaitForCondition(() => storage.OutputCount == 12, 6f, "Saved backup did not drain into storage.");
+        Assert.That(first.ConveyorPositions.Count + second.ConveyorPositions.Count, Is.Zero);
+        TestUIVisibility.SetVisible(true);
+    }
+
+    [UnityTest]
+    public IEnumerator PlacedConveyorDeliversAndPersistsAcrossFloorTravel()
+    {
+        yield return WaitForCondition(() => PlayerSceneTransition.LocalOwner.gameObject.scene.name == "OutsideTest",
+            10f, "Player did not reach the world.");
+        var player = PlayerSceneTransition.LocalOwner;
+        var manager = GameSceneManager.Instance;
+        manager.TryGetOutsideTestFloorState(2, 0, out var floor);
+        floor.SetEntities(Array.Empty<FactoryEntityRecord>());
+        yield return EnterMachineTestBuilding();
+        Assert.That(player.GetComponent<FactoryBuildController>(), Is.Not.Null);
+        player.RequestPlaceEquipment(FactoryEntityDefinitions.TestMachineDefinitionId, new Vector2(0.5f, 0.5f));
+        player.RequestPlaceEquipment("conveyor-east", new Vector2(1.5f, 0.5f));
+        player.RequestPlaceEquipment("conveyor-east", new Vector2(2.5f, 0.5f));
+        player.RequestPlaceEquipment(FactoryEntityDefinitions.TestStorageDefinitionId, new Vector2(3.5f, 0.5f));
+        yield return WaitForCondition(() => floor.Entities.Count == 4, 3f, "Equipment placement failed.");
+        Assert.That(manager.TryPlaceCurrentFloorEquipment(player, "conveyor-east", new Vector2(1.5f, 0.5f), out _, out _), Is.False);
+        Assert.That(manager.TryPlaceCurrentFloorEquipment(player, "conveyor-east", new Vector2(-0.5f, 0.5f), out _, out _), Is.False);
+        yield return WaitForCondition(() => floor.Entities[3].OutputCount > 0, 5f, "Conveyor did not deliver to storage.");
+        var view = UnityEngine.Object.FindFirstObjectByType<FactoryConveyorView>();
+        Assert.That(view, Is.Not.Null);
+        Assert.That(view.GetComponent<SpriteRenderer>().sprite, Is.Not.Null);
+        Assert.That(view.GetComponent<Animator>().runtimeAnimatorController, Is.Not.Null);
+        Assert.That(view.transform.Find("Item Dot").GetComponent<SpriteRenderer>().sprite, Is.Not.Null);
+        var playerRenderer = player.GetComponent<SpriteRenderer>();
+        foreach (var beltView in UnityEngine.Object.FindObjectsByType<FactoryConveyorView>(FindObjectsSortMode.None))
+            foreach (var renderer in beltView.GetComponentsInChildren<Renderer>(true))
+                Assert.That(renderer.sortingOrder, Is.LessThan(playerRenderer.sortingOrder));
+        SceneGrid.TryGetForScene(player.gameObject.scene, out var grid);
+        player.ServerTeleport(grid.LogicalToWorld(new Vector2(2.5f, 0.5f)));
+        TestUIVisibility.SetVisible(false);
+        yield return null;
+        Assert.That(player.GetComponent<OutsideTestFloorDebugPanel>().IsOpen, Is.False);
+        foreach (var canvas in UnityEngine.Object.FindObjectsByType<Canvas>(FindObjectsSortMode.None))
+            if (canvas.name == "NetworkHudCanvas") Assert.That(canvas.enabled, Is.False);
+        Assert.That(player.GetComponent<OutsideTestFloorDebugPanel>().GetComponentInChildren<Canvas>().enabled, Is.False);
+        yield return WaitForCondition(() => floor.Entities[1].InputCount > 0, 3f, "No visible in-flight item.");
+        yield return new WaitForSeconds(0.2f);
+        ScreenCapture.CaptureScreenshot(Path.GetFullPath("Temp/factory-conveyor-smoke.png"));
+        yield return null;
+        TestUIVisibility.SetVisible(true);
+        yield return ExitMachineTestBuilding();
+        yield return EnterMachineTestBuilding();
+        manager.TryGetOutsideTestFloorState(2, 0, out var restored);
+        Assert.That(restored.Entities.Count, Is.EqualTo(4));
+        Assert.That(restored.Entities[1].DefinitionId, Is.EqualTo("conveyor-east"));
+        Assert.That(restored.Entities[3].OutputCount, Is.GreaterThan(0));
+    }
+
+    [UnityTest]
     public IEnumerator MachineRequestsPersistAcrossTravelAndRestart()
     {
         yield return WaitForCondition(() => PlayerSceneTransition.LocalOwner.gameObject.scene.name == "OutsideTest",
