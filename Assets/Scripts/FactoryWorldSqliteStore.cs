@@ -1,4 +1,4 @@
-// Stores one complete factory world snapshot in the schema-8 normalized SQLite database.
+// Stores one complete factory world snapshot in the schema-9 normalized SQLite database.
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -36,9 +36,10 @@ public sealed class FactoryWorldSqliteStore
         using var database = new SQLiteConnection(path);
         if (!HasSchema(database))
         {
-            throw new InvalidDataException("The unified factory database has no schema-8 metadata.");
+            throw new InvalidDataException("The unified factory database has no recognized metadata.");
         }
 
+        UpgradeSchema(database);
         var version = ReadMetadata(database, SchemaVersionKey);
         if (version != FactoryWorldSnapshot.CurrentSchemaVersion)
         {
@@ -120,6 +121,44 @@ public sealed class FactoryWorldSqliteStore
                     row.DestinationFloorIndex)));
         }
 
+        foreach (var row in database.Query<TruckRouteRow>(
+                     "SELECT * FROM factory_truck_routes ORDER BY Guid"))
+        {
+            snapshot.Routes.Add(new FactoryWorldTruckRouteRecord(
+                ParseGuid(row.Guid, "truck route"),
+                ParseGuid(row.TruckGuid, "truck route truck"),
+                new FactoryWorldEndpoint(
+                    ParseGuid(row.SourceBuildingGuid, "truck route source building"),
+                    ParseGuid(row.SourceFloorGuid, "truck route source floor"),
+                    ParseGuid(row.SourceEntityGuid, "truck route source entity"),
+                    row.SourceFloorIndex),
+                new FactoryWorldEndpoint(
+                    ParseGuid(row.DestinationBuildingGuid, "truck route destination building"),
+                    ParseGuid(row.DestinationFloorGuid, "truck route destination floor"),
+                    ParseGuid(row.DestinationEntityGuid, "truck route destination entity"),
+                    row.DestinationFloorIndex),
+                row.ItemId,
+                row.CargoCapacity,
+                row.TransferRateItemsPerSecond,
+                row.OutboundTravelSeconds,
+                row.ReturnTravelSeconds,
+                row.PartialLoadDepartureWindowSeconds));
+        }
+
+        foreach (var row in database.Query<TruckRow>(
+                     "SELECT * FROM factory_trucks ORDER BY Guid"))
+        {
+            snapshot.Trucks.Add(new FactoryWorldTruckRecord(
+                ParseGuid(row.Guid, "truck"),
+                ParseGuid(row.RouteGuid, "truck route"),
+                (FactoryTruckState)row.State,
+                row.CargoItemId,
+                row.CargoCount,
+                row.RemainingTravelSeconds,
+                row.LoadingWindowProgress,
+                row.BlockingReason));
+        }
+
         if (!FactoryWorldValidation.TryValidate(snapshot, out var error))
         {
             throw new InvalidDataException(error);
@@ -145,6 +184,8 @@ public sealed class FactoryWorldSqliteStore
         EnsureSchema(database);
         database.RunInTransaction(() =>
         {
+            database.Execute("DELETE FROM factory_trucks");
+            database.Execute("DELETE FROM factory_truck_routes");
             database.Execute("DELETE FROM factory_metadata");
             database.Execute("DELETE FROM factory_doors");
             database.Execute("DELETE FROM factory_entities");
@@ -247,6 +288,44 @@ public sealed class FactoryWorldSqliteStore
                 });
             }
 
+            foreach (var route in snapshot.Routes)
+            {
+                database.Insert(new TruckRouteRow
+                {
+                    Guid = FactoryGuidMigration.ToCanonical(route.Guid),
+                    TruckGuid = FactoryGuidMigration.ToCanonical(route.TruckGuid),
+                    SourceBuildingGuid = FactoryGuidMigration.ToCanonical(route.Source.BuildingGuid),
+                    SourceFloorGuid = FactoryGuidMigration.ToCanonical(route.Source.FloorGuid),
+                    SourceEntityGuid = FactoryGuidMigration.ToCanonical(route.Source.EntityGuid),
+                    SourceFloorIndex = route.Source.FloorIndex,
+                    DestinationBuildingGuid = FactoryGuidMigration.ToCanonical(route.Destination.BuildingGuid),
+                    DestinationFloorGuid = FactoryGuidMigration.ToCanonical(route.Destination.FloorGuid),
+                    DestinationEntityGuid = FactoryGuidMigration.ToCanonical(route.Destination.EntityGuid),
+                    DestinationFloorIndex = route.Destination.FloorIndex,
+                    ItemId = route.ItemId,
+                    CargoCapacity = route.CargoCapacity,
+                    TransferRateItemsPerSecond = route.TransferRateItemsPerSecond,
+                    OutboundTravelSeconds = route.OutboundTravelSeconds,
+                    ReturnTravelSeconds = route.ReturnTravelSeconds,
+                    PartialLoadDepartureWindowSeconds = route.PartialLoadDepartureWindowSeconds
+                });
+            }
+
+            foreach (var truck in snapshot.Trucks)
+            {
+                database.Insert(new TruckRow
+                {
+                    Guid = FactoryGuidMigration.ToCanonical(truck.Guid),
+                    RouteGuid = FactoryGuidMigration.ToCanonical(truck.RouteGuid),
+                    State = (int)truck.State,
+                    CargoItemId = truck.CargoItemId,
+                    CargoCount = truck.CargoCount,
+                    RemainingTravelSeconds = truck.RemainingTravelSeconds,
+                    LoadingWindowProgress = truck.LoadingWindowProgress,
+                    BlockingReason = truck.BlockingReason
+                });
+            }
+
             foreach (var mapping in snapshot.MigrationMappings)
             {
                 database.Insert(new MigrationMappingRow
@@ -272,6 +351,65 @@ public sealed class FactoryWorldSqliteStore
 
     private static bool HasSchema(SQLiteConnection database)
     {
+        return HasCoreSchema(ReadSchemaTableNames(database));
+    }
+
+    private static void EnsureSchema(SQLiteConnection database)
+    {
+        var tableNames = ReadSchemaTableNames(database);
+        if (tableNames.Count == 0)
+        {
+            CreateSchema9Tables(database);
+            return;
+        }
+
+        if (!HasCoreSchema(tableNames))
+        {
+            throw new InvalidDataException("The unified factory database has an incomplete schema.");
+        }
+
+        UpgradeSchema(database);
+    }
+
+    private static void UpgradeSchema(SQLiteConnection database)
+    {
+        var tableNames = ReadSchemaTableNames(database);
+        if (!HasCoreSchema(tableNames))
+        {
+            throw new InvalidDataException("The unified factory database has an incomplete schema.");
+        }
+
+        var version = ReadMetadata(database, SchemaVersionKey);
+        if (version == 8)
+        {
+            database.RunInTransaction(() =>
+            {
+                CreateSchema9TransportTables(database);
+                var updatedRows = database.Execute(
+                    "UPDATE factory_metadata SET Value = ? WHERE Name = ?",
+                    FactoryWorldSnapshot.CurrentSchemaVersion.ToString(),
+                    SchemaVersionKey);
+                if (updatedRows != 1)
+                {
+                    throw new InvalidDataException("The schema-8 database has no schema version metadata row.");
+                }
+            });
+            return;
+        }
+
+        if (version != FactoryWorldSnapshot.CurrentSchemaVersion)
+        {
+            throw new InvalidDataException($"Unsupported unified factory schema version {version}.");
+        }
+
+        if (!HasSchema9Tables(tableNames))
+        {
+            throw new InvalidDataException("The schema-9 factory database is missing transport tables.");
+        }
+    }
+
+    private static HashSet<string> ReadSchemaTableNames(SQLiteConnection database)
+    {
         var tables = database.Query<SchemaRow>(
             "SELECT name AS Name FROM sqlite_master WHERE type = 'table'");
         var names = new HashSet<string>();
@@ -280,16 +418,27 @@ public sealed class FactoryWorldSqliteStore
             names.Add(table.Name);
         }
 
-        return names.Contains("factory_metadata")
-            && names.Contains("factory_buildings")
-            && names.Contains("factory_floors")
-            && names.Contains("factory_entities")
-            && names.Contains("factory_connections")
-            && names.Contains("factory_migration_map")
-            && ReadMetadata(database, SchemaVersionKey) == FactoryWorldSnapshot.CurrentSchemaVersion;
+        return names;
     }
 
-    private static void EnsureSchema(SQLiteConnection database)
+    private static bool HasCoreSchema(HashSet<string> tableNames)
+    {
+        return tableNames.Contains("factory_metadata")
+            && tableNames.Contains("factory_buildings")
+            && tableNames.Contains("factory_floors")
+            && tableNames.Contains("factory_entities")
+            && tableNames.Contains("factory_connections")
+            && tableNames.Contains("factory_doors")
+            && tableNames.Contains("factory_migration_map");
+    }
+
+    private static bool HasSchema9Tables(HashSet<string> tableNames)
+    {
+        return tableNames.Contains("factory_truck_routes")
+            && tableNames.Contains("factory_trucks");
+    }
+
+    private static void CreateSchema9Tables(SQLiteConnection database)
     {
         database.Execute("CREATE TABLE IF NOT EXISTS factory_metadata (Name TEXT PRIMARY KEY NOT NULL, Value TEXT NOT NULL)");
         database.Execute("CREATE TABLE IF NOT EXISTS factory_buildings (Guid TEXT PRIMARY KEY NOT NULL, LegacyBuildingId INTEGER NOT NULL, DefinitionId TEXT NOT NULL, AnchorX INTEGER NOT NULL, AnchorY INTEGER NOT NULL, AnchorZ INTEGER NOT NULL, FootprintX INTEGER NOT NULL, FootprintY INTEGER NOT NULL, StoryCount INTEGER NOT NULL, InteriorOnly INTEGER NOT NULL)");
@@ -299,6 +448,17 @@ public sealed class FactoryWorldSqliteStore
         database.Execute("CREATE TABLE IF NOT EXISTS factory_doors (BuildingGuid TEXT NOT NULL, DoorIndex INTEGER NOT NULL, WallId TEXT NOT NULL, NormalizedOffset REAL NOT NULL, PRIMARY KEY (BuildingGuid, DoorIndex))");
         database.Execute("CREATE TABLE IF NOT EXISTS factory_migration_map (Kind TEXT NOT NULL, LegacyKey TEXT NOT NULL, Guid TEXT PRIMARY KEY NOT NULL)");
         database.Execute("CREATE UNIQUE INDEX IF NOT EXISTS factory_floor_order ON factory_floors (BuildingGuid, FloorIndex)");
+        CreateSchema9TransportTables(database);
+    }
+
+    private static void CreateSchema9TransportTables(SQLiteConnection database)
+    {
+        database.Execute("CREATE TABLE IF NOT EXISTS factory_truck_routes (Guid TEXT PRIMARY KEY NOT NULL, TruckGuid TEXT NOT NULL, SourceBuildingGuid TEXT NOT NULL, SourceFloorGuid TEXT NOT NULL, SourceEntityGuid TEXT NOT NULL, SourceFloorIndex INTEGER NOT NULL, DestinationBuildingGuid TEXT NOT NULL, DestinationFloorGuid TEXT NOT NULL, DestinationEntityGuid TEXT NOT NULL, DestinationFloorIndex INTEGER NOT NULL, ItemId TEXT NOT NULL, CargoCapacity INTEGER NOT NULL, TransferRateItemsPerSecond REAL NOT NULL, OutboundTravelSeconds REAL NOT NULL, ReturnTravelSeconds REAL NOT NULL, PartialLoadDepartureWindowSeconds REAL NOT NULL)");
+        database.Execute("CREATE TABLE IF NOT EXISTS factory_trucks (Guid TEXT PRIMARY KEY NOT NULL, RouteGuid TEXT NOT NULL, State INTEGER NOT NULL, CargoItemId TEXT NOT NULL, CargoCount INTEGER NOT NULL, RemainingTravelSeconds REAL NOT NULL, LoadingWindowProgress REAL NOT NULL, BlockingReason TEXT NOT NULL)");
+        database.Execute("CREATE UNIQUE INDEX IF NOT EXISTS factory_truck_route_truck ON factory_truck_routes (TruckGuid)");
+        database.Execute("CREATE UNIQUE INDEX IF NOT EXISTS factory_truck_route_source_terminal ON factory_truck_routes (SourceEntityGuid)");
+        database.Execute("CREATE UNIQUE INDEX IF NOT EXISTS factory_truck_route_destination_terminal ON factory_truck_routes (DestinationEntityGuid)");
+        database.Execute("CREATE UNIQUE INDEX IF NOT EXISTS factory_truck_route ON factory_trucks (RouteGuid)");
     }
 
     private static int ReadMetadata(SQLiteConnection database, string name)
@@ -454,6 +614,40 @@ public sealed class FactoryWorldSqliteStore
         public string DestinationFloorGuid { get; set; } = string.Empty;
         public string DestinationEntityGuid { get; set; } = string.Empty;
         public int DestinationFloorIndex { get; set; }
+    }
+
+    [Table("factory_truck_routes")]
+    private sealed class TruckRouteRow
+    {
+        [PrimaryKey] public string Guid { get; set; } = string.Empty;
+        public string TruckGuid { get; set; } = string.Empty;
+        public string SourceBuildingGuid { get; set; } = string.Empty;
+        public string SourceFloorGuid { get; set; } = string.Empty;
+        public string SourceEntityGuid { get; set; } = string.Empty;
+        public int SourceFloorIndex { get; set; }
+        public string DestinationBuildingGuid { get; set; } = string.Empty;
+        public string DestinationFloorGuid { get; set; } = string.Empty;
+        public string DestinationEntityGuid { get; set; } = string.Empty;
+        public int DestinationFloorIndex { get; set; }
+        public string ItemId { get; set; } = string.Empty;
+        public int CargoCapacity { get; set; }
+        public float TransferRateItemsPerSecond { get; set; }
+        public float OutboundTravelSeconds { get; set; }
+        public float ReturnTravelSeconds { get; set; }
+        public float PartialLoadDepartureWindowSeconds { get; set; }
+    }
+
+    [Table("factory_trucks")]
+    private sealed class TruckRow
+    {
+        [PrimaryKey] public string Guid { get; set; } = string.Empty;
+        public string RouteGuid { get; set; } = string.Empty;
+        public int State { get; set; }
+        public string CargoItemId { get; set; } = string.Empty;
+        public int CargoCount { get; set; }
+        public float RemainingTravelSeconds { get; set; }
+        public float LoadingWindowProgress { get; set; }
+        public string BlockingReason { get; set; } = string.Empty;
     }
 
     [Table("factory_doors")]

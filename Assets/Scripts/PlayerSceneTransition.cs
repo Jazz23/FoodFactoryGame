@@ -1,4 +1,5 @@
 // Transitions a player through the exact portal they interacted with.
+using System;
 using FishNet.Component.Transforming;
 using FishNet.Connection;
 using FishNet.Object;
@@ -20,6 +21,7 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
     private InsideFactoryElevator activeElevator = null!;
     private OutsideTestFloorDebugPanel debugPanel = null!;
     private FactoryBuildController factoryBuilder = null!;
+    private FactoryTruckRoutePanel routePanel = null!;
 
     public static PlayerSceneTransition LocalOwner = null!;
     public bool IsTransitioning => isTransitioning;
@@ -52,6 +54,8 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         debugPanel.Initialize(this);
         factoryBuilder = gameObject.AddComponent<FactoryBuildController>();
         factoryBuilder.Initialize(this);
+        routePanel = gameObject.AddComponent<FactoryTruckRoutePanel>();
+        routePanel.Initialize(this);
     }
 
     public override void OnStopClient()
@@ -69,6 +73,7 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         cancel.Disable();
         CloseElevatorPrompt();
         if (factoryBuilder is not null) Destroy(factoryBuilder);
+        if (routePanel is not null) Destroy(routePanel);
         if (debugPanel is not null && debugPanel)
         {
             Destroy(debugPanel);
@@ -475,6 +480,63 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
     {
         debugPanel.SetMachineEditResult(message);
         factoryBuilder.SetStatus(message);
+        routePanel.SetStatus(message);
+    }
+
+    public void RequestCreateTruckRoute(
+        FactoryEntityEndpoint source,
+        FactoryEntityEndpoint destination)
+    {
+        if (IsOwner)
+        {
+            RequestCreateTruckRouteServerRpc(
+                source.BuildingInstanceId,
+                source.FloorIndex,
+                source.EntityId,
+                destination.BuildingInstanceId,
+                destination.FloorIndex,
+                destination.EntityId);
+        }
+    }
+
+    public void RequestDeleteTruckRoute(Guid routeGuid)
+    {
+        if (IsOwner)
+        {
+            RequestDeleteTruckRouteServerRpc(FactoryGuidMigration.ToCanonical(routeGuid));
+        }
+    }
+
+    [ServerRpc]
+    private void RequestCreateTruckRouteServerRpc(
+        uint sourceBuildingInstanceId,
+        int sourceFloorIndex,
+        uint sourceEntityId,
+        uint destinationBuildingInstanceId,
+        int destinationFloorIndex,
+        uint destinationEntityId)
+    {
+        var created = GameSceneManager.Instance.TryCreateTruckRoute(
+            this,
+            new FactoryEntityEndpoint(sourceBuildingInstanceId, sourceFloorIndex, sourceEntityId),
+            new FactoryEntityEndpoint(destinationBuildingInstanceId, destinationFloorIndex, destinationEntityId),
+            out var routeGuid,
+            out var error);
+        TargetReceiveMachineEditResult(
+            Owner,
+            created ? $"Created truck route {routeGuid:D}." : error);
+    }
+
+    [ServerRpc]
+    private void RequestDeleteTruckRouteServerRpc(string routeGuidString)
+    {
+        var parsed = FactoryGuidMigration.TryParseCanonical(routeGuidString, out var routeGuid);
+        var error = string.Empty;
+        var deleted = parsed
+            && GameSceneManager.Instance.TryDeleteTruckRoute(this, routeGuid, out error);
+        TargetReceiveMachineEditResult(
+            Owner,
+            deleted ? "Deleted truck route." : parsed ? error : "The truck route identity is invalid.");
     }
 
     public void RequestOutsideTestFloorSnapshot()

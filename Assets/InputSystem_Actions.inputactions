@@ -1423,6 +1423,24 @@
                     "initialStateCheck": false
                 },
                 {
+                    "name": "Select4",
+                    "type": "Button",
+                    "id": "da4f1ccd-f0d2-4ee8-8135-375c58832dfd",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "Select5",
+                    "type": "Button",
+                    "id": "b5d5b04a-0733-4d09-bcba-b248e89976c2",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
                     "name": "Rotate",
                     "type": "Button",
                     "id": "71fb57bc-4956-47ab-8ff0-116e3e813eb3",
@@ -1475,6 +1493,15 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
+                },
+                {
+                    "name": "ToggleTruckRoutes",
+                    "type": "Button",
+                    "id": "c41d7e22-58aa-4f6b-9d81-3e0b6c2f9a17",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -1519,6 +1546,28 @@
                     "processors": "",
                     "groups": "Keyboard&Mouse",
                     "action": "Select3",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "2e9d318e-bd01-412a-8076-5b35b7493a7f",
+                    "path": "<Keyboard>/4",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
+                    "action": "Select4",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "d5e819f8-9bc6-45c9-991f-5c2a51e07bb7",
+                    "path": "<Keyboard>/5",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
+                    "action": "Select5",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },
@@ -1585,6 +1634,17 @@
                     "processors": "",
                     "groups": "Keyboard&Mouse",
                     "action": "ToggleTestUI",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "8b9d6a34-1c02-4f57-9c3e-6f1a52d4e7b0",
+                    "path": "<Keyboard>/t",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
+                    "action": "ToggleTruckRoutes",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

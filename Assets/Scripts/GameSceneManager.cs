@@ -77,6 +77,7 @@ public sealed class GameSceneManager : MonoBehaviour
     private bool outsideTestStateLoadedFromDisk;
     private bool outsideTestStateLoadFailed;
     private bool outsideTestStateNeedsSave;
+    private FactoryTruckMarkerView truckMarkerView = null!;
     private SceneHandle registeredOutsideTestSceneHandle;
     private bool outsideTestWorldReconciled;
     private int clientOutsideTestLoadedInteriorCount;
@@ -179,6 +180,7 @@ public sealed class GameSceneManager : MonoBehaviour
     private void Update()
     {
         EnsureOutsideTestStateLoaded();
+        EnsureTruckMarkerView();
 
         if (!networkManager.IsServerStarted)
         {
@@ -192,6 +194,36 @@ public sealed class GameSceneManager : MonoBehaviour
 
         nextOutsideTestBroadcastTime = Time.unscaledTime + OutsideTestBroadcastInterval;
         BroadcastOutsideTestFloorStates();
+    }
+
+    private void EnsureTruckMarkerView()
+    {
+        if (!stateManager.IsInitialized)
+        {
+            return;
+        }
+
+        if (truckMarkerView is null || !truckMarkerView)
+        {
+            truckMarkerView = new GameObject("Factory Truck Markers").AddComponent<FactoryTruckMarkerView>();
+        }
+
+        if (SceneGrid.TryGetForScene(truckMarkerView.gameObject.scene, out _))
+        {
+            return;
+        }
+
+        for (var sceneIndex = 0; sceneIndex < UnitySceneManager.sceneCount; sceneIndex++)
+        {
+            var scene = UnitySceneManager.GetSceneAt(sceneIndex);
+            if (scene.IsValid()
+                && scene.isLoaded
+                && SceneGrid.TryGetForScene(scene, out _))
+            {
+                UnitySceneManager.MoveGameObjectToScene(truckMarkerView.gameObject, scene);
+                return;
+            }
+        }
     }
 
     public bool TryGetOutsideTestFloorState(
@@ -614,6 +646,78 @@ public sealed class GameSceneManager : MonoBehaviour
             removedConnection.Destination.FloorIndex);
         outsideTestStateNeedsSave = true;
         return true;
+    }
+
+    public bool CanManageTruckRoutes(PlayerSceneTransition player)
+    {
+        return networkManager.IsServerStarted
+            && networkManager.IsClientStarted
+            && player.IsOwner
+            && player.Owner == networkManager.ClientManager.Connection
+            && !player.IsTransitioning;
+    }
+
+    public bool TryCreateTruckRoute(
+        PlayerSceneTransition player,
+        FactoryEntityEndpoint source,
+        FactoryEntityEndpoint destination,
+        out Guid routeGuid,
+        out string error)
+    {
+        routeGuid = Guid.Empty;
+        error = "Only the host can manage truck routes.";
+        if (!CanManageTruckRoutes(player))
+        {
+            return false;
+        }
+
+        EnsureOutsideTestStateLoaded();
+        if (!stateManager.TryCreateTruckRoute(source, destination, out routeGuid, out error))
+        {
+            return false;
+        }
+
+        outsideTestStateNeedsSave = true;
+        return true;
+    }
+
+    public bool TryDeleteTruckRoute(
+        PlayerSceneTransition player,
+        Guid routeGuid,
+        out string error)
+    {
+        error = "Only the host can manage truck routes.";
+        if (!CanManageTruckRoutes(player))
+        {
+            return false;
+        }
+
+        EnsureOutsideTestStateLoaded();
+        if (!stateManager.TryDeleteTruckRoute(routeGuid, out error))
+        {
+            return false;
+        }
+
+        outsideTestStateNeedsSave = true;
+        return true;
+    }
+
+    public List<FactoryTerminalListing> GetFactoryTerminalListings()
+    {
+        EnsureOutsideTestStateLoaded();
+        return stateManager.GetFactoryTerminalListings();
+    }
+
+    public List<FactoryTruckRouteRecord> GetTruckRoutes()
+    {
+        EnsureOutsideTestStateLoaded();
+        return stateManager.GetTruckRoutes();
+    }
+
+    public List<FactoryTruckRecord> GetTrucks()
+    {
+        EnsureOutsideTestStateLoaded();
+        return stateManager.GetTrucks();
     }
 
     public bool TrySetOutsideTestFloorState(

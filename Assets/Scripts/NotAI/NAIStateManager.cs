@@ -323,6 +323,108 @@ namespace NotAI
                 out _);
         }
 
+        public bool TryCreateTruckRoute(
+            FactoryEntityEndpoint source,
+            FactoryEntityEndpoint destination,
+            out Guid routeGuid,
+            out string error)
+        {
+            routeGuid = Guid.Empty;
+            if (!TryResolveFactoryEndpoint(source, out var resolvedSource, out error)
+                || !TryResolveFactoryEndpoint(destination, out var resolvedDestination, out error))
+            {
+                return false;
+            }
+
+            if (!factoryState.TryCreateTruckRoute(
+                    resolvedSource,
+                    resolvedDestination,
+                    out routeGuid,
+                    out _,
+                    out error))
+            {
+                return false;
+            }
+
+            worldDirty = true;
+            return true;
+        }
+
+        public bool TryDeleteTruckRoute(Guid routeGuid, out string error)
+        {
+            if (!factoryState.TryRemoveTruckRoute(routeGuid, out error))
+            {
+                return false;
+            }
+
+            worldDirty = true;
+            return true;
+        }
+
+        public List<FactoryTruckRouteRecord> GetTruckRoutes()
+        {
+            var result = new List<FactoryTruckRouteRecord>();
+            foreach (var route in factoryState.TruckRoutes)
+            {
+                result.Add(route.Clone());
+            }
+
+            return result;
+        }
+
+        public List<FactoryTruckRecord> GetTrucks()
+        {
+            var result = new List<FactoryTruckRecord>();
+            foreach (var truck in factoryState.Trucks)
+            {
+                result.Add(truck.Clone());
+            }
+
+            return result;
+        }
+
+        public List<FactoryTerminalListing> GetFactoryTerminalListings()
+        {
+            var result = new List<FactoryTerminalListing>();
+            if (!IsInitialized)
+            {
+                return result;
+            }
+
+            foreach (var building in factoryState.BuildingRecords)
+            {
+                for (var floorIndex = 0; floorIndex < building.StoryCount; floorIndex++)
+                {
+                    if (!factoryState.TryGetFloorState(building.BuildingInstanceId, floorIndex, out var floor))
+                    {
+                        continue;
+                    }
+
+                    foreach (var entity in floor.Entities)
+                    {
+                        if (!entity.IsTerminal
+                            || !TryResolveFactoryEndpoint(
+                                new FactoryEntityEndpoint(building.BuildingInstanceId, floorIndex, entity.EntityId),
+                                out var endpoint,
+                                out _))
+                        {
+                            continue;
+                        }
+
+                        result.Add(new FactoryTerminalListing(
+                            endpoint,
+                            building.BuildingInstanceId,
+                            floorIndex,
+                            entity.EntityId,
+                            entity.DefinitionId,
+                            floor.Label));
+                    }
+                }
+            }
+
+            return result;
+        }
+
         public bool TrySetFloorState(uint buildingInstanceId, int floorIndex, string label, float productionRate, Vector2 markerPosition)
             => factoryState.TrySetFloorState(buildingInstanceId, floorIndex, label, productionRate, markerPosition);
 
@@ -989,6 +1091,8 @@ namespace NotAI
                 throw new InvalidDataException("The unified factory snapshot failed factory-state validation.");
             }
 
+            RestoreTruckRoutes(snapshot, legacyBuildingIds, legacyEntityIds);
+
             factoryBuildingGuids.Clear();
             foreach (var pair in loadedFactoryBuildingGuids)
             {
@@ -1008,6 +1112,101 @@ namespace NotAI
             }
 
             worldSnapshot = snapshot.Clone();
+        }
+
+        private void RestoreTruckRoutes(
+            FactoryWorldSnapshot snapshot,
+            IReadOnlyDictionary<Guid, uint> legacyBuildingIds,
+            IReadOnlyDictionary<Guid, uint> legacyEntityIds)
+        {
+            var restoredRoutes = new List<FactoryTruckRouteRecord>();
+            var restoredTrucks = new List<FactoryTruckRecord>();
+            foreach (var route in snapshot.Routes)
+            {
+                FactoryWorldTruckRecord matchingTruck = null!;
+                foreach (var candidate in snapshot.Trucks)
+                {
+                    if (candidate.RouteGuid == route.Guid)
+                    {
+                        matchingTruck = candidate;
+                        break;
+                    }
+                }
+
+                var source = ResolveTruckRouteEndpoint(
+                    route.Source,
+                    matchingTruck.State,
+                    snapshot,
+                    legacyBuildingIds,
+                    legacyEntityIds);
+                var destination = ResolveTruckRouteEndpoint(
+                    route.Destination,
+                    matchingTruck.State,
+                    snapshot,
+                    legacyBuildingIds,
+                    legacyEntityIds);
+                restoredRoutes.Add(new FactoryTruckRouteRecord(
+                    route.Guid,
+                    route.TruckGuid,
+                    source,
+                    destination,
+                    route.ItemId,
+                    route.CargoCapacity,
+                    route.TransferRateItemsPerSecond,
+                    route.OutboundTravelSeconds,
+                    route.ReturnTravelSeconds,
+                    route.PartialLoadDepartureWindowSeconds));
+                restoredTrucks.Add(new FactoryTruckRecord(
+                    matchingTruck.Guid,
+                    route.Guid,
+                    matchingTruck.State,
+                    matchingTruck.CargoItemId,
+                    matchingTruck.CargoCount,
+                    matchingTruck.RemainingTravelSeconds,
+                    matchingTruck.LoadingWindowProgress,
+                    matchingTruck.BlockingReason));
+            }
+
+            if (restoredRoutes.Count == 0)
+            {
+                return;
+            }
+
+            if (!factoryState.TryRestoreTruckRoutes(restoredRoutes, restoredTrucks, out var error))
+            {
+                throw new InvalidDataException(error);
+            }
+        }
+
+        private static FactoryEntityEndpoint ResolveTruckRouteEndpoint(
+            FactoryWorldEndpoint endpoint,
+            FactoryTruckState truckState,
+            FactoryWorldSnapshot snapshot,
+            IReadOnlyDictionary<Guid, uint> legacyBuildingIds,
+            IReadOnlyDictionary<Guid, uint> legacyEntityIds)
+        {
+            if (TryResolveWorldEndpoint(
+                    endpoint,
+                    snapshot,
+                    legacyBuildingIds,
+                    legacyEntityIds,
+                    out var resolved,
+                    out _))
+            {
+                return resolved;
+            }
+
+            if (truckState == FactoryTruckState.Blocked)
+            {
+                return new FactoryEntityEndpoint(
+                    endpoint.BuildingGuid,
+                    endpoint.FloorGuid,
+                    endpoint.EntityGuid,
+                    endpoint.FloorIndex);
+            }
+
+            throw new InvalidDataException(
+                $"Truck route endpoint {endpoint.EntityGuid:D} could not be restored for an active truck.");
         }
 
         private FactoryWorldSnapshot CaptureWorldSnapshot()
@@ -1080,6 +1279,33 @@ namespace NotAI
                         : connection.Guid,
                     source,
                     destination));
+            }
+
+            foreach (var route in factoryState.TruckRoutes)
+            {
+                result.Routes.Add(new FactoryWorldTruckRouteRecord(
+                    route.Guid,
+                    route.TruckGuid,
+                    CreateWorldEndpoint(route.Source),
+                    CreateWorldEndpoint(route.Destination),
+                    route.ItemId,
+                    route.CargoCapacity,
+                    route.TransferRateItemsPerSecond,
+                    route.OutboundTravelSeconds,
+                    route.ReturnTravelSeconds,
+                    route.PartialLoadDepartureWindowSeconds));
+                if (factoryState.TryGetTruck(route.TruckGuid, out var truck))
+                {
+                    result.Trucks.Add(new FactoryWorldTruckRecord(
+                        truck.Guid,
+                        truck.RouteGuid,
+                        truck.State,
+                        truck.CargoItemId,
+                        truck.CargoCount,
+                        truck.RemainingTravelSeconds,
+                        truck.LoadingWindowProgress,
+                        truck.BlockingReason));
+                }
             }
 
             foreach (var mapping in worldSnapshot.MigrationMappings)

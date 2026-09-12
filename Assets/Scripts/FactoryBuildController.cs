@@ -20,12 +20,16 @@ public sealed class FactoryBuildController : MonoBehaviour
     private bool validCell;
     private Vector2 position;
     private uint hoveredId;
-    private string status = "Place a source, belts, then storage. Belts send toward their arrow.";
-    private readonly string[] labels = { "1 Source", "2 Conveyor", "3 Storage" };
+    private string status = "Place a source, belts, and a sending terminal. Receiving terminals feed belts toward storage.";
+    private readonly string[] labels = { "1 Source", "2 Conveyor", "3 Storage", "4 Send terminal", "5 Receive terminal" };
     private readonly string[] arrows = { "East >", "North ^", "West <", "South v" };
     private Rect Toolbar => new(12f, Screen.height - 116f, Mathf.Min(680f, Screen.width - 24f), 104f);
     private string Definition => selection == 0 ? FactoryEntityDefinitions.TestMachineDefinitionId
-        : selection == 2 ? FactoryEntityDefinitions.TestStorageDefinitionId : FactoryConveyor.Definitions[direction];
+        : selection == 2 ? FactoryEntityDefinitions.TestStorageDefinitionId
+        : selection == 3 ? FactoryEntityDefinitions.SendingTerminalDefinitionId
+        : selection == 4 ? FactoryEntityDefinitions.ReceivingTerminalDefinitionId
+        : FactoryConveyor.Definitions[direction];
+    private bool IsConveyorSelection => selection == 1;
 
     public void Initialize(PlayerSceneTransition newOwner)
     {
@@ -74,6 +78,7 @@ public sealed class FactoryBuildController : MonoBehaviour
         var screen = actions["Point"].ReadValue<Vector2>();
         var guiPoint = new Vector2(screen.x, Screen.height - screen.y);
         var overUI = Toolbar.Contains(guiPoint) || TestUIVisibility.ButtonRect.Contains(guiPoint)
+            || FactoryTruckRoutePanel.ContainsPointer(guiPoint)
             || (EventSystem.current is not null && EventSystem.current.IsPointerOverGameObject());
         SceneGrid.TryGetForScene(gameObject.scene, out var grid);
         var camera = Camera.main!;
@@ -91,15 +96,21 @@ public sealed class FactoryBuildController : MonoBehaviour
         validCell = !overUI && hoveredId == 0 && position.x >= 0.5f && position.y >= 0.5f
             && position.x < indoor.Size.x && position.y < indoor.Size.y;
         preview.transform.position = grid.LogicalToWorld(position);
-        previewRenderer.sprite = selection == 1 ? art.sprite : previewSprite;
+        previewRenderer.sprite = IsConveyorSelection ? art.sprite : previewSprite;
         var delta = grid.LogicalToWorld(position + FactoryConveyor.Direction(Definition)) - grid.LogicalToWorld(position);
-        preview.transform.rotation = selection == 1
+        preview.transform.rotation = IsConveyorSelection
             ? Quaternion.Euler(0, 0, Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg - 90f) : Quaternion.identity;
-        preview.transform.localScale = selection == 1 ? new Vector3(delta.magnitude * 0.8f, delta.magnitude, 1f) : Vector3.one * 0.65f;
+        preview.transform.localScale = IsConveyorSelection ? new Vector3(delta.magnitude * 0.8f, delta.magnitude, 1f) : Vector3.one * 0.65f;
         previewLabel.transform.rotation = Quaternion.identity;
         previewLabel.transform.position = preview.transform.position + Vector3.up * 0.65f;
-        previewLabel.text = selection == 1 ? arrows[direction] : labels[selection].Substring(2);
-        previewRenderer.color = validCell ? new Color(0.3f, 1f, 0.6f, 0.5f) : new Color(1f, 0.2f, 0.2f, 0.5f);
+        previewLabel.text = IsConveyorSelection
+            ? arrows[direction]
+            : selection == 3
+                ? "Sending\nTerminal"
+                : selection == 4
+                    ? "Receiving\nTerminal"
+                    : labels[selection].Substring(2);
+        previewRenderer.color = validCell ? GetPreviewColor() : new Color(1f, 0.2f, 0.2f, 0.5f);
         if (!overUI && actions["Remove"].WasPressedThisFrame() && hoveredId != 0) owner.RequestRemoveCurrentFloorEntity(hoveredId);
         if (validCell && actions["Place"].WasPressedThisFrame()) owner.RequestPlaceEquipment(Definition, position);
     }
@@ -114,9 +125,19 @@ public sealed class FactoryBuildController : MonoBehaviour
             if (GUILayout.Toggle(building && selection == index, labels[index], GUI.skin.button)) { selection = index; building = true; }
         if (GUILayout.Button($"R: {arrows[direction]}")) direction = (direction + 1) % 4;
         GUILayout.EndHorizontal();
-        GUILayout.Label("Click: place | Right click: remove | Esc: cancel | F2: test UIs | F3: floor debug");
+        GUILayout.Label("Click: place | Right click: remove | Esc: cancel | T: truck routes | F2: test UIs | F3: floor debug");
         GUILayout.Label(status);
         GUILayout.EndArea();
+    }
+
+    private Color GetPreviewColor()
+    {
+        return selection switch
+        {
+            3 => new Color(0.25f, 0.95f, 0.55f, 0.5f),
+            4 => new Color(0.35f, 0.65f, 1f, 0.5f),
+            _ => new Color(0.3f, 1f, 0.6f, 0.5f)
+        };
     }
 
     private void OnDestroy()

@@ -42,7 +42,7 @@ public struct FactoryEntitySnapshot
 }
 
 [Serializable]
-public sealed class FactoryEntityRecord
+public sealed class FactoryEntityRecord : IFactoryItemTransferInventory
 {
     public const int InputCapacity = 100;
     public const int OutputCapacity = 100;

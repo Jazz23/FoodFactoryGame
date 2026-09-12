@@ -85,6 +85,8 @@ public sealed class FactoryWorldState
     private readonly Dictionary<OutsideTestFloorKey, OutsideTestFloorRecord> floorStates = new();
     private readonly Dictionary<uint, BuildingRecord> buildingRecords = new();
     private readonly List<FactoryEntityConnectionRecord> connections = new();
+    private readonly List<FactoryTruckRouteRecord> truckRoutes = new();
+    private readonly List<FactoryTruckRecord> trucks = new();
     private int lastLoadedVersion;
     private bool lastLoadHadBuildingRecords;
 
@@ -97,6 +99,9 @@ public sealed class FactoryWorldState
     public IEnumerable<BuildingRecord> BuildingRecords => buildingRecords.Values;
     public IEnumerable<OutsideTestBuildingInfo> Buildings => GetBuildingInfos();
     public IReadOnlyList<FactoryEntityConnectionRecord> Connections => connections;
+    public IReadOnlyList<FactoryTruckRouteRecord> TruckRoutes => truckRoutes;
+    public IReadOnlyList<FactoryTruckRecord> Trucks => trucks;
+    public int TruckRouteCount => truckRoutes.Count;
     public int ConnectionCount => connections.Count;
     public int LastLoadedVersion => lastLoadedVersion;
     public bool LastLoadHadBuildingRecords => lastLoadHadBuildingRecords;
@@ -240,6 +245,10 @@ public sealed class FactoryWorldState
 
         foreach (var key in staleKeys)
         {
+            BlockRoutesForFloor(
+                key.BuildingInstanceId,
+                key.FloorIndex,
+                $"Route endpoint floor {key.FloorIndex} in building {key.BuildingInstanceId} was removed.");
             RemoveConnectionsForFloor(key.BuildingInstanceId, key.FloorIndex);
             floorStates.Remove(key);
         }
@@ -316,6 +325,9 @@ public sealed class FactoryWorldState
 
     public bool RemoveBuilding(uint buildingInstanceId)
     {
+        BlockRoutesForBuilding(
+            buildingInstanceId,
+            $"Route endpoint building {buildingInstanceId} was removed.");
         RemoveConnectionsForBuilding(buildingInstanceId);
         var removed = buildingRecords.Remove(buildingInstanceId);
         var staleKeys = new List<OutsideTestFloorKey>();
@@ -329,6 +341,10 @@ public sealed class FactoryWorldState
 
         foreach (var key in staleKeys)
         {
+            BlockRoutesForFloor(
+                key.BuildingInstanceId,
+                key.FloorIndex,
+                $"Route endpoint floor {key.FloorIndex} in building {key.BuildingInstanceId} was removed.");
             removed |= floorStates.Remove(key);
         }
 
@@ -525,6 +541,9 @@ public sealed class FactoryWorldState
             return false;
         }
 
+        BlockRoutesForEndpoint(
+            new FactoryEntityEndpoint(buildingInstanceId, floorIndex, entityId),
+            $"Route endpoint entity {entityId} on floor {floorIndex} was removed.");
         RemoveConnectionsForEndpoint(new FactoryEntityEndpoint(
             buildingInstanceId,
             floorIndex,
@@ -617,6 +636,14 @@ public sealed class FactoryWorldState
                 buildingRecords,
                 floorStates,
                 connections,
+                out error))
+        {
+            return false;
+        }
+
+        if (!TryValidateRemoteRoleAvailability(
+                connection.Source,
+                connection.Destination,
                 out error))
         {
             return false;
@@ -788,11 +815,267 @@ public sealed class FactoryWorldState
                 return false;
             }
 
+            if (!TryValidateRemoteRoleAvailability(
+                    connection.Source,
+                    connection.Destination,
+                    out error))
+            {
+                return false;
+            }
+
             seenConnections.Add(connection);
         }
 
         error = string.Empty;
         return true;
+    }
+
+    public bool TryCreateTruckRoute(
+        FactoryEntityEndpoint source,
+        FactoryEntityEndpoint destination,
+        out FactoryTruckRouteRecord route,
+        out FactoryTruckRecord truck,
+        out string error)
+    {
+        route = null!;
+        truck = null!;
+        var routeGuid = Guid.NewGuid();
+        var truckGuid = Guid.NewGuid();
+        var candidateRoute = new FactoryTruckRouteRecord(
+            routeGuid,
+            truckGuid,
+            source,
+            destination);
+        var candidateTruck = new FactoryTruckRecord(
+            truckGuid,
+            routeGuid,
+            FactoryTruckState.Loading,
+            string.Empty,
+            0,
+            0f,
+            0f,
+            string.Empty);
+        if (!TryAddTruckRoute(candidateRoute, candidateTruck, out error))
+        {
+            return false;
+        }
+
+        route = candidateRoute;
+        truck = candidateTruck;
+        return true;
+    }
+
+    public bool TryCreateTruckRoute(
+        FactoryEntityEndpoint source,
+        FactoryEntityEndpoint destination,
+        out Guid routeGuid,
+        out Guid truckGuid,
+        out string error)
+    {
+        routeGuid = Guid.Empty;
+        truckGuid = Guid.Empty;
+        if (!TryCreateTruckRoute(
+                source,
+                destination,
+                out FactoryTruckRouteRecord route,
+                out FactoryTruckRecord truck,
+                out error))
+        {
+            return false;
+        }
+
+        routeGuid = route.Guid;
+        truckGuid = truck.Guid;
+        return true;
+    }
+
+    public bool TryAddTruckRoute(
+        FactoryTruckRouteRecord route,
+        FactoryTruckRecord truck,
+        out string error)
+    {
+        error = string.Empty;
+        if (route is null || truck is null)
+        {
+            error = "Truck route and truck records are required.";
+            return false;
+        }
+
+        if (route.Guid == Guid.Empty || route.TruckGuid == Guid.Empty
+            || truck.Guid == Guid.Empty || truck.RouteGuid == Guid.Empty
+            || route.TruckGuid != truck.Guid || route.Guid != truck.RouteGuid)
+        {
+            error = "Truck route and truck identities must be stable and agree.";
+            return false;
+        }
+
+        if (truckRoutes.Exists(candidate => candidate.Guid == route.Guid))
+        {
+            error = $"Truck route {route.Guid:D} already exists.";
+            return false;
+        }
+
+        if (trucks.Exists(candidate => candidate.Guid == truck.Guid))
+        {
+            error = $"Truck {truck.Guid:D} already exists.";
+            return false;
+        }
+
+        if (!TryValidateTruckRoute(
+                route,
+                truck,
+                truckRoutes,
+                out error))
+        {
+            return false;
+        }
+
+        var ownedRoute = route.Clone();
+        var ownedTruck = truck.Clone();
+        ownedTruck.ConfigureCargoCapacity(ownedRoute);
+        truckRoutes.Add(ownedRoute);
+        trucks.Add(ownedTruck);
+        SortTruckRecords();
+        return true;
+    }
+
+    public bool TryRestoreTruckRoutes(
+        IEnumerable<FactoryTruckRouteRecord> routes,
+        IEnumerable<FactoryTruckRecord> restoredTrucks,
+        out string error)
+    {
+        error = string.Empty;
+        var routeList = new List<FactoryTruckRouteRecord>();
+        var truckList = new List<FactoryTruckRecord>();
+        if (routes is null || restoredTrucks is null)
+        {
+            error = "Truck route and truck collections are required.";
+            return false;
+        }
+
+        foreach (var route in routes)
+        {
+            if (route is null)
+            {
+                error = "Truck route collection contains a null record.";
+                return false;
+            }
+
+            routeList.Add(route.Clone());
+        }
+
+        foreach (var truck in restoredTrucks)
+        {
+            if (truck is null)
+            {
+                error = "Truck collection contains a null record.";
+                return false;
+            }
+
+            truckList.Add(truck.Clone());
+        }
+
+        if (routeList.Count != truckList.Count)
+        {
+            error = "Every truck route must have exactly one truck.";
+            return false;
+        }
+
+        var validatedRoutes = new List<FactoryTruckRouteRecord>();
+        var validatedTrucks = new List<FactoryTruckRecord>();
+        foreach (var route in routeList)
+        {
+            var matchingTruck = truckList.Find(candidate => candidate.RouteGuid == route.Guid);
+            if (matchingTruck is null)
+            {
+                error = $"Truck route {route.Guid:D} has no assigned truck.";
+                return false;
+            }
+
+            if (!TryValidateTruckRoute(
+                    route,
+                    matchingTruck,
+                    validatedRoutes,
+                    out error))
+            {
+                return false;
+            }
+
+            matchingTruck.ConfigureCargoCapacity(route);
+            validatedRoutes.Add(route);
+            validatedTrucks.Add(matchingTruck);
+        }
+
+        truckRoutes.Clear();
+        trucks.Clear();
+        truckRoutes.AddRange(validatedRoutes);
+        trucks.AddRange(validatedTrucks);
+        SortTruckRecords();
+        return true;
+    }
+
+    public bool TryGetTruckRoute(Guid routeGuid, out FactoryTruckRouteRecord route)
+    {
+        foreach (var candidate in truckRoutes)
+        {
+            if (candidate.Guid == routeGuid)
+            {
+                route = candidate;
+                return true;
+            }
+        }
+
+        route = null!;
+        return false;
+    }
+
+    public bool TryGetTruck(Guid truckGuid, out FactoryTruckRecord truck)
+    {
+        foreach (var candidate in trucks)
+        {
+            if (candidate.Guid == truckGuid)
+            {
+                truck = candidate;
+                return true;
+            }
+        }
+
+        truck = null!;
+        return false;
+    }
+
+    public bool TryRemoveTruckRoute(Guid routeGuid, out string error)
+    {
+        error = string.Empty;
+        var routeIndex = truckRoutes.FindIndex(candidate => candidate.Guid == routeGuid);
+        if (routeIndex < 0)
+        {
+            error = "The truck route does not exist.";
+            return false;
+        }
+
+        var route = truckRoutes[routeIndex];
+        var truck = trucks.Find(candidate => candidate.Guid == route.TruckGuid);
+        if (truck is not null && truck.CargoCount > 0)
+        {
+            error = "A truck route can only be deleted when its cargo is empty.";
+            return false;
+        }
+
+        truckRoutes.RemoveAt(routeIndex);
+        trucks.RemoveAll(candidate => candidate.Guid == route.TruckGuid);
+        return true;
+    }
+
+    public bool TryDeleteTruckRoute(Guid routeGuid, out string error)
+    {
+        return TryRemoveTruckRoute(routeGuid, out error);
+    }
+
+    public void ClearTruckRoutes()
+    {
+        truckRoutes.Clear();
+        trucks.Clear();
     }
 
     public bool TrySetFloorState(
@@ -840,6 +1123,8 @@ public sealed class FactoryWorldState
         {
             FactoryConveyor.TransferAdjacent(state.Entities);
         }
+
+        AdvanceTruckRoutes(deltaTime);
     }
 
     public bool ApplySnapshot(
@@ -1385,6 +1670,399 @@ public sealed class FactoryWorldState
         }
 
         return true;
+    }
+
+    private bool TryValidateTruckRoute(
+        FactoryTruckRouteRecord route,
+        FactoryTruckRecord truck,
+        IReadOnlyList<FactoryTruckRouteRecord> existingRoutes,
+        out string error)
+    {
+        error = string.Empty;
+        if (route.Guid == Guid.Empty || route.TruckGuid == Guid.Empty
+            || truck.Guid == Guid.Empty || truck.RouteGuid == Guid.Empty
+            || route.TruckGuid != truck.Guid || route.Guid != truck.RouteGuid)
+        {
+            error = "Truck route and truck identities must be stable and agree.";
+            return false;
+        }
+
+        if (route.Source.BuildingInstanceId == 0
+            || route.Destination.BuildingInstanceId == 0
+            || route.Source.FloorIndex < 0
+            || route.Destination.FloorIndex < 0
+            || route.Source.EntityId == 0
+            || route.Destination.EntityId == 0)
+        {
+            if (truck.State != FactoryTruckState.Blocked
+                || string.IsNullOrWhiteSpace(truck.BlockingReason))
+            {
+                error = "A truck route must resolve both terminal endpoints unless deliberately blocked.";
+                return false;
+            }
+        }
+
+        if (route.Source.BuildingGuid == Guid.Empty
+            || route.Source.FloorGuid == Guid.Empty
+            || route.Source.EntityGuid == Guid.Empty
+            || route.Destination.BuildingGuid == Guid.Empty
+            || route.Destination.FloorGuid == Guid.Empty
+            || route.Destination.EntityGuid == Guid.Empty)
+        {
+            error = "Truck route endpoints must contain stable GUIDs.";
+            return false;
+        }
+
+        if ((route.Source.BuildingInstanceId != 0
+                && route.Source.BuildingInstanceId == route.Destination.BuildingInstanceId)
+            || route.Source.BuildingGuid == route.Destination.BuildingGuid)
+        {
+            error = "A truck route requires two distinct buildings.";
+            return false;
+        }
+
+        if (route.ItemId != FactoryEntityDefinitions.TestProductId
+            || route.CargoCapacity <= 0
+            || route.TransferRateItemsPerSecond <= 0f
+            || route.OutboundTravelSeconds <= 0f
+            || route.ReturnTravelSeconds <= 0f
+            || route.PartialLoadDepartureWindowSeconds < 0f
+            || float.IsNaN(route.TransferRateItemsPerSecond)
+            || float.IsInfinity(route.TransferRateItemsPerSecond)
+            || float.IsNaN(route.OutboundTravelSeconds)
+            || float.IsInfinity(route.OutboundTravelSeconds)
+            || float.IsNaN(route.ReturnTravelSeconds)
+            || float.IsInfinity(route.ReturnTravelSeconds)
+            || float.IsNaN(route.PartialLoadDepartureWindowSeconds)
+            || float.IsInfinity(route.PartialLoadDepartureWindowSeconds))
+        {
+            error = "Truck route configuration is invalid.";
+            return false;
+        }
+
+        if (truck.CargoCount < 0 || truck.CargoCount > route.CargoCapacity)
+        {
+            error = "Truck cargo exceeds its configured capacity.";
+            return false;
+        }
+
+        if (truck.CargoCount == 0 && !string.IsNullOrWhiteSpace(truck.CargoItemId))
+        {
+            error = "An empty truck cannot retain a cargo item identity.";
+            return false;
+        }
+
+        if (truck.CargoCount > 0 && truck.CargoItemId != route.ItemId)
+        {
+            error = "Truck cargo item does not match the route item.";
+            return false;
+        }
+
+        if (truck.State == FactoryTruckState.Blocked
+            && string.IsNullOrWhiteSpace(truck.BlockingReason))
+        {
+            error = "A blocked truck must retain a readable blocking reason.";
+            return false;
+        }
+
+        if (truck.State == FactoryTruckState.Returning && truck.CargoCount != 0)
+        {
+            error = "A returning truck must have unloaded all cargo.";
+            return false;
+        }
+
+        if (truck.RemainingTravelSeconds < 0f
+            || truck.LoadingWindowProgress < 0f
+            || float.IsNaN(truck.RemainingTravelSeconds)
+            || float.IsInfinity(truck.RemainingTravelSeconds)
+            || float.IsNaN(truck.LoadingWindowProgress)
+            || float.IsInfinity(truck.LoadingWindowProgress))
+        {
+            error = "Truck progress values must be finite and non-negative.";
+            return false;
+        }
+
+        if (TryGetEntity(route.Source, out var sourceEntity)
+            && TryGetEntity(route.Destination, out var destinationEntity))
+        {
+            if (!sourceEntity.IsSendingTerminal || !destinationEntity.IsReceivingTerminal)
+            {
+                error = "Truck routes must connect a sending terminal to a receiving terminal.";
+                return false;
+            }
+        }
+        else if (truck.State != FactoryTruckState.Blocked)
+        {
+            error = "Truck route endpoints must refer to existing terminal entities.";
+            return false;
+        }
+
+        foreach (var existingRoute in existingRoutes)
+        {
+            if (existingRoute.Guid == route.Guid
+                || existingRoute.TruckGuid == route.TruckGuid)
+            {
+                error = "Truck route and truck GUIDs must be unique.";
+                return false;
+            }
+
+            if (EndpointsMatch(existingRoute.Source, route.Source))
+            {
+                error = "The sending terminal already has a truck assignment.";
+                return false;
+            }
+
+            if (EndpointsMatch(existingRoute.Destination, route.Destination))
+            {
+                error = "The receiving terminal already has a truck assignment.";
+                return false;
+            }
+        }
+
+        if (!TryValidateRemoteRoleAvailability(
+                route.Source,
+                route.Destination,
+                out error))
+        {
+            return false;
+        }
+
+        foreach (var connection in connections)
+        {
+            if (EndpointsMatch(connection.Source, route.Source))
+            {
+                error = "The sending terminal's outgoing remote role already has an explicit connection.";
+                return false;
+            }
+
+            if (EndpointsMatch(connection.Destination, route.Destination))
+            {
+                error = "The receiving terminal's incoming remote role already has an explicit connection.";
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private bool TryValidateRemoteRoleAvailability(
+        FactoryEntityEndpoint source,
+        FactoryEntityEndpoint destination,
+        out string error)
+    {
+        foreach (var route in truckRoutes)
+        {
+            if (EndpointsMatch(route.Source, source))
+            {
+                error = "The sending terminal's outgoing remote role is already assigned to a truck route.";
+                return false;
+            }
+
+            if (EndpointsMatch(route.Destination, destination))
+            {
+                error = "The receiving terminal's incoming remote role is already assigned to a truck route.";
+                return false;
+            }
+        }
+
+        error = string.Empty;
+        return true;
+    }
+
+    private void AdvanceTruckRoutes(float deltaTime)
+    {
+        if (float.IsNaN(deltaTime)
+            || float.IsInfinity(deltaTime)
+            || deltaTime <= 0f)
+        {
+            return;
+        }
+
+        foreach (var route in truckRoutes)
+        {
+            var truck = trucks.Find(candidate => candidate.Guid == route.TruckGuid);
+            if (truck is null || truck.State == FactoryTruckState.Blocked)
+            {
+                continue;
+            }
+
+            switch (truck.State)
+            {
+                case FactoryTruckState.Loading:
+                    AdvanceTruckLoading(route, truck, deltaTime);
+                    break;
+                case FactoryTruckState.Outbound:
+                    AdvanceTruckTravel(truck, route.OutboundTravelSeconds, FactoryTruckState.Unloading, deltaTime);
+                    break;
+                case FactoryTruckState.Unloading:
+                    AdvanceTruckUnloading(route, truck, deltaTime);
+                    break;
+                case FactoryTruckState.Returning:
+                    AdvanceTruckTravel(truck, route.ReturnTravelSeconds, FactoryTruckState.Loading, deltaTime);
+                    break;
+            }
+        }
+    }
+
+    private void AdvanceTruckLoading(
+        FactoryTruckRouteRecord route,
+        FactoryTruckRecord truck,
+        float deltaTime)
+    {
+        if (!TryGetEntity(route.Source, out var source))
+        {
+            BlockTruck(truck, "Sending terminal is missing.");
+            return;
+        }
+
+        var wasEmpty = truck.CargoCount == 0;
+        var requested = Mathf.Max(
+            1,
+            Mathf.FloorToInt(route.TransferRateItemsPerSecond * deltaTime + 0.00001f));
+        if (truck.CargoCount < route.CargoCapacity)
+        {
+            FactoryItemTransfer.TryTransfer(source, truck, requested);
+        }
+
+        if (truck.CargoCount >= route.CargoCapacity)
+        {
+            truck.SetState(
+                FactoryTruckState.Outbound,
+                route.OutboundTravelSeconds,
+                truck.LoadingWindowProgress,
+                string.Empty);
+            return;
+        }
+
+        if (truck.CargoCount <= 0)
+        {
+            truck.SetState(FactoryTruckState.Loading, 0f, 0f, string.Empty);
+            return;
+        }
+
+        var progress = truck.LoadingWindowProgress;
+        if (!wasEmpty)
+        {
+            progress += deltaTime;
+        }
+
+        if (progress >= route.PartialLoadDepartureWindowSeconds)
+        {
+            truck.SetState(
+                FactoryTruckState.Outbound,
+                route.OutboundTravelSeconds,
+                progress,
+                string.Empty);
+        }
+        else
+        {
+            truck.SetState(FactoryTruckState.Loading, 0f, progress, string.Empty);
+        }
+    }
+
+    private void AdvanceTruckUnloading(
+        FactoryTruckRouteRecord route,
+        FactoryTruckRecord truck,
+        float deltaTime)
+    {
+        if (!TryGetEntity(route.Destination, out var destination))
+        {
+            BlockTruck(truck, "Receiving terminal is missing.");
+            return;
+        }
+
+        var requested = Mathf.Max(
+            1,
+            Mathf.FloorToInt(route.TransferRateItemsPerSecond * deltaTime + 0.00001f));
+        FactoryItemTransfer.TryTransfer(truck, destination, requested);
+        if (truck.CargoCount == 0)
+        {
+            truck.SetState(
+                FactoryTruckState.Returning,
+                route.ReturnTravelSeconds,
+                0f,
+                string.Empty);
+        }
+    }
+
+    private static void AdvanceTruckTravel(
+        FactoryTruckRecord truck,
+        float journeyDuration,
+        FactoryTruckState arrivalState,
+        float deltaTime)
+    {
+        var remaining = Mathf.Max(0f, truck.RemainingTravelSeconds - deltaTime);
+        if (remaining <= 0f)
+        {
+            truck.SetState(arrivalState, 0f, truck.LoadingWindowProgress, string.Empty);
+            return;
+        }
+
+        truck.SetState(truck.State, remaining, truck.LoadingWindowProgress, string.Empty);
+    }
+
+    private static void BlockTruck(FactoryTruckRecord truck, string reason)
+    {
+        truck.SetState(
+            FactoryTruckState.Blocked,
+            truck.RemainingTravelSeconds,
+            truck.LoadingWindowProgress,
+            reason);
+    }
+
+    private void BlockRoutesForEndpoint(FactoryEntityEndpoint endpoint, string reason)
+    {
+        foreach (var route in truckRoutes)
+        {
+            if (!EndpointsMatch(route.Source, endpoint)
+                && !EndpointsMatch(route.Destination, endpoint))
+            {
+                continue;
+            }
+
+            if (TryGetTruck(route.TruckGuid, out var truck))
+            {
+                BlockTruck(truck, reason);
+            }
+        }
+    }
+
+    private void BlockRoutesForFloor(uint buildingInstanceId, int floorIndex, string reason)
+    {
+        foreach (var route in truckRoutes)
+        {
+            var sourceMatch = route.Source.BuildingInstanceId == buildingInstanceId
+                && route.Source.FloorIndex == floorIndex;
+            var destinationMatch = route.Destination.BuildingInstanceId == buildingInstanceId
+                && route.Destination.FloorIndex == floorIndex;
+            if (sourceMatch || destinationMatch)
+            {
+                BlockRoutesForEndpoint(
+                    sourceMatch ? route.Source : route.Destination,
+                    reason);
+            }
+        }
+    }
+
+    private void BlockRoutesForBuilding(uint buildingInstanceId, string reason)
+    {
+        foreach (var route in truckRoutes)
+        {
+            if (route.Source.BuildingInstanceId == buildingInstanceId)
+            {
+                BlockRoutesForEndpoint(route.Source, reason);
+            }
+            else if (route.Destination.BuildingInstanceId == buildingInstanceId)
+            {
+                BlockRoutesForEndpoint(route.Destination, reason);
+            }
+        }
+    }
+
+    private void SortTruckRecords()
+    {
+        truckRoutes.Sort((left, right) => left.Guid.CompareTo(right.Guid));
+        trucks.Sort((left, right) => left.Guid.CompareTo(right.Guid));
     }
 
     private void RemoveConnectionsForEndpoint(FactoryEntityEndpoint endpoint)

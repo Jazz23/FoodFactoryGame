@@ -1,4 +1,4 @@
-// Defines the GUID-based snapshot records shared by the authoritative state and SQLite repository.
+// Defines the GUID-based schema-9 snapshot records shared by the authoritative state and SQLite repository.
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -428,14 +428,174 @@ public sealed class FactoryWorldMigrationMapping
 }
 
 [Serializable]
+public sealed class FactoryWorldTruckRouteRecord
+{
+    [SerializeField] private string guidString = string.Empty;
+    [SerializeField] private string truckGuidString = string.Empty;
+    [SerializeField] private FactoryWorldEndpoint source;
+    [SerializeField] private FactoryWorldEndpoint destination;
+    [SerializeField] private string itemId = FactoryEntityDefinitions.TestProductId;
+    [SerializeField] private int cargoCapacity = FactoryTruckRouteRecord.DefaultCargoCapacity;
+    [SerializeField] private float transferRateItemsPerSecond = FactoryTruckRouteRecord.DefaultTransferRateItemsPerSecond;
+    [SerializeField] private float outboundTravelSeconds = FactoryTruckRouteRecord.DefaultOutboundTravelSeconds;
+    [SerializeField] private float returnTravelSeconds = FactoryTruckRouteRecord.DefaultReturnTravelSeconds;
+    [SerializeField] private float partialLoadDepartureWindowSeconds = FactoryTruckRouteRecord.DefaultPartialLoadDepartureWindowSeconds;
+
+    public FactoryWorldTruckRouteRecord()
+    {
+    }
+
+    public FactoryWorldTruckRouteRecord(
+        Guid newGuid,
+        Guid newTruckGuid,
+        FactoryWorldEndpoint newSource,
+        FactoryWorldEndpoint newDestination,
+        string newItemId = FactoryEntityDefinitions.TestProductId,
+        int newCargoCapacity = FactoryTruckRouteRecord.DefaultCargoCapacity,
+        float newTransferRateItemsPerSecond = FactoryTruckRouteRecord.DefaultTransferRateItemsPerSecond,
+        float newOutboundTravelSeconds = FactoryTruckRouteRecord.DefaultOutboundTravelSeconds,
+        float newReturnTravelSeconds = FactoryTruckRouteRecord.DefaultReturnTravelSeconds,
+        float newPartialLoadDepartureWindowSeconds = FactoryTruckRouteRecord.DefaultPartialLoadDepartureWindowSeconds)
+    {
+        Guid = newGuid;
+        TruckGuid = newTruckGuid;
+        source = newSource;
+        destination = newDestination;
+        itemId = newItemId;
+        cargoCapacity = newCargoCapacity;
+        transferRateItemsPerSecond = newTransferRateItemsPerSecond;
+        outboundTravelSeconds = newOutboundTravelSeconds;
+        returnTravelSeconds = newReturnTravelSeconds;
+        partialLoadDepartureWindowSeconds = newPartialLoadDepartureWindowSeconds;
+    }
+
+    public Guid Guid
+    {
+        get => FactoryGuidMigration.TryParseCanonical(guidString, out var value)
+            ? value
+            : Guid.Empty;
+        private set => guidString = value == Guid.Empty ? string.Empty : value.ToString("D");
+    }
+
+    public Guid TruckGuid
+    {
+        get => FactoryGuidMigration.TryParseCanonical(truckGuidString, out var value)
+            ? value
+            : Guid.Empty;
+        private set => truckGuidString = value == Guid.Empty ? string.Empty : value.ToString("D");
+    }
+
+    public FactoryWorldEndpoint Source => source;
+    public FactoryWorldEndpoint Destination => destination;
+    public FactoryWorldEndpoint SourceEndpoint => source;
+    public FactoryWorldEndpoint DestinationEndpoint => destination;
+    public string ItemId => itemId;
+    public int CargoCapacity => cargoCapacity;
+    public float TransferRateItemsPerSecond => transferRateItemsPerSecond;
+    public float OutboundTravelSeconds => outboundTravelSeconds;
+    public float ReturnTravelSeconds => returnTravelSeconds;
+    public float PartialLoadDepartureWindowSeconds => partialLoadDepartureWindowSeconds;
+
+    public FactoryWorldTruckRouteRecord Clone()
+    {
+        return new FactoryWorldTruckRouteRecord(
+            Guid,
+            TruckGuid,
+            source,
+            destination,
+            itemId,
+            cargoCapacity,
+            transferRateItemsPerSecond,
+            outboundTravelSeconds,
+            returnTravelSeconds,
+            partialLoadDepartureWindowSeconds);
+    }
+}
+
+[Serializable]
+public sealed class FactoryWorldTruckRecord
+{
+    [SerializeField] private string guidString = string.Empty;
+    [SerializeField] private string routeGuidString = string.Empty;
+    [SerializeField] private FactoryTruckState state;
+    [SerializeField] private string cargoItemId = string.Empty;
+    [SerializeField] private int cargoCount;
+    [SerializeField] private float remainingTravelSeconds;
+    [SerializeField] private float loadingWindowProgress;
+    [SerializeField] private string blockingReason = string.Empty;
+
+    public FactoryWorldTruckRecord()
+    {
+    }
+
+    public FactoryWorldTruckRecord(
+        Guid newGuid,
+        Guid newRouteGuid,
+        FactoryTruckState newState,
+        string newCargoItemId,
+        int newCargoCount,
+        float newRemainingTravelSeconds,
+        float newLoadingWindowProgress,
+        string newBlockingReason)
+    {
+        Guid = newGuid;
+        RouteGuid = newRouteGuid;
+        state = newState;
+        cargoItemId = newCargoItemId;
+        cargoCount = newCargoCount;
+        remainingTravelSeconds = newRemainingTravelSeconds;
+        loadingWindowProgress = newLoadingWindowProgress;
+        blockingReason = newBlockingReason;
+    }
+
+    public Guid Guid
+    {
+        get => FactoryGuidMigration.TryParseCanonical(guidString, out var value)
+            ? value
+            : Guid.Empty;
+        private set => guidString = value == Guid.Empty ? string.Empty : value.ToString("D");
+    }
+
+    public Guid RouteGuid
+    {
+        get => FactoryGuidMigration.TryParseCanonical(routeGuidString, out var value)
+            ? value
+            : Guid.Empty;
+        private set => routeGuidString = value == Guid.Empty ? string.Empty : value.ToString("D");
+    }
+
+    public FactoryTruckState State => state;
+    public string CargoItemId => cargoItemId;
+    public int CargoCount => cargoCount;
+    public float RemainingTravelSeconds => remainingTravelSeconds;
+    public float LoadingWindowProgress => loadingWindowProgress;
+    public string BlockingReason => blockingReason;
+
+    public FactoryWorldTruckRecord Clone()
+    {
+        return new FactoryWorldTruckRecord(
+            Guid,
+            RouteGuid,
+            state,
+            cargoItemId,
+            cargoCount,
+            remainingTravelSeconds,
+            loadingWindowProgress,
+            blockingReason);
+    }
+}
+
+[Serializable]
 public sealed class FactoryWorldSnapshot
 {
-    public const int CurrentSchemaVersion = 8;
+    public const int CurrentSchemaVersion = 9;
 
     public int SchemaVersion = CurrentSchemaVersion;
     public List<FactoryWorldBuildingRecord> Buildings = new();
     public List<FactoryWorldFloorRecord> Floors = new();
     public List<FactoryWorldConnectionRecord> Connections = new();
+    public List<FactoryWorldTruckRouteRecord> Routes = new();
+    public List<FactoryWorldTruckRecord> Trucks = new();
     public List<FactoryWorldMigrationMapping> MigrationMappings = new();
 
     public FactoryWorldSnapshot Clone()
@@ -454,6 +614,16 @@ public sealed class FactoryWorldSnapshot
         foreach (var connection in Connections)
         {
             result.Connections.Add(connection.Clone());
+        }
+
+        foreach (var route in Routes)
+        {
+            result.Routes.Add(route.Clone());
+        }
+
+        foreach (var truck in Trucks)
+        {
+            result.Trucks.Add(truck.Clone());
         }
 
         foreach (var mapping in MigrationMappings)
