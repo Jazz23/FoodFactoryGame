@@ -226,6 +226,27 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         if (IsOwner) RequestPlaceEquipmentServerRpc(definitionId, position);
     }
 
+    public void RequestRelocateCurrentFloorEntity(uint entityId, Vector2 position)
+    {
+        if (IsOwner)
+        {
+            RequestRelocateCurrentFloorEntityServerRpc(entityId, position);
+        }
+    }
+
+    [ServerRpc]
+    private void RequestRelocateCurrentFloorEntityServerRpc(uint entityId, Vector2 position)
+    {
+        var relocated = GameSceneManager.Instance.TryRelocateCurrentFloorEntity(
+            this,
+            entityId,
+            position,
+            out var error);
+        TargetReceiveMachineEditResult(
+            Owner,
+            relocated ? $"Recovered entity {entityId}." : error);
+    }
+
     [ServerRpc]
     private void RequestPlaceEquipmentServerRpc(string definitionId, Vector2 position)
     {

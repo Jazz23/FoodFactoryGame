@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using FishNet.Object;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -106,6 +107,19 @@ namespace NotAI
 
         public bool TryGetFloorState(uint buildingInstanceId, int floorIndex, out OutsideTestFloorRecord state)
             => factoryState.TryGetFloorState(buildingInstanceId, floorIndex, out state);
+
+        public bool TryRelocateEntity(
+            uint buildingInstanceId,
+            int floorIndex,
+            uint entityId,
+            Vector2 position,
+            out string error)
+            => factoryState.TryRelocateEntity(
+                buildingInstanceId,
+                floorIndex,
+                entityId,
+                position,
+                out error);
 
         public bool TryAddTestMachine(uint buildingInstanceId, int floorIndex, Vector2 position, out uint entityId, out string error)
         {
@@ -436,7 +450,21 @@ namespace NotAI
             => factoryState.LoadState(data, doorCornerExclusionDistance);
 
         public bool ApplySnapshot(uint buildingInstanceId, int floorIndex, string label, float productionRate, float accumulatedProduction, Vector2 markerPosition, FactoryEntitySnapshot[] entitySnapshots)
-            => factoryState.ApplySnapshot(buildingInstanceId, floorIndex, label, productionRate, accumulatedProduction, markerPosition, entitySnapshots);
+        {
+            if (buildingInstanceId == 2 && floorIndex == 0)
+            {
+                Debug.LogWarning($"Factory client snapshot marker={markerPosition} server={IsServerStarted}.", this);
+            }
+
+            return factoryState.ApplySnapshot(
+                buildingInstanceId,
+                floorIndex,
+                label,
+                productionRate,
+                accumulatedProduction,
+                markerPosition,
+                entitySnapshots);
+        }
 
         public bool TryGetBuildingInfo(uint buildingInstanceId, out OutsideTestBuildingInfo info)
             => factoryState.TryGetBuildingInfo(buildingInstanceId, out info);
@@ -526,7 +554,8 @@ namespace NotAI
 
         public bool ConfigureLegacyPaths(string outsidePath, string naiPath)
         {
-            if (InitializationStatus is not NAIStateInitializationStatus.Uninitialized)
+            if (InitializationStatus is NAIStateInitializationStatus.Loading
+                or NAIStateInitializationStatus.Ready)
             {
                 return false;
             }
@@ -953,6 +982,7 @@ namespace NotAI
             worldStore = null!;
             worldDirty = false;
             viewsHydrated = false;
+            InitializationStatus = NAIStateInitializationStatus.Uninitialized;
         }
 
         private void ApplyWorldSnapshot(FactoryWorldSnapshot snapshot)

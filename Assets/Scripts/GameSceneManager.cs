@@ -124,6 +124,8 @@ public sealed class GameSceneManager : MonoBehaviour
             return false;
         }
 
+        EnsureStateManagerReference();
+
         outsideTestStatePath = string.IsNullOrWhiteSpace(path)
             ? string.Empty
             : path;
@@ -135,9 +137,13 @@ public sealed class GameSceneManager : MonoBehaviour
         outsideTestFloorInstances.Clear();
         registeredOutsideTestSceneHandle = default;
         lastOutsideTestError = string.Empty;
-        stateManager.ConfigureLegacyPaths(
-            outsideTestStatePath,
-            FactoryWorldPaths.GetLegacyNaiWorldPath());
+        if (!stateManager.ConfigureLegacyPaths(
+                outsideTestStatePath,
+                FactoryWorldPaths.GetLegacyNaiWorldPath()))
+        {
+            return false;
+        }
+
         NAIStateManager.ConfigureDatabasePath(outsideTestStatePath);
         return true;
     }
@@ -270,7 +276,15 @@ public sealed class GameSceneManager : MonoBehaviour
     {
         entityId = 0;
         error = "Only the host inside a factory floor can build; wait for travel to finish.";
-        if (!CanEditCurrentFloorEntities(player)) return false;
+        if (!CanEditCurrentFloorEntities(player))
+        {
+            Debug.LogWarning(
+                $"Placement rejected before state mutation: scene={player.gameObject.scene.name}, "
+                + $"transitioning={player.IsTransitioning}, state={stateManager.InitializationStatus}, "
+                + $"accepting={stateManager.IsAcceptingMutations}.",
+                this);
+            return false;
+        }
         if (!FactoryConveyor.IsPlaceable(definitionId))
         {
             error = "Unknown equipment type.";
@@ -278,13 +292,54 @@ public sealed class GameSceneManager : MonoBehaviour
         }
         player.TryGetCurrentOutsideTestFloor(out var buildingId, out var floorIndex);
         stateManager.TryGetFloorState(buildingId, floorIndex, out var floor);
+        stateManager.TryGetBuildingInfo(buildingId, out var buildingInfo);
+        stateManager.TryGetBuildingRecord(buildingId, out var buildingRecord);
+        Debug.LogWarning(
+            $"Placement context: building={buildingId}, floor={floorIndex}, position={position}, "
+            + $"footprint={buildingRecord.FootprintSize}, interior={buildingInfo.InteriorSize}.",
+            this);
         if (FactoryConveyor.IsOccupied(floor.Entities, position))
         {
             error = "That cell is occupied.";
             return false;
         }
         if (!stateManager.TryAddTestEntity(buildingId, floorIndex, definitionId, position, out entityId, out error))
+        {
+            Debug.LogWarning(
+                $"Placement rejected by world state: building={buildingId}, floor={floorIndex}, "
+                + $"position={position}, error={error}, state={stateManager.InitializationStatus}, "
+                + $"accepting={stateManager.IsAcceptingMutations}.",
+                this);
             return false;
+        }
+        BroadcastOutsideTestFloorState(buildingId, floorIndex);
+        outsideTestStateNeedsSave = true;
+        return true;
+    }
+
+    public bool TryRelocateCurrentFloorEntity(
+        PlayerSceneTransition player,
+        uint entityId,
+        Vector2 position,
+        out string error)
+    {
+        error = "Only the host inside a factory floor can recover equipment; wait for travel to finish.";
+        if (!CanEditCurrentFloorEntities(player)
+            || !player.TryGetCurrentOutsideTestFloor(out var buildingId, out var floorIndex))
+        {
+            return false;
+        }
+
+        if (!stateManager.TryRelocateEntity(
+                buildingId,
+                floorIndex,
+                entityId,
+                position,
+                out error))
+        {
+            return false;
+        }
+
         BroadcastOutsideTestFloorState(buildingId, floorIndex);
         outsideTestStateNeedsSave = true;
         return true;

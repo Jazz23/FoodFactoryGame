@@ -87,4 +87,29 @@ public sealed class BuildingFootprintTests
             BuildingFootprint.GetEffectiveSize(new Vector2Int(2, 3), fallback),
             Is.EqualTo(new Vector2Int(2, 3)));
     }
+
+    [TestCase(5, 5, 3, 3)]
+    [TestCase(8, 5, 6, 3)]
+    [TestCase(2, 6, 0, 4)]
+    public void UsableInteriorSizeExcludesOneWallCellOnEverySide(
+        int footprintX,
+        int footprintY,
+        int interiorX,
+        int interiorY)
+    {
+        Assert.That(
+            BuildingFootprint.GetUsableInteriorSize(new Vector2Int(footprintX, footprintY)),
+            Is.EqualTo(new Vector2Int(interiorX, interiorY)));
+    }
+
+    [Test]
+    public void InteriorCoordinateHelpersApplyTheOneCellOriginInset()
+    {
+        var exterior = BuildingFootprint.InteriorLocalToExteriorLocal(new Vector2(0.5f, 2.5f));
+
+        Assert.That(exterior, Is.EqualTo(new Vector2(1.5f, 3.5f)));
+        Assert.That(
+            BuildingFootprint.ExteriorLocalToInteriorLocal(exterior),
+            Is.EqualTo(new Vector2(0.5f, 2.5f)));
+    }
 }

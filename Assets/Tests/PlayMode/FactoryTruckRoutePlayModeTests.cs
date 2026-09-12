@@ -148,7 +148,7 @@ public sealed class FactoryTruckRoutePlayModeTests
         TestUIVisibility.SetVisible(false);
         yield return null;
         Assert.That(manager.CanEditCurrentFloorMachines(player), Is.True);
-        player.RequestPlaceEquipment(FactoryEntityRecord.StorageDefinitionId, new Vector2(4.5f, 2.5f));
+        player.RequestPlaceEquipment(FactoryEntityRecord.StorageDefinitionId, new Vector2(3.5f, 1.5f));
         yield return WaitForCondition(() => senderFloor.Entities.Count == 4, 5f, "Placement failed while test UIs were hidden.");
         TestUIVisibility.SetVisible(true);
 

@@ -122,12 +122,18 @@ public sealed class OutsideTestFloorRecord
             Mathf.Clamp(safePosition.y, 0.5f, maximum.y));
     }
 
-    public void Advance(float deltaTime)
+    public void Advance(float deltaTime, Vector2Int interiorSize)
     {
-        accumulatedProduction += productionRate * Mathf.Max(0f, deltaTime);
+        var hasUsableInterior = BuildingFootprint.IsValid(interiorSize);
+        if (hasUsableInterior)
+        {
+            accumulatedProduction += productionRate * Mathf.Max(0f, deltaTime);
+        }
+
         foreach (var entity in GetEntities())
         {
-            if (entity is not null)
+            if (entity is not null
+                && BuildingFootprint.IsUsableInteriorPosition(entity.LogicalPosition, interiorSize))
             {
                 entity.Advance(deltaTime);
             }
@@ -208,15 +214,101 @@ public sealed class OutsideTestFloorRecord
         }
     }
 
-    public void ClampEntityPositions(Vector2Int interiorSize)
+    public int ReconcileEntityPositions(Vector2Int interiorSize)
     {
-        foreach (var entity in GetEntities())
+        var occupiedCells = new HashSet<Vector2Int>();
+        var displaced = new List<FactoryEntityRecord>();
+        var ordered = new List<FactoryEntityRecord>(GetEntities());
+        ordered.Sort((left, right) => left.EntityId.CompareTo(right.EntityId));
+        foreach (var entity in ordered)
         {
-            if (entity is not null)
+            if (entity is null)
             {
-                entity.ClampPosition(interiorSize);
+                continue;
+            }
+
+            var cell = Vector2Int.FloorToInt(entity.LogicalPosition);
+            if (BuildingFootprint.IsUsableInteriorPosition(entity.LogicalPosition, interiorSize)
+                && occupiedCells.Add(cell))
+            {
+                continue;
+            }
+
+            displaced.Add(entity);
+        }
+
+        var movedCount = 0;
+        foreach (var entity in displaced)
+        {
+            var bestCell = Vector2Int.zero;
+            var foundCell = false;
+            var bestDistance = float.PositiveInfinity;
+            for (var y = 0; y < interiorSize.y; y++)
+            {
+                for (var x = 0; x < interiorSize.x; x++)
+                {
+                    var candidate = new Vector2Int(x, y);
+                    if (occupiedCells.Contains(candidate))
+                    {
+                        continue;
+                    }
+
+                    var center = (Vector2)candidate + Vector2.one * 0.5f;
+                    var distance = (center - entity.LogicalPosition).sqrMagnitude;
+                    if (foundCell
+                        && (distance > bestDistance
+                            || (Mathf.Approximately(distance, bestDistance)
+                                && (candidate.y < bestCell.y
+                                    || (candidate.y == bestCell.y && candidate.x < bestCell.x)))))
+                    {
+                        continue;
+                    }
+
+                    bestCell = candidate;
+                    bestDistance = distance;
+                    foundCell = true;
+                }
+            }
+
+            if (foundCell)
+            {
+                entity.SetLogicalPosition((Vector2)bestCell + Vector2.one * 0.5f);
+                occupiedCells.Add(bestCell);
+                movedCount++;
             }
         }
+
+        return movedCount;
+    }
+
+    public List<FactoryEntityRecord> GetUsableEntities(Vector2Int interiorSize)
+    {
+        var result = new List<FactoryEntityRecord>();
+        foreach (var entity in GetEntities())
+        {
+            if (entity is not null
+                && BuildingFootprint.IsUsableInteriorPosition(entity.LogicalPosition, interiorSize))
+            {
+                result.Add(entity);
+            }
+        }
+
+        return result;
+    }
+
+    public int GetRecoveryEntityCount(Vector2Int interiorSize)
+    {
+        var count = 0;
+        foreach (var entity in GetEntities())
+        {
+            if (entity is not null
+                && !BuildingFootprint.IsUsableInteriorPosition(entity.LogicalPosition, interiorSize))
+            {
+                count++;
+            }
+        }
+
+        return count;
     }
 
     public FactoryEntitySnapshot[] GetEntitySnapshots()

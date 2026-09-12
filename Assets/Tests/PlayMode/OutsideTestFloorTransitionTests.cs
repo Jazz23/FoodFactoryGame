@@ -1377,14 +1377,14 @@ public sealed class OutsideTestFloorTransitionTests
 
     private IEnumerator StopNetworking()
     {
-        if (networkManager.ClientManager.Started)
-        {
-            networkManager.ClientManager.StopConnection();
-        }
-
         if (networkManager.ServerManager.Started)
         {
             networkManager.ServerManager.StopConnection(true);
+        }
+
+        if (networkManager.ClientManager.Started)
+        {
+            networkManager.ClientManager.StopConnection();
         }
 
         yield return WaitForCondition(

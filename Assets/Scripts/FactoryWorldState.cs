@@ -59,7 +59,7 @@ public readonly struct OutsideTestBuildingInfo
     {
         BuildingInstanceId = record.BuildingInstanceId;
         StoryCount = record.StoryCount;
-        InteriorSize = record.FootprintSize;
+        InteriorSize = BuildingFootprint.GetUsableInteriorSize(record.FootprintSize);
         AnchorCell = record.AnchorCell;
         FootprintSize = record.FootprintSize;
     }
@@ -84,6 +84,7 @@ public sealed class FactoryWorldState
     private readonly uint legacyBuildingInstanceId;
     private readonly Dictionary<OutsideTestFloorKey, OutsideTestFloorRecord> floorStates = new();
     private readonly Dictionary<uint, BuildingRecord> buildingRecords = new();
+    private readonly HashSet<uint> interiorOnlyBuildingIds = new();
     private readonly List<FactoryEntityConnectionRecord> connections = new();
     private readonly List<FactoryTruckRouteRecord> truckRoutes = new();
     private readonly List<FactoryTruckRecord> trucks = new();
@@ -181,6 +182,7 @@ public sealed class FactoryWorldState
                 buildingInstanceId,
                 out var existingRecord))
         {
+            interiorOnlyBuildingIds.Add(buildingInstanceId);
             if (existingRecord.StoryCount != storyCount
                 || existingRecord.FootprintSize != interiorSize)
             {
@@ -198,6 +200,7 @@ public sealed class FactoryWorldState
             interiorSize,
             storyCount);
         buildingRecords.Add(buildingInstanceId, legacyRecord);
+        interiorOnlyBuildingIds.Add(buildingInstanceId);
         NormalizeBuildingFloorStates(legacyRecord);
         return true;
     }
@@ -330,6 +333,7 @@ public sealed class FactoryWorldState
             $"Route endpoint building {buildingInstanceId} was removed.");
         RemoveConnectionsForBuilding(buildingInstanceId);
         var removed = buildingRecords.Remove(buildingInstanceId);
+        interiorOnlyBuildingIds.Remove(buildingInstanceId);
         var staleKeys = new List<OutsideTestFloorKey>();
         foreach (var pair in floorStates)
         {
@@ -383,11 +387,8 @@ public sealed class FactoryWorldState
             return false;
         }
 
-        if (float.IsNaN(position.x) || float.IsInfinity(position.x)
-            || float.IsNaN(position.y) || float.IsInfinity(position.y)
-            || position.x < 0.5f || position.y < 0.5f
-            || position.x > building.FootprintSize.x - 0.5f
-            || position.y > building.FootprintSize.y - 0.5f)
+        var interiorSize = GetInteriorSize(building.BuildingInstanceId);
+        if (!BuildingFootprint.IsUsableInteriorPosition(position, interiorSize))
         {
             error = "Machine/entity position must be finite and inside the floor bounds.";
             return false;
@@ -549,6 +550,52 @@ public sealed class FactoryWorldState
             floorIndex,
             entityId));
         floor.RemoveEntity(entityId);
+        return true;
+    }
+
+    public bool TryRelocateEntity(
+        uint buildingInstanceId,
+        int floorIndex,
+        uint entityId,
+        Vector2 position,
+        out string error)
+    {
+        error = string.Empty;
+        if (!buildingRecords.ContainsKey(buildingInstanceId)
+            || !TryGetFloorState(buildingInstanceId, floorIndex, out var floor))
+        {
+            error = "The floor does not exist.";
+            return false;
+        }
+
+        var interiorSize = GetInteriorSize(buildingInstanceId);
+        if (!BuildingFootprint.IsUsableInteriorPosition(position, interiorSize))
+        {
+            error = "The recovery position is outside the usable interior.";
+            return false;
+        }
+
+        var targetCell = Vector2Int.FloorToInt(position);
+        foreach (var candidate in floor.Entities)
+        {
+            if (candidate is not null
+                && candidate.EntityId != entityId
+                && BuildingFootprint.IsUsableInteriorPosition(candidate.LogicalPosition, interiorSize)
+                && Vector2Int.FloorToInt(candidate.LogicalPosition) == targetCell)
+            {
+                error = "That cell is occupied.";
+                return false;
+            }
+        }
+
+        if (!floor.TryGetEntity(entityId, out var entity))
+        {
+            error = "The selected recovery entity no longer exists.";
+            return false;
+        }
+
+        entity.SetLogicalPosition(position);
+        ResumeRecoveryTruckRoutes();
         return true;
     }
 
@@ -1108,20 +1155,23 @@ public sealed class FactoryWorldState
 
         return OutsideTestFloorRecord.ClampMarkerPosition(
             markerPosition,
-            registration.FootprintSize);
+            GetInteriorSize(registration.BuildingInstanceId));
     }
 
     public void AdvanceProduction(float deltaTime)
     {
         foreach (var state in floorStates.Values)
         {
-            state.Advance(deltaTime);
+            state.Advance(
+                deltaTime,
+                GetInteriorSize(state.BuildingInstanceId));
         }
 
         TransferOneItemPerConnection();
         foreach (var state in floorStates.Values)
         {
-            FactoryConveyor.TransferAdjacent(state.Entities);
+            FactoryConveyor.TransferAdjacent(
+                state.GetUsableEntities(GetInteriorSize(state.BuildingInstanceId)));
         }
 
         AdvanceTruckRoutes(deltaTime);
@@ -1273,6 +1323,10 @@ public sealed class FactoryWorldState
             return false;
         }
 
+        // Scene registration rebuilds this classification after persisted state loads.
+        var previousInteriorOnlyBuildingIds = new HashSet<uint>(interiorOnlyBuildingIds);
+        interiorOnlyBuildingIds.Clear();
+
         var loadedBuildingRecords = new Dictionary<uint, BuildingRecord>();
         if (version >= BuildingRecordsSaveVersion)
         {
@@ -1303,6 +1357,14 @@ public sealed class FactoryWorldState
             foreach (var pair in buildingRecords)
             {
                 loadedBuildingRecords.Add(pair.Key, pair.Value.Clone());
+            }
+        }
+
+        foreach (var buildingInstanceId in previousInteriorOnlyBuildingIds)
+        {
+            if (loadedBuildingRecords.ContainsKey(buildingInstanceId))
+            {
+                interiorOnlyBuildingIds.Add(buildingInstanceId);
             }
         }
 
@@ -1502,14 +1564,27 @@ public sealed class FactoryWorldState
         BuildingRecord registration,
         OutsideTestFloorRecord state)
     {
+        var interiorSize = interiorOnlyBuildingIds.Contains(registration.BuildingInstanceId)
+            ? registration.FootprintSize
+            : BuildingFootprint.GetUsableInteriorSize(registration.FootprintSize);
         state.SetState(
             state.Label,
             state.ProductionRate,
             state.AccumulatedProduction,
             OutsideTestFloorRecord.ClampMarkerPosition(
                 state.MarkerPosition,
-                registration.FootprintSize));
-        state.ClampEntityPositions(registration.FootprintSize);
+                interiorSize));
+        state.ReconcileEntityPositions(
+            interiorSize);
+    }
+
+    private Vector2Int GetInteriorSize(uint buildingInstanceId)
+    {
+        return buildingRecords.TryGetValue(buildingInstanceId, out var registration)
+            ? interiorOnlyBuildingIds.Contains(buildingInstanceId)
+                ? registration.FootprintSize
+                : BuildingFootprint.GetUsableInteriorSize(registration.FootprintSize)
+            : Vector2Int.zero;
     }
 
     private List<BuildingRecord> GetSortedBuildingRecords()
@@ -1881,8 +1956,34 @@ public sealed class FactoryWorldState
         foreach (var route in truckRoutes)
         {
             var truck = trucks.Find(candidate => candidate.Guid == route.TruckGuid);
-            if (truck is null || truck.State == FactoryTruckState.Blocked)
+            if (truck is null)
             {
+                continue;
+            }
+
+            if (truck.State == FactoryTruckState.Blocked)
+            {
+                if (!truck.BlockingReason.StartsWith("Equipment recovery", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                if (!TryGetEntity(route.Source, out var sourceEntity)
+                    || !TryGetEntity(route.Destination, out var destinationEntity)
+                    || !IsUsableEntity(route.Source, sourceEntity)
+                    || !IsUsableEntity(route.Destination, destinationEntity)
+                    || !truck.TryResumeFromRecovery())
+                {
+                    continue;
+                }
+            }
+
+            if (!TryGetEntity(route.Source, out var activeSource)
+                || !TryGetEntity(route.Destination, out var activeDestination)
+                || !IsUsableEntity(route.Source, activeSource)
+                || !IsUsableEntity(route.Destination, activeDestination))
+            {
+                truck.PauseForRecovery("Equipment recovery is required at a route endpoint.");
                 continue;
             }
 
@@ -2010,6 +2111,26 @@ public sealed class FactoryWorldState
             reason);
     }
 
+    private void ResumeRecoveryTruckRoutes()
+    {
+        foreach (var route in truckRoutes)
+        {
+            if (!TryGetEntity(route.Source, out var sourceEntity)
+                || !TryGetEntity(route.Destination, out var destinationEntity)
+                || !IsUsableEntity(route.Source, sourceEntity)
+                || !IsUsableEntity(route.Destination, destinationEntity))
+            {
+                continue;
+            }
+
+            if (TryGetTruck(route.TruckGuid, out var truck)
+                && truck.BlockingReason.StartsWith("Equipment recovery", StringComparison.Ordinal))
+            {
+                truck.TryResumeFromRecovery();
+            }
+        }
+    }
+
     private void BlockRoutesForEndpoint(FactoryEntityEndpoint endpoint, string reason)
     {
         foreach (var route in truckRoutes)
@@ -2116,8 +2237,24 @@ public sealed class FactoryWorldState
                 continue;
             }
 
+            if (!IsUsableEntity(connection.Source, sourceEntity)
+                || !IsUsableEntity(connection.Destination, destinationEntity))
+            {
+                continue;
+            }
+
             FactoryItemTransfer.TryTransfer(sourceEntity, destinationEntity, 1);
         }
+    }
+
+    private bool IsUsableEntity(
+        FactoryEntityEndpoint endpoint,
+        FactoryEntityRecord entity)
+    {
+        return buildingRecords.TryGetValue(endpoint.BuildingInstanceId, out var building)
+            && BuildingFootprint.IsUsableInteriorPosition(
+                entity.LogicalPosition,
+                GetInteriorSize(endpoint.BuildingInstanceId));
     }
 
     private bool TryGetEntity(

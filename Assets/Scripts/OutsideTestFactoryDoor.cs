@@ -98,7 +98,7 @@ public sealed class OutsideTestFactoryDoor : MonoBehaviour
 
         portal.ConfigureBuilding(
             layout.BuildingInstanceId,
-            layout.Size,
+            BuildingFootprint.GetUsableInteriorSize(layout.Size),
             grid.LogicalToWorld(exteriorDoorLogicalPosition),
             interiorSceneName,
             interiorArrivalLogicalPosition,

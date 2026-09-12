@@ -141,6 +141,10 @@ public sealed class FactoryTruckRecord : IFactoryItemTransferInventory
     [SerializeField] private float remainingTravelSeconds;
     [SerializeField] private float loadingWindowProgress;
     [SerializeField] private string blockingReason = string.Empty;
+    [SerializeField] private FactoryTruckState recoveryResumeState;
+    [SerializeField] private float recoveryResumeTravelSeconds;
+    [SerializeField] private float recoveryResumeLoadingProgress;
+    [SerializeField] private bool hasRecoveryResumeState;
 
     [NonSerialized] private string routeItemId = string.Empty;
     [NonSerialized] private int routeCargoCapacity;
@@ -167,6 +171,9 @@ public sealed class FactoryTruckRecord : IFactoryItemTransferInventory
         remainingTravelSeconds = newRemainingTravelSeconds;
         loadingWindowProgress = newLoadingWindowProgress;
         blockingReason = newBlockingReason;
+        recoveryResumeState = newState;
+        recoveryResumeTravelSeconds = newRemainingTravelSeconds;
+        recoveryResumeLoadingProgress = newLoadingWindowProgress;
     }
 
     public FactoryTruckRecord(
@@ -238,6 +245,35 @@ public sealed class FactoryTruckRecord : IFactoryItemTransferInventory
         remainingTravelSeconds = newRemainingTravelSeconds;
         loadingWindowProgress = newLoadingWindowProgress;
         blockingReason = newBlockingReason;
+    }
+
+    public void PauseForRecovery(string reason)
+    {
+        if (state != FactoryTruckState.Blocked)
+        {
+            recoveryResumeState = state;
+            recoveryResumeTravelSeconds = remainingTravelSeconds;
+            recoveryResumeLoadingProgress = loadingWindowProgress;
+            hasRecoveryResumeState = true;
+        }
+
+        SetState(FactoryTruckState.Blocked, remainingTravelSeconds, loadingWindowProgress, reason);
+    }
+
+    public bool TryResumeFromRecovery()
+    {
+        if (state != FactoryTruckState.Blocked || !hasRecoveryResumeState)
+        {
+            return false;
+        }
+
+        SetState(
+            recoveryResumeState,
+            recoveryResumeTravelSeconds,
+            recoveryResumeLoadingProgress,
+            string.Empty);
+        hasRecoveryResumeState = false;
+        return true;
     }
 
     public bool CanAcceptItem(string itemId)
@@ -323,6 +359,10 @@ public sealed class FactoryTruckRecord : IFactoryItemTransferInventory
             loadingWindowProgress,
             blockingReason);
         result.ConfigureCargoCapacity(routeItemId, routeCargoCapacity);
+        result.recoveryResumeState = recoveryResumeState;
+        result.recoveryResumeTravelSeconds = recoveryResumeTravelSeconds;
+        result.recoveryResumeLoadingProgress = recoveryResumeLoadingProgress;
+        result.hasRecoveryResumeState = hasRecoveryResumeState;
         return result;
     }
 }

@@ -137,9 +137,10 @@ public sealed class OutsideTestFloorPresentation : MonoBehaviour
         }
         var elapsed = stateManager is not null && stateManager.IsServerStarted
             ? stateManager.SimulationRemainder : Time.time - snapshotTime;
-        var queuePositions = FactoryConveyor.PredictQueues(state.Entities, elapsed);
+        var usableEntities = state.GetUsableEntities(indoorGrid.Size);
+        var queuePositions = FactoryConveyor.PredictQueues(usableEntities, elapsed);
         activeEntityIds.Clear();
-        foreach (var entity in state.Entities)
+        foreach (var entity in usableEntities)
         {
             if (entity is null
                 || entity.EntityId == 0
@@ -149,9 +150,7 @@ public sealed class OutsideTestFloorPresentation : MonoBehaviour
             }
 
             var view = GetEntityView(entity);
-            var logicalPosition = OutsideTestFloorRecord.ClampMarkerPosition(
-                entity.LogicalPosition,
-                indoorGrid.Size);
+            var logicalPosition = entity.LogicalPosition;
             var worldPosition = grid.LogicalToWorld(logicalPosition);
             var position = new Vector3(
                 worldPosition.x,
@@ -163,7 +162,7 @@ public sealed class OutsideTestFloorPresentation : MonoBehaviour
             view.Renderer.color = entity.IsConveyor ? Color.white : GetEntityColor(entity.DefinitionId);
             if (entity.IsConveyor)
             {
-                view.Object.GetComponent<FactoryConveyorView>().Apply(entity, grid, state.Entities, queuePositions[entity.EntityId]);
+                view.Object.GetComponent<FactoryConveyorView>().Apply(entity, grid, usableEntities, queuePositions[entity.EntityId]);
                 view.Label.transform.rotation = Quaternion.identity;
                 view.Label.text = $"Conveyor {entity.ConveyorPositions.Count}/{FactoryConveyorQueue.Capacity}";
                 continue;

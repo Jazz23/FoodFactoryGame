@@ -15,6 +15,43 @@ public static class BuildingFootprint
         return IsValid(size) ? size : fallback;
     }
 
+    public static Vector2Int GetUsableInteriorSize(Vector2Int footprintSize)
+    {
+        return new Vector2Int(
+            Mathf.Max(0, footprintSize.x - 2),
+            Mathf.Max(0, footprintSize.y - 2));
+    }
+
+    public static Vector2Int GetInteriorOriginOffset(Vector2Int footprintSize)
+    {
+        return IsValid(GetUsableInteriorSize(footprintSize))
+            ? Vector2Int.one
+            : Vector2Int.zero;
+    }
+
+    public static Vector2 ExteriorLocalToInteriorLocal(Vector2 exteriorLocalPosition)
+    {
+        return exteriorLocalPosition - Vector2.one;
+    }
+
+    public static Vector2 InteriorLocalToExteriorLocal(Vector2 interiorLocalPosition)
+    {
+        return interiorLocalPosition + Vector2.one;
+    }
+
+    public static bool IsUsableInteriorPosition(Vector2 position, Vector2Int interiorSize)
+    {
+        return IsValid(interiorSize)
+            && !float.IsNaN(position.x)
+            && !float.IsInfinity(position.x)
+            && !float.IsNaN(position.y)
+            && !float.IsInfinity(position.y)
+            && position.x >= 0.5f
+            && position.y >= 0.5f
+            && position.x <= interiorSize.x - 0.5f
+            && position.y <= interiorSize.y - 0.5f;
+    }
+
     public static Vector3Int GetLowerLeftAnchorCell(Vector3Int firstCorner, Vector3Int secondCorner)
     {
         return new Vector3Int(

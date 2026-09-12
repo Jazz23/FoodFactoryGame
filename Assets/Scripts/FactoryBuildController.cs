@@ -20,6 +20,7 @@ public sealed class FactoryBuildController : MonoBehaviour
     private bool validCell;
     private Vector2 position;
     private uint hoveredId;
+    private uint recoveryId;
     private string status = "Place a source, belts, and a sending terminal. Receiving terminals feed belts toward storage.";
     private readonly string[] labels = { "1 Source", "2 Conveyor", "3 Storage", "4 Send terminal", "5 Receive terminal" };
     private readonly string[] arrows = { "East >", "North ^", "West <", "South v" };
@@ -112,7 +113,18 @@ public sealed class FactoryBuildController : MonoBehaviour
                     : labels[selection].Substring(2);
         previewRenderer.color = validCell ? GetPreviewColor() : new Color(1f, 0.2f, 0.2f, 0.5f);
         if (!overUI && actions["Remove"].WasPressedThisFrame() && hoveredId != 0) owner.RequestRemoveCurrentFloorEntity(hoveredId);
-        if (validCell && actions["Place"].WasPressedThisFrame()) owner.RequestPlaceEquipment(Definition, position);
+        if (validCell && actions["Place"].WasPressedThisFrame())
+        {
+            if (recoveryId != 0)
+            {
+                owner.RequestRelocateCurrentFloorEntity(recoveryId, position);
+                recoveryId = 0;
+            }
+            else
+            {
+                owner.RequestPlaceEquipment(Definition, position);
+            }
+        }
     }
 
     private void OnGUI()
@@ -127,6 +139,35 @@ public sealed class FactoryBuildController : MonoBehaviour
         GUILayout.EndHorizontal();
         GUILayout.Label("Click: place | Right click: remove | Esc: cancel | T: truck routes | F2: test UIs | F3: floor debug");
         GUILayout.Label(status);
+        if (owner.TryGetCurrentOutsideTestFloor(out var buildingId, out var floorIndex)
+            && GameSceneManager.Instance.TryGetOutsideTestFloorState(
+                buildingId,
+                floorIndex,
+                out var floor)
+            && GameSceneManager.Instance.TryGetOutsideTestBuildingInfo(
+                buildingId,
+                out var buildingInfo))
+        {
+            foreach (var entity in floor.Entities)
+            {
+                if (entity is null
+                    || BuildingFootprint.IsUsableInteriorPosition(
+                        entity.LogicalPosition,
+                        buildingInfo.InteriorSize))
+                {
+                    continue;
+                }
+
+                if (GUILayout.Button(
+                        $"Recover E{entity.EntityId} ({entity.DefinitionId}) "
+                        + $"{entity.OutputCount + entity.InputCount} item(s)"))
+                {
+                    recoveryId = entity.EntityId;
+                    building = true;
+                    status = $"Recovery selected: entity {entity.EntityId}. Click a free interior cell.";
+                }
+            }
+        }
         GUILayout.EndArea();
     }
 

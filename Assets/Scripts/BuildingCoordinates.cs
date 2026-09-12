@@ -13,6 +13,16 @@ public static class BuildingCoordinates
         return exteriorPosition - new Vector2(anchor.x, anchor.y);
     }
 
+    public static Vector2 ExteriorLocalToInteriorLocal(Vector2 exteriorLocalPosition)
+    {
+        return BuildingFootprint.ExteriorLocalToInteriorLocal(exteriorLocalPosition);
+    }
+
+    public static Vector2 InteriorLocalToExteriorLocal(Vector2 interiorLocalPosition)
+    {
+        return BuildingFootprint.InteriorLocalToExteriorLocal(interiorLocalPosition);
+    }
+
     public static float GetFloorElevation(int floorIndex, float storyHeight)
     {
         return Mathf.Max(0, floorIndex) * Mathf.Max(0f, storyHeight);

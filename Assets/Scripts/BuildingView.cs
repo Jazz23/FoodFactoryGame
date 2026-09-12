@@ -57,7 +57,7 @@ public sealed class BuildingView : MonoBehaviour
         portal.enabled = true;
         portal.ConfigureBuilding(
             instance.Id,
-            size,
+            BuildingFootprint.GetUsableInteriorSize(size),
             entranceWorldPosition,
             definition.InteriorSceneName,
             definition.InteriorArrivalLogicalPosition,

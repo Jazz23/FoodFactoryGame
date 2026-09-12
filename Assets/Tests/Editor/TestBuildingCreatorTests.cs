@@ -402,8 +402,8 @@ public sealed class TestBuildingCreatorTests
                     out var normalizedPosition),
                 Is.True);
             Assert.That(exteriorDoor, Is.EqualTo(new Vector2(1.25f, 5.5f)));
-            Assert.That(normalizedPosition, Is.EqualTo(0.4375f).Within(0.0001f));
-            Assert.That(interiorArrival, Is.EqualTo(new Vector2(2.25f, 0.5f)));
+            Assert.That(normalizedPosition, Is.EqualTo(0.375f).Within(0.0001f));
+            Assert.That(interiorArrival, Is.EqualTo(new Vector2(1.25f, 0.5f)));
             Assert.That(exteriorArrival, Is.EqualTo(new Vector2(1.25f, 4.75f)));
         }
         finally
@@ -437,8 +437,8 @@ public sealed class TestBuildingCreatorTests
                     out var normalizedPosition),
                 Is.True);
             Assert.That(exteriorDoor, Is.EqualTo(new Vector2(5.5f, 0.75f)));
-            Assert.That(normalizedPosition, Is.EqualTo(0.5625f).Within(0.0001f));
-            Assert.That(interiorArrival, Is.EqualTo(new Vector2(0.5f, 2.75f)));
+            Assert.That(normalizedPosition, Is.EqualTo(0.625f).Within(0.0001f));
+            Assert.That(interiorArrival, Is.EqualTo(new Vector2(0.5f, 1.75f)));
             Assert.That(exteriorArrival, Is.EqualTo(new Vector2(4.75f, 0.75f)));
         }
         finally
@@ -450,9 +450,9 @@ public sealed class TestBuildingCreatorTests
     [Test]
     public void EditorBuildingsRequireAtLeastTwoCellsInEachDimension()
     {
-        Assert.That(TestBuildingCreator.IsSupportedSize(new Vector2Int(2, 2)), Is.True);
-        Assert.That(TestBuildingCreator.IsSupportedSize(new Vector2Int(3, 2)), Is.True);
-        Assert.That(TestBuildingCreator.IsSupportedSize(new Vector2Int(2, 3)), Is.True);
+        Assert.That(TestBuildingCreator.IsSupportedSize(new Vector2Int(3, 3)), Is.True);
+        Assert.That(TestBuildingCreator.IsSupportedSize(new Vector2Int(4, 3)), Is.True);
+        Assert.That(TestBuildingCreator.IsSupportedSize(new Vector2Int(3, 4)), Is.True);
         Assert.That(TestBuildingCreator.IsSupportedSize(new Vector2Int(1, 2)), Is.False);
         Assert.That(TestBuildingCreator.IsSupportedSize(new Vector2Int(2, 1)), Is.False);
     }

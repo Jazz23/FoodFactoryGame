@@ -236,6 +236,11 @@ public sealed class FactoryEntityRecord : IFactoryItemTransferInventory
             Mathf.Clamp(safePosition.y, 0.5f, maximum.y));
     }
 
+    public void SetLogicalPosition(Vector2 newLogicalPosition)
+    {
+        logicalPosition = SanitizeLogicalPosition(newLogicalPosition);
+    }
+
     public void Advance(float deltaTime)
     {
         if (IsConveyor)

@@ -109,7 +109,7 @@ public sealed class TestBuildingCreator : MonoBehaviour
 
     public static bool IsSupportedSize(Vector2Int size)
     {
-        return size.x >= 2 && size.y >= 2;
+        return size.x >= 3 && size.y >= 3;
     }
 
     public static void GetWallPlacements(

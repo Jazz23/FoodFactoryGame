@@ -55,28 +55,35 @@ public static class TestBuildingInteriorMapping
             anchorCell,
             exteriorDoorLogicalPosition);
         var isHorizontal = wall.Direction is GridEdgeDirection.South or GridEdgeDirection.North;
-        var wallStart = InteriorInset;
-        var wallLength = isHorizontal
-            ? size.x - 1f
-            : size.y - 1f;
-        var wallPosition = isHorizontal
-            ? localExteriorDoorLogicalPosition.x
-            : localExteriorDoorLogicalPosition.y;
-        normalizedWallPosition = Mathf.Clamp01((wallPosition - wallStart) / wallLength);
+        var interiorSize = BuildingFootprint.GetUsableInteriorSize(size);
+        if (!BuildingFootprint.IsValid(interiorSize))
+        {
+            return false;
+        }
 
-        var interiorLength = isHorizontal
-            ? size.x - 1f
-            : size.y - 1f;
-        var interiorWallPosition = InteriorInset + normalizedWallPosition * interiorLength;
+        var wallStart = 0.5f;
+        var localInteriorDoorLogicalPosition = BuildingCoordinates.ExteriorLocalToInteriorLocal(
+            localExteriorDoorLogicalPosition);
+        var wallPosition = isHorizontal
+            ? localInteriorDoorLogicalPosition.x
+            : localInteriorDoorLogicalPosition.y;
+        var interiorLength = isHorizontal ? interiorSize.x : interiorSize.y;
+        var interiorWallPosition = Mathf.Clamp(
+            wallPosition,
+            0.5f,
+            Mathf.Max(0.5f, interiorLength - 0.5f));
+        normalizedWallPosition = interiorLength <= 1
+            ? 0.5f
+            : Mathf.Clamp01((interiorWallPosition - wallStart) / (interiorLength - 1f));
         interiorArrivalLogicalPosition = wall.Direction switch
         {
             GridEdgeDirection.South => new Vector2(interiorWallPosition, InteriorInset),
             GridEdgeDirection.West => new Vector2(InteriorInset, interiorWallPosition),
             GridEdgeDirection.North => new Vector2(
                 interiorWallPosition,
-                size.y - InteriorInset),
+                interiorSize.y - InteriorInset),
             GridEdgeDirection.East => new Vector2(
-                size.x - InteriorInset,
+                interiorSize.x - InteriorInset,
                 interiorWallPosition),
             _ => default
         };
