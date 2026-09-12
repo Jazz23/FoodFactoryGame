@@ -292,7 +292,7 @@ public sealed class FactoryTruckRouteTests
                 out FactoryTruckRecord _,
                 out var kindError),
             Is.False);
-        Assert.That(kindError, Does.Contain("sending terminal"));
+        Assert.That(kindError, Does.Contain("shipping dock"));
 
         senderFloor.SetEntities(new List<FactoryEntityRecord>(senderFloor.Entities)
         {

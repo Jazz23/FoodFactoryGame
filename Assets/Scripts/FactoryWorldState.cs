@@ -376,7 +376,8 @@ public sealed class FactoryWorldState
         string definitionId,
         Vector2 position,
         out uint entityId,
-        out string error)
+        out string error,
+        GridEdgeDirection dockDirection = GridEdgeDirection.South)
     {
         entityId = 0;
         error = string.Empty;
@@ -420,7 +421,11 @@ public sealed class FactoryWorldState
             position,
             definition.IsStorage ? 0f : 1f,
             0f,
-            0));
+            0,
+            0,
+            0,
+            null,
+            dockDirection));
         return true;
     }
 
@@ -494,7 +499,7 @@ public sealed class FactoryWorldState
         return TryAddTestEntity(
             buildingInstanceId,
             floorIndex,
-            FactoryEntityRecord.SendingTerminalDefinitionId,
+            FactoryEntityDefinitions.ShippingDockDefinitionId,
             position,
             out entityId,
             out error);
@@ -510,10 +515,46 @@ public sealed class FactoryWorldState
         return TryAddTestEntity(
             buildingInstanceId,
             floorIndex,
-            FactoryEntityRecord.ReceivingTerminalDefinitionId,
+            FactoryEntityDefinitions.ReceivingDockDefinitionId,
             position,
             out entityId,
             out error);
+    }
+
+    public bool TryAddShippingDock(
+        uint buildingInstanceId,
+        int floorIndex,
+        Vector2 position,
+        GridEdgeDirection direction,
+        out uint entityId,
+        out string error)
+    {
+        return TryAddTestEntity(
+            buildingInstanceId,
+            floorIndex,
+            FactoryEntityDefinitions.ShippingDockDefinitionId,
+            position,
+            out entityId,
+            out error,
+            direction);
+    }
+
+    public bool TryAddReceivingDock(
+        uint buildingInstanceId,
+        int floorIndex,
+        Vector2 position,
+        GridEdgeDirection direction,
+        out uint entityId,
+        out string error)
+    {
+        return TryAddTestEntity(
+            buildingInstanceId,
+            floorIndex,
+            FactoryEntityDefinitions.ReceivingDockDefinitionId,
+            position,
+            out entityId,
+            out error,
+            direction);
     }
 
     public bool TryRemoveTestMachine(uint buildingInstanceId, int floorIndex,
@@ -1860,9 +1901,9 @@ public sealed class FactoryWorldState
         if (TryGetEntity(route.Source, out var sourceEntity)
             && TryGetEntity(route.Destination, out var destinationEntity))
         {
-            if (!sourceEntity.IsSendingTerminal || !destinationEntity.IsReceivingTerminal)
+            if (!sourceEntity.IsShippingDock || !destinationEntity.IsReceivingDock)
             {
-                error = "Truck routes must connect a sending terminal to a receiving terminal.";
+                error = "Truck routes must connect a shipping dock to a receiving dock.";
                 return false;
             }
         }

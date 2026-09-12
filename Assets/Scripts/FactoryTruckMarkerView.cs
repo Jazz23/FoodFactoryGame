@@ -1,4 +1,4 @@
-// Presents authoritative truck progress as simple exterior markers between persistent building pickup points.
+// Presents authoritative truck progress along exterior grid paths between shared loading docks.
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -7,6 +7,7 @@ using NotAI;
 public sealed class FactoryTruckMarkerView : MonoBehaviour
 {
     private readonly Dictionary<Guid, GameObject> markers = new();
+    private readonly List<Vector2Int> pathCells = new();
 
     private void Update()
     {
@@ -24,6 +25,7 @@ public sealed class FactoryTruckMarkerView : MonoBehaviour
 
         var routes = manager.GetTruckRoutes();
         var trucks = manager.GetTrucks();
+        var buildings = new List<BuildingRecord>(manager.BuildingRecords);
         if (routes.Count == 0)
         {
             ClearMarkers();
@@ -48,12 +50,13 @@ public sealed class FactoryTruckMarkerView : MonoBehaviour
                 continue;
             }
 
-            if (!TryResolveBuildingPoint(route.Source, grid, out var pickup))
+            if (!TryResolveDockCell(route.Source, out var pickup))
             {
                 continue;
             }
 
-            if (!TryResolveBuildingPoint(route.Destination, grid, out var dropoff))
+            if (!TryResolveDockCell(route.Destination, out var dropoff)
+                || !FactoryTruckGridPath.TryBuild(buildings, pickup, dropoff, pathCells))
             {
                 continue;
             }
@@ -63,7 +66,7 @@ public sealed class FactoryTruckMarkerView : MonoBehaviour
                 continue;
             }
 
-            if (!TryComputeMarkerPosition(route, truck, pickup, dropoff, out var position))
+            if (!TryComputeMarkerPosition(route, truck, grid, pathCells, out var position))
             {
                 continue;
             }
@@ -94,46 +97,54 @@ public sealed class FactoryTruckMarkerView : MonoBehaviour
         }
     }
 
-    private static bool TryResolveBuildingPoint(
+    private static bool TryResolveDockCell(
         FactoryEntityEndpoint endpoint,
-        SceneGrid grid,
-        out Vector2 worldPoint)
+        out Vector2Int exteriorCell)
     {
-        worldPoint = default;
+        exteriorCell = default;
         if (endpoint.BuildingInstanceId == 0
-            || !NAIStateManager.Instance!.TryGetBuildingRecord(endpoint.BuildingInstanceId, out var record))
+            || !NAIStateManager.Instance!.TryGetBuildingRecord(endpoint.BuildingInstanceId, out var record)
+            || !NAIStateManager.Instance.TryGetFloorState(
+                endpoint.BuildingInstanceId,
+                endpoint.FloorIndex,
+                out var floor)
+            || !floor.TryGetEntity(endpoint.EntityId, out var entity)
+            || !entity.IsDock)
         {
             return false;
         }
 
-        var pickupLocal = new Vector2(record.FootprintSize.x * 0.5f, record.FootprintSize.y * 0.5f);
-        var exteriorLogical = BuildingCoordinates.LocalToExteriorLogical(record.AnchorCell, pickupLocal);
-        worldPoint = grid.LogicalToWorld(exteriorLogical);
-        return true;
+        return FactoryDock.TryGetExteriorApproachCell(
+            record,
+            entity.LogicalPosition,
+            entity.DockDirection,
+            out exteriorCell);
     }
 
     private static bool TryComputeMarkerPosition(
         FactoryTruckRouteRecord route,
         FactoryTruckRecord truck,
-        Vector2 pickup,
-        Vector2 dropoff,
+        SceneGrid grid,
+        IReadOnlyList<Vector2Int> cells,
         out Vector2 position)
     {
-        position = pickup;
+        position = grid.LogicalToWorld(FactoryTruckGridPath.Sample(cells, 0f));
         switch (truck.State)
         {
             case FactoryTruckState.Loading:
             case FactoryTruckState.Blocked:
-                position = pickup;
+                position = grid.LogicalToWorld(FactoryTruckGridPath.Sample(cells, 0f));
                 return true;
             case FactoryTruckState.Unloading:
-                position = dropoff;
+                position = grid.LogicalToWorld(FactoryTruckGridPath.Sample(cells, 1f));
                 return true;
             case FactoryTruckState.Outbound:
-                position = Vector2.Lerp(pickup, dropoff, OutboundProgress(route, truck));
+                position = grid.LogicalToWorld(
+                    FactoryTruckGridPath.Sample(cells, OutboundProgress(route, truck)));
                 return true;
             case FactoryTruckState.Returning:
-                position = Vector2.Lerp(dropoff, pickup, ReturnProgress(route, truck));
+                position = grid.LogicalToWorld(
+                    FactoryTruckGridPath.Sample(cells, 1f - ReturnProgress(route, truck)));
                 return true;
             default:
                 return false;

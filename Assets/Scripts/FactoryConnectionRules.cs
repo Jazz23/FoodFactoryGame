@@ -27,40 +27,40 @@ public static class FactoryConnectionRules
             return false;
         }
 
-        if (destination.IsSendingTerminal
+        if (destination.IsShippingDock
             && (!source.IsProducer || !sameBuilding))
         {
-            error = "A sending terminal must receive from a producer in its own building.";
+            error = "A shipping dock must receive from a producer in its own building.";
             return false;
         }
 
-        if (source.IsSendingTerminal
-            && (!destination.IsReceivingTerminal || sameBuilding))
+        if (source.IsShippingDock
+            && (!destination.IsReceivingDock || sameBuilding))
         {
-            error = "A sending terminal must connect to a receiving terminal in another building.";
+            error = "A shipping dock must connect to a receiving dock in another building.";
             return false;
         }
 
-        if (destination.IsReceivingTerminal
-            && (!source.IsSendingTerminal || sameBuilding))
+        if (destination.IsReceivingDock
+            && (!source.IsShippingDock || sameBuilding))
         {
-            error = "A receiving terminal must receive from a sending terminal in another building.";
+            error = "A receiving dock must receive from a shipping dock in another building.";
             return false;
         }
 
-        if (source.IsReceivingTerminal
+        if (source.IsReceivingDock
             && (!sameBuilding || (!destination.IsProcessor && !destination.IsStorage)))
         {
-            error = "A receiving terminal must supply a processor or storage in its own building.";
+            error = "A receiving dock must supply a processor or storage in its own building.";
             return false;
         }
 
         if (sameBuilding
             && sameFloor
-            && !source.IsTerminal
-            && !destination.IsTerminal)
+            && !source.IsDock
+            && !destination.IsDock)
         {
-            error = "Connection endpoints must be on different floors unless a terminal is involved.";
+            error = "Connection endpoints must be on different floors unless a dock is involved.";
             return false;
         }
 

@@ -2,6 +2,7 @@
 using System;
 using System.Collections;
 using System.IO;
+using System.Linq;
 using FishNet.Managing;
 using NUnit.Framework;
 using UnityEngine;
@@ -82,7 +83,7 @@ public sealed class FactoryTruckRoutePlayModeTests
         manager.TryGetOutsideTestFloorState(2, 0, out var senderFloor);
         senderFloor.SetEntities(Array.Empty<FactoryEntityRecord>());
 
-        // Second exterior building with the receiving terminal; it has no interior scene at all.
+        // Second exterior building with the receiving dock; it has no interior scene at all.
         manager.TryGetOutsideTestFloorState(42, 0, out _);
         Assert.That(
             stateManager.TryRegisterBuilding(
@@ -91,24 +92,63 @@ public sealed class FactoryTruckRoutePlayModeTests
             Is.True,
             registrationError);
         Assert.That(
-            stateManager.TryAddReceivingTerminal(42, 0, new Vector2(0.5f, 0.5f), out var receiverId, out var receiverError),
+            stateManager.TryAddReceivingDock(
+                42,
+                0,
+                new Vector2(0.5f, 0.5f),
+                GridEdgeDirection.South,
+                out var receiverId,
+                out var receiverError),
             Is.True,
             receiverError);
 
         yield return EnterMachineTestBuilding();
 
-        // Place the complete source -> belts -> sending terminal chain through the placement requests.
+        // Place the interior source -> belt chain through the placement requests.
         player.RequestPlaceEquipment(FactoryEntityDefinitions.TestMachineDefinitionId, new Vector2(0.5f, 0.5f));
         player.RequestPlaceEquipment("conveyor-east", new Vector2(1.5f, 0.5f));
-        player.RequestPlaceEquipment(FactoryEntityRecord.SendingTerminalDefinitionId, new Vector2(2.5f, 0.5f));
+        yield return WaitForCondition(
+            () => senderFloor.Entities.Count == 2,
+            5f,
+            "Interior chain placement failed.");
+        yield return ExitMachineTestBuilding();
+        Assert.That(stateManager.TryGetBuildingRecord(2, out var senderBuilding), Is.True);
+        var exteriorDockPosition = new Vector2(
+            senderBuilding.AnchorCell.x + 3.5f,
+            senderBuilding.AnchorCell.y - 0.5f);
+        Assert.That(
+            manager.TryPlaceExteriorDock(
+                player,
+                FactoryEntityDefinitions.ShippingDockDefinitionId,
+                exteriorDockPosition,
+                out _,
+                out var dockError),
+            Is.True,
+            dockError);
         yield return WaitForCondition(
             () => senderFloor.Entities.Count == 3,
             5f,
-            "Chain placement failed.");
+            "Exterior dock placement failed.");
+        yield return null;
+        var exteriorDockView = UnityEngine.Object.FindFirstObjectByType<FactoryDockExteriorView>();
+        Assert.That(exteriorDockView, Is.Not.Null);
+        Assert.That(
+            exteriorDockView.GetComponentInChildren<TextMesh>(true),
+            Is.Not.Null,
+            "The exterior dock should have a visible label.");
+        yield return EnterMachineTestBuilding();
+        yield return null;
+        var interiorPresentation = UnityEngine.Object.FindFirstObjectByType<OutsideTestFloorPresentation>();
+        Assert.That(interiorPresentation, Is.Not.Null);
+        Assert.That(
+            interiorPresentation.GetComponentsInChildren<TextMesh>(true)
+                .Any(label => label.text.Contains(FactoryEntityDefinitions.ShippingDockDefinitionId)),
+            Is.True,
+            "The shared shipping dock should be presented inside the factory.");
         FactoryEntityRecord sender = null!;
         foreach (var entity in senderFloor.Entities)
         {
-            if (entity.DefinitionId == FactoryEntityRecord.SendingTerminalDefinitionId)
+            if (entity.DefinitionId == FactoryEntityDefinitions.ShippingDockDefinitionId)
             {
                 sender = entity;
             }

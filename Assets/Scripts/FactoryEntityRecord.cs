@@ -17,7 +17,8 @@ public struct FactoryEntitySnapshot
         int newProducedCount,
         int newOutputCount = 0,
         int newInputCount = 0,
-        float[] newConveyorPositions = null)
+        float[] newConveyorPositions = null,
+        GridEdgeDirection newDockDirection = GridEdgeDirection.South)
     {
         EntityId = newEntityId;
         DefinitionId = newDefinitionId;
@@ -28,6 +29,7 @@ public struct FactoryEntitySnapshot
         OutputCount = newOutputCount;
         InputCount = newInputCount;
         ConveyorPositions = newConveyorPositions is null ? null! : (float[])newConveyorPositions.Clone();
+        DockDirection = newDockDirection;
     }
 
     public uint EntityId;
@@ -39,6 +41,7 @@ public struct FactoryEntitySnapshot
     public int OutputCount;
     public int InputCount;
     public float[] ConveyorPositions;
+    public GridEdgeDirection DockDirection;
 }
 
 [Serializable]
@@ -65,6 +68,7 @@ public sealed class FactoryEntityRecord : IFactoryItemTransferInventory
     [SerializeField] private int outputCount;
     [SerializeField] private int inputCount;
     [SerializeField] private FactoryConveyorQueue conveyorQueue = new();
+    [SerializeField] private GridEdgeDirection dockDirection;
 
     public FactoryEntityRecord()
     {
@@ -79,7 +83,8 @@ public sealed class FactoryEntityRecord : IFactoryItemTransferInventory
         int newProducedCount,
         int newOutputCount = 0,
         int newInputCount = 0,
-        float[] newConveyorPositions = null)
+        float[] newConveyorPositions = null,
+        GridEdgeDirection newDockDirection = GridEdgeDirection.South)
     {
         SetState(
             newEntityId,
@@ -90,7 +95,8 @@ public sealed class FactoryEntityRecord : IFactoryItemTransferInventory
             newProducedCount,
             newOutputCount,
             newInputCount,
-            newConveyorPositions);
+            newConveyorPositions,
+            newDockDirection);
     }
 
     public bool IsConveyor => FactoryConveyor.IsConveyor(definitionId);
@@ -103,6 +109,7 @@ public sealed class FactoryEntityRecord : IFactoryItemTransferInventory
     public int OutputCount => IsConveyor ? conveyorQueue.ReadyCount : outputCount;
     public int InputCount => IsConveyor ? conveyorQueue.Count - conveyorQueue.ReadyCount : inputCount;
     public IReadOnlyList<float> ConveyorPositions => conveyorQueue.Positions;
+    public GridEdgeDirection DockDirection => dockDirection;
     public void SetConveyorPositions(float[] positions) => conveyorQueue.SetPositions(positions);
     public byte[] GetConveyorState() => IsConveyor ? FactoryConveyorQueue.Encode(ConveyorPositions) : Array.Empty<byte>();
     public string AcceptedItemId => FactoryEntityDefinitions.Get(definitionId).AcceptedItemId;
@@ -116,6 +123,9 @@ public sealed class FactoryEntityRecord : IFactoryItemTransferInventory
     public bool IsStorage => FactoryEntityDefinitions.Get(definitionId).IsStorage;
     public bool IsSendingTerminal => FactoryEntityDefinitions.Get(definitionId).IsSendingTerminal;
     public bool IsReceivingTerminal => FactoryEntityDefinitions.Get(definitionId).IsReceivingTerminal;
+    public bool IsShippingDock => FactoryEntityDefinitions.Get(definitionId).IsShippingDock;
+    public bool IsReceivingDock => FactoryEntityDefinitions.Get(definitionId).IsReceivingDock;
+    public bool IsDock => FactoryEntityDefinitions.Get(definitionId).IsDock;
     public bool IsTerminal => FactoryEntityDefinitions.Get(definitionId).IsTerminal;
     public string SuppliedItemId => FactoryEntityDefinitions.Get(definitionId).SuppliedItemId;
     public int InventoryCount => IsTerminal || IsStorage ? outputCount : 0;
@@ -172,7 +182,8 @@ public sealed class FactoryEntityRecord : IFactoryItemTransferInventory
             snapshot.ProducedCount,
             snapshot.OutputCount,
             snapshot.InputCount,
-            snapshot.ConveyorPositions);
+            snapshot.ConveyorPositions,
+            snapshot.DockDirection);
     }
 
     public void SetState(
@@ -184,12 +195,13 @@ public sealed class FactoryEntityRecord : IFactoryItemTransferInventory
         int newProducedCount,
         int newOutputCount = 0,
         int newInputCount = 0,
-        float[] newConveyorPositions = null)
+        float[] newConveyorPositions = null,
+        GridEdgeDirection newDockDirection = GridEdgeDirection.South)
     {
         entityId = newEntityId;
         definitionId = string.IsNullOrWhiteSpace(newDefinitionId)
             ? DefaultDefinitionId
-            : newDefinitionId.Trim();
+            : FactoryEntityDefinitions.NormalizeDefinitionId(newDefinitionId.Trim());
         logicalPosition = SanitizeLogicalPosition(newLogicalPosition);
         cycleRate = float.IsNaN(newCycleRate)
             || float.IsInfinity(newCycleRate)
@@ -202,6 +214,7 @@ public sealed class FactoryEntityRecord : IFactoryItemTransferInventory
         producedCount = Mathf.Max(0, newProducedCount);
         outputCount = Mathf.Clamp(newOutputCount, 0, OutputCapacity);
         inputCount = Mathf.Clamp(newInputCount, 0, InputCapacity);
+        dockDirection = newDockDirection;
         if (IsConveyor) conveyorQueue.Restore(newConveyorPositions, inputCount, outputCount, cycleProgress);
         var definition = FactoryEntityDefinitions.Get(definitionId);
         if (definition.IsProcessor)
@@ -209,7 +222,7 @@ public sealed class FactoryEntityRecord : IFactoryItemTransferInventory
             cycleRate = 1f;
         }
 
-        if (definition.IsTerminal)
+        if (definition.IsDock)
         {
             cycleRate = 0f;
             cycleProgress = 0f;
@@ -248,7 +261,7 @@ public sealed class FactoryEntityRecord : IFactoryItemTransferInventory
             conveyorQueue.Advance(deltaTime);
             return;
         }
-        if (IsStorage || IsTerminal)
+        if (IsStorage || IsDock)
         {
             return;
         }
@@ -504,7 +517,8 @@ public sealed class FactoryEntityRecord : IFactoryItemTransferInventory
             producedCount,
             OutputCount,
             InputCount,
-            IsConveyor ? conveyorQueue.Snapshot() : null);
+            IsConveyor ? conveyorQueue.Snapshot() : null,
+            dockDirection);
     }
 
     public FactoryEntitySnapshot ToSnapshot()
@@ -518,7 +532,8 @@ public sealed class FactoryEntityRecord : IFactoryItemTransferInventory
             producedCount,
             OutputCount,
             InputCount,
-            IsConveyor ? conveyorQueue.Snapshot() : null);
+            IsConveyor ? conveyorQueue.Snapshot() : null,
+            dockDirection);
     }
 
     private void AdvanceProcessor(float deltaTime)

@@ -12,7 +12,7 @@ public sealed class FactoryTruckRoutePanel : MonoBehaviour
     private InputActionMap actions = null!;
     private InputAction toggle = null!;
     private bool visible;
-    private string status = "Select a sending and a receiving terminal, then create the route.";
+    private string status = "Select a shipping dock and a receiving dock, then create the route.";
     private List<FactoryTerminalListing> listings = new();
     private List<FactoryTruckRouteRecord> routes = new();
     private List<FactoryTruckRecord> trucks = new();
@@ -75,17 +75,17 @@ public sealed class FactoryTruckRoutePanel : MonoBehaviour
         var receivings = new List<FactoryTerminalListing>();
         foreach (var listing in listings)
         {
-            if (listing.IsSending) sendings.Add(listing);
+            if (listing.IsShipping) sendings.Add(listing);
             if (listing.IsReceiving) receivings.Add(listing);
         }
 
-        DrawTerminalSelector("Sender", sendings, ref senderIndex);
-        DrawTerminalSelector("Receiver", receivings, ref receiverIndex);
+        DrawTerminalSelector("Shipping", sendings, ref senderIndex);
+        DrawTerminalSelector("Receiving", receivings, ref receiverIndex);
         if (GUILayout.Button("Create route"))
         {
             if (sendings.Count == 0 || receivings.Count == 0)
             {
-                status = "Place a sending terminal and a receiving terminal first.";
+                status = "Place a shipping dock and a receiving dock first.";
             }
             else
             {
@@ -130,7 +130,7 @@ public sealed class FactoryTruckRoutePanel : MonoBehaviour
         }
 
         GUI.enabled = true;
-        var label = options.Count == 0 ? $"no {title.ToLowerInvariant()} terminals" : DescribeListing(options[index % options.Count]);
+        var label = options.Count == 0 ? $"no {title.ToLowerInvariant()} docks" : DescribeListing(options[index % options.Count]);
         GUILayout.Label($"{title}: {label}");
         GUI.enabled = options.Count > 0;
         if (GUILayout.Button(">", GUILayout.Width(26f)) && options.Count > 0)

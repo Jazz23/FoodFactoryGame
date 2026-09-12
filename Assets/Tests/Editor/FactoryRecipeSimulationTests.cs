@@ -390,21 +390,21 @@ public sealed class FactoryRecipeSimulationTests
             false,
             false,
             out error), Is.False);
-        Assert.That(error, Does.Contain("receiving terminal"));
+        Assert.That(error, Does.Contain("receiving dock"));
         Assert.That(FactoryConnectionRules.TryValidate(
             sendingDefinition,
             processorDefinition,
             true,
             true,
             out error), Is.False);
-        Assert.That(error, Does.Contain("sending terminal"));
+        Assert.That(error, Does.Contain("shipping dock"));
         Assert.That(FactoryConnectionRules.TryValidate(
             receivingDefinition,
             storageDefinition,
             false,
             false,
             out error), Is.False);
-        Assert.That(error, Does.Contain("receiving terminal"));
+        Assert.That(error, Does.Contain("receiving dock"));
         Assert.That(FactoryConnectionRules.TryValidate(
             producerDefinition,
             storageDefinition,

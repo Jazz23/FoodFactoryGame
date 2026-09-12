@@ -399,6 +399,102 @@ public sealed class FactoryWorldPersistenceTests
         Assert.That(HasConnection(restored, processorGuid, storageGuid), Is.True);
     }
 
+    [Test]
+    public void LegacyDockDefinitionsPreserveInventoryAndFacingThroughSqlite()
+    {
+        var buildingGuid = Guid.NewGuid();
+        var floorGuid = Guid.NewGuid();
+        var shippingGuid = Guid.NewGuid();
+        var receivingGuid = Guid.NewGuid();
+        var snapshot = new FactoryWorldSnapshot();
+        snapshot.Buildings.Add(new FactoryWorldBuildingRecord(
+            buildingGuid,
+            "outside-test-building",
+            Vector3Int.zero,
+            new Vector2Int(6, 4),
+            1,
+            false,
+            7));
+        var floor = new FactoryWorldFloorRecord(
+            floorGuid,
+            buildingGuid,
+            0,
+            "Ground",
+            0f,
+            0f,
+            Vector2.one);
+        floor.SetEntities(new[]
+        {
+            new FactoryWorldEntityRecord(
+                shippingGuid,
+                floorGuid,
+                "sending-terminal",
+                new Vector2(1.5f, 0.5f),
+                FactoryDock.DirectionToRotation(GridEdgeDirection.West),
+                Vector2.one,
+                Array.Empty<byte>(),
+                1,
+                false,
+                0f,
+                0f,
+                0,
+                11),
+            new FactoryWorldEntityRecord(
+                receivingGuid,
+                floorGuid,
+                "receiving-terminal",
+                new Vector2(2.5f, 1.5f),
+                FactoryDock.DirectionToRotation(GridEdgeDirection.North),
+                Vector2.one,
+                Array.Empty<byte>(),
+                2,
+                false,
+                0f,
+                0f,
+                0,
+                7)
+        });
+        snapshot.Floors.Add(floor);
+
+        var store = new FactoryWorldSqliteStore(databasePath);
+        store.Save(snapshot);
+        var restored = store.Load();
+        var restoredFloor = restored.Floors.Find(candidate => candidate.Guid == floorGuid);
+        var restoredShipping = GetEntity(restoredFloor, shippingGuid);
+        var restoredReceiving = GetEntity(restoredFloor, receivingGuid);
+        var shipping = new FactoryEntityRecord(
+            restoredShipping.LegacyEntityId,
+            restoredShipping.DefinitionId,
+            restoredShipping.LocalPosition,
+            restoredShipping.CycleRate,
+            restoredShipping.CycleProgress,
+            restoredShipping.ProducedCount,
+            restoredShipping.OutputCount,
+            restoredShipping.InputCount,
+            null,
+            FactoryDock.RotationToDirection(restoredShipping.RotationZ));
+        var receiving = new FactoryEntityRecord(
+            restoredReceiving.LegacyEntityId,
+            restoredReceiving.DefinitionId,
+            restoredReceiving.LocalPosition,
+            restoredReceiving.CycleRate,
+            restoredReceiving.CycleProgress,
+            restoredReceiving.ProducedCount,
+            restoredReceiving.OutputCount,
+            restoredReceiving.InputCount,
+            null,
+            FactoryDock.RotationToDirection(restoredReceiving.RotationZ));
+
+        Assert.That(shipping.DefinitionId, Is.EqualTo(FactoryEntityDefinitions.ShippingDockDefinitionId));
+        Assert.That(shipping.IsShippingDock, Is.True);
+        Assert.That(shipping.InventoryCount, Is.EqualTo(11));
+        Assert.That(shipping.DockDirection, Is.EqualTo(GridEdgeDirection.West));
+        Assert.That(receiving.DefinitionId, Is.EqualTo(FactoryEntityDefinitions.ReceivingDockDefinitionId));
+        Assert.That(receiving.IsReceivingDock, Is.True);
+        Assert.That(receiving.InventoryCount, Is.EqualTo(7));
+        Assert.That(receiving.DockDirection, Is.EqualTo(GridEdgeDirection.North));
+    }
+
     private static bool HasConnection(
         FactoryWorldSnapshot snapshot,
         Guid sourceEntityGuid,

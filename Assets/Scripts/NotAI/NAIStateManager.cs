@@ -143,7 +143,8 @@ namespace NotAI
             string definitionId,
             Vector2 position,
             out uint entityId,
-            out string error)
+            out string error,
+            GridEdgeDirection dockDirection = GridEdgeDirection.South)
         {
             var added = factoryState.TryAddTestEntity(
                 buildingInstanceId,
@@ -151,7 +152,8 @@ namespace NotAI
                 definitionId,
                 position,
                 out entityId,
-                out error);
+                out error,
+                dockDirection);
             if (added)
             {
                 EnsureFactoryEntityGuid(buildingInstanceId, floorIndex, entityId);
@@ -238,6 +240,80 @@ namespace NotAI
                 position,
                 out entityId,
                 out error);
+        }
+
+        public bool TryAddExteriorDock(
+            uint buildingInstanceId,
+            string definitionId,
+            Vector2 interiorPosition,
+            GridEdgeDirection direction,
+            out uint entityId,
+            out string error)
+        {
+            var normalizedDefinitionId = string.IsNullOrWhiteSpace(definitionId)
+                ? string.Empty
+                : FactoryEntityDefinitions.NormalizeDefinitionId(definitionId.Trim());
+            if (normalizedDefinitionId == FactoryEntityDefinitions.ShippingDockDefinitionId)
+            {
+                return TryAddShippingDock(
+                    buildingInstanceId,
+                    0,
+                    interiorPosition,
+                    direction,
+                    out entityId,
+                    out error);
+            }
+
+            if (normalizedDefinitionId == FactoryEntityDefinitions.ReceivingDockDefinitionId)
+            {
+                return TryAddReceivingDock(
+                    buildingInstanceId,
+                    0,
+                    interiorPosition,
+                    direction,
+                    out entityId,
+                    out error);
+            }
+
+            entityId = 0;
+            error = "Unknown dock type.";
+            return false;
+        }
+
+        public bool TryAddShippingDock(
+            uint buildingInstanceId,
+            int floorIndex,
+            Vector2 position,
+            GridEdgeDirection direction,
+            out uint entityId,
+            out string error)
+        {
+            return TryAddTestEntity(
+                buildingInstanceId,
+                floorIndex,
+                FactoryEntityDefinitions.ShippingDockDefinitionId,
+                position,
+                out entityId,
+                out error,
+                direction);
+        }
+
+        public bool TryAddReceivingDock(
+            uint buildingInstanceId,
+            int floorIndex,
+            Vector2 position,
+            GridEdgeDirection direction,
+            out uint entityId,
+            out string error)
+        {
+            return TryAddTestEntity(
+                buildingInstanceId,
+                floorIndex,
+                FactoryEntityDefinitions.ReceivingDockDefinitionId,
+                position,
+                out entityId,
+                out error,
+                direction);
         }
 
         public bool TryRemoveTestMachine(uint buildingInstanceId, int floorIndex, uint entityId, out string error)
@@ -416,7 +492,7 @@ namespace NotAI
 
                     foreach (var entity in floor.Entities)
                     {
-                        if (!entity.IsTerminal
+                        if (!entity.IsDock
                             || !TryResolveFactoryEndpoint(
                                 new FactoryEntityEndpoint(building.BuildingInstanceId, floorIndex, entity.EntityId),
                                 out var endpoint,
@@ -1080,7 +1156,8 @@ namespace NotAI
                         entity.ProducedCount,
                         entity.OutputCount,
                         entity.InputCount,
-                        FactoryConveyor.IsConveyor(entity.DefinitionId) ? FactoryConveyorQueue.Decode(entity.State) : null));
+                        FactoryConveyor.IsConveyor(entity.DefinitionId) ? FactoryConveyorQueue.Decode(entity.State) : null,
+                        FactoryDock.RotationToDirection(entity.RotationZ)));
                 }
 
                 floorRecord.SetEntities(entities);
@@ -1283,7 +1360,7 @@ namespace NotAI
                         floorGuid,
                         entity.DefinitionId,
                         entity.LogicalPosition,
-                        0f,
+                        entity.IsDock ? FactoryDock.DirectionToRotation(entity.DockDirection) : 0f,
                         Vector2.one,
                         entity.GetConveyorState(),
                         entity.EntityId,

@@ -78,6 +78,7 @@ public sealed class GameSceneManager : MonoBehaviour
     private bool outsideTestStateLoadFailed;
     private bool outsideTestStateNeedsSave;
     private FactoryTruckMarkerView truckMarkerView = null!;
+    private FactoryDockExteriorView dockExteriorView = null!;
     private SceneHandle registeredOutsideTestSceneHandle;
     private bool outsideTestWorldReconciled;
     private int clientOutsideTestLoadedInteriorCount;
@@ -187,6 +188,7 @@ public sealed class GameSceneManager : MonoBehaviour
     {
         EnsureOutsideTestStateLoaded();
         EnsureTruckMarkerView();
+        EnsureDockExteriorView();
 
         if (!networkManager.IsServerStarted)
         {
@@ -214,9 +216,42 @@ public sealed class GameSceneManager : MonoBehaviour
             truckMarkerView = new GameObject("Factory Truck Markers").AddComponent<FactoryTruckMarkerView>();
         }
 
-        if (SceneGrid.TryGetForScene(truckMarkerView.gameObject.scene, out _))
+        EnsureExteriorViewScene(truckMarkerView.gameObject);
+    }
+
+    private void EnsureDockExteriorView()
+    {
+        if (!stateManager.IsInitialized)
         {
             return;
+        }
+
+        if (dockExteriorView is null || !dockExteriorView)
+        {
+            dockExteriorView = new GameObject("Factory Dock Markers").AddComponent<FactoryDockExteriorView>();
+        }
+
+        EnsureExteriorViewScene(dockExteriorView.gameObject);
+    }
+
+    private static void EnsureExteriorViewScene(GameObject view)
+    {
+        if (view.scene.name == "OutsideTest"
+            && SceneGrid.TryGetForScene(view.scene, out _))
+        {
+            return;
+        }
+
+        for (var sceneIndex = 0; sceneIndex < UnitySceneManager.sceneCount; sceneIndex++)
+        {
+            var scene = UnitySceneManager.GetSceneAt(sceneIndex);
+            if (scene.IsValid() && scene.name == "OutsideTest"
+                && scene.isLoaded
+                && SceneGrid.TryGetForScene(scene, out _))
+            {
+                UnitySceneManager.MoveGameObjectToScene(view, scene);
+                return;
+            }
         }
 
         for (var sceneIndex = 0; sceneIndex < UnitySceneManager.sceneCount; sceneIndex++)
@@ -226,7 +261,7 @@ public sealed class GameSceneManager : MonoBehaviour
                 && scene.isLoaded
                 && SceneGrid.TryGetForScene(scene, out _))
             {
-                UnitySceneManager.MoveGameObjectToScene(truckMarkerView.gameObject, scene);
+                UnitySceneManager.MoveGameObjectToScene(view, scene);
                 return;
             }
         }
@@ -278,11 +313,6 @@ public sealed class GameSceneManager : MonoBehaviour
         error = "Only the host inside a factory floor can build; wait for travel to finish.";
         if (!CanEditCurrentFloorEntities(player))
         {
-            Debug.LogWarning(
-                $"Placement rejected before state mutation: scene={player.gameObject.scene.name}, "
-                + $"transitioning={player.IsTransitioning}, state={stateManager.InitializationStatus}, "
-                + $"accepting={stateManager.IsAcceptingMutations}.",
-                this);
             return false;
         }
         if (!FactoryConveyor.IsPlaceable(definitionId))
@@ -290,14 +320,15 @@ public sealed class GameSceneManager : MonoBehaviour
             error = "Unknown equipment type.";
             return false;
         }
+        if (FactoryDock.IsDock(definitionId))
+        {
+            error = "Docks must be placed from OutsideTest beside a building wall.";
+            return false;
+        }
         player.TryGetCurrentOutsideTestFloor(out var buildingId, out var floorIndex);
         stateManager.TryGetFloorState(buildingId, floorIndex, out var floor);
         stateManager.TryGetBuildingInfo(buildingId, out var buildingInfo);
         stateManager.TryGetBuildingRecord(buildingId, out var buildingRecord);
-        Debug.LogWarning(
-            $"Placement context: building={buildingId}, floor={floorIndex}, position={position}, "
-            + $"footprint={buildingRecord.FootprintSize}, interior={buildingInfo.InteriorSize}.",
-            this);
         if (FactoryConveyor.IsOccupied(floor.Entities, position))
         {
             error = "That cell is occupied.";
@@ -305,14 +336,65 @@ public sealed class GameSceneManager : MonoBehaviour
         }
         if (!stateManager.TryAddTestEntity(buildingId, floorIndex, definitionId, position, out entityId, out error))
         {
-            Debug.LogWarning(
-                $"Placement rejected by world state: building={buildingId}, floor={floorIndex}, "
-                + $"position={position}, error={error}, state={stateManager.InitializationStatus}, "
-                + $"accepting={stateManager.IsAcceptingMutations}.",
-                this);
             return false;
         }
         BroadcastOutsideTestFloorState(buildingId, floorIndex);
+        outsideTestStateNeedsSave = true;
+        return true;
+    }
+
+    public bool TryPlaceExteriorDock(
+        PlayerSceneTransition player,
+        string definitionId,
+        Vector2 exteriorLogicalPosition,
+        out uint entityId,
+        out string error)
+    {
+        entityId = 0;
+        error = "Only the host in OutsideTest can place docks.";
+        if (!CanManageTruckRoutes(player)
+            || player.gameObject.scene.name != "OutsideTest")
+        {
+            return false;
+        }
+
+        EnsureOutsideTestStateLoaded();
+        if (!FactoryDock.IsDock(definitionId))
+        {
+            error = "Unknown dock type.";
+            return false;
+        }
+
+        if (!FactoryDock.TryFindExteriorPlacement(
+                stateManager.BuildingRecords,
+                exteriorLogicalPosition,
+                out var building,
+                out var interiorPosition,
+                out var direction))
+        {
+            error = "Place a dock in an exterior cell beside a non-corner building wall.";
+            return false;
+        }
+
+        if (!stateManager.TryGetFloorState(building.BuildingInstanceId, 0, out var floor)
+            || FactoryConveyor.IsOccupied(floor.Entities, interiorPosition))
+        {
+            error = "That dock position is occupied.";
+            return false;
+        }
+
+        if (!stateManager.TryAddExteriorDock(
+                building.BuildingInstanceId,
+                definitionId,
+                interiorPosition,
+                direction,
+                out entityId,
+                out error))
+        {
+            return false;
+        }
+
+        BroadcastOutsideTestFloorState(building.BuildingInstanceId, 0);
         outsideTestStateNeedsSave = true;
         return true;
     }
@@ -462,26 +544,8 @@ public sealed class GameSceneManager : MonoBehaviour
         out string error)
     {
         entityId = 0;
-        error = "Only the local host inside a floor can edit entities; wait for travel to finish.";
-        if (!CanEditCurrentFloorEntities(player))
-        {
-            return false;
-        }
-
-        player.TryGetCurrentOutsideTestFloor(out var buildingId, out var floorIndex);
-        if (!stateManager.TryAddSendingTerminal(
-                buildingId,
-                floorIndex,
-                position,
-                out entityId,
-                out error))
-        {
-            return false;
-        }
-
-        BroadcastOutsideTestFloorState(buildingId, floorIndex);
-        outsideTestStateNeedsSave = true;
-        return true;
+        error = "Shipping docks must be placed outside beside a building wall.";
+        return false;
     }
 
     public bool TryAddCurrentFloorReceivingTerminal(
@@ -491,26 +555,8 @@ public sealed class GameSceneManager : MonoBehaviour
         out string error)
     {
         entityId = 0;
-        error = "Only the local host inside a floor can edit entities; wait for travel to finish.";
-        if (!CanEditCurrentFloorEntities(player))
-        {
-            return false;
-        }
-
-        player.TryGetCurrentOutsideTestFloor(out var buildingId, out var floorIndex);
-        if (!stateManager.TryAddReceivingTerminal(
-                buildingId,
-                floorIndex,
-                position,
-                out entityId,
-                out error))
-        {
-            return false;
-        }
-
-        BroadcastOutsideTestFloorState(buildingId, floorIndex);
-        outsideTestStateNeedsSave = true;
-        return true;
+        error = "Receiving docks must be placed outside beside a building wall.";
+        return false;
     }
 
     public bool TryRemoveCurrentFloorMachine(PlayerSceneTransition player, uint entityId,

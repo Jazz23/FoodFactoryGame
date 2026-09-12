@@ -34,8 +34,6 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
     private Button addStorageButton = null!;
     private Button addProcessorButton = null!;
     private Button addPackedStorageButton = null!;
-    private Button addSendingTerminalButton = null!;
-    private Button addReceivingTerminalButton = null!;
     private Button removeMachineButton = null!;
     private Button drainOutputButton = null!;
     private Button nextMachineButton = null!;
@@ -125,32 +123,6 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
 
         machineStatusText.text = "Adding packed storage...";
         owner.RequestAddCurrentFloorPackedStorage(new Vector2(x, y));
-    }
-
-    private void AddSendingTerminalClicked()
-    {
-        if (!float.TryParse(machineXInput.text, NumberStyles.Float, CultureInfo.InvariantCulture, out var x)
-            || !float.TryParse(machineYInput.text, NumberStyles.Float, CultureInfo.InvariantCulture, out var y))
-        {
-            machineStatusText.text = "X and Y must be finite numbers.";
-            return;
-        }
-
-        machineStatusText.text = "Adding sending terminal...";
-        owner.RequestAddCurrentFloorSendingTerminal(new Vector2(x, y));
-    }
-
-    private void AddReceivingTerminalClicked()
-    {
-        if (!float.TryParse(machineXInput.text, NumberStyles.Float, CultureInfo.InvariantCulture, out var x)
-            || !float.TryParse(machineYInput.text, NumberStyles.Float, CultureInfo.InvariantCulture, out var y))
-        {
-            machineStatusText.text = "X and Y must be finite numbers.";
-            return;
-        }
-
-        machineStatusText.text = "Adding receiving terminal...";
-        owner.RequestAddCurrentFloorReceivingTerminal(new Vector2(x, y));
     }
 
     private void RemoveMachineClicked()
@@ -244,7 +216,7 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             ? "No entity selected"
             : "Enter a floor as host to edit entities";
         machineDetailsText.text = hasCurrentFloor
-            ? "Select an entity or terminal to inspect it."
+            ? "Select an entity or dock to inspect it."
             : "Entity editing is unavailable outside a floor.";
         if (hasCurrentFloor
             && GameSceneManager.Instance.TryGetOutsideTestFloorState(
@@ -258,10 +230,10 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
                 if (entity.EntityId == selectedMachineId)
                 {
                     selected = true;
-                    machineDetailsText.text = entity.IsTerminal
+                    machineDetailsText.text = entity.IsDock
                         ? $"INVENTORY: {entity.InventoryCount}/{entity.InventoryCapacity} "
                             + $"{entity.AcceptedItemId}\n"
-                            + "TERMINAL: receives and supplies test-product"
+                            + "DOCK: receives and supplies test-product"
                         : entity.IsProcessor
                         ? $"INPUT: {entity.InputCount}/{FactoryEntityRecord.InputCapacity} "
                             + $"{entity.AcceptedItemId}\n"
@@ -309,8 +281,6 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
         addStorageButton.interactable = canEdit;
         addProcessorButton.interactable = canEdit;
         addPackedStorageButton.interactable = canEdit;
-        addSendingTerminalButton.interactable = canEdit;
-        addReceivingTerminalButton.interactable = canEdit;
         nextMachineButton.interactable = canEdit && count > 0;
         removeMachineButton.interactable = canEdit && selected;
         drainOutputButton.interactable = canEdit && selected;
@@ -1312,24 +1282,6 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             12f, 80f, 190f, 32f, AddProcessorClicked);
         addPackedStorageButton = CreateButton("Add Packed Storage", "ADD PACKED STORAGE", machineContent,
             208f, 80f, 190f, 32f, AddPackedStorageClicked);
-        addSendingTerminalButton = CreateButton(
-            "Add Sending Terminal",
-            "ADD SENDING TERMINAL",
-            machineContent,
-            12f,
-            118f,
-            190f,
-            32f,
-            AddSendingTerminalClicked);
-        addReceivingTerminalButton = CreateButton(
-            "Add Receiving Terminal",
-            "ADD RECEIVING TERMINAL",
-            machineContent,
-            208f,
-            118f,
-            190f,
-            32f,
-            AddReceivingTerminalClicked);
         machineSelectionText = CreateText("Machine Selection", machineContent, string.Empty, 13,
             TextAnchor.MiddleLeft, Color.white);
         SetTopRect(machineSelectionText.rectTransform, 12f, 156f, 396f, 38f);

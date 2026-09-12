@@ -17,20 +17,22 @@ public sealed class FactoryBuildController : MonoBehaviour
     private int direction;
     private bool building;
     private bool activeFloor;
+    private bool activeExterior;
     private bool validCell;
     private Vector2 position;
     private uint hoveredId;
     private uint recoveryId;
-    private string status = "Place a source, belts, and a sending terminal. Receiving terminals feed belts toward storage.";
-    private readonly string[] labels = { "1 Source", "2 Conveyor", "3 Storage", "4 Send terminal", "5 Receive terminal" };
+    private string status = "Place sources, belts, and storage inside. Place shipping and receiving docks outside.";
+    private readonly string[] labels = { "1 Source", "2 Conveyor", "3 Storage", "4 Shipping dock", "5 Receiving dock" };
     private readonly string[] arrows = { "East >", "North ^", "West <", "South v" };
     private Rect Toolbar => new(12f, Screen.height - 116f, Mathf.Min(680f, Screen.width - 24f), 104f);
     private string Definition => selection == 0 ? FactoryEntityDefinitions.TestMachineDefinitionId
         : selection == 2 ? FactoryEntityDefinitions.TestStorageDefinitionId
-        : selection == 3 ? FactoryEntityDefinitions.SendingTerminalDefinitionId
-        : selection == 4 ? FactoryEntityDefinitions.ReceivingTerminalDefinitionId
+        : selection == 3 ? FactoryEntityDefinitions.ShippingDockDefinitionId
+        : selection == 4 ? FactoryEntityDefinitions.ReceivingDockDefinitionId
         : FactoryConveyor.Definitions[direction];
     private bool IsConveyorSelection => selection == 1;
+    private bool IsDockSelection => selection is 3 or 4;
 
     public void Initialize(PlayerSceneTransition newOwner)
     {
@@ -60,7 +62,10 @@ public sealed class FactoryBuildController : MonoBehaviour
     private void Update()
     {
         activeFloor = !owner.IsTransitioning && owner.TryGetCurrentOutsideTestFloor(out _, out _);
-        if (!activeFloor)
+        activeExterior = !activeFloor
+            && !owner.IsTransitioning
+            && gameObject.scene.name == "OutsideTest";
+        if (!activeFloor && !activeExterior)
         {
             preview.SetActive(false);
             building = false;
@@ -76,6 +81,18 @@ public sealed class FactoryBuildController : MonoBehaviour
         if (actions["Rotate"].WasPressedThisFrame()) direction = (direction + 1) % 4;
         preview.SetActive(building);
         if (!building) return;
+        if (activeExterior)
+        {
+            UpdateExteriorDockPlacement();
+            return;
+        }
+        if (IsDockSelection)
+        {
+            validCell = false;
+            previewRenderer.color = new Color(1f, 0.2f, 0.2f, 0.5f);
+            previewLabel.text = "Place docks\noutside";
+            return;
+        }
         var screen = actions["Point"].ReadValue<Vector2>();
         var guiPoint = new Vector2(screen.x, Screen.height - screen.y);
         var overUI = Toolbar.Contains(guiPoint) || TestUIVisibility.ButtonRect.Contains(guiPoint)
@@ -107,9 +124,9 @@ public sealed class FactoryBuildController : MonoBehaviour
         previewLabel.text = IsConveyorSelection
             ? arrows[direction]
             : selection == 3
-                ? "Sending\nTerminal"
+                ? "Shipping\nDock"
                 : selection == 4
-                    ? "Receiving\nTerminal"
+                    ? "Receiving\nDock"
                     : labels[selection].Substring(2);
         previewRenderer.color = validCell ? GetPreviewColor() : new Color(1f, 0.2f, 0.2f, 0.5f);
         if (!overUI && actions["Remove"].WasPressedThisFrame() && hoveredId != 0) owner.RequestRemoveCurrentFloorEntity(hoveredId);
@@ -129,7 +146,7 @@ public sealed class FactoryBuildController : MonoBehaviour
 
     private void OnGUI()
     {
-        if (!activeFloor) return;
+        if (!activeFloor && !activeExterior) return;
         GUILayout.BeginArea(Toolbar, GUI.skin.box);
         GUILayout.BeginHorizontal();
         if (GUILayout.Button(building ? "B: Stop building" : "B: Build")) building = !building;
@@ -137,8 +154,15 @@ public sealed class FactoryBuildController : MonoBehaviour
             if (GUILayout.Toggle(building && selection == index, labels[index], GUI.skin.button)) { selection = index; building = true; }
         if (GUILayout.Button($"R: {arrows[direction]}")) direction = (direction + 1) % 4;
         GUILayout.EndHorizontal();
-        GUILayout.Label("Click: place | Right click: remove | Esc: cancel | T: truck routes | F2: test UIs | F3: floor debug");
+        GUILayout.Label(activeExterior
+            ? "Click an exterior cell beside a wall to place a dock | Esc: cancel | T: truck routes"
+            : "Click: place | Right click: remove | Esc: cancel | T: truck routes | F2: test UIs | F3: floor debug");
         GUILayout.Label(status);
+        if (activeExterior)
+        {
+            GUILayout.EndArea();
+            return;
+        }
         if (owner.TryGetCurrentOutsideTestFloor(out var buildingId, out var floorIndex)
             && GameSceneManager.Instance.TryGetOutsideTestFloorState(
                 buildingId,
@@ -179,6 +203,53 @@ public sealed class FactoryBuildController : MonoBehaviour
             4 => new Color(0.35f, 0.65f, 1f, 0.5f),
             _ => new Color(0.3f, 1f, 0.6f, 0.5f)
         };
+    }
+
+    private void UpdateExteriorDockPlacement()
+    {
+        var screen = actions["Point"].ReadValue<Vector2>();
+        var guiPoint = new Vector2(screen.x, Screen.height - screen.y);
+        var overUI = Toolbar.Contains(guiPoint) || TestUIVisibility.ButtonRect.Contains(guiPoint)
+            || FactoryTruckRoutePanel.ContainsPointer(guiPoint)
+            || (EventSystem.current is not null && EventSystem.current.IsPointerOverGameObject());
+        if (!SceneGrid.TryGetForScene(gameObject.scene, out var grid))
+        {
+            preview.SetActive(false);
+            return;
+        }
+
+        var ray = Camera.main!.ScreenPointToRay(screen);
+        var plane = new Plane(Vector3.forward, Vector3.zero);
+        if (!plane.Raycast(ray, out var distance))
+        {
+            preview.SetActive(false);
+            return;
+        }
+
+        var logical = grid.WorldToLogical(ray.GetPoint(distance));
+        position = (Vector2)Vector2Int.FloorToInt(logical) + Vector2.one * 0.5f;
+        var manager = NotAI.NAIStateManager.Instance;
+        validCell = !overUI
+            && IsDockSelection
+            && manager is { IsInitialized: true }
+            && FactoryDock.TryFindExteriorPlacement(
+                manager.BuildingRecords,
+                position,
+                out _,
+                out _,
+                out _);
+        preview.transform.position = grid.LogicalToWorld(position);
+        preview.transform.rotation = Quaternion.identity;
+        preview.transform.localScale = new Vector3(0.7f, 0.35f, 1f);
+        previewRenderer.sprite = previewSprite;
+        previewLabel.transform.rotation = Quaternion.identity;
+        previewLabel.transform.position = preview.transform.position + Vector3.up * 0.5f;
+        previewLabel.text = selection == 3 ? "Shipping\nDock" : selection == 4 ? "Receiving\nDock" : "Select a\ndock";
+        previewRenderer.color = validCell ? GetPreviewColor() : new Color(1f, 0.2f, 0.2f, 0.5f);
+        if (validCell && actions["Place"].WasPressedThisFrame())
+        {
+            owner.RequestPlaceExteriorDock(Definition, position);
+        }
     }
 
     private void OnDestroy()

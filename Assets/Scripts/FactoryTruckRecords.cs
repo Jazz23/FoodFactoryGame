@@ -35,8 +35,9 @@ public readonly struct FactoryTerminalListing
     public uint EntityId { get; }
     public string DefinitionId { get; }
     public string FloorLabel { get; }
-    public bool IsSending => DefinitionId == FactoryEntityRecord.SendingTerminalDefinitionId;
-    public bool IsReceiving => DefinitionId == FactoryEntityRecord.ReceivingTerminalDefinitionId;
+    public bool IsShipping => DefinitionId == FactoryEntityDefinitions.ShippingDockDefinitionId;
+    public bool IsReceiving => DefinitionId == FactoryEntityDefinitions.ReceivingDockDefinitionId;
+    public bool IsSending => IsShipping;
 }
 
 [Serializable]

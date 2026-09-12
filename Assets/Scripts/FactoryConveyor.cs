@@ -13,8 +13,8 @@ public static class FactoryConveyor
     public static bool IsPlaceable(string definitionId) => IsConveyor(definitionId)
         || definitionId == FactoryEntityDefinitions.TestMachineDefinitionId
         || definitionId == FactoryEntityDefinitions.TestStorageDefinitionId
-        || definitionId == FactoryEntityDefinitions.SendingTerminalDefinitionId
-        || definitionId == FactoryEntityDefinitions.ReceivingTerminalDefinitionId;
+        || definitionId == FactoryEntityDefinitions.ShippingDockDefinitionId
+        || definitionId == FactoryEntityDefinitions.ReceivingDockDefinitionId;
 
     public static Vector2 Direction(string definitionId) => definitionId switch
     {

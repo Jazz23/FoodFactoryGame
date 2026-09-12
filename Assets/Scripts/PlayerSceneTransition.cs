@@ -226,6 +226,14 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         if (IsOwner) RequestPlaceEquipmentServerRpc(definitionId, position);
     }
 
+    public void RequestPlaceExteriorDock(string definitionId, Vector2 exteriorLogicalPosition)
+    {
+        if (IsOwner)
+        {
+            RequestPlaceExteriorDockServerRpc(definitionId, exteriorLogicalPosition);
+        }
+    }
+
     public void RequestRelocateCurrentFloorEntity(uint entityId, Vector2 position)
     {
         if (IsOwner)
@@ -253,6 +261,22 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         var placed = GameSceneManager.Instance.TryPlaceCurrentFloorEquipment(
             this, definitionId, position, out _, out var error);
         TargetReceiveMachineEditResult(Owner, placed ? "Equipment placed." : error);
+    }
+
+    [ServerRpc]
+    private void RequestPlaceExteriorDockServerRpc(
+        string definitionId,
+        Vector2 exteriorLogicalPosition)
+    {
+        var placed = GameSceneManager.Instance.TryPlaceExteriorDock(
+            this,
+            definitionId,
+            exteriorLogicalPosition,
+            out var entityId,
+            out var error);
+        TargetReceiveMachineEditResult(
+            Owner,
+            placed ? $"Placed dock {entityId}." : error);
     }
 
     public void RequestAddCurrentFloorMachine(Vector2 position)

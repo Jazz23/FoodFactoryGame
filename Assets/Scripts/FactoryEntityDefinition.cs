@@ -28,16 +28,19 @@ public readonly struct FactoryEntityDefinition
     public bool IsReceiver => !string.IsNullOrWhiteSpace(AcceptedItemId);
     public bool IsProducer => !string.IsNullOrWhiteSpace(ProducedItemId);
     public bool IsProcessor => InputQuantity > 0;
-    public bool IsSendingTerminal => DefinitionId == FactoryEntityDefinitions.SendingTerminalDefinitionId;
-    public bool IsReceivingTerminal => DefinitionId == FactoryEntityDefinitions.ReceivingTerminalDefinitionId;
-    public bool IsTerminal => IsSendingTerminal || IsReceivingTerminal;
-    public bool IsSupplier => IsProducer || IsTerminal;
+    public bool IsShippingDock => DefinitionId == FactoryEntityDefinitions.ShippingDockDefinitionId;
+    public bool IsReceivingDock => DefinitionId == FactoryEntityDefinitions.ReceivingDockDefinitionId;
+    public bool IsDock => IsShippingDock || IsReceivingDock;
+    public bool IsSendingTerminal => IsShippingDock;
+    public bool IsReceivingTerminal => IsReceivingDock;
+    public bool IsTerminal => IsDock;
+    public bool IsSupplier => IsProducer || IsDock;
     public string SuppliedItemId => IsProducer
         ? ProducedItemId
-        : IsTerminal
+        : IsDock
             ? AcceptedItemId
             : string.Empty;
-    public bool IsStorage => IsReceiver && !IsProducer && !IsProcessor && !IsTerminal;
+    public bool IsStorage => IsReceiver && !IsProducer && !IsProcessor && !IsDock;
 }
 
 public static class FactoryEntityDefinitions
@@ -46,13 +49,16 @@ public static class FactoryEntityDefinitions
     public const string ProcessorDefinitionId = "test-processor";
     public const string TestStorageDefinitionId = "test-storage";
     public const string PackedStorageDefinitionId = "packed-storage";
-    public const string SendingTerminalDefinitionId = "sending-terminal";
-    public const string ReceivingTerminalDefinitionId = "receiving-terminal";
+    public const string ShippingDockDefinitionId = "shipping-dock";
+    public const string ReceivingDockDefinitionId = "receiving-dock";
+    public const string SendingTerminalDefinitionId = ShippingDockDefinitionId;
+    public const string ReceivingTerminalDefinitionId = ReceivingDockDefinitionId;
     public const string TestProductId = "test-product";
     public const string PackedProductId = "packed-product";
 
     public static FactoryEntityDefinition Get(string definitionId)
     {
+        definitionId = NormalizeDefinitionId(definitionId);
         if (FactoryConveyor.IsConveyor(definitionId))
         {
             return new FactoryEntityDefinition(definitionId, TestProductId, TestProductId, 1, 1, 0.6f);
@@ -90,8 +96,8 @@ public static class FactoryEntityDefinitions
                 0f);
         }
 
-        if (definitionId == SendingTerminalDefinitionId
-            || definitionId == ReceivingTerminalDefinitionId)
+        if (definitionId == ShippingDockDefinitionId
+            || definitionId == ReceivingDockDefinitionId)
         {
             return new FactoryEntityDefinition(
                 definitionId,
@@ -112,5 +118,15 @@ public static class FactoryEntityDefinitions
             0,
             1,
             0f);
+    }
+
+    public static string NormalizeDefinitionId(string definitionId)
+    {
+        return definitionId switch
+        {
+            "sending-terminal" => ShippingDockDefinitionId,
+            "receiving-terminal" => ReceivingDockDefinitionId,
+            _ => definitionId
+        };
     }
 }

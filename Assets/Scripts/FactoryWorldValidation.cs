@@ -117,10 +117,10 @@ public static class FactoryWorldValidation
 
                 entityParents.Add(entity.Guid, floor.Guid);
                 entityRecords.Add(entity.Guid, entity);
-                if (FactoryEntityDefinitions.Get(entity.DefinitionId).IsTerminal
+                if (FactoryEntityDefinitions.Get(entity.DefinitionId).IsDock
                     && entity.InputCount != 0)
                 {
-                    error = $"Terminal entity {entity.Guid:D} cannot have a separate input buffer.";
+                    error = $"Dock entity {entity.Guid:D} cannot have a separate input buffer.";
                     return false;
                 }
             }
@@ -315,13 +315,13 @@ public static class FactoryWorldValidation
 
             if (!routeSourceEndpoints.Add(route.Source.EntityGuid))
             {
-                error = $"Truck route {route.Guid:D} sending terminal already has a truck assignment.";
+                error = $"Truck route {route.Guid:D} shipping dock already has a truck assignment.";
                 return false;
             }
 
             if (!routeDestinationEndpoints.Add(route.Destination.EntityGuid))
             {
-                error = $"Truck route {route.Guid:D} receiving terminal already has a truck assignment.";
+                error = $"Truck route {route.Guid:D} receiving dock already has a truck assignment.";
                 return false;
             }
 
@@ -362,21 +362,21 @@ public static class FactoryWorldValidation
                     entityRecords[route.Source.EntityGuid].DefinitionId);
                 var destinationDefinition = FactoryEntityDefinitions.Get(
                     entityRecords[route.Destination.EntityGuid].DefinitionId);
-                if (!sourceDefinition.IsSendingTerminal || !destinationDefinition.IsReceivingTerminal)
+                if (!sourceDefinition.IsShippingDock || !destinationDefinition.IsReceivingDock)
                 {
-                    error = $"Truck route {route.Guid:D} must connect a sending terminal to a receiving terminal.";
+                    error = $"Truck route {route.Guid:D} must connect a shipping dock to a receiving dock.";
                     return false;
                 }
 
                 if (connectionSources.Contains(route.Source.EntityGuid))
                 {
-                    error = $"Truck route {route.Guid:D} sending terminal already has an explicit connection.";
+                    error = $"Truck route {route.Guid:D} shipping dock already has an explicit connection.";
                     return false;
                 }
 
                 if (connectionDestinations.Contains(route.Destination.EntityGuid))
                 {
-                    error = $"Truck route {route.Guid:D} receiving terminal already has an explicit connection.";
+                    error = $"Truck route {route.Guid:D} receiving dock already has an explicit connection.";
                     return false;
                 }
             }
