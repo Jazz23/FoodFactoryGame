@@ -56,6 +56,7 @@ public sealed class FactoryRebuildAndValidateResult
 public sealed class FactoryReconcileSaveResult
 {
     public bool ok;
+    public string error = string.Empty;
     public bool changed;
     public int buildings;
     public List<FactoryPipelineRelocation> relocated = new();
@@ -296,7 +297,23 @@ public static class FactoryPipelineCommands
         [CliArg("confirm", "Save the reconciled database.")] bool confirm = false)
     {
         var databasePath = FactoryPipelinePersistenceService.ResolveDatabasePath(path);
-        var snapshot = new FactoryWorldSqliteStore(databasePath).Load();
+        var store = new FactoryWorldSqliteStore(databasePath);
+        var migrationPlan = store.PlanMigration();
+        if (migrationPlan.FromVersion != FactoryWorldSnapshot.CurrentSchemaVersion)
+        {
+            if (!migrationPlan.CanApply || dryRun || !confirm)
+            {
+                return new FactoryReconcileSaveResult
+                {
+                    ok = false,
+                    error = $"Database migration is required before reconciliation: {migrationPlan.Description}"
+                };
+            }
+
+            store.ApplyMigration();
+        }
+
+        var snapshot = store.Read();
         var reconciliation = FactoryWorldReconciliationService.Reconcile(snapshot);
         var result = new FactoryReconcileSaveResult
         {

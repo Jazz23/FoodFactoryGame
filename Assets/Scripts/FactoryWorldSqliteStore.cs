@@ -4,6 +4,48 @@ using System.Collections.Generic;
 using System.IO;
 using SQLite;
 
+public readonly struct FactoryWorldSchemaInspection
+{
+    public FactoryWorldSchemaInspection(
+        bool newExists,
+        bool newHasCoreSchema,
+        bool newHasTransportTables,
+        int newVersion)
+    {
+        Exists = newExists;
+        HasCoreSchema = newHasCoreSchema;
+        HasTransportTables = newHasTransportTables;
+        Version = newVersion;
+    }
+
+    public bool Exists { get; }
+    public bool HasCoreSchema { get; }
+    public bool HasTransportTables { get; }
+    public int Version { get; }
+    public bool RequiresMigration => HasCoreSchema
+        && Version != FactoryWorldSnapshot.CurrentSchemaVersion;
+}
+
+public readonly struct FactoryWorldMigrationPlan
+{
+    public FactoryWorldMigrationPlan(
+        int newFromVersion,
+        int newToVersion,
+        bool newCanApply,
+        string newDescription)
+    {
+        FromVersion = newFromVersion;
+        ToVersion = newToVersion;
+        CanApply = newCanApply;
+        Description = newDescription ?? string.Empty;
+    }
+
+    public int FromVersion { get; }
+    public int ToVersion { get; }
+    public bool CanApply { get; }
+    public string Description { get; }
+}
+
 public sealed class FactoryWorldSqliteStore
 {
     public const string DatabaseFileName = "factory-world.db";
@@ -23,10 +65,20 @@ public sealed class FactoryWorldSqliteStore
 
     public FactoryWorldSnapshot Load()
     {
-        return Load(Path);
+        return Read(Path);
     }
 
     public FactoryWorldSnapshot Load(string path)
+    {
+        return Read(path);
+    }
+
+    public FactoryWorldSnapshot Read()
+    {
+        return Read(Path);
+    }
+
+    public FactoryWorldSnapshot Read(string path)
     {
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
         {
@@ -34,16 +86,21 @@ public sealed class FactoryWorldSqliteStore
         }
 
         using var database = new SQLiteConnection(path);
-        if (!HasSchema(database))
+        var tableNames = ReadSchemaTableNames(database);
+        if (!HasCoreSchema(tableNames))
         {
             throw new InvalidDataException("The unified factory database has no recognized metadata.");
         }
 
-        UpgradeSchema(database);
         var version = ReadMetadata(database, SchemaVersionKey);
         if (version != FactoryWorldSnapshot.CurrentSchemaVersion)
         {
             throw new InvalidDataException($"Unsupported unified factory schema version {version}.");
+        }
+
+        if (!HasSchema9Tables(tableNames))
+        {
+            throw new InvalidDataException("The schema-9 factory database is missing transport tables.");
         }
 
         var snapshot = new FactoryWorldSnapshot { SchemaVersion = version };
@@ -165,6 +222,67 @@ public sealed class FactoryWorldSqliteStore
         }
 
         return snapshot;
+    }
+
+    public FactoryWorldSchemaInspection Inspect()
+    {
+        return Inspect(Path);
+    }
+
+    public FactoryWorldSchemaInspection Inspect(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+        {
+            return new FactoryWorldSchemaInspection(false, false, false, 0);
+        }
+
+        using var database = new SQLiteConnection(path);
+        var tableNames = ReadSchemaTableNames(database);
+        var hasCoreSchema = HasCoreSchema(tableNames);
+        return new FactoryWorldSchemaInspection(
+            true,
+            hasCoreSchema,
+            HasSchema9Tables(tableNames),
+            hasCoreSchema ? ReadMetadata(database, SchemaVersionKey) : 0);
+    }
+
+    public void ApplyMigration()
+    {
+        ApplyMigration(Path);
+    }
+
+    public void ApplyMigration(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+        {
+            throw new FileNotFoundException("The unified factory database does not exist.", path);
+        }
+
+        using var database = new SQLiteConnection(path);
+        UpgradeSchema(database);
+    }
+
+    public FactoryWorldMigrationPlan PlanMigration()
+    {
+        return PlanMigration(Path);
+    }
+
+    public FactoryWorldMigrationPlan PlanMigration(string path)
+    {
+        var inspection = Inspect(path);
+        var canApply = inspection.Exists
+            && inspection.HasCoreSchema
+            && inspection.Version == 8;
+        var description = canApply
+            ? "Add schema-9 transport tables and update schema metadata."
+            : inspection.Version == FactoryWorldSnapshot.CurrentSchemaVersion
+                ? "The database is already at the current schema."
+                : "No supported migration is available for this database.";
+        return new FactoryWorldMigrationPlan(
+            inspection.Version,
+            FactoryWorldSnapshot.CurrentSchemaVersion,
+            canApply,
+            description);
     }
 
     public void Save(FactoryWorldSnapshot snapshot)
@@ -368,7 +486,17 @@ public sealed class FactoryWorldSqliteStore
             throw new InvalidDataException("The unified factory database has an incomplete schema.");
         }
 
-        UpgradeSchema(database);
+        var version = ReadMetadata(database, SchemaVersionKey);
+        if (version != FactoryWorldSnapshot.CurrentSchemaVersion)
+        {
+            throw new InvalidDataException(
+                $"The unified factory database schema is {version}; call ApplyMigration before saving.");
+        }
+
+        if (!HasSchema9Tables(tableNames))
+        {
+            throw new InvalidDataException("The schema-9 factory database is missing transport tables.");
+        }
     }
 
     private static void UpgradeSchema(SQLiteConnection database)

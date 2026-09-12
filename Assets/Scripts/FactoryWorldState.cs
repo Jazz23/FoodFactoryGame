@@ -210,54 +210,25 @@ public sealed class FactoryWorldState
         float doorCornerExclusionDistance,
         out string error)
     {
-        error = string.Empty;
-        if (record is null)
-        {
-            error = "Building record is required.";
-            return false;
-        }
+        return TryUpdateBuildingRecord(
+            record,
+            doorCornerExclusionDistance,
+            out error,
+            out _);
+    }
 
-        var otherRecords = new List<BuildingRecord>();
-        foreach (var existingRecord in buildingRecords.Values)
-        {
-            if (existingRecord.BuildingInstanceId != record.BuildingInstanceId)
-            {
-                otherRecords.Add(existingRecord);
-            }
-        }
-
-        if (!BuildingShellValidation.TryValidate(
-                record,
-                otherRecords,
-                doorCornerExclusionDistance,
-                out error))
-        {
-            return false;
-        }
-
-        buildingRecords[record.BuildingInstanceId] = record.Clone();
-        var staleKeys = new List<OutsideTestFloorKey>();
-        foreach (var pair in floorStates)
-        {
-            if (pair.Key.BuildingInstanceId == record.BuildingInstanceId
-                && pair.Key.FloorIndex >= record.StoryCount)
-            {
-                staleKeys.Add(pair.Key);
-            }
-        }
-
-        foreach (var key in staleKeys)
-        {
-            BlockRoutesForFloor(
-                key.BuildingInstanceId,
-                key.FloorIndex,
-                $"Route endpoint floor {key.FloorIndex} in building {key.BuildingInstanceId} was removed.");
-            RemoveConnectionsForFloor(key.BuildingInstanceId, key.FloorIndex);
-            floorStates.Remove(key);
-        }
-
-        NormalizeBuildingFloorStates(buildingRecords[record.BuildingInstanceId]);
-        return true;
+    public bool TryUpdateBuildingRecord(
+        BuildingRecord record,
+        float doorCornerExclusionDistance,
+        out string error,
+        out FactoryBuildingEditResult result)
+    {
+        return FactoryBuildingEditService.TryUpdateBuildingRecord(
+            this,
+            record,
+            doorCornerExclusionDistance,
+            out error,
+            out result);
     }
 
     public bool TryGetBuildingInfo(
@@ -1288,6 +1259,13 @@ public sealed class FactoryWorldState
 
         try
         {
+            var unifiedStore = new FactoryWorldSqliteStore(path);
+            var migrationPlan = unifiedStore.PlanMigration();
+            if (migrationPlan.CanApply)
+            {
+                unifiedStore.ApplyMigration();
+            }
+
             var data = new OutsideTestFloorSqliteStore().Load(path);
             return LoadState(data, doorCornerExclusionDistance);
         }
@@ -1599,6 +1577,92 @@ public sealed class FactoryWorldState
 
             NormalizeFloorState(registration, state);
         }
+    }
+
+    internal void ApplyBuildingRecord(BuildingRecord record)
+    {
+        buildingRecords[record.BuildingInstanceId] = record.Clone();
+        var staleKeys = new List<OutsideTestFloorKey>();
+        foreach (var pair in floorStates)
+        {
+            if (pair.Key.BuildingInstanceId == record.BuildingInstanceId
+                && pair.Key.FloorIndex >= record.StoryCount)
+            {
+                staleKeys.Add(pair.Key);
+            }
+        }
+
+        foreach (var key in staleKeys)
+        {
+            BlockRoutesForFloor(
+                key.BuildingInstanceId,
+                key.FloorIndex,
+                $"Route endpoint floor {key.FloorIndex} in building {key.BuildingInstanceId} was removed.");
+            RemoveConnectionsForFloor(key.BuildingInstanceId, key.FloorIndex);
+            floorStates.Remove(key);
+        }
+
+        NormalizeBuildingFloorStates(buildingRecords[record.BuildingInstanceId]);
+    }
+
+    internal Vector2Int GetInteriorSize(BuildingRecord record)
+    {
+        return interiorOnlyBuildingIds.Contains(record.BuildingInstanceId)
+            ? record.FootprintSize
+            : BuildingFootprint.GetUsableInteriorSize(record.FootprintSize);
+    }
+
+    internal void RebindEntityEndpoint(
+        FactoryEntityEndpoint oldEndpoint,
+        FactoryEntityEndpoint newEndpoint)
+    {
+        for (var index = 0; index < connections.Count; index++)
+        {
+            var connection = connections[index];
+            var source = EndpointsMatch(connection.Source, oldEndpoint)
+                ? newEndpoint
+                : connection.Source;
+            var destination = EndpointsMatch(connection.Destination, oldEndpoint)
+                ? newEndpoint
+                : connection.Destination;
+            if (!source.Equals(connection.Source) || !destination.Equals(connection.Destination))
+            {
+                connections[index] = new FactoryEntityConnectionRecord(
+                    connection.Guid,
+                    source,
+                    destination);
+            }
+        }
+
+        for (var index = 0; index < truckRoutes.Count; index++)
+        {
+            var route = truckRoutes[index];
+            var source = EndpointsMatch(route.Source, oldEndpoint)
+                ? newEndpoint
+                : route.Source;
+            var destination = EndpointsMatch(route.Destination, oldEndpoint)
+                ? newEndpoint
+                : route.Destination;
+            if (!source.Equals(route.Source) || !destination.Equals(route.Destination))
+            {
+                truckRoutes[index] = new FactoryTruckRouteRecord(
+                    route.Guid,
+                    route.TruckGuid,
+                    source,
+                    destination,
+                    route.ItemId,
+                    route.CargoCapacity,
+                    route.TransferRateItemsPerSecond,
+                    route.OutboundTravelSeconds,
+                    route.ReturnTravelSeconds,
+                    route.PartialLoadDepartureWindowSeconds);
+            }
+        }
+    }
+
+    internal void ResumeRecoveryRoutes()
+    {
+        ResumeRecoveryTruckRoutes();
     }
 
     private void NormalizeFloorState(

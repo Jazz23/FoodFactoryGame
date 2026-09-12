@@ -722,6 +722,7 @@ namespace NotAI
 
             try
             {
+                ApplyPendingWorldMigration();
                 var loadedSnapshot = worldStore.Load();
                 ApplyWorldSnapshot(loadedSnapshot);
                 worldDirty = false;
@@ -984,6 +985,7 @@ namespace NotAI
                 worldStore = new FactoryWorldSqliteStore(GetDatabasePath());
                 if (worldStore.Exists)
                 {
+                    ApplyPendingWorldMigration();
                     worldSnapshot = worldStore.Load();
                 }
                 else
@@ -1011,6 +1013,15 @@ namespace NotAI
                 InitializationStatus = NAIStateInitializationStatus.Failed;
                 initializationError = exception.Message;
                 Debug.LogError($"NAIStateManager initialization failed: {exception}", this);
+            }
+        }
+
+        private void ApplyPendingWorldMigration()
+        {
+            var migrationPlan = worldStore.PlanMigration();
+            if (migrationPlan.CanApply)
+            {
+                worldStore.ApplyMigration();
             }
         }
 

@@ -5,7 +5,9 @@
 - `GameSceneManager` owns network scene loading, OutsideTest floor bindings, and transition-facing scene state.
 - `NAIStateManager` owns the authoritative factory snapshot, simulation, and runtime persistence coordination.
 - `FactoryWorldState` owns building, floor, entity, connection, route, and truck records.
+- `FactoryBuildingEditService` owns validated topology edits, deterministic equipment relocation, and endpoint rebinding.
 - `FactoryWorldSqliteStore` is the persistence adapter. Database roles are application save, authoring data, test fixture, and temporary preview.
+- `FactoryWorldSqliteStore.Inspect`, `PlanMigration`, `ApplyMigration`, `Read`, and `Save` keep schema inspection, migration, loading, and writing explicit.
 - `OutsideTestFloorPresentation` and related views render explicit building/floor state; they are not authoritative state owners.
 - `OutsideTestFloorDebugPanel` is a UI client of the current player/floor binding and should not be used as the primary API for domain tests.
 

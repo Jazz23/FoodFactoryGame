@@ -891,6 +891,63 @@ public sealed class OutsideTestFloorStateOwnerTests
     }
 
     [Test]
+    public void BuildingStoryReductionRelocatesEntitiesAndRebindsConnections()
+    {
+        var owner = new OutsideTestFloorStateOwner(1);
+        var original = new BuildingRecord(
+            2,
+            Vector3Int.zero,
+            new Vector2Int(5, 3),
+            2);
+        Assert.That(owner.TryRegisterBuilding(original, out var registrationError), Is.True, registrationError);
+        Assert.That(owner.TryGetFloorState(2, 0, out var ground), Is.True);
+        Assert.That(owner.TryGetFloorState(2, 1, out var upper), Is.True);
+        ground.SetEntities(new[]
+        {
+            new FactoryEntityRecord(1, "test-machine", new Vector2(0.5f, 0.5f), 0f, 0.4f, 8, 6)
+        });
+        upper.SetEntities(new[]
+        {
+            new FactoryEntityRecord(
+                9,
+                FactoryEntityRecord.StorageDefinitionId,
+                new Vector2(0.5f, 0.5f),
+                0f,
+                0f,
+                3,
+                4)
+        });
+        Assert.That(owner.TryAddConnection(
+            new FactoryEntityEndpoint(2, 0, 1),
+            new FactoryEntityEndpoint(2, 1, 9),
+            out var connectionError), Is.True, connectionError);
+
+        var reduced = new BuildingRecord(
+            2,
+            Vector3Int.zero,
+            new Vector2Int(5, 3),
+            1);
+        Assert.That(FactoryBuildingEditService.TryUpdateBuildingRecord(
+            owner,
+            reduced,
+            TestBuildingCreator.DefaultDoorCornerExclusionDistance,
+            out var error,
+            out var result), Is.True, error);
+
+        Assert.That(result.Changed, Is.True);
+        Assert.That(result.Relocations, Has.Count.EqualTo(1));
+        Assert.That(result.Relocations[0].EntityId, Is.EqualTo(9u));
+        Assert.That(result.Relocations[0].FromFloorIndex, Is.EqualTo(1));
+        Assert.That(result.Relocations[0].ToFloorIndex, Is.EqualTo(0));
+        Assert.That(owner.TryGetFloorState(2, 1, out _), Is.False);
+        Assert.That(owner.TryGetFloorState(2, 0, out ground), Is.True);
+        Assert.That(ground.TryGetEntity(9, out var movedEntity), Is.True);
+        Assert.That(movedEntity.OutputCount, Is.EqualTo(4));
+        Assert.That(owner.Connections, Has.Count.EqualTo(1));
+        Assert.That(owner.Connections[0].Destination, Is.EqualTo(new FactoryEntityEndpoint(2, 0, 9)));
+    }
+
+    [Test]
     public void VersionFivePreservesOutputAndVersionSixRoundTripPreservesConnection()
     {
         var source = new OutsideTestFloorStateOwner(1);

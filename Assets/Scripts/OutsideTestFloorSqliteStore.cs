@@ -126,7 +126,7 @@ public sealed class OutsideTestFloorSqliteStore
 
     private static OutsideTestFloorSaveData LoadUnifiedProjection(string path)
     {
-        var snapshot = new FactoryWorldSqliteStore().Load(path);
+        var snapshot = new FactoryWorldSqliteStore().Read(path);
         var data = new OutsideTestFloorSaveData
         {
             Version = FactoryWorldState.CurrentSaveVersion

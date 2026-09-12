@@ -85,6 +85,43 @@ public sealed class FactoryWorldPersistenceTests
     }
 
     [Test]
+    public void InspectAndReadDoNotMigrateOrModifyTheDatabase()
+    {
+        var snapshot = new FactoryWorldSnapshot();
+        var buildingGuid = Guid.NewGuid();
+        snapshot.Buildings.Add(new FactoryWorldBuildingRecord(
+            buildingGuid,
+            "outside-test-building",
+            Vector3Int.zero,
+            new Vector2Int(8, 8),
+            1,
+            false));
+        snapshot.Floors.Add(new FactoryWorldFloorRecord(
+            Guid.NewGuid(),
+            buildingGuid,
+            0,
+            "Floor 0",
+            1f,
+            0f,
+            Vector2.one));
+
+        var store = new FactoryWorldSqliteStore(databasePath);
+        store.Save(snapshot);
+        var before = File.GetLastWriteTimeUtc(databasePath);
+
+        var inspection = store.Inspect();
+        var restored = store.Read();
+
+        Assert.That(inspection.Exists, Is.True);
+        Assert.That(inspection.HasCoreSchema, Is.True);
+        Assert.That(inspection.HasTransportTables, Is.True);
+        Assert.That(inspection.Version, Is.EqualTo(FactoryWorldSnapshot.CurrentSchemaVersion));
+        Assert.That(inspection.RequiresMigration, Is.False);
+        Assert.That(restored.Buildings[0].Guid, Is.EqualTo(buildingGuid));
+        Assert.That(File.GetLastWriteTimeUtc(databasePath), Is.EqualTo(before));
+    }
+
+    [Test]
     public void ValidationRejectsDuplicateFloorIndicesWithinOneBuilding()
     {
         var buildingGuid = Guid.NewGuid();

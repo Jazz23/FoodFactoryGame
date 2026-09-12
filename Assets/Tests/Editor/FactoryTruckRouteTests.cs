@@ -652,6 +652,15 @@ public sealed class FactoryTruckRouteTests
         CreateSchema8Database(databasePath);
 
         var store = new FactoryWorldSqliteStore(databasePath);
+        var inspection = store.Inspect();
+        var migrationPlan = store.PlanMigration();
+        Assert.That(inspection.Version, Is.EqualTo(8));
+        Assert.That(inspection.RequiresMigration, Is.True);
+        Assert.That(migrationPlan.CanApply, Is.True);
+        Assert.That(migrationPlan.FromVersion, Is.EqualTo(8));
+        Assert.That(migrationPlan.ToVersion, Is.EqualTo(FactoryWorldSnapshot.CurrentSchemaVersion));
+        Assert.Throws<InvalidDataException>(() => store.Load());
+        store.ApplyMigration();
         var restored = store.Load();
 
         var buildingGuid = FactoryGuidMigration.ForBuilding(20);
