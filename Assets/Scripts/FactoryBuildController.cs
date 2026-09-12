@@ -8,6 +8,7 @@ public sealed class FactoryBuildController : MonoBehaviour
 {
     private PlayerSceneTransition owner = null!;
     private InputActionMap actions = null!;
+    private TestToolsShell shell = null!;
     private GameObject preview = null!;
     private SpriteRenderer previewRenderer = null!;
     private Sprite previewSprite = null!;
@@ -25,7 +26,6 @@ public sealed class FactoryBuildController : MonoBehaviour
     private string status = "Place sources, belts, and storage inside. Place shipping and receiving docks outside.";
     private readonly string[] labels = { "1 Source", "2 Conveyor", "3 Storage", "4 Shipping dock", "5 Receiving dock" };
     private readonly string[] arrows = { "East >", "North ^", "West <", "South v" };
-    private Rect Toolbar => new(12f, Screen.height - 116f, Mathf.Min(680f, Screen.width - 24f), 104f);
     private string Definition => selection == 0 ? FactoryEntityDefinitions.TestMachineDefinitionId
         : selection == 2 ? FactoryEntityDefinitions.TestStorageDefinitionId
         : selection == 3 ? FactoryEntityDefinitions.ShippingDockDefinitionId
@@ -37,6 +37,8 @@ public sealed class FactoryBuildController : MonoBehaviour
     public void Initialize(PlayerSceneTransition newOwner)
     {
         owner = newOwner;
+        shell = TestToolsShell.GetOrCreate();
+        shell.BindBuilder(this);
         actions = InputSystem.actions.FindActionMap("FactoryBuild", true).Clone();
         actions.Enable();
         preview = new GameObject("Factory Placement Preview");
@@ -59,6 +61,87 @@ public sealed class FactoryBuildController : MonoBehaviour
 
     public void SetStatus(string message) => status = message;
 
+    public bool IsBuilding => building;
+    public bool IsBuildContextActive => activeFloor || activeExterior;
+    public string Status => status;
+    public string DirectionLabel => arrows[direction];
+    public int RecoveryCount => GetRecoveryCount();
+
+    public string GetEquipmentLabel(int index) => labels[index];
+
+    public string GetInstructions()
+    {
+        return activeExterior
+            ? "Click an exterior cell beside a wall to place a dock | Esc: cancel | T: routes"
+            : "Click: place | Right click: remove | Esc: cancel | T: routes | F2: hide tools | F3: floors";
+    }
+
+    public void ToggleBuilding()
+    {
+        if (IsBuildContextActive)
+        {
+            building = !building;
+        }
+    }
+
+    public void SelectEquipment(int index)
+    {
+        if (index < 0 || index >= labels.Length || !IsBuildContextActive)
+        {
+            return;
+        }
+
+        selection = index;
+        building = true;
+    }
+
+    public void RotateBuilding()
+    {
+        if (IsBuildContextActive)
+        {
+            direction = (direction + 1) % 4;
+        }
+    }
+
+    public bool TryGetRecoveryCandidate(int index, out uint entityId, out string label)
+    {
+        entityId = 0;
+        label = string.Empty;
+        if (!TryGetCurrentMachineFloor(out var floor, out var buildingInfo))
+        {
+            return false;
+        }
+
+        var candidateIndex = 0;
+        foreach (var entity in floor.Entities)
+        {
+            if (entity is null
+                || BuildingFootprint.IsUsableInteriorPosition(entity.LogicalPosition, buildingInfo.InteriorSize))
+            {
+                continue;
+            }
+
+            if (candidateIndex != index)
+            {
+                candidateIndex++;
+                continue;
+            }
+
+            entityId = entity.EntityId;
+            label = $"RECOVER E{entity.EntityId}  {entity.DefinitionId}  ({entity.OutputCount + entity.InputCount} item(s))";
+            return true;
+        }
+
+        return false;
+    }
+
+    public void SelectRecovery(uint entityId)
+    {
+        recoveryId = entityId;
+        building = true;
+        status = $"Recovery selected: entity {entityId}. Click a free interior cell.";
+    }
+
     private void Update()
     {
         activeFloor = !owner.IsTransitioning && owner.TryGetCurrentOutsideTestFloor(out _, out _);
@@ -71,8 +154,7 @@ public sealed class FactoryBuildController : MonoBehaviour
             building = false;
             return;
         }
-        if (EventSystem.current is not null && EventSystem.current.currentSelectedGameObject is not null
-            && EventSystem.current.currentSelectedGameObject && EventSystem.current.currentSelectedGameObject.TryGetComponent<InputField>(out var field) && field.isFocused)
+        if (TestToolsShell.IsTextInputFocused)
             return;
         if (actions["Toggle"].WasPressedThisFrame()) building = !building;
         if (actions["Cancel"].WasPressedThisFrame()) building = false;
@@ -95,8 +177,7 @@ public sealed class FactoryBuildController : MonoBehaviour
         }
         var screen = actions["Point"].ReadValue<Vector2>();
         var guiPoint = new Vector2(screen.x, Screen.height - screen.y);
-        var overUI = Toolbar.Contains(guiPoint) || TestUIVisibility.ButtonRect.Contains(guiPoint)
-            || FactoryTruckRoutePanel.ContainsPointer(guiPoint)
+        var overUI = TestToolsShell.ContainsPointer(guiPoint)
             || (EventSystem.current is not null && EventSystem.current.IsPointerOverGameObject());
         SceneGrid.TryGetForScene(gameObject.scene, out var grid);
         var camera = Camera.main!;
@@ -144,57 +225,6 @@ public sealed class FactoryBuildController : MonoBehaviour
         }
     }
 
-    private void OnGUI()
-    {
-        if (!activeFloor && !activeExterior) return;
-        GUILayout.BeginArea(Toolbar, GUI.skin.box);
-        GUILayout.BeginHorizontal();
-        if (GUILayout.Button(building ? "B: Stop building" : "B: Build")) building = !building;
-        for (var index = 0; index < labels.Length; index++)
-            if (GUILayout.Toggle(building && selection == index, labels[index], GUI.skin.button)) { selection = index; building = true; }
-        if (GUILayout.Button($"R: {arrows[direction]}")) direction = (direction + 1) % 4;
-        GUILayout.EndHorizontal();
-        GUILayout.Label(activeExterior
-            ? "Click an exterior cell beside a wall to place a dock | Esc: cancel | T: truck routes"
-            : "Click: place | Right click: remove | Esc: cancel | T: truck routes | F2: test UIs | F3: floor debug");
-        GUILayout.Label(status);
-        if (activeExterior)
-        {
-            GUILayout.EndArea();
-            return;
-        }
-        if (owner.TryGetCurrentOutsideTestFloor(out var buildingId, out var floorIndex)
-            && GameSceneManager.Instance.TryGetOutsideTestFloorState(
-                buildingId,
-                floorIndex,
-                out var floor)
-            && GameSceneManager.Instance.TryGetOutsideTestBuildingInfo(
-                buildingId,
-                out var buildingInfo))
-        {
-            foreach (var entity in floor.Entities)
-            {
-                if (entity is null
-                    || BuildingFootprint.IsUsableInteriorPosition(
-                        entity.LogicalPosition,
-                        buildingInfo.InteriorSize))
-                {
-                    continue;
-                }
-
-                if (GUILayout.Button(
-                        $"Recover E{entity.EntityId} ({entity.DefinitionId}) "
-                        + $"{entity.OutputCount + entity.InputCount} item(s)"))
-                {
-                    recoveryId = entity.EntityId;
-                    building = true;
-                    status = $"Recovery selected: entity {entity.EntityId}. Click a free interior cell.";
-                }
-            }
-        }
-        GUILayout.EndArea();
-    }
-
     private Color GetPreviewColor()
     {
         return selection switch
@@ -209,8 +239,7 @@ public sealed class FactoryBuildController : MonoBehaviour
     {
         var screen = actions["Point"].ReadValue<Vector2>();
         var guiPoint = new Vector2(screen.x, Screen.height - screen.y);
-        var overUI = Toolbar.Contains(guiPoint) || TestUIVisibility.ButtonRect.Contains(guiPoint)
-            || FactoryTruckRoutePanel.ContainsPointer(guiPoint)
+        var overUI = TestToolsShell.ContainsPointer(guiPoint)
             || (EventSystem.current is not null && EventSystem.current.IsPointerOverGameObject());
         if (!SceneGrid.TryGetForScene(gameObject.scene, out var grid))
         {
@@ -252,9 +281,57 @@ public sealed class FactoryBuildController : MonoBehaviour
         }
     }
 
+    private int GetRecoveryCount()
+    {
+        if (!TryGetCurrentMachineFloor(out var floor, out var buildingInfo))
+        {
+            return 0;
+        }
+
+        var count = 0;
+        foreach (var entity in floor.Entities)
+        {
+            if (entity is not null
+                && !BuildingFootprint.IsUsableInteriorPosition(
+                    entity.LogicalPosition,
+                    buildingInfo.InteriorSize))
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    private bool TryGetCurrentMachineFloor(
+        out OutsideTestFloorRecord floor,
+        out OutsideTestBuildingInfo buildingInfo)
+    {
+        floor = null!;
+        buildingInfo = default;
+        if (owner is null
+            || !owner.TryGetCurrentOutsideTestFloor(out var buildingId, out var floorIndex)
+            || GameSceneManager.Instance is null
+            || !GameSceneManager.Instance.TryGetOutsideTestFloorState(buildingId, floorIndex, out floor)
+            || !GameSceneManager.Instance.TryGetOutsideTestBuildingInfo(buildingId, out buildingInfo))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
     private void OnDestroy()
     {
-        actions.Disable();
+        if (shell is not null && shell)
+        {
+            shell.UnbindBuilder(this);
+        }
+
+        if (actions is not null)
+        {
+            actions.Disable();
+        }
         if (preview is not null) Destroy(preview);
         if (previewSprite is not null) Destroy(previewSprite);
     }

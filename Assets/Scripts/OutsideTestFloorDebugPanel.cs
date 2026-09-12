@@ -49,13 +49,14 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
     private int destinationFloorIndex = -1;
     private uint selectedStorageId;
     private Transform selectorRoot = null!;
+    private Transform selectorContentRoot = null!;
     private Transform destinationBuildingRoot = null!;
     private Transform destinationFloorRoot = null!;
     private Transform destinationStorageRoot = null!;
-    private InputAction toggle = null!;
-    private InputAction cancel = null!;
     private InputAction moveMarker = null!;
-    private GameObject createdEventSystem = null!;
+    private TestToolsShell shell = null!;
+    private GameObject advancedConnectionsRoot = null!;
+    private Button connectionsToggle = null!;
     private string statusMessage = "Waiting for server state";
     private string selectorFingerprint = string.Empty;
     private string destinationFingerprint = string.Empty;
@@ -63,9 +64,18 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
     private int selectedFloor;
     private uint connectionSourceMachineId;
     private bool initialized;
-    private bool isOpen = true;
+    private bool connectionsExpanded;
 
-    public bool IsOpen => isOpen && TestUIVisibility.Visible;
+    public bool IsOpen => shell is not null && shell.IsFloorToolsVisible;
+
+    public void UnbindFromShell()
+    {
+        if (shell is not null && shell)
+        {
+            shell.TabChanged -= TabChanged;
+            shell.UnbindPlayer(owner);
+        }
+    }
 
     public void SetMachineEditResult(string message)
     {
@@ -167,6 +177,15 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
         owner.RequestDisconnectCurrentFloorEntity(
             selectedMachineId,
             FactoryEntityConnectionDirection.Outgoing);
+    }
+
+    private void ToggleConnectionsClicked()
+    {
+        connectionsExpanded = !connectionsExpanded;
+        advancedConnectionsRoot.SetActive(connectionsExpanded);
+        connectionsToggle.GetComponentInChildren<Text>().text = connectionsExpanded
+            ? "HIDE ADVANCED CONNECTIONS"
+            : "ADVANCED CONNECTIONS";
     }
 
     private void NextMachineClicked()
@@ -684,16 +703,12 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
         }
 
         owner = newOwner;
-        CreateEventSystem();
+        shell = TestToolsShell.GetOrCreate();
+        shell.BindPlayer(owner);
+        shell.TabChanged += TabChanged;
         CreateInterface();
-        toggle = InputSystem.actions.FindAction("OutsideTest/ToggleDebug", true);
-        cancel = InputSystem.actions.FindAction("UI/Cancel", true);
         moveMarker = InputSystem.actions.FindAction("OutsideTest/MoveMarker", true);
-        toggle.performed += TogglePerformed;
-        cancel.performed += CancelPerformed;
         moveMarker.performed += MoveMarkerPerformed;
-        toggle.Enable();
-        cancel.Enable();
         moveMarker.Enable();
         initialized = true;
         owner.RequestOutsideTestFloorSnapshot();
@@ -753,8 +768,6 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
     {
         if (initialized)
         {
-            canvasObject.GetComponent<Canvas>().enabled = TestUIVisibility.Visible;
-            root.SetActive(isOpen && TestUIVisibility.Visible);
             Refresh();
         }
     }
@@ -766,42 +779,17 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             return;
         }
 
-        toggle.performed -= TogglePerformed;
-        cancel.performed -= CancelPerformed;
+        UnbindFromShell();
         moveMarker.performed -= MoveMarkerPerformed;
-        toggle.Disable();
-        cancel.Disable();
         moveMarker.Disable();
-        if (canvasObject is not null && canvasObject)
-        {
-            Destroy(canvasObject);
-        }
-
-        if (createdEventSystem is not null && createdEventSystem)
-        {
-            Destroy(createdEventSystem);
-        }
     }
 
-    private void TogglePerformed(InputAction.CallbackContext _)
+    private void TabChanged(TestToolsTab tab)
     {
-        isOpen = !isOpen;
-        root.SetActive(isOpen);
-        if (isOpen)
+        if (tab == TestToolsTab.Floors || tab == TestToolsTab.Machines)
         {
             Refresh();
         }
-    }
-
-    private void CancelPerformed(InputAction.CallbackContext _)
-    {
-        if (!isOpen)
-        {
-            return;
-        }
-
-        isOpen = false;
-        root.SetActive(false);
     }
 
     private void MoveMarkerPerformed(InputAction.CallbackContext context)
@@ -916,11 +904,6 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
 
     private void Refresh()
     {
-        if (!isOpen)
-        {
-            return;
-        }
-
         RefreshSelectionButtons();
         RefreshMachines();
         var hasState = GameSceneManager.Instance.TryGetOutsideTestFloorState(
@@ -1004,40 +987,14 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             : $"{statusMessage}\n{authoritativeError}";
     }
 
-    private void CreateEventSystem()
-    {
-        if (FindFirstObjectByType<EventSystem>() is not null)
-        {
-            return;
-        }
-
-        createdEventSystem = new GameObject(
-            "OutsideTest EventSystem",
-            typeof(EventSystem),
-            typeof(InputSystemUIInputModule));
-        createdEventSystem.transform.SetParent(transform, false);
-    }
-
     private void CreateInterface()
     {
-        canvasObject = new GameObject(
-            "OutsideTest Debug Canvas",
-            typeof(Canvas),
-            typeof(CanvasScaler),
-            typeof(GraphicRaycaster));
-        canvasObject.transform.SetParent(transform, false);
-        var canvas = canvasObject.GetComponent<Canvas>();
-        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvas.sortingOrder = 200;
-        var scaler = canvasObject.GetComponent<CanvasScaler>();
-        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1280f, 720f);
-
+        canvasObject = shell.ToolsCanvasObject;
         root = CreateImage(
-            "OutsideTest Debug Panel",
-            canvasObject.transform,
-            new Color(0.025f, 0.055f, 0.075f, 0.94f));
-        SetTopRect(root.GetComponent<RectTransform>(), 16f, 16f, 420f, 700f);
+            "Floors Tool Content",
+            shell.GetTabContent(TestToolsTab.Floors),
+            TestToolsShell.CharcoalRaised);
+        SetTopRect(root.GetComponent<RectTransform>(), 0f, 0f, 428f, 720f);
 
         titleText = CreateText(
             "Title",
@@ -1068,9 +1025,36 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
 
         selectorRoot = new GameObject(
             "Building and Floor Selectors",
-            typeof(RectTransform)).transform;
+            typeof(RectTransform),
+            typeof(CanvasRenderer),
+            typeof(Image),
+            typeof(RectMask2D),
+            typeof(ScrollRect)).transform;
         selectorRoot.SetParent(root.transform, false);
-        SetTopRect(selectorRoot.GetComponent<RectTransform>(), 14f, 252f, 392f, 70f);
+        selectorRoot.GetComponent<Image>().color = TestToolsShell.CharcoalField;
+        selectorRoot.GetComponent<Image>().raycastTarget = true;
+        SetTopRect(selectorRoot.GetComponent<RectTransform>(), 14f, 252f, 392f, 72f);
+        selectorContentRoot = new GameObject(
+            "Building and Floor Selector Content",
+            typeof(RectTransform)).transform;
+        selectorContentRoot.SetParent(selectorRoot, false);
+        var selectorContentRect = selectorContentRoot.GetComponent<RectTransform>();
+        selectorContentRect.anchorMin = new Vector2(0f, 1f);
+        selectorContentRect.anchorMax = new Vector2(1f, 1f);
+        selectorContentRect.pivot = new Vector2(0f, 1f);
+        selectorContentRect.sizeDelta = new Vector2(0f, 72f);
+        selectorContentRoot.gameObject.AddComponent<GridLayoutGroup>().cellSize = new Vector2(120f, 30f);
+        var selectorGrid = selectorContentRoot.GetComponent<GridLayoutGroup>();
+        selectorGrid.spacing = new Vector2(6f, 4f);
+        selectorGrid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+        selectorGrid.constraintCount = 3;
+        var selectorFitter = selectorContentRoot.gameObject.AddComponent<ContentSizeFitter>();
+        selectorFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        var selectorScroll = selectorRoot.GetComponent<ScrollRect>();
+        selectorScroll.horizontal = false;
+        selectorScroll.vertical = true;
+        selectorScroll.viewport = selectorRoot.GetComponent<RectTransform>();
+        selectorScroll.content = selectorContentRect;
 
         CreateTextLabel(root.transform, "Label", "LABEL", 14f, 332f);
         labelInput = CreateInputField(
@@ -1236,38 +1220,15 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             TextAnchor.UpperLeft,
             new Color(0.6f, 0.78f, 0.76f));
         SetTopRect(statusText.rectTransform, 14f, 446f, 392f, 40f);
-        var machines = CreateImage("Current Floor Machines", root.transform,
-            new Color(0.025f, 0.055f, 0.075f, 0.94f));
-        SetTopRect(machines.GetComponent<RectTransform>(), 434f, 0f, 420f, 270f);
+        var machines = CreateImage(
+            "Machines Tool Content",
+            shell.GetTabContent(TestToolsTab.Machines),
+            TestToolsShell.CharcoalRaised);
+        SetTopRect(machines.GetComponent<RectTransform>(), 0f, 0f, 428f, 730f);
         var machineTitle = CreateText("Machine Title", machines.transform, "CURRENT FLOOR MACHINES", 16,
-            TextAnchor.MiddleLeft, new Color(0.78f, 1f, 0.9f));
+            TextAnchor.MiddleLeft, TestToolsShell.Teal);
         SetTopRect(machineTitle.rectTransform, 12f, 10f, 396f, 28f);
-        var machineScrollRect = machines.AddComponent<ScrollRect>();
-        machineScrollRect.horizontal = false;
-        machineScrollRect.vertical = true;
-        var machineViewport = new GameObject(
-            "Current Floor Machines Viewport",
-            typeof(RectTransform),
-            typeof(RectMask2D));
-        machineViewport.transform.SetParent(machines.transform, false);
-        SetTopRect(
-            machineViewport.GetComponent<RectTransform>(),
-            0f,
-            42f,
-            420f,
-            228f);
-        var machineContent = new GameObject(
-            "Current Floor Machines Content",
-            typeof(RectTransform)).transform;
-        machineContent.SetParent(machineViewport.transform, false);
-        SetTopRect(
-            machineContent.GetComponent<RectTransform>(),
-            0f,
-            0f,
-            420f,
-            600f);
-        machineScrollRect.viewport = machineViewport.GetComponent<RectTransform>();
-        machineScrollRect.content = machineContent.GetComponent<RectTransform>();
+        var machineContent = machines.transform;
         CreateTextLabel(machineContent, "Machine X Label", "X", 12f, 4f);
         machineXInput = CreateInputField(machineContent, "Machine X Input", "1", 38f, 0f, 120f, 32f,
             InputField.ContentType.DecimalNumber);
@@ -1283,64 +1244,81 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
         addPackedStorageButton = CreateButton("Add Packed Storage", "ADD PACKED STORAGE", machineContent,
             208f, 80f, 190f, 32f, AddPackedStorageClicked);
         machineSelectionText = CreateText("Machine Selection", machineContent, string.Empty, 13,
-            TextAnchor.MiddleLeft, Color.white);
-        SetTopRect(machineSelectionText.rectTransform, 12f, 156f, 396f, 38f);
+            TextAnchor.MiddleLeft, TestToolsShell.TextPrimary);
+        SetTopRect(machineSelectionText.rectTransform, 12f, 120f, 396f, 32f);
         machineDetailsText = CreateText("Machine Details", machineContent, string.Empty, 12,
-            TextAnchor.UpperLeft, new Color(0.9f, 0.94f, 0.96f));
-        SetTopRect(machineDetailsText.rectTransform, 12f, 194f, 396f, 52f);
+            TextAnchor.UpperLeft, TestToolsShell.TextPrimary);
+        SetTopRect(machineDetailsText.rectTransform, 12f, 156f, 396f, 52f);
         nextMachineButton = CreateButton("Next Machine", "SELECT NEXT", machineContent,
-            12f, 252f, 190f, 32f, NextMachineClicked);
+            12f, 216f, 190f, 32f, NextMachineClicked);
         removeMachineButton = CreateButton("Remove Machine", "REMOVE SELECTED", machineContent,
-            208f, 252f, 190f, 32f, RemoveMachineClicked);
+            208f, 216f, 190f, 32f, RemoveMachineClicked);
+        removeMachineButton.GetComponent<Image>().color = TestToolsShell.Destructive;
         drainOutputButton = CreateButton("Drain Output", "DRAIN OUTPUT", machineContent,
-            12f, 290f, 396f, 32f, DrainOutputClicked);
+            12f, 254f, 396f, 32f, DrainOutputClicked);
         connectionText = CreateText("Connection Text", machineContent, "CONNECTION: select an entity", 12,
-            TextAnchor.UpperLeft, new Color(0.78f, 0.9f, 0.88f));
-        SetTopRect(connectionText.rectTransform, 12f, 328f, 396f, 38f);
-        CreateTextLabel(machineContent, "Destination Building Label", "DEST BUILDING", 12f, 368f);
+            TextAnchor.UpperLeft, TestToolsShell.TextSecondary);
+        connectionsToggle = CreateButton(
+            "Advanced Connections",
+            "ADVANCED CONNECTIONS",
+            machineContent,
+            12f,
+            330f,
+            396f,
+            34f,
+            ToggleConnectionsClicked);
+        connectionsToggle.GetComponent<Image>().color = TestToolsShell.TealMuted;
+        advancedConnectionsRoot = CreateImage(
+            "Advanced Connection Controls",
+            machineContent,
+            TestToolsShell.Charcoal);
+        SetTopRect(advancedConnectionsRoot.GetComponent<RectTransform>(), 0f, 370f, 428f, 330f);
+        advancedConnectionsRoot.SetActive(false);
+        SetTopRect(connectionText.rectTransform, 12f, 8f, 404f, 48f);
+        connectionText.transform.SetParent(advancedConnectionsRoot.transform, false);
+        CreateTextLabel(advancedConnectionsRoot.transform, "Destination Building Label", "DEST BUILDING", 12f, 62f);
         destinationBuildingRoot = new GameObject(
             "Destination Building Selectors",
             typeof(RectTransform)).transform;
-        destinationBuildingRoot.SetParent(machineContent, false);
-        SetTopRect(destinationBuildingRoot.GetComponent<RectTransform>(), 104f, 366f, 294f, 30f);
-        CreateTextLabel(machineContent, "Destination Floor Label", "DEST FLOOR", 12f, 404f);
+        destinationBuildingRoot.SetParent(advancedConnectionsRoot.transform, false);
+        SetTopRect(destinationBuildingRoot.GetComponent<RectTransform>(), 104f, 60f, 294f, 30f);
+        CreateTextLabel(advancedConnectionsRoot.transform, "Destination Floor Label", "DEST FLOOR", 12f, 98f);
         destinationFloorRoot = new GameObject(
             "Destination Floor Selectors",
             typeof(RectTransform)).transform;
-        destinationFloorRoot.SetParent(machineContent, false);
-        SetTopRect(destinationFloorRoot.GetComponent<RectTransform>(), 104f, 402f, 294f, 30f);
-        CreateTextLabel(machineContent, "Destination Storage Label", "RECEIVER", 12f, 440f);
+        destinationFloorRoot.SetParent(advancedConnectionsRoot.transform, false);
+        SetTopRect(destinationFloorRoot.GetComponent<RectTransform>(), 104f, 96f, 294f, 30f);
+        CreateTextLabel(advancedConnectionsRoot.transform, "Destination Storage Label", "RECEIVER", 12f, 134f);
         destinationStorageRoot = new GameObject(
             "Destination Storage Selectors",
             typeof(RectTransform)).transform;
-        destinationStorageRoot.SetParent(machineContent, false);
-        SetTopRect(destinationStorageRoot.GetComponent<RectTransform>(), 104f, 438f, 294f, 30f);
-        connectButton = CreateButton("Connect", "CONNECT", machineContent,
-            12f, 474f, 94f, 32f, ConnectClicked);
-        disconnectButton = CreateButton("Disconnect", "DISCONNECT", machineContent,
-            112f, 474f, 98f, 32f, DisconnectClicked);
+        destinationStorageRoot.SetParent(advancedConnectionsRoot.transform, false);
+        SetTopRect(destinationStorageRoot.GetComponent<RectTransform>(), 104f, 132f, 294f, 30f);
+        connectButton = CreateButton("Connect", "CONNECT", advancedConnectionsRoot.transform,
+            12f, 170f, 94f, 32f, ConnectClicked);
+        disconnectButton = CreateButton("Disconnect", "DISCONNECT", advancedConnectionsRoot.transform,
+            112f, 170f, 98f, 32f, DisconnectClicked);
         disconnectIncomingButton = CreateButton(
             "Disconnect Incoming",
             "DISCONNECT IN",
-            machineContent,
+            advancedConnectionsRoot.transform,
             216f,
-            474f,
+            170f,
             98f,
             32f,
             DisconnectIncomingClicked);
         disconnectOutgoingButton = CreateButton(
             "Disconnect Outgoing",
             "DISCONNECT OUT",
-            machineContent,
+            advancedConnectionsRoot.transform,
             320f,
-            474f,
+            170f,
             78f,
             32f,
             DisconnectOutgoingClicked);
         machineStatusText = CreateText("Machine Status", machineContent, "Select an entity to drain or remove it.", 12,
-            TextAnchor.UpperLeft, new Color(0.6f, 0.78f, 0.76f));
-        SetTopRect(machineStatusText.rectTransform, 12f, 512f, 396f, 62f);
-        root.SetActive(true);
+            TextAnchor.UpperLeft, TestToolsShell.TextSecondary);
+        SetTopRect(machineStatusText.rectTransform, 12f, 370f, 396f, 48f);
     }
 
     private void CreateBuildingClicked()
@@ -1395,9 +1373,9 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
         }
 
         selectorFingerprint = fingerprint;
-        for (var index = selectorRoot.childCount - 1; index >= 0; index--)
+        for (var index = selectorContentRoot.childCount - 1; index >= 0; index--)
         {
-            Destroy(selectorRoot.GetChild(index).gameObject);
+            Destroy(selectorContentRoot.GetChild(index).gameObject);
         }
 
         for (var index = 0; index < buildingIds.Length; index++)
@@ -1406,7 +1384,7 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             var buildingButton = CreateButton(
                 $"Building {buildingId} Button",
                 $"BUILDING {buildingId}",
-                selectorRoot,
+                selectorContentRoot,
                 index * 126f,
                 0f,
                 120f,
@@ -1424,7 +1402,7 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             var floorButton = CreateButton(
                 $"Floor {floorIndex} Button",
                 $"FLOOR {floorIndex}",
-                selectorRoot,
+                selectorContentRoot,
                 floorIndex * 126f,
                 34f,
                 120f,
@@ -1447,7 +1425,7 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
         var inputObject = CreateImage(
             name,
             parent,
-            new Color(0.1f, 0.15f, 0.17f, 1f));
+            TestToolsShell.CharcoalField);
         SetTopRect(inputObject.GetComponent<RectTransform>(), x, y, width, height);
         var input = inputObject.AddComponent<InputField>();
         input.contentType = contentType;
@@ -1458,7 +1436,7 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             value,
             14,
             TextAnchor.MiddleLeft,
-            Color.white);
+            TestToolsShell.TextPrimary);
         Stretch(text.rectTransform, new Vector2(8f, 0f), new Vector2(-8f, 0f));
         input.textComponent = text;
         var placeholder = CreateText(
@@ -1467,7 +1445,7 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             "type here",
             14,
             TextAnchor.MiddleLeft,
-            new Color(0.46f, 0.54f, 0.56f));
+            TestToolsShell.TextSecondary);
         Stretch(placeholder.rectTransform, new Vector2(8f, 0f), new Vector2(-8f, 0f));
         input.placeholder = placeholder;
         return input;
@@ -1486,7 +1464,7 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
         var buttonObject = CreateImage(
             name,
             parent,
-            new Color(0.16f, 0.28f, 0.3f, 1f));
+            TestToolsShell.TealMuted);
         SetTopRect(buttonObject.GetComponent<RectTransform>(), x, y, width, height);
         var button = buttonObject.AddComponent<Button>();
         button.targetGraphic = buttonObject.GetComponent<Image>();
@@ -1497,7 +1475,7 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             value,
             13,
             TextAnchor.MiddleCenter,
-            new Color(0.9f, 0.98f, 0.96f));
+            TestToolsShell.TextPrimary);
         Stretch(text.rectTransform, Vector2.zero, Vector2.zero);
         return button;
     }
@@ -1514,14 +1492,14 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
         var toggleObject = CreateImage(
             name,
             parent,
-            new Color(0.1f, 0.15f, 0.17f, 1f));
+            TestToolsShell.CharcoalField);
         SetTopRect(toggleObject.GetComponent<RectTransform>(), x, y, width, height);
         var toggle = toggleObject.AddComponent<Toggle>();
         toggle.targetGraphic = toggleObject.GetComponent<Image>();
         var checkmarkObject = CreateImage(
             "Checkmark",
             toggleObject.transform,
-            new Color(0.25f, 0.85f, 0.68f, 1f));
+            TestToolsShell.Teal);
         SetTopRect(checkmarkObject.GetComponent<RectTransform>(), 7f, 5f, 20f, 20f);
         toggle.graphic = checkmarkObject.GetComponent<Image>();
         toggle.isOn = true;
@@ -1531,7 +1509,7 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             value,
             12,
             TextAnchor.MiddleLeft,
-            new Color(0.9f, 0.98f, 0.96f));
+            TestToolsShell.TextPrimary);
         SetTopRect(text.rectTransform, 34f, 0f, width - 34f, height);
         return toggle;
     }
@@ -1549,7 +1527,7 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             value,
             12,
             TextAnchor.MiddleLeft,
-            new Color(0.58f, 0.73f, 0.72f));
+            TestToolsShell.TextSecondary);
         SetTopRect(text.rectTransform, x, y, 70f, 24f);
     }
 

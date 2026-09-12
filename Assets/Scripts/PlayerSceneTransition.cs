@@ -72,6 +72,10 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         move.Disable();
         cancel.Disable();
         CloseElevatorPrompt();
+        if (debugPanel is not null && debugPanel)
+        {
+            debugPanel.UnbindFromShell();
+        }
         if (factoryBuilder is not null) Destroy(factoryBuilder);
         if (routePanel is not null) Destroy(routePanel);
         if (debugPanel is not null && debugPanel)
@@ -523,9 +527,20 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
     [TargetRpc]
     private void TargetReceiveMachineEditResult(NetworkConnection connection, string message)
     {
-        debugPanel.SetMachineEditResult(message);
-        factoryBuilder.SetStatus(message);
-        routePanel.SetStatus(message);
+        if (debugPanel is not null && debugPanel)
+        {
+            debugPanel.SetMachineEditResult(message);
+        }
+
+        if (factoryBuilder is not null && factoryBuilder)
+        {
+            factoryBuilder.SetStatus(message);
+        }
+
+        if (routePanel is not null && routePanel)
+        {
+            routePanel.SetStatus(message);
+        }
     }
 
     public void RequestCreateTruckRoute(

@@ -1,15 +1,27 @@
-// Toggles test overlays together while leaving gameplay and the factory build toolbar available.
+// Owns F2 visibility for developer tools while leaving the shared launcher and build bar available.
+using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
 public sealed class TestUIVisibility : MonoBehaviour
 {
     public static bool Visible { get; private set; } = true;
+    public static event Action<bool> VisibilityChanged = delegate { };
+
     private InputAction toggle = null!;
 
-    public static Rect ButtonRect => new(Screen.width - 164f, 8f, 152f, 26f);
+    public static Rect ButtonRect => new(Screen.width - 164f, 8f, 148f, 44f);
 
-    public static void SetVisible(bool visible) => Visible = visible;
+    public static void SetVisible(bool visible)
+    {
+        if (Visible == visible)
+        {
+            return;
+        }
+
+        Visible = visible;
+        VisibilityChanged(visible);
+    }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     private static void Initialize()
@@ -18,6 +30,7 @@ public sealed class TestUIVisibility : MonoBehaviour
         var controller = new GameObject("Test UI Visibility");
         DontDestroyOnLoad(controller);
         controller.AddComponent<TestUIVisibility>();
+        controller.AddComponent<TestToolsShell>();
     }
 
     private void Start()
@@ -28,20 +41,10 @@ public sealed class TestUIVisibility : MonoBehaviour
 
     private void Update()
     {
-        if (toggle.WasPressedThisFrame()) Visible = !Visible;
-        foreach (var canvas in FindObjectsByType<Canvas>(FindObjectsInactive.Include, FindObjectsSortMode.None))
-            if (canvas.name == "NetworkHudCanvas")
-            {
-                canvas.enabled = Visible;
-                foreach (var behaviour in canvas.GetComponents<MonoBehaviour>())
-                    if (behaviour.GetType().Name == "NetworkHudCanvases") behaviour.enabled = Visible;
-            }
-    }
-
-    private void OnGUI()
-    {
-        if (GUI.Button(ButtonRect, Visible ? "F2: Hide test UIs" : "F2: Show test UIs"))
-            Visible = !Visible;
+        if (toggle.WasPressedThisFrame() && !TestToolsShell.IsTextInputFocused)
+        {
+            SetVisible(!Visible);
+        }
     }
 
     private void OnDestroy()
