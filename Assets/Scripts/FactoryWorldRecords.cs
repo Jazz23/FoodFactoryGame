@@ -299,6 +299,11 @@ public sealed class FactoryWorldEntityRecord
     public int InputCount => inputCount;
     public bool IsNaiEntity => naiEntity;
 
+    public void SetLocalPosition(Vector2 newLocalPosition)
+    {
+        localPosition = newLocalPosition;
+    }
+
     public FactoryWorldEntityRecord Clone()
     {
         return new FactoryWorldEntityRecord(
