@@ -37,7 +37,6 @@ public sealed class FactoryAuthoringValidationResult
     public bool ok;
     public string scene = string.Empty;
     public int buildingsChecked;
-    public int floorScenesChecked;
     public List<FactoryPipelineIssue> issues = new();
 }
 
@@ -151,7 +150,7 @@ public static class FactoryPipelineCommands
 
     [CliCommand(
         "factory_validate_authoring",
-        "Validate deterministic OutsideTest authoring and floor-scene conformance.",
+        "Validate deterministic OutsideTest authoring and shared-template conformance.",
         MainThreadRequired = true)]
     public static FactoryAuthoringValidationResult ValidateAuthoring()
     {
@@ -483,6 +482,7 @@ public static class FactoryAuthoringPipelineService
         ValidateOutsideTestShells(context, result);
         ValidateOutsideTestGlobalState(context, result);
         ValidateBootstrapScene(result.issues);
+        ValidateBuildSceneList(result.issues);
         ValidateInsideFactoryTemplate(result.issues);
         result.ok = result.issues.Count == 0;
         return result;
@@ -560,22 +560,6 @@ public static class FactoryAuthoringPipelineService
                 layout.AnchorCell,
                 secondCorner,
                 expectedPlacements);
-            var floorSceneCount = layout.StoryCount;
-            result.floorScenesChecked += floorSceneCount;
-            for (var floorIndex = 0; floorIndex < floorSceneCount; floorIndex++)
-            {
-                var floorPath = TestBuildingFloorScenes.GetScenePath(
-                    buildingId,
-                    floorIndex);
-                if (AssetDatabase.LoadAssetAtPath<SceneAsset>(floorPath) is null)
-                {
-                    result.issues.Add(Issue(
-                        "FLOOR_SCENE_MISSING",
-                        buildingId,
-                        floorIndex));
-                }
-            }
-
             if (visuals is null || collision is null || doors is null)
             {
                 continue;
@@ -800,6 +784,34 @@ public static class FactoryAuthoringPipelineService
             if (openedForTest && scene.isLoaded)
             {
                 EditorSceneManager.CloseScene(scene, true);
+            }
+        }
+    }
+
+    private static void ValidateBuildSceneList(List<FactoryPipelineIssue> issues)
+    {
+        var expectedPaths = new HashSet<string>
+        {
+            FactoryPipelineCommands.BootstrapScenePath,
+            FactoryPipelineCommands.OutsideTestScenePath,
+            FactoryPipelineCommands.InsideFactoryTemplatePath
+        };
+        var buildScenes = EditorBuildSettings.scenes;
+        foreach (var scene in buildScenes)
+        {
+            if (!scene.enabled || expectedPaths.Contains(scene.path))
+            {
+                continue;
+            }
+
+            issues.Add(Issue("NON_CANONICAL_SCENE_IN_BUILD"));
+        }
+
+        foreach (var path in expectedPaths)
+        {
+            if (!buildScenes.Any(scene => scene.enabled && scene.path == path))
+            {
+                issues.Add(Issue("CANONICAL_SCENE_MISSING_FROM_BUILD"));
             }
         }
     }

@@ -1,4 +1,4 @@
-// Loads building-specific interior scenes and returns players to their source building.
+// Loads shared factory interior instances and returns players to their source building.
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -61,7 +61,7 @@ public sealed class GameSceneManager : MonoBehaviour
     [SerializeField] private NetworkObject playerPrefab = null!;
     [SerializeField] private NetworkObject stateManagerPrefab = null!;
     [SerializeField] private string worldSceneName = "World";
-    [SerializeField] private string insideSceneName = "Inside";
+    [SerializeField] private string insideSceneName = TestBuildingFloorScenes.TemplateSceneName;
     [SerializeField] private string outsideTestStatePath = string.Empty;
 
     private readonly HashSet<int> awaitingInitialSpawn = new();

@@ -28,6 +28,12 @@ public sealed class TestBuildingCreatorEditor : Editor
 
     private TestBuildingCreator Creator => (TestBuildingCreator)target;
 
+    private static string EditorPreviewStatePath => Path.Combine(
+        FactoryWorldPaths.GetProjectRoot(),
+        "Temp",
+        "factory-editor-preview",
+        GameSceneManager.OutsideTestStateFileName);
+
     private void OnEnable()
     {
         if (target is not TestBuildingCreator || !target)
@@ -687,15 +693,6 @@ public sealed class TestBuildingCreatorEditor : Editor
             }
         }
 
-        var deletedSceneCount = 0;
-        if (!TestBuildingFloorSceneUtility.DeleteAllFloorScenes(out deletedSceneCount))
-        {
-            statusMessage = "Could not clear generated test buildings. Close any open inside scenes and try again.";
-            Repaint();
-            SceneView.RepaintAll();
-            return;
-        }
-
         var undoGroup = Undo.GetCurrentGroup();
         Undo.SetCurrentGroupName("Clear test buildings");
         for (var index = Creator.GeneratedBuildings.childCount - 1; index >= 0; index--)
@@ -706,16 +703,14 @@ public sealed class TestBuildingCreatorEditor : Editor
         RemoveAuthoredBuildingsFromSave(authoredBuildingIds);
         EditorSceneManager.MarkSceneDirty(Creator.gameObject.scene);
         Undo.CollapseUndoOperations(undoGroup);
-        statusMessage = deletedSceneCount > 0
-            ? $"Cleared generated test buildings and deleted {deletedSceneCount} inside scenes."
-            : "Cleared generated test buildings.";
+        statusMessage = "Cleared generated test buildings and persisted their removal from floor data.";
         Repaint();
         SceneView.RepaintAll();
     }
 
     private void PersistAuthoredBuildings()
     {
-        var path = GameSceneManager.GetDefaultOutsideTestStatePath();
+        var path = EditorPreviewStatePath;
         var owner = new OutsideTestFloorStateOwner(GameSceneManager.LegacyOutsideTestBuildingId);
         if (File.Exists(path)
             && !owner.LoadFromFile(path, Creator.DoorCornerExclusionDistance))
@@ -726,7 +721,6 @@ public sealed class TestBuildingCreatorEditor : Editor
 
         foreach (var layout in Creator.GeneratedBuildings.GetComponentsInChildren<TestBuildingLayout>(true))
         {
-            TestBuildingFloorSceneUtility.EnsureFloorScenes(layout);
             if (!owner.TryUpdateBuildingRecord(
                     layout.ExportBuildingRecord(),
                     Creator.DoorCornerExclusionDistance,
@@ -745,7 +739,7 @@ public sealed class TestBuildingCreatorEditor : Editor
 
     private void RemoveAuthoredBuildingsFromSave(IEnumerable<uint> buildingIds)
     {
-        var path = GameSceneManager.GetDefaultOutsideTestStatePath();
+        var path = EditorPreviewStatePath;
         if (!File.Exists(path))
         {
             return;

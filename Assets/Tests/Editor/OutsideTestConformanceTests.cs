@@ -77,12 +77,6 @@ public sealed class OutsideTestConformanceTests
                         Is.EqualTo(TestBuildingCreator.GetRoofLogicalMax(
                             layout.AnchorCell,
                             secondCorner)));
-                    Assert.That(
-                        AssetDatabase.LoadAssetAtPath<SceneAsset>(
-                            TestBuildingFloorScenes.GetScenePath(
-                                layout.BuildingInstanceId,
-                                floorIndex)),
-                        Is.Not.Null);
                 }
 
                 var walls = visuals.GetComponentsInChildren<GridWall>(true);
@@ -185,6 +179,21 @@ public sealed class OutsideTestConformanceTests
                 EditorSceneManager.CloseScene(scene, true);
             }
         }
+    }
+
+    [Test]
+    public void BuildSettingsContainOnlyCanonicalFactoryScenes()
+    {
+        var buildScenes = EditorBuildSettings.scenes;
+        Assert.That(
+            buildScenes.Select(scene => scene.path),
+            Is.EquivalentTo(new[]
+            {
+                "Assets/Scenes/Bootstrap.unity",
+                "Assets/Scenes/OutsideTest.unity",
+                "Assets/Scenes/insidefactory0.unity"
+            }));
+        Assert.That(buildScenes.All(scene => scene.enabled), Is.True);
     }
 
     [Test]

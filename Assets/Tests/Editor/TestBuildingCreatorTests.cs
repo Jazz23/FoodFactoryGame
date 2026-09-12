@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
-using UnityEditor;
 using UnityEngine;
 
 public sealed class TestBuildingCreatorTests
@@ -182,116 +181,6 @@ public sealed class TestBuildingCreatorTests
         finally
         {
             Object.DestroyImmediate(layoutObject);
-        }
-    }
-
-    [Test]
-    public void FloorSceneNamesKeepTheBuildingIdAndFloorIndex()
-    {
-        Assert.That(
-            TestBuildingFloorScenes.GetSceneName(7, 0),
-            Is.EqualTo("insidefactory_7_0"));
-        Assert.That(
-            TestBuildingFloorScenes.GetScenePath(7, 3),
-            Is.EqualTo("Assets/Scenes/insidefactory_7_3.unity"));
-    }
-
-    [Test]
-    public void DeleteTopStoryRemovesItsSceneAndBuildEntry()
-    {
-        var buildingId = 900000u;
-        while (AssetDatabase.LoadAssetAtPath<SceneAsset>(
-                   TestBuildingFloorScenes.GetScenePath(buildingId, 1)) is not null)
-        {
-            buildingId++;
-        }
-
-        var path = TestBuildingFloorScenes.GetScenePath(buildingId, 1);
-        var originalScenes = EditorBuildSettings.scenes;
-        var layoutObject = new GameObject("Delete Top Story Layout");
-        try
-        {
-            Assert.That(
-                AssetDatabase.CopyAsset(TestBuildingFloorScenes.TemplateScenePath, path),
-                Is.True);
-            var scenes = new List<EditorBuildSettingsScene>(originalScenes)
-            {
-                new(path, true)
-            };
-            EditorBuildSettings.scenes = scenes.ToArray();
-            var layout = layoutObject.AddComponent<TestBuildingLayout>();
-            layout.SetBuildingInstanceId(buildingId);
-            layout.SetStoryCount(2);
-
-            Assert.That(TestBuildingFloorSceneUtility.DeleteTopStory(layout), Is.True);
-            Assert.That(AssetDatabase.LoadAssetAtPath<SceneAsset>(path), Is.Null);
-            Assert.That(layout.StoryCount, Is.EqualTo(1));
-            Assert.That(
-                EditorBuildSettings.scenes.Any(scene => scene.path == path),
-                Is.False);
-        }
-        finally
-        {
-            EditorBuildSettings.scenes = originalScenes;
-            AssetDatabase.DeleteAsset(path);
-            Object.DestroyImmediate(layoutObject);
-        }
-    }
-
-    [Test]
-    public void DeleteFloorScenesRemovesItsScenesAndBuildEntries()
-    {
-        var buildingId = 900000u;
-        while (AssetDatabase.LoadAssetAtPath<SceneAsset>(
-                   TestBuildingFloorScenes.GetScenePath(buildingId, 0)) is not null
-            || AssetDatabase.LoadAssetAtPath<SceneAsset>(
-                   TestBuildingFloorScenes.GetScenePath(buildingId, 1)) is not null)
-        {
-            buildingId++;
-        }
-
-        var paths = new[]
-        {
-            TestBuildingFloorScenes.GetScenePath(buildingId, 0),
-            TestBuildingFloorScenes.GetScenePath(buildingId, 1)
-        };
-        var originalScenes = EditorBuildSettings.scenes;
-        try
-        {
-            foreach (var path in paths)
-            {
-                Assert.That(
-                    AssetDatabase.CopyAsset(TestBuildingFloorScenes.TemplateScenePath, path),
-                    Is.True);
-            }
-
-            var scenes = new List<EditorBuildSettingsScene>(originalScenes);
-            foreach (var path in paths)
-            {
-                scenes.Add(new EditorBuildSettingsScene(path, true));
-            }
-
-            EditorBuildSettings.scenes = scenes.ToArray();
-            var deletedSceneCount = 0;
-            Assert.That(
-                TestBuildingFloorSceneUtility.DeleteFloorScenes(paths, out deletedSceneCount),
-                Is.True);
-            Assert.That(deletedSceneCount, Is.EqualTo(paths.Length));
-            foreach (var path in paths)
-            {
-                Assert.That(AssetDatabase.LoadAssetAtPath<SceneAsset>(path), Is.Null);
-                Assert.That(
-                    EditorBuildSettings.scenes.Any(scene => scene.path == path),
-                    Is.False);
-            }
-        }
-        finally
-        {
-            EditorBuildSettings.scenes = originalScenes;
-            foreach (var path in paths)
-            {
-                AssetDatabase.DeleteAsset(path);
-            }
         }
     }
 

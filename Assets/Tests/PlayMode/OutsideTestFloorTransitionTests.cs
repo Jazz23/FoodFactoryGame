@@ -226,6 +226,10 @@ public sealed class OutsideTestFloorTransitionTests
 
         // The debug selection intentionally differs from the occupied floor.
         player.GetComponent<OutsideTestFloorDebugPanel>().SelectFloor(2, 1);
+        yield return WaitForCondition(
+            () => FindMachineButton(player, "Add Test Machine").interactable,
+            3f,
+            "The add-machine control did not become available.");
         var addButton = FindMachineButton(player, "Add Test Machine");
         Assert.That(addButton.interactable, Is.True);
         addButton.onClick.Invoke();
@@ -293,11 +297,19 @@ public sealed class OutsideTestFloorTransitionTests
         player = PlayerSceneTransition.LocalOwner;
         yield return WaitForCondition(() => HasMachineView(player.gameObject.scene, survivorId),
             3f, "Restarted machine view did not restore.");
+        yield return WaitForCondition(
+            () => FindMachineButton(player, "Next Machine").interactable,
+            3f,
+            "The machine selection control did not become available.");
         FindMachineButton(player, "Next Machine").onClick.Invoke();
         yield return null;
         var lifetimeBeforeDrain = floor.Entities[0].ProducedCount;
         var outputBeforeDrain = floor.Entities[0].OutputCount;
         Assert.That(outputBeforeDrain, Is.EqualTo(FactoryEntityRecord.OutputCapacity));
+        yield return WaitForCondition(
+            () => FindMachineButton(player, "Drain Output").interactable,
+            3f,
+            "The drain-output control did not become available.");
         var drainButton = FindMachineButton(player, "Drain Output");
         Assert.That(drainButton.interactable, Is.True);
         drainButton.onClick.Invoke();
@@ -340,6 +352,10 @@ public sealed class OutsideTestFloorTransitionTests
         destinationFloor.SetEntities(Array.Empty<FactoryEntityRecord>());
 
         yield return EnterMachineTestBuilding();
+        yield return WaitForCondition(
+            () => FindMachineButton(player, "Add Test Machine").interactable,
+            3f,
+            "The source add-machine control did not become available.");
         FindMachineButton(player, "Add Test Machine").onClick.Invoke();
         yield return WaitForCondition(
             () => sourceFloor.Entities.Count == 1,
@@ -358,6 +374,10 @@ public sealed class OutsideTestFloorTransitionTests
                 && !player.IsTransitioning,
             10f,
             "The player did not reach the destination floor.");
+        yield return WaitForCondition(
+            () => FindMachineButton(player, "Add Test Storage").interactable,
+            3f,
+            "The destination add-storage control did not become available.");
         FindMachineButton(player, "Add Test Storage").onClick.Invoke();
         yield return WaitForCondition(
             () => destinationFloor.Entities.Count == 1,
@@ -463,8 +483,15 @@ public sealed class OutsideTestFloorTransitionTests
             3f,
             "The restored storage label did not hydrate.");
 
+        yield return WaitForCondition(
+            () => FindMachineButton(player, "Next Machine").interactable,
+            3f,
+            "The restored machine selection control did not become available.");
         FindMachineButton(player, "Next Machine").onClick.Invoke();
-        yield return null;
+        yield return WaitForCondition(
+            () => FindMachineButton(player, "Disconnect").interactable,
+            3f,
+            "The disconnect control did not become available.");
         var disconnectButton = FindMachineButton(player, "Disconnect");
         Assert.That(disconnectButton.interactable, Is.True);
         disconnectButton.onClick.Invoke();
