@@ -726,6 +726,7 @@ public sealed class TestBuildingCreatorEditor : Editor
 
         foreach (var layout in Creator.GeneratedBuildings.GetComponentsInChildren<TestBuildingLayout>(true))
         {
+            TestBuildingFloorSceneUtility.EnsureFloorScenes(layout);
             if (!owner.TryUpdateBuildingRecord(
                     layout.ExportBuildingRecord(),
                     Creator.DoorCornerExclusionDistance,

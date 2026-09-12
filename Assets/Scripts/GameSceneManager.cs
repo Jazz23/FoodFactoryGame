@@ -905,6 +905,7 @@ public sealed class GameSceneManager : MonoBehaviour
         outsideTestWorldReconciled = false;
         if (!ReconcileOutsideTestWorld(
                 !stateManager.LoadedFactoryBuildingRecords,
+                out var reconciliationChanged,
                 out var reconciliationError))
         {
             stateManager.LoadState(
@@ -913,8 +914,23 @@ public sealed class GameSceneManager : MonoBehaviour
             outsideTestWorldReconciled = false;
             ReconcileOutsideTestWorld(
                 false,
+                out _,
                 out _);
             lastOutsideTestError = reconciliationError;
+            return false;
+        }
+
+        if (reconciliationChanged && !stateManager.SaveWorld())
+        {
+            stateManager.LoadState(
+                previousState,
+                doorCornerExclusionDistance);
+            outsideTestWorldReconciled = false;
+            ReconcileOutsideTestWorld(
+                false,
+                out _,
+                out _);
+            lastOutsideTestError = "Could not save newly authored OutsideTest building state.";
             return false;
         }
 
@@ -1061,6 +1077,7 @@ public sealed class GameSceneManager : MonoBehaviour
         var importSceneLayouts = !stateManager.LoadedFactoryBuildingRecords;
         if (!ReconcileOutsideTestWorld(
                 importSceneLayouts,
+                out var reconciliationChanged,
                 out var reconciliationError))
         {
             outsideTestStateLoadFailed = true;
@@ -1069,12 +1086,25 @@ public sealed class GameSceneManager : MonoBehaviour
             return;
         }
 
+        if (networkManager.IsServerStarted && reconciliationChanged)
+        {
+            if (!stateManager.SaveWorld())
+            {
+                outsideTestStateLoadFailed = true;
+                lastOutsideTestError = "Could not save newly authored OutsideTest building state.";
+                Debug.LogError(lastOutsideTestError, this);
+                return;
+            }
+
+            outsideTestStateNeedsSave = false;
+        }
+
         stateManager.HydrateInsideTestScene(worldScene);
 
         outsideTestStateLoaded = true;
         outsideTestWorldReconciled = true;
         registeredOutsideTestSceneHandle = worldScene.GetRawHandle();
-        if (networkManager.IsServerStarted && importSceneLayouts)
+        if (networkManager.IsServerStarted && importSceneLayouts && !reconciliationChanged)
         {
             outsideTestStateNeedsSave = true;
         }
@@ -1372,8 +1402,10 @@ public sealed class GameSceneManager : MonoBehaviour
 
     private bool ReconcileOutsideTestWorld(
         bool importSceneLayouts,
+        out bool stateChanged,
         out string error)
     {
+        stateChanged = false;
         error = string.Empty;
         var worldScene = GetOutsideTestWorldScene();
         if (!worldScene.IsValid() || !worldScene.isLoaded)
@@ -1422,27 +1454,45 @@ public sealed class GameSceneManager : MonoBehaviour
             return false;
         }
 
-        if (importSceneLayouts)
+        var recordsToImport = new List<BuildingRecord>();
+        foreach (var record in layoutRecords)
         {
-            foreach (var record in layoutRecords)
+            if (stateManager.TryGetBuildingRecord(
+                    record.BuildingInstanceId,
+                    out var existingRecord))
             {
-                if (stateManager.TryGetBuildingRecord(
-                        record.BuildingInstanceId,
-                        out var existingRecord))
+                if (importSceneLayouts && !existingRecord.HasSameTopology(record))
                 {
-                    if (!existingRecord.HasSameTopology(record))
-                    {
-                        error = $"Duplicate building ID {record.BuildingInstanceId} has conflicting layout data.";
-                        return false;
-                    }
-
-                    continue;
+                    error = $"Duplicate building ID {record.BuildingInstanceId} has conflicting layout data.";
+                    return false;
                 }
 
+                continue;
+            }
+
+            recordsToImport.Add(record);
+        }
+
+        if (recordsToImport.Count > 0)
+        {
+            var combinedRecords = new List<BuildingRecord>(stateManager.BuildingRecords);
+            combinedRecords.AddRange(recordsToImport);
+            if (!BuildingShellValidation.TryValidateRecords(
+                    combinedRecords,
+                    creator.DoorCornerExclusionDistance,
+                    out error))
+            {
+                return false;
+            }
+
+            foreach (var record in recordsToImport)
+            {
                 if (!stateManager.TryRegisterBuilding(record, out error))
                 {
                     return false;
                 }
+
+                stateChanged = true;
             }
         }
 
