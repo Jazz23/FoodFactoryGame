@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using UnityEditor;
 using UnityEditor.SceneManagement;
+using UnityEditor.TestTools.TestRunner.Api;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using Unity.Pipeline.Commands;
@@ -84,6 +85,35 @@ public sealed class FactoryInspectSaveResult
 }
 
 [Serializable]
+public sealed class FactoryVerifyFailure
+{
+    public string name = string.Empty;
+    public string resultState = string.Empty;
+    public string message = string.Empty;
+    public string stackTrace = string.Empty;
+}
+
+[Serializable]
+public sealed class FactoryVerifyResult
+{
+    public string runId = string.Empty;
+    public string profile = string.Empty;
+    public string filter = string.Empty;
+    public string filterType = string.Empty;
+    public string sourceRevision = string.Empty;
+    public string status = "not_started";
+    public string artifactPath = string.Empty;
+    public string nunitArtifactPath = string.Empty;
+    public int matchedTestCount;
+    public int passedTestCount;
+    public int failedTestCount;
+    public int skippedTestCount;
+    public int inconclusiveTestCount;
+    public string error = string.Empty;
+    public List<FactoryVerifyFailure> failures = new();
+}
+
+[Serializable]
 public sealed class FactoryBuildingInspection
 {
     public string guid = string.Empty;
@@ -136,6 +166,105 @@ public static class FactoryPipelineCommands
     public const string OutsideTestScenePath = "Assets/Scenes/OutsideTest.unity";
     public const string BootstrapScenePath = "Assets/Scenes/Bootstrap.unity";
     public const string InsideFactoryTemplatePath = "Assets/Scenes/insidefactory0.unity";
+
+    private static FactoryVerifyCallback activeVerification;
+
+    [CliCommand(
+        "factory_verify",
+        "Start one named verification profile and persist concise results plus full artifacts.",
+        MainThreadRequired = true)]
+    public static FactoryVerifyResult Verify(
+        [CliArg("profile", "Verification profile: playmode, outside_floor, or truck_route.")] string profile = "playmode",
+        [CliArg("filter", "Optional test-name, assembly, or category filter.")] string filter = "",
+        [CliArg("filter_type", "Filter type: testName, assembly, or category.")] string filterType = "testName")
+    {
+        if (activeVerification is not null)
+        {
+            return activeVerification.Result;
+        }
+
+        var normalizedProfile = profile.Trim().ToLowerInvariant();
+        var normalizedFilterType = filterType.Trim().ToLowerInvariant();
+        if (!TryCreateVerificationFilter(
+                normalizedProfile,
+                filter,
+                normalizedFilterType,
+                out var testFilter,
+                out var error))
+        {
+            return FailedVerification(
+                normalizedProfile,
+                filter,
+                normalizedFilterType,
+                error);
+        }
+
+        var runId = Guid.NewGuid().ToString("N");
+        var artifactDirectory = Path.Combine(
+            FactoryWorldPaths.GetProjectRoot(),
+            "Temp",
+            "factory-verification");
+        Directory.CreateDirectory(artifactDirectory);
+        var result = new FactoryVerifyResult
+        {
+            runId = runId,
+            profile = normalizedProfile,
+            filter = filter,
+            filterType = normalizedFilterType,
+            sourceRevision = "unavailable",
+            status = "running",
+            artifactPath = Path.Combine(artifactDirectory, runId + ".json"),
+            nunitArtifactPath = Path.Combine(artifactDirectory, runId + ".xml")
+        };
+        activeVerification = new FactoryVerifyCallback(result);
+        activeVerification.Save();
+
+        try
+        {
+            var api = ScriptableObject.CreateInstance<TestRunnerApi>();
+            activeVerification.Api = api;
+            api.RegisterCallbacks(activeVerification);
+            activeVerification.TestRunnerGuid = api.Execute(new ExecutionSettings(testFilter));
+            activeVerification.Save();
+        }
+        catch (Exception exception)
+        {
+            activeVerification.FailInfrastructure(exception.Message);
+        }
+
+        return result;
+    }
+
+    [CliCommand(
+        "factory_verify_status",
+        "Read the persisted status and summary for a factory verification run.",
+        MainThreadRequired = true)]
+    public static FactoryVerifyResult VerifyStatus(
+        [CliArg("run_id", "Verification run ID returned by factory_verify.")] string runId = "")
+    {
+        if (!Guid.TryParseExact(runId, "N", out _))
+        {
+            return FailedVerification("", "", "", "run_id must be a verification ID.", runId);
+        }
+
+        if (activeVerification is not null
+            && string.Equals(activeVerification.Result.runId, runId, StringComparison.Ordinal))
+        {
+            return activeVerification.Result;
+        }
+
+        var artifactPath = Path.Combine(
+            FactoryWorldPaths.GetProjectRoot(),
+            "Temp",
+            "factory-verification",
+            runId + ".json");
+        if (!File.Exists(artifactPath))
+        {
+            return FailedVerification("", "", "", "Verification run was not found.", runId);
+        }
+
+        return JsonUtility.FromJson<FactoryVerifyResult>(File.ReadAllText(artifactPath));
+    }
 
     [CliCommand(
         "factory_rebuild_outside_shells",
@@ -211,6 +340,176 @@ public static class FactoryPipelineCommands
         [CliArg("confirm", "Apply stale shell rebuilds and save the scene.")] bool confirm = false)
     {
         return FactoryAuthoringPipelineService.RebuildAndValidate(dryRun, confirm);
+    }
+
+    private static bool TryCreateVerificationFilter(
+        string profile,
+        string filter,
+        string filterType,
+        out Filter testFilter,
+        out string error)
+    {
+        testFilter = new Filter
+        {
+            testMode = UnityEditor.TestTools.TestRunner.Api.TestMode.PlayMode
+        };
+        error = string.Empty;
+        if (filterType is not ("testname" or "assembly" or "category"))
+        {
+            error = "filter_type must be testName, assembly, or category.";
+            return false;
+        }
+
+        if (profile is not ("playmode" or "outside_floor" or "truck_route"))
+        {
+            error = "profile must be playmode, outside_floor, or truck_route.";
+            return false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter))
+        {
+            switch (filterType)
+            {
+                case "testname":
+                    testFilter.testNames = new[] { filter };
+                    break;
+                case "assembly":
+                    testFilter.assemblyNames = new[] { filter };
+                    break;
+                case "category":
+                    testFilter.categoryNames = new[] { filter };
+                    break;
+            }
+
+            return true;
+        }
+
+        switch (profile)
+        {
+            case "playmode":
+                return true;
+            case "outside_floor":
+                testFilter.groupNames = new[] { @"^OutsideTestFloorTransitionTests\." };
+                return true;
+            case "truck_route":
+                testFilter.groupNames = new[] { @"^FactoryTruckRoutePlayModeTests\." };
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private static FactoryVerifyResult FailedVerification(
+        string profile,
+        string filter,
+        string filterType,
+        string error,
+        string runId = "")
+    {
+        return new FactoryVerifyResult
+        {
+            runId = runId,
+            profile = profile,
+            filter = filter,
+            filterType = filterType,
+            status = "infrastructure_failed",
+            error = error
+        };
+    }
+
+    private sealed class FactoryVerifyCallback : ICallbacks
+    {
+        public FactoryVerifyCallback(FactoryVerifyResult result)
+        {
+            Result = result;
+        }
+
+        public readonly FactoryVerifyResult Result;
+        public TestRunnerApi Api;
+        public string TestRunnerGuid = string.Empty;
+
+        public void RunStarted(ITestAdaptor _)
+        {
+            Save();
+        }
+
+        public void RunFinished(ITestResultAdaptor result)
+        {
+            Result.passedTestCount = result.PassCount;
+            Result.failedTestCount = result.FailCount;
+            Result.skippedTestCount = result.SkipCount;
+            Result.inconclusiveTestCount = result.InconclusiveCount;
+            Result.matchedTestCount = result.PassCount
+                + result.FailCount
+                + result.SkipCount
+                + result.InconclusiveCount;
+            if (Result.matchedTestCount == 0)
+            {
+                Result.status = "infrastructure_failed";
+                Result.error = "The requested verification filter matched zero tests.";
+            }
+            else if (result.ResultState.Contains("Error", StringComparison.Ordinal)
+                     || result.ResultState.Contains("Cancelled", StringComparison.Ordinal)
+                     || result.ResultState.Contains("Invalid", StringComparison.Ordinal))
+            {
+                Result.status = "infrastructure_failed";
+                Result.error = result.Message;
+            }
+            else
+            {
+                Result.status = result.FailCount == 0 ? "passed" : "failed";
+            }
+
+            TestRunnerApi.SaveResultToFile(result, Result.nunitArtifactPath);
+            Save();
+            Finish();
+        }
+
+        public void TestStarted(ITestAdaptor test)
+        {
+        }
+
+        public void TestFinished(ITestResultAdaptor result)
+        {
+            if (!result.HasChildren
+                && result.TestStatus == UnityEditor.TestTools.TestRunner.Api.TestStatus.Failed)
+            {
+                Result.failures.Add(new FactoryVerifyFailure
+                {
+                    name = result.FullName,
+                    resultState = result.ResultState,
+                    message = result.Message,
+                    stackTrace = result.StackTrace
+                });
+            }
+        }
+
+        public void FailInfrastructure(string message)
+        {
+            Result.status = "infrastructure_failed";
+            Result.error = message;
+            Save();
+            Finish();
+        }
+
+        public void Save()
+        {
+            var absolutePath = Path.Combine(
+                FactoryWorldPaths.GetProjectRoot(),
+                Result.artifactPath);
+            File.WriteAllText(absolutePath, JsonUtility.ToJson(Result, true));
+        }
+
+        private void Finish()
+        {
+            if (Api is not null)
+            {
+                TestRunnerApi.UnregisterTestCallback(this);
+                UnityEngine.Object.DestroyImmediate(Api);
+            }
+
+            activeVerification = null!;
+        }
     }
 }
 

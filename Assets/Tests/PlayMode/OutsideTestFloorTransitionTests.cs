@@ -45,6 +45,7 @@ public sealed class OutsideTestFloorTransitionTests
 
     private readonly List<string> sceneGridErrors = new();
     private readonly List<string> unexpectedUnityErrors = new();
+    private FactoryTestWorld testWorld = null!;
     private NetworkManager networkManager = null!;
     private string savePath = string.Empty;
 
@@ -53,56 +54,16 @@ public sealed class OutsideTestFloorTransitionTests
     {
         Application.logMessageReceived += CaptureSceneGridError;
         Application.logMessageReceived += CaptureUnexpectedUnityError;
-        savePath = Path.Combine(
-            Application.temporaryCachePath,
-            $"outside-test-floor-{Guid.NewGuid():N}.db");
-        yield return SceneManager.LoadSceneAsync("Bootstrap", LoadSceneMode.Single);
-        yield return null;
-
-        networkManager = UnityEngine.Object.FindFirstObjectByType<NetworkManager>();
-        var sceneManager = UnityEngine.Object.FindFirstObjectByType<GameSceneManager>();
-        Assert.That(sceneManager, Is.Not.Null);
-        Assert.That(
-            sceneManager.ConfigureOutsideTestStatePath(savePath),
-            Is.True,
-            "The isolated PlayMode save path must be configured before FishNet starts.");
-        networkManager.ServerManager.StartConnection();
-        networkManager.ClientManager.StartConnection();
-        yield return WaitForCondition(
-            () => networkManager.ServerManager.Started
-                && networkManager.ClientManager.Started
-                && PlayerSceneTransition.LocalOwner is not null,
-            10f,
-            "FishNet host/client player did not start.");
+        testWorld = new FactoryTestWorld();
+        yield return testWorld.SetUp();
+        networkManager = testWorld.NetworkManager;
+        savePath = testWorld.SavePath;
     }
 
     [UnityTearDown]
     public IEnumerator TearDown()
     {
-        if (networkManager is not null)
-        {
-            if (networkManager.ClientManager.Started)
-            {
-                networkManager.ClientManager.StopConnection();
-            }
-
-            if (networkManager.ServerManager.Started)
-            {
-                networkManager.ServerManager.StopConnection(true);
-            }
-
-            yield return WaitForCondition(
-                () => !networkManager.ClientManager.Started
-                    && !networkManager.ServerManager.Started,
-                10f,
-                "FishNet did not stop before the isolated save file cleanup.");
-            yield return null;
-        }
-
-        if (File.Exists(savePath))
-        {
-            File.Delete(savePath);
-        }
+        yield return testWorld.TearDown();
 
         Application.logMessageReceived -= CaptureSceneGridError;
         Application.logMessageReceived -= CaptureUnexpectedUnityError;

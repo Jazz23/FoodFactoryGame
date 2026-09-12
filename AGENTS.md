@@ -12,3 +12,10 @@
 - Factory shell footprints include wall cells; usable interior size is `max(footprint - (2, 2), zero)`. Interior-only buildings retain their configured dimensions.
 - Factory reconciliation must preserve identities and gameplay state. Overflow equipment remains recoverable and must never be silently deleted.
 - Stateful tests must use isolated save paths and must not modify the application database.
+- Establish a baseline before attributing a regression; after a failure, capture diagnostics and state an evidence-backed hypothesis before adding waits or changing authoring.
+- Serialize live Editor mutations, compilation, and test execution. Parallelize only independent repository reads.
+- Do not change gameplay authoring to satisfy test fixture assumptions; use isolated test fixtures for test-specific dimensions and records.
+- Verification must report its requested filter, run identity, matched test count, and artifact path. Zero matched tests are a failure.
+- Mark acceptance criteria complete only when the required evidence exists; a build dry run is not a successful player build.
+- Keep tool responses concise and retrieve full logs only for relevant failures.
+- Keep the architecture and tested workflow map in `docs/architecture.md` and `docs/development.md`.
