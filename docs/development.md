@@ -36,3 +36,8 @@ Zero matched tests, compile failures, runner initialization failures, and timeou
 - UI tests deliberately verify binding, readiness, and displayed state.
 - PlayMode fixtures own temporary database paths, network lifecycle, static/UI reset, stable identities, and cleanup.
 - Tests must not resize gameplay buildings or modify the application database.
+
+## Transition Verification
+
+- `FloorTransitionCoordinatorTests` verifies phase sequencing, stale-sequence rejection, loaded-floor reuse, failed-load cleanup, and building return state without a live network connection.
+- Scene/network transition tests must additionally verify player arrival, scene unloading, disconnect cleanup, and client transition-state reset.

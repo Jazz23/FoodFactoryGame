@@ -2,7 +2,8 @@
 
 ## Runtime Ownership
 
-- `GameSceneManager` owns network scene loading, OutsideTest floor bindings, and transition-facing scene state.
+- `GameSceneManager` adapts FishNet scene callbacks and portal/elevator requests to the transition service.
+- `FloorTransitionCoordinator` owns transition phases, sequence validation, pending floor loads, loaded-floor reuse, return-floor state, and unload guards.
 - `NAIStateManager` owns the authoritative factory snapshot, simulation, and runtime persistence coordination.
 - `FactoryWorldState` owns building, floor, entity, connection, route, and truck records.
 - `FactoryBuildingEditService` owns validated topology edits, deterministic equipment relocation, and endpoint rebinding.

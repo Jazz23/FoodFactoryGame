@@ -206,6 +206,12 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         TargetSetTransitionState(Owner, true);
     }
 
+    public void ServerCancelTransition()
+    {
+        SetTransitionState(false);
+        TargetSetTransitionState(Owner, false);
+    }
+
     public bool TryGetCurrentOutsideTestFloor(
         out uint buildingInstanceId,
         out int floorIndex)
