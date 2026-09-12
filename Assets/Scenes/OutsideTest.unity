@@ -28663,6 +28663,7 @@ MonoBehaviour:
   roofSortingOrder: 1000
   visualStyle: {fileID: 11400000, guid: 70fb37141d8a41ec8c71847526d4a8be, type: 2}
   doorCornerExclusionDistance: 0.15
+  authoredLayout: {fileID: 11400000, guid: ec0c00e2d7626654fb5077327475ec87, type: 2}
   settingsVersion: 4
 --- !u!1 &3100000004
 GameObject:

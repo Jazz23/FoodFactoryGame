@@ -13,6 +13,7 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
     private PlayerSceneTransition owner = null!;
     private GameObject canvasObject = null!;
     private GameObject root = null!;
+    private GameObject machineRoot = null!;
     private Text titleText = null!;
     private Text stateText = null!;
     private Text summaryText = null!;
@@ -67,6 +68,42 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
     private bool connectionsExpanded;
 
     public bool IsOpen => shell is not null && shell.IsFloorToolsVisible;
+
+    public string GetMachineEditDiagnostics()
+    {
+        var manager = GameSceneManager.Instance;
+        var currentBuildingId = 0u;
+        var currentFloorIndex = -1;
+        var hasCurrentFloor = owner is not null
+            && owner
+            && owner.TryGetCurrentOutsideTestFloor(out currentBuildingId, out currentFloorIndex);
+        var canEdit = manager is not null
+            && manager
+            && owner is not null
+            && owner
+            && manager.CanEditCurrentFloorMachines(owner);
+        var addInteractable = addMachineButton is not null
+            && addMachineButton
+            && addMachineButton.interactable;
+        var selectedTabName = shell is null || !shell
+            ? "none"
+            : shell.SelectedTab.ToString();
+        var currentFloorName = hasCurrentFloor
+            ? $"B{currentBuildingId}/F{currentFloorIndex}"
+            : "none";
+        var managerError = manager is null || !manager
+            ? "none"
+            : manager.LastOutsideTestError;
+        return $"initialized={initialized};ownerAlive={owner is not null && owner};"
+            + $"shellBound={shell is not null && shell && shell.IsBoundTo(owner)};"
+            + $"visible={TestUIVisibility.Visible};"
+            + $"expanded={shell is not null && shell && shell.IsExpanded};"
+            + $"selectedTab={selectedTabName};"
+            + $"currentFloor={currentFloorName};"
+            + $"selectedFloor=B{selectedBuildingInstanceId}/F{selectedFloor};"
+            + $"canEdit={canEdit};addInteractable={addInteractable};"
+            + $"managerError={managerError}";
+    }
 
     public void UnbindFromShell()
     {
@@ -782,6 +819,15 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
         UnbindFromShell();
         moveMarker.performed -= MoveMarkerPerformed;
         moveMarker.Disable();
+        if (root is not null && root)
+        {
+            Destroy(root);
+        }
+
+        if (machineRoot is not null && machineRoot)
+        {
+            Destroy(machineRoot);
+        }
     }
 
     private void TabChanged(TestToolsTab tab)
@@ -1220,15 +1266,15 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             TextAnchor.UpperLeft,
             new Color(0.6f, 0.78f, 0.76f));
         SetTopRect(statusText.rectTransform, 14f, 446f, 392f, 40f);
-        var machines = CreateImage(
+        machineRoot = CreateImage(
             "Machines Tool Content",
             shell.GetTabContent(TestToolsTab.Machines),
             TestToolsShell.CharcoalRaised);
-        SetTopRect(machines.GetComponent<RectTransform>(), 0f, 0f, 428f, 730f);
-        var machineTitle = CreateText("Machine Title", machines.transform, "CURRENT FLOOR MACHINES", 16,
+        SetTopRect(machineRoot.GetComponent<RectTransform>(), 0f, 0f, 428f, 730f);
+        var machineTitle = CreateText("Machine Title", machineRoot.transform, "CURRENT FLOOR MACHINES", 16,
             TextAnchor.MiddleLeft, TestToolsShell.Teal);
         SetTopRect(machineTitle.rectTransform, 12f, 10f, 396f, 28f);
-        var machineContent = machines.transform;
+        var machineContent = machineRoot.transform;
         CreateTextLabel(machineContent, "Machine X Label", "X", 12f, 4f);
         machineXInput = CreateInputField(machineContent, "Machine X Input", "1", 38f, 0f, 120f, 32f,
             InputField.ContentType.DecimalNumber);

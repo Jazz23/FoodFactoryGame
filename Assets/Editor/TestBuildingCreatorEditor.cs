@@ -700,6 +700,7 @@ public sealed class TestBuildingCreatorEditor : Editor
             Undo.DestroyObjectImmediate(Creator.GeneratedBuildings.GetChild(index).gameObject);
         }
 
+        PersistCompactLayoutAsset();
         RemoveAuthoredBuildingsFromSave(authoredBuildingIds);
         EditorSceneManager.MarkSceneDirty(Creator.gameObject.scene);
         Undo.CollapseUndoOperations(undoGroup);
@@ -734,7 +735,10 @@ public sealed class TestBuildingCreatorEditor : Editor
         if (!owner.SaveToFile(path))
         {
             statusMessage = "Could not persist authored OutsideTest building records.";
+            return;
         }
+
+        PersistCompactLayoutAsset();
     }
 
     private void RemoveAuthoredBuildingsFromSave(IEnumerable<uint> buildingIds)
@@ -761,6 +765,24 @@ public sealed class TestBuildingCreatorEditor : Editor
         {
             statusMessage = "Could not remove authored OutsideTest building records.";
         }
+    }
+
+    private void PersistCompactLayoutAsset()
+    {
+        if (!Creator.HasAuthoredLayout)
+        {
+            return;
+        }
+
+        var records = new List<BuildingRecord>();
+        foreach (var layout in Creator.GeneratedBuildings.GetComponentsInChildren<TestBuildingLayout>(true))
+        {
+            records.Add(layout.ExportBuildingRecord());
+        }
+
+        Creator.AuthoredLayout.ReplaceRecords(records);
+        EditorUtility.SetDirty(Creator.AuthoredLayout);
+        AssetDatabase.SaveAssets();
     }
 
     private void EnsureBuildingInstanceIds()

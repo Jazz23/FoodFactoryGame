@@ -2,6 +2,7 @@
     "name": "FoodFactoryGame.PlayModeTests",
     "rootNamespace": "",
     "references": [
+        "FoodFactoryGame.Core",
         "FoodFactoryGame.Runtime",
         "FishNet.Runtime",
         "Unity.InputSystem"

@@ -2,6 +2,7 @@
     "name": "FoodFactoryGame.Runtime",
     "rootNamespace": "",
     "references": [
+        "FoodFactoryGame.Core",
         "FishNet.Runtime",
         "Unity.InputSystem",
         "Unity.RenderPipelines.Universal.Runtime",

@@ -41,3 +41,10 @@ Zero matched tests, compile failures, runner initialization failures, and timeou
 
 - `FloorTransitionCoordinatorTests` verifies phase sequencing, stale-sequence rejection, loaded-floor reuse, failed-load cleanup, and building return state without a live network connection.
 - Scene/network transition tests must additionally verify player arrival, scene unloading, disconnect cleanup, and client transition-state reset.
+
+## Compact Layout Workflow
+
+- `factory_export_building_layout --dry_run true` previews an OutsideTest layout export.
+- `factory_export_building_layout --confirm true --assign true` writes `Assets/Authoring/OutsideTestBuildingLayout.asset` and assigns it to `TestBuildingCreator`.
+- `factory_validate_building_layout` checks the asset schema, topology, and generated-layout match.
+- `factory_rebuild_outside_shells --dry_run true` verifies deterministic shell output without changing the scene.

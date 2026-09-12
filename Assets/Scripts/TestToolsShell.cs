@@ -84,6 +84,11 @@ public sealed class TestToolsShell : MonoBehaviour
         && selectedTab == TestToolsTab.Floors
         && TestUIVisibility.Visible;
 
+    public bool IsBoundTo(PlayerSceneTransition candidate)
+    {
+        return player == candidate;
+    }
+
     public event Action<TestToolsTab> TabChanged = delegate { };
 
     public static TestToolsShell GetOrCreate()

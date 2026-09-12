@@ -1406,10 +1406,15 @@ public sealed class GameSceneManager : MonoBehaviour
             layoutsById.Add(layout.BuildingInstanceId, layout);
         }
 
-        var layoutRecords = new List<BuildingRecord>();
-        foreach (var layout in layoutsById.Values)
+        var layoutRecords = creator.HasAuthoredLayout
+            ? creator.GetAuthoredBuildingRecords()
+            : new List<BuildingRecord>();
+        if (!creator.HasAuthoredLayout)
         {
-            layoutRecords.Add(layout.ExportBuildingRecord());
+            foreach (var layout in layoutsById.Values)
+            {
+                layoutRecords.Add(layout.ExportBuildingRecord());
+            }
         }
 
         if (importSceneLayouts
@@ -1566,11 +1571,11 @@ public sealed class GameSceneManager : MonoBehaviour
             yield break;
         }
 
-        foreach (var layout in creator.GeneratedBuildings.GetComponentsInChildren<TestBuildingLayout>(true))
+        foreach (var record in creator.GetAuthoredBuildingRecords())
         {
-            if (layout.BuildingInstanceId != 0)
+            if (record.BuildingInstanceId != 0)
             {
-                yield return layout.BuildingInstanceId;
+                yield return record.BuildingInstanceId;
             }
         }
     }

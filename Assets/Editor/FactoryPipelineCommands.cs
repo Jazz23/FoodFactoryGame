@@ -703,7 +703,9 @@ public static class FactoryAuthoringPipelineService
         {
             ok = true,
             scene = FactoryPipelineCommands.OutsideTestScenePath,
-            layoutCount = context.layouts.Count
+            layoutCount = context.creator is null || !context.creator
+                ? context.layouts.Count
+                : context.creator.GetAuthoredBuildingRecords().Count
         };
         AddContextIssues(context, result.issues);
         if (result.issues.Count > 0)
@@ -712,9 +714,12 @@ public static class FactoryAuthoringPipelineService
             return result;
         }
 
-        var records = context.layouts
-            .Select(layout => layout.ExportBuildingRecord())
-            .ToList();
+        var records = context.creator is not null && context.creator
+            ? context.creator.GetAuthoredBuildingRecords()
+            : context.layouts
+                .Select(layout => layout.ExportBuildingRecord())
+                .ToList();
+        records.Sort((left, right) => left.BuildingInstanceId.CompareTo(right.BuildingInstanceId));
         if (!BuildingShellValidation.TryValidateRecords(
                 records,
                 context.creator.DoorCornerExclusionDistance,
@@ -728,11 +733,39 @@ public static class FactoryAuthoringPipelineService
             return result;
         }
 
+        var layoutsById = context.layouts
+            .Where(layout => layout.BuildingInstanceId != 0)
+            .ToDictionary(layout => layout.BuildingInstanceId);
+        var retainedLayoutIds = new HashSet<uint>();
         var shouldApply = confirm && !dryRun;
-        for (var index = 0; index < context.layouts.Count; index++)
+        foreach (var record in records)
         {
-            var layout = context.layouts[index];
-            var record = records[index];
+            layoutsById.TryGetValue(record.BuildingInstanceId, out var layout);
+            if (layout is null || !layout)
+            {
+                result.rebuiltBuildingIds.Add(record.BuildingInstanceId);
+                if (!shouldApply)
+                {
+                    continue;
+                }
+
+                var createdShell = new BuildingShellAssembler().CreateShell(
+                    record,
+                    context.creator,
+                    context.creator.GeneratedBuildings);
+                if (createdShell is null || !createdShell)
+                {
+                    result.issues.Add(new FactoryPipelineIssue
+                    {
+                        code = "SHELL_CREATE_FAILED",
+                        buildingId = record.BuildingInstanceId
+                    });
+                }
+
+                continue;
+            }
+
+            retainedLayoutIds.Add(record.BuildingInstanceId);
             if (!BuildingShellAssembler.NeedsRebuild(
                     record,
                     context.creator,
@@ -757,6 +790,31 @@ public static class FactoryAuthoringPipelineService
                 code = "SHELL_REBUILD_FAILED",
                 buildingId = record.BuildingInstanceId
             });
+        }
+
+        if (context.creator.HasAuthoredLayout)
+        {
+            foreach (var layout in context.layouts)
+            {
+                if (retainedLayoutIds.Contains(layout.BuildingInstanceId)
+                    || records.Any(record => record.BuildingInstanceId == layout.BuildingInstanceId))
+                {
+                    continue;
+                }
+
+                if (shouldApply)
+                {
+                    UnityEngine.Object.DestroyImmediate(layout.gameObject);
+                }
+                else
+                {
+                    result.issues.Add(new FactoryPipelineIssue
+                    {
+                        code = "STALE_SCENE_LAYOUT",
+                        buildingId = layout.BuildingInstanceId
+                    });
+                }
+            }
         }
 
         if (result.issues.Count > 0)
@@ -808,10 +866,28 @@ public static class FactoryAuthoringPipelineService
         OutsideTestContext context,
         FactoryAuthoringValidationResult result)
     {
-        var records = new List<BuildingRecord>();
+        var sceneRecords = new List<BuildingRecord>();
         foreach (var layout in context.layouts)
         {
-            records.Add(layout.ExportBuildingRecord());
+            sceneRecords.Add(layout.ExportBuildingRecord());
+        }
+
+        var records = context.creator is not null && context.creator.HasAuthoredLayout
+            ? context.creator.GetAuthoredBuildingRecords()
+            : sceneRecords;
+        if (context.creator is not null
+            && context.creator.HasAuthoredLayout)
+        {
+            if (!context.creator.AuthoredLayout.TryValidate(
+                    context.creator.DoorCornerExclusionDistance,
+                    out _))
+            {
+                result.issues.Add(Issue("COMPACT_LAYOUT_INVALID"));
+            }
+            else if (!context.creator.AuthoredLayout.HasSameRecords(sceneRecords))
+            {
+                result.issues.Add(Issue("COMPACT_LAYOUT_SCENE_MISMATCH"));
+            }
         }
 
         if (!BuildingShellValidation.TryValidateRecords(
@@ -1001,6 +1077,7 @@ public static class FactoryAuthoringPipelineService
                 }
             }
         }
+
     }
 
     private static void ValidateOutsideTestGlobalState(

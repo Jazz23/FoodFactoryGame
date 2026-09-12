@@ -7,6 +7,7 @@ using FishNet.Managing;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 public sealed class FactoryTestWorld
 {
@@ -90,6 +91,9 @@ public sealed class FactoryTestWorld
     {
         var player = PlayerSceneTransition.LocalOwner;
         var manager = GameSceneManager.Instance;
+        var floorPanel = player is null
+            ? null
+            : player.GetComponentInChildren<OutsideTestFloorDebugPanel>(true);
         var diagnostic = new FactoryTestWorldDiagnostics
         {
             testName = TestContext.CurrentContext.Test.Name,
@@ -101,6 +105,10 @@ public sealed class FactoryTestWorld
             playerScene = player is null ? string.Empty : player.gameObject.scene.name,
             playerIsTransitioning = player is not null && player.IsTransitioning,
             loadedInteriorCount = manager is null ? -1 : manager.OutsideTestLoadedInteriorCount,
+            machineEditDiagnostics = floorPanel is null
+                ? "panel=missing"
+                : floorPanel.GetMachineEditDiagnostics()
+                    + $";buttonMatches={DescribeMachineButtons(player)}",
             consoleErrors = new List<string>(consoleErrors)
         };
         if (player is not null
@@ -121,6 +129,27 @@ public sealed class FactoryTestWorld
         diagnostic.artifactPath = Path.Combine(directory, fileName);
         File.WriteAllText(diagnostic.artifactPath, JsonUtility.ToJson(diagnostic, true));
         Debug.LogWarning($"Factory test diagnostics written to {diagnostic.artifactPath}.");
+    }
+
+    private static string DescribeMachineButtons(PlayerSceneTransition player)
+    {
+        if (player is null)
+        {
+            return "none";
+        }
+
+        var descriptions = new List<string>();
+        foreach (var button in player.GetComponentsInChildren<Button>(true))
+        {
+            if (button.name is "Add Test Machine" or "Next Machine")
+            {
+                descriptions.Add(
+                    $"{button.name}[active={button.gameObject.activeInHierarchy},"
+                    + $"enabled={button.isActiveAndEnabled},interactable={button.interactable}]" );
+            }
+        }
+
+        return descriptions.Count == 0 ? "none" : string.Join(",", descriptions);
     }
 
     private static IEnumerator WaitForCondition(
@@ -154,5 +183,6 @@ public sealed class FactoryTestWorldDiagnostics
     public string playerBuildingInstanceId = string.Empty;
     public int playerFloorIndex = -1;
     public int loadedInteriorCount;
+    public string machineEditDiagnostics = string.Empty;
     public List<string> consoleErrors = new();
 }

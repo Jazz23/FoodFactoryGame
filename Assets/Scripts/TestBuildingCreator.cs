@@ -60,6 +60,7 @@ public sealed class TestBuildingCreator : MonoBehaviour
     [SerializeField] private int roofSortingOrder = DefaultRoofSortingOrder;
     [SerializeField] private BuildingVisualStyle visualStyle = null!;
     [SerializeField, Min(0.01f)] private float doorCornerExclusionDistance = DefaultDoorCornerExclusionDistance;
+    [SerializeField] private FactoryBuildingLayoutAsset authoredLayout = null!;
     [SerializeField, HideInInspector] private int settingsVersion;
 
     public SceneGrid Grid => grid;
@@ -73,6 +74,34 @@ public sealed class TestBuildingCreator : MonoBehaviour
     public int RoofSortingOrder => roofSortingOrder;
     public BuildingVisualStyle VisualStyle => visualStyle;
     public float DoorCornerExclusionDistance => doorCornerExclusionDistance;
+    public FactoryBuildingLayoutAsset AuthoredLayout => authoredLayout;
+    public bool HasAuthoredLayout => authoredLayout is not null && authoredLayout;
+
+    public List<BuildingRecord> GetAuthoredBuildingRecords()
+    {
+        if (HasAuthoredLayout)
+        {
+            return authoredLayout.CloneRecords();
+        }
+
+        var records = new List<BuildingRecord>();
+        if (generatedBuildings is null || !generatedBuildings)
+        {
+            return records;
+        }
+
+        foreach (var layout in generatedBuildings.GetComponentsInChildren<TestBuildingLayout>(true))
+        {
+            records.Add(layout.ExportBuildingRecord());
+        }
+
+        return records;
+    }
+
+    public void SetAuthoredLayout(FactoryBuildingLayoutAsset newAuthoredLayout)
+    {
+        authoredLayout = newAuthoredLayout;
+    }
 
     public uint GetNextBuildingInstanceId()
     {
@@ -91,6 +120,17 @@ public sealed class TestBuildingCreator : MonoBehaviour
             if (stateNextId > maximumId)
             {
                 maximumId = stateNextId - 1u;
+            }
+        }
+
+        if (HasAuthoredLayout)
+        {
+            foreach (var record in authoredLayout.BuildingRecords)
+            {
+                if (record is not null && record.BuildingInstanceId > maximumId)
+                {
+                    maximumId = record.BuildingInstanceId;
+                }
             }
         }
 

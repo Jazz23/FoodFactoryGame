@@ -7,6 +7,8 @@
 - `NAIStateManager` owns the authoritative factory snapshot, simulation, and runtime persistence coordination.
 - `FactoryWorldState` owns building, floor, entity, connection, route, and truck records.
 - `FactoryBuildingEditService` owns validated topology edits, deterministic equipment relocation, and endpoint rebinding.
+- `FactoryBuildingLayoutAsset` stores compact authored building topology (identity, footprint, stories, and doors); generated shell children remain rebuildable output.
+- `TestBuildingCreator` and `GameSceneManager` consume the compact layout when it is assigned; `BuildingShellAssembler` is the deterministic geometry adapter.
 - `FactoryWorldSqliteStore` is the persistence adapter. Database roles are application save, authoring data, test fixture, and temporary preview.
 - `FactoryWorldSqliteStore.Inspect`, `PlanMigration`, `ApplyMigration`, `Read`, and `Save` keep schema inspection, migration, loading, and writing explicit.
 - `OutsideTestFloorPresentation` and related views render explicit building/floor state; they are not authoritative state owners.
