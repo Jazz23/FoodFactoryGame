@@ -58,11 +58,11 @@ public sealed class InteriorSizingTests
             Assert.That(generatedRoot.childCount, Is.EqualTo(9));
             Assert.That(edgeCollider.points, Is.EqualTo(new[]
             {
-                new Vector2(0f, -0.5f),
-                new Vector2(4f, -0.5f),
+                new Vector2(0f, 0f),
+                new Vector2(4f, 0f),
                 new Vector2(4f, 3f),
                 new Vector2(0f, 3f),
-                new Vector2(0f, -0.5f)
+                new Vector2(0f, 0f)
             }));
         }
         finally

@@ -11,8 +11,6 @@ public sealed class IndoorGrid : MonoBehaviour
     [SerializeField, Min(0.005f)] private float lineWidth = 0.025f;
     [SerializeField] private Color lineColor = new(0.17f, 0.21f, 0.27f, 1f);
     [SerializeField] private int sortingOrder = -10;
-    [SerializeField, Min(0f)] private float bottomCollisionPadding = 0.5f;
-
     private Transform generatedRoot = null!;
 
     public Vector2Int Size => size;
@@ -101,14 +99,13 @@ public sealed class IndoorGrid : MonoBehaviour
                 new Vector2(size.x, y));
         }
 
-        var bottom = -bottomCollisionPadding;
         edgeCollider.points = new[]
         {
-            ToLocalPoint(grid, new Vector2(0f, bottom)),
-            ToLocalPoint(grid, new Vector2(size.x, bottom)),
+            ToLocalPoint(grid, Vector2.zero),
+            ToLocalPoint(grid, new Vector2(size.x, 0f)),
             ToLocalPoint(grid, new Vector2(size.x, size.y)),
             ToLocalPoint(grid, new Vector2(0f, size.y)),
-            ToLocalPoint(grid, new Vector2(0f, bottom))
+            ToLocalPoint(grid, Vector2.zero)
         };
     }
 
