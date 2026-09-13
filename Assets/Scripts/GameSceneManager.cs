@@ -28,7 +28,7 @@ public sealed class GameSceneManager : MonoBehaviour
 
     [SerializeField] private NetworkObject playerPrefab = null!;
     [SerializeField] private NetworkObject stateManagerPrefab = null!;
-    [SerializeField] private string worldSceneName = "World";
+    [SerializeField] private string worldSceneName = "OutsideTest";
     [SerializeField] private string insideSceneName = TestBuildingFloorScenes.TemplateSceneName;
     [SerializeField] private string outsideTestStatePath = string.Empty;
 

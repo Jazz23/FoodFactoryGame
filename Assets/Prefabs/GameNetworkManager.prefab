@@ -88,8 +88,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   playerPrefab: {fileID: 5761831483980123327, guid: 69674d22f7cc5cc44abd39defee9af88, type: 3}
   stateManagerPrefab: {fileID: 3278503678750341793, guid: 0f844985623fade46a18a9e662037969, type: 3}
-  worldSceneName: '"OutsideTest"'
-  insideSceneName: '"insidefactory0"'
+  worldSceneName: OutsideTest
+  insideSceneName: insidefactory0
   outsideTestStatePath: 
 --- !u!114 &940202612940218515
 MonoBehaviour:

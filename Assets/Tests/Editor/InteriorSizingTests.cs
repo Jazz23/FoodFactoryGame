@@ -17,7 +17,7 @@ public sealed class InteriorSizingTests
                 7,
                 new Vector2Int(4, 5),
                 Vector2.one,
-                "FactoryInterior",
+                "insidefactory0",
                 new Vector2(2f, 0.5f),
                 new Vector2(3f, 1f),
                 GridEdgeDirection.West,
