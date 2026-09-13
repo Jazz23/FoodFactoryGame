@@ -17,7 +17,7 @@ GameObject:
   - component: {fileID: 7826029626880817274}
   - component: {fileID: 8034260352912711009}
   - component: {fileID: 4268245842914826721}
-  - component: {fileID: -3357010297339903751}
+  - component: {fileID: -8518492988767602189}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -258,14 +258,14 @@ MonoBehaviour:
   _spectatorInterpolation: 2
   _enableTeleport: 0
   _teleportThreshold: 1
-  <PrefabId>k__BackingField: 0
+  <PrefabId>k__BackingField: 2
   <SpawnableCollectionId>k__BackingField: 0
   <AssetPathHash>k__BackingField: 2092870565765373345
   SceneId: 0
   SerializedTransformProperties:
     Position: {x: 0, y: 0, z: 0}
     Rotation: {x: 0, y: 0, z: 0, w: 1}
-    Scale: {x: 0.5, y: 0.5, z: 1}
+    Scale: {x: 1, y: 1, z: 1}
     IsValid: 1
   <IsNested>k__BackingField: 0
   WasActiveDuringEdit: 0
@@ -287,7 +287,7 @@ MonoBehaviour:
   _initializeOrder: 0
   _preventDespawnOnDisconnect: 0
   _defaultDespawnType: 0
-  _initializedTimestamp: -8584141529974316679
+  _initializedTimestamp: -8584123404716251845
 --- !u!50 &5857774014812465802
 Rigidbody2D:
   serializedVersion: 5
@@ -349,9 +349,9 @@ CapsuleCollider2D:
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
-  m_Offset: {x: 0, y: -0.64}
-  m_Size: {x: 0.72, y: 0.72}
-  m_Direction: 0
+  m_Offset: {x: 0, y: 0.15}
+  m_Size: {x: 0.6, y: 0.3}
+  m_Direction: 1
 --- !u!114 &8034260352912711009
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -364,7 +364,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c8ef29d1feda98342904e88df191d275, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  size: {x: 0.36, y: 0.36, z: 1}
+  width: 0.6
+  groundDepth: 0.3
   synchronizeWithCollider: 1
 --- !u!114 &4268245842914826721
 MonoBehaviour:
@@ -381,7 +382,7 @@ MonoBehaviour:
   _componentIndexCache: 2
   _addedNetworkObject: {fileID: 5761831483980123327}
   _networkObjectCache: {fileID: 5761831483980123327}
---- !u!114 &-3357010297339903751
+--- !u!114 &-8518492988767602189
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -392,7 +393,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 8dfeef4607d624d44b4495ddae8b3048, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: 
+  m_EditorClassIdentifier: FoodFactoryGame.Runtime::PlayerInventory
   _componentIndexCache: 255
   _addedNetworkObject: {fileID: 5761831483980123327}
   _networkObjectCache: {fileID: 0}

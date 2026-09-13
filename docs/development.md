@@ -48,3 +48,10 @@ Zero matched tests, compile failures, runner initialization failures, and timeou
 - `factory_export_building_layout --confirm true --assign true` writes `Assets/Authoring/OutsideTestBuildingLayout.asset` and assigns it to `TestBuildingCreator`.
 - `factory_validate_building_layout` checks the asset schema, topology, and generated-layout match.
 - `factory_rebuild_outside_shells --dry_run true` verifies deterministic shell output without changing the scene.
+
+## Presentation-Scale Verification
+
+- `InteriorSizingTests` covers logical-to-world scaling plus generated interior floor-cell and doorway proportions.
+- The `outside_floor` profile covers isolated-save transition, movement, interaction, and equipment tests across `OutsideTest` and `insidefactory0`.
+- `InteractEntersBuildingFromExteriorArrival` exercises the configured E binding after physics settles at the exterior arrival, enters and exits through portal selection/RPCs, and verifies the return position remains usable. Direct scene-manager transition calls do not cover interaction reachability. Captures are `Temp/player-ground-interior.png` and `Temp/player-ground-exterior.png`.
+- The `truck_route` profile covers the isolated-save equipment, dock, transition, reload, and delivery route smoke test.

@@ -7,6 +7,8 @@ using System.Linq;
 using FishNet.Managing;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.LowLevel;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using UnityEngine.UI;
@@ -121,6 +123,124 @@ public sealed class OutsideTestFloorTransitionTests
         yield return WaitForCondition(() => storage.OutputCount == 12, 6f, "Saved backup did not drain into storage.");
         Assert.That(first.ConveyorPositions.Count + second.ConveyorPositions.Count, Is.Zero);
         TestUIVisibility.SetVisible(true);
+    }
+
+    [UnityTest]
+    public IEnumerator InteractEntersBuildingFromExteriorArrival()
+    {
+        var player = PlayerSceneTransition.LocalOwner;
+        var portal = FindPortal("OutsideTest", candidate => candidate.BuildingInstanceId == 2);
+        Assert.That(SceneGrid.TryGetForScene(player.gameObject.scene, out var grid), Is.True);
+        player.ServerTeleport(grid.LogicalToWorld(portal.ExteriorArrivalLogicalPosition));
+        yield return new WaitForSeconds(0.25f);
+        var ground = player.GetComponent<Virtual3DSize>();
+        Assert.That(portal.CanUse(ground.GroundAnchor), Is.True,
+            $"Door unreachable after physics: feet={ground.GroundAnchor}, door={portal.transform.position}");
+        var keyboard = Keyboard.current;
+        var addedKeyboard = keyboard is null;
+        keyboard ??= InputSystem.AddDevice<Keyboard>();
+        try
+        {
+            InputSystem.QueueStateEvent(keyboard, new KeyboardState(Key.E));
+            InputSystem.Update();
+            yield return null;
+            InputSystem.QueueStateEvent(keyboard, new KeyboardState());
+            InputSystem.Update();
+            yield return WaitForCondition(() => player.TryGetCurrentOutsideTestFloor(out var building, out var floor)
+                && building == 2 && floor == 0 && !player.IsTransitioning, 10f,
+                "Configured E interaction did not enter the factory.");
+            yield return new WaitForSeconds(0.25f);
+            Assert.That(ScenePortal.TryGetClosest(player.gameObject.scene, ground.GroundAnchor,
+                SceneDestination.World, out var exit), Is.True,
+                $"Interior arrival must remain within reach of its exit after physics. Feet={ground.GroundAnchor}; "
+                + string.Join("; ", UnityEngine.Object.FindObjectsByType<ScenePortal>(FindObjectsSortMode.None)
+                    .Where(candidate => candidate.gameObject.scene == player.gameObject.scene)
+                    .Select(candidate => $"{candidate.name}: logical={candidate.InteractionLogicalPosition}, world={candidate.transform.position}")));
+            ScreenCapture.CaptureScreenshot(Path.GetFullPath("Temp/player-ground-interior.png"));
+            InputSystem.QueueStateEvent(keyboard, new KeyboardState(Key.E));
+            InputSystem.Update();
+            yield return null;
+            InputSystem.QueueStateEvent(keyboard, new KeyboardState());
+            InputSystem.Update();
+            yield return WaitForCondition(() => player.gameObject.scene.name == "OutsideTest"
+                && !player.IsTransitioning, 10f, "Configured E interaction did not exit the factory.");
+            yield return new WaitForSeconds(0.25f);
+            var returnedPortal = FindPortal("OutsideTest", candidate => candidate.BuildingInstanceId == 2);
+            Assert.That(returnedPortal.CanUse(ground.GroundAnchor), Is.True,
+                "Exterior return must remain within reach of the door after physics.");
+            ScreenCapture.CaptureScreenshot(Path.GetFullPath("Temp/player-ground-exterior.png"));
+            yield return null;
+        }
+        finally
+        {
+            InputSystem.QueueStateEvent(keyboard, new KeyboardState());
+            InputSystem.Update();
+            if (addedKeyboard) InputSystem.RemoveDevice(keyboard);
+        }
+    }
+
+    [UnityTest]
+    public IEnumerator ConfiguredMovementKeepsTheCompactGroundAnchorAligned()
+    {
+        yield return WaitForCondition(
+            () => PlayerSceneTransition.LocalOwner.gameObject.scene.name == "OutsideTest",
+            10f,
+            "Player did not reach the world.");
+
+        var player = PlayerSceneTransition.LocalOwner;
+        var body = player.GetComponent<Rigidbody2D>();
+        var collider = player.GetComponent<CapsuleCollider2D>();
+        var groundSize = player.GetComponent<Virtual3DSize>();
+        var renderer = player.GetComponent<SpriteRenderer>();
+        var outsideWidth = groundSize.Width;
+        var startPosition = body.position;
+        Assert.That(outsideWidth, Is.LessThan(renderer.bounds.size.x));
+        var keyboard = Keyboard.current;
+        var addedKeyboard = keyboard is null;
+        keyboard ??= InputSystem.AddDevice<Keyboard>();
+
+        try
+        {
+            InputSystem.QueueStateEvent(keyboard, new KeyboardState(Key.D));
+            InputSystem.Update();
+            yield return new WaitForSeconds(0.25f);
+            var movedPosition = body.position;
+
+            Assert.That(movedPosition.x, Is.GreaterThan(startPosition.x + 0.1f));
+        }
+        finally
+        {
+            InputSystem.QueueStateEvent(keyboard, new KeyboardState());
+            InputSystem.Update();
+            if (addedKeyboard)
+            {
+                InputSystem.RemoveDevice(keyboard);
+            }
+        }
+
+        Assert.That(groundSize.GroundAnchor.x, Is.EqualTo(renderer.bounds.center.x).Within(0.0001f));
+        Assert.That(groundSize.GroundAnchor.y, Is.EqualTo(renderer.bounds.min.y).Within(0.0001f));
+        Assert.That(groundSize.GroundAnchor, Is.EqualTo((Vector2)player.transform.position));
+        Assert.That(
+            collider.size.x * Mathf.Abs(collider.transform.lossyScale.x),
+            Is.EqualTo(groundSize.Width).Within(0.0001f));
+        Assert.That(
+            collider.size.y * Mathf.Abs(collider.transform.lossyScale.y),
+            Is.EqualTo(groundSize.Size.y).Within(0.0001f));
+        var colliderBottom = collider.transform.TransformPoint(
+            new Vector2(collider.offset.x, collider.offset.y - collider.size.y * 0.5f)).y;
+        Assert.That(colliderBottom, Is.EqualTo(groundSize.GroundAnchor.y).Within(0.0001f));
+        Assert.That(groundSize.Size.y, Is.LessThan(groundSize.Width));
+
+        yield return EnterMachineTestBuilding();
+        player = PlayerSceneTransition.LocalOwner;
+        groundSize = player.GetComponent<Virtual3DSize>();
+        renderer = player.GetComponent<SpriteRenderer>();
+        Assert.That(SceneGrid.TryGetForScene(player.gameObject.scene, out var insideGrid), Is.True);
+        Assert.That(insideGrid.CellSize, Is.EqualTo(1.5f).Within(0.0001f));
+        Assert.That(groundSize.Width, Is.EqualTo(outsideWidth).Within(0.0001f));
+        Assert.That(renderer.bounds.size.x, Is.GreaterThan(groundSize.Width));
+        Assert.That(groundSize.GroundAnchor.y, Is.EqualTo(renderer.bounds.min.y).Within(0.0001f));
     }
 
     [UnityTest]

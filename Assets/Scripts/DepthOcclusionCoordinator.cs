@@ -112,9 +112,7 @@ public sealed class DepthOcclusionCoordinator : MonoBehaviour
 
             player.GetProjectedPolygon(playerPolygon);
             var playerFootprint = player.FootprintBounds;
-            var playerDepthReference = new Vector2(
-                playerFootprint.center.x,
-                playerFootprint.center.y);
+            var playerDepthReference = player.GroundAnchor;
             foreach (var surface in surfaces)
             {
                 if (surface is null || !surface || !surface.IsConfigured)

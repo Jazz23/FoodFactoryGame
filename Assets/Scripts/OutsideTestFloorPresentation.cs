@@ -116,7 +116,9 @@ public sealed class OutsideTestFloorPresentation : MonoBehaviour
                 worldPosition.y,
                 transform.position.z - 0.1f);
             marker.position = position;
-            markerLabel.transform.position = position + Vector3.up * LabelHeight;
+            marker.localScale = Vector3.one * (MarkerSize * grid.CellSize);
+            markerLabel.transform.position = position
+                + Vector3.up * (LabelHeight * grid.CellSize);
             ApplyEntityViews(state, grid, indoorGrid);
         }
 
@@ -157,7 +159,11 @@ public sealed class OutsideTestFloorPresentation : MonoBehaviour
                 worldPosition.y,
                 transform.position.z - 0.2f);
             view.Object.transform.position = position;
-            view.Label.transform.position = position + Vector3.up * 0.45f;
+            view.Label.transform.position = position + Vector3.up * (0.45f * grid.CellSize);
+            if (!entity.IsConveyor)
+            {
+                view.Object.transform.localScale = Vector3.one * (0.5f * grid.CellSize);
+            }
             view.Label.gameObject.SetActive(TestUIVisibility.Visible);
             view.Renderer.color = entity.IsConveyor ? Color.white : GetEntityColor(entity.DefinitionId);
             if (entity.IsConveyor)

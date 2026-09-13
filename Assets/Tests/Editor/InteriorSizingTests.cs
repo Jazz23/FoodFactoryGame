@@ -2,6 +2,7 @@
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Tilemaps;
 
 public sealed class InteriorSizingTests
 {
@@ -235,5 +236,71 @@ public sealed class InteriorSizingTests
         Assert.That(
             InsideFactoryVisuals.GetDoorRotation(GridEdgeDirection.North),
             Is.EqualTo(180f));
+    }
+
+    [Test]
+    public void SceneGridCellSizeScalesWorldCoordinatesWithoutChangingLogicalCoordinates()
+    {
+        var gridObject = new GameObject("Scene Grid");
+        try
+        {
+            var sceneGrid = gridObject.AddComponent<SceneGrid>();
+            var serializedGrid = new SerializedObject(sceneGrid);
+            serializedGrid.FindProperty("projection").enumValueIndex = (int)GridProjection.Orthogonal;
+            serializedGrid.FindProperty("cellSize").floatValue = 1.5f;
+            serializedGrid.ApplyModifiedPropertiesWithoutUndo();
+
+            var logical = new Vector2(2.5f, 0.5f);
+            var world = sceneGrid.LogicalToWorld(logical);
+
+            Assert.That(world, Is.EqualTo(new Vector2(3.75f, 0.75f)));
+            Assert.That(sceneGrid.WorldToLogical(world), Is.EqualTo(logical));
+        }
+        finally
+        {
+            Object.DestroyImmediate(gridObject);
+        }
+    }
+
+    [Test]
+    public void InsideFactoryPresentationScalesFloorCellsAndDoorwaysWithTheSceneGrid()
+    {
+        var gridObject = new GameObject("Inside Factory Grid");
+        try
+        {
+            var sceneGrid = gridObject.AddComponent<SceneGrid>();
+            var serializedGrid = new SerializedObject(sceneGrid);
+            serializedGrid.FindProperty("projection").enumValueIndex = (int)GridProjection.Orthogonal;
+            serializedGrid.FindProperty("cellSize").floatValue = 1.5f;
+            serializedGrid.ApplyModifiedPropertiesWithoutUndo();
+
+            var visuals = gridObject.AddComponent<InsideFactoryVisuals>();
+            var serializedVisuals = new SerializedObject(visuals);
+            serializedVisuals.FindProperty("floorTile").objectReferenceValue =
+                AssetDatabase.LoadAssetAtPath<TileBase>(
+                    "Assets/Sprites/Factory/FactoryFloorSpriteSheet_44.asset");
+            serializedVisuals.FindProperty("doorSprite").objectReferenceValue =
+                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Art/Generated/InsideFactoryDoor.png");
+            serializedVisuals.FindProperty("material").objectReferenceValue =
+                AssetDatabase.LoadAssetAtPath<Material>("Assets/Art/Generated/FactoryModule.mat");
+            serializedVisuals.ApplyModifiedPropertiesWithoutUndo();
+
+            visuals.Configure(
+                new Vector2Int(4, 3),
+                new[] { new Vector2(2f, 0.5f) },
+                new[] { GridEdgeDirection.South });
+
+            var generatedRoot = gridObject.transform.Find("Generated Interior Visuals");
+            var floor = generatedRoot.Find("Industrial Floor");
+            var door = generatedRoot.Find("Interior Door 1");
+            Assert.That(floor.localScale, Is.EqualTo(Vector3.one * 1.5f));
+            Assert.That(
+                door.GetComponent<SpriteRenderer>().bounds.size.x,
+                Is.EqualTo(1.2f).Within(0.001f));
+        }
+        finally
+        {
+            Object.DestroyImmediate(gridObject);
+        }
     }
 }

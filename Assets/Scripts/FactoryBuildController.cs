@@ -199,9 +199,12 @@ public sealed class FactoryBuildController : MonoBehaviour
         var delta = grid.LogicalToWorld(position + FactoryConveyor.Direction(Definition)) - grid.LogicalToWorld(position);
         preview.transform.rotation = IsConveyorSelection
             ? Quaternion.Euler(0, 0, Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg - 90f) : Quaternion.identity;
-        preview.transform.localScale = IsConveyorSelection ? new Vector3(delta.magnitude * 0.8f, delta.magnitude, 1f) : Vector3.one * 0.65f;
+        preview.transform.localScale = IsConveyorSelection
+            ? new Vector3(delta.magnitude * 0.8f, delta.magnitude, 1f)
+            : Vector3.one * (0.65f * grid.CellSize);
         previewLabel.transform.rotation = Quaternion.identity;
-        previewLabel.transform.position = preview.transform.position + Vector3.up * 0.65f;
+        previewLabel.transform.position = preview.transform.position
+            + Vector3.up * (0.65f * grid.CellSize);
         previewLabel.text = IsConveyorSelection
             ? arrows[direction]
             : selection == 3
@@ -269,10 +272,14 @@ public sealed class FactoryBuildController : MonoBehaviour
                 out _);
         preview.transform.position = grid.LogicalToWorld(position);
         preview.transform.rotation = Quaternion.identity;
-        preview.transform.localScale = new Vector3(0.7f, 0.35f, 1f);
+        preview.transform.localScale = new Vector3(
+            0.7f * grid.CellSize,
+            0.35f * grid.CellSize,
+            1f);
         previewRenderer.sprite = previewSprite;
         previewLabel.transform.rotation = Quaternion.identity;
-        previewLabel.transform.position = preview.transform.position + Vector3.up * 0.5f;
+        previewLabel.transform.position = preview.transform.position
+            + Vector3.up * (0.5f * grid.CellSize);
         previewLabel.text = selection == 3 ? "Shipping\nDock" : selection == 4 ? "Receiving\nDock" : "Select a\ndock";
         previewRenderer.color = validCell ? GetPreviewColor() : new Color(1f, 0.2f, 0.2f, 0.5f);
         if (validCell && actions["Place"].WasPressedThisFrame())

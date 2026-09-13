@@ -408,14 +408,14 @@ public sealed class TestBuildingCreatorTests
     }
 
     [Test]
-    public void PlayerBehindCornerUsesFootprintCenterForDepth()
+    public void PlayerBehindCornerUsesGroundAnchorForDepth()
     {
         var playerObject = new GameObject("Corner Player", typeof(CapsuleCollider2D), typeof(SpriteRenderer));
         var surfaceObject = new GameObject("Corner Surface", typeof(MeshRenderer));
         var coordinatorObject = new GameObject("Corner Coordinator");
         try
         {
-            playerObject.transform.position = new Vector3(1.71724725f, 3.65915537f);
+            playerObject.transform.position = new Vector3(1.71724725f, 3.75915537f);
             var collider = playerObject.GetComponent<CapsuleCollider2D>();
             collider.offset = new Vector2(0f, -0.64f);
             collider.size = new Vector2(0.7249f, 0.7249f);
@@ -432,13 +432,13 @@ public sealed class TestBuildingCreatorTests
             surface.Configure(ground, ground, Vector3.zero, Vector2.zero, Vector2.one);
             var coordinator = coordinatorObject.AddComponent<DepthOcclusionCoordinator>();
             var resolve = typeof(DepthOcclusionCoordinator).GetMethod("ResolveBehind", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
-            var depth = surface.GetDepthKey(player.FootprintBounds.center);
-            Assert.That(player.FrontY, Is.LessThan(depth));
+            var depth = surface.GetDepthKey(player.GroundAnchor);
+            Assert.That(player.FrontY, Is.GreaterThan(depth));
             Assert.That(resolve.Invoke(coordinator, new object[] { surface, player, depth }), Is.True);
 
             playerObject.transform.position += Vector3.down;
             Physics2D.SyncTransforms();
-            depth = surface.GetDepthKey(player.FootprintBounds.center);
+            depth = surface.GetDepthKey(player.GroundAnchor);
             Assert.That(resolve.Invoke(coordinator, new object[] { surface, player, depth }), Is.False);
         }
         finally

@@ -120,8 +120,8 @@ public sealed class IndoorGrid : MonoBehaviour
         var line = lineObject.AddComponent<LineRenderer>();
         line.useWorldSpace = false;
         line.positionCount = 2;
-        line.startWidth = lineWidth;
-        line.endWidth = lineWidth;
+        line.startWidth = lineWidth * grid.CellSize;
+        line.endWidth = lineWidth * grid.CellSize;
         line.startColor = lineColor;
         line.endColor = lineColor;
         line.numCapVertices = 0;

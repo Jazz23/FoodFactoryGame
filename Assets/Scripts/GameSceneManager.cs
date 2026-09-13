@@ -2078,6 +2078,7 @@ public sealed class GameSceneManager : MonoBehaviour
             position,
             Quaternion.identity,
             true);
+        player.GetComponent<PlayerSceneTransition>().ServerTeleport(position);
 
         UnitySceneManager.MoveGameObjectToScene(player.gameObject, scene);
         networkManager.ServerManager.Spawn(player, connection);

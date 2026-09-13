@@ -5,27 +5,26 @@ using UnityEngine;
 [RequireComponent(typeof(CapsuleCollider2D), typeof(SpriteRenderer))]
 public sealed class Virtual3DSize : MonoBehaviour
 {
-    // The axes represent width, ground depth, and height respectively.
-    [SerializeField] private Vector3 size = new(0.36f, 0.36f, 0.9f);
+    [SerializeField, Min(0.01f)] private float width = 0.6f;
+    [SerializeField, Min(0.01f)] private float groundDepth = 0.3f;
     [SerializeField] private bool synchronizeWithCollider = true;
 
     private CapsuleCollider2D bodyCollider;
     private SpriteRenderer spriteRenderer;
 
-    public Vector3 Size => size;
-    public float FrontY => bodyCollider is not null
-        ? bodyCollider.bounds.min.y
-        : transform.position.y - size.y * 0.5f;
-    public float DepthY => FootprintBounds.center.y;
-    public Bounds FootprintBounds => bodyCollider is not null
-        ? bodyCollider.bounds
-        : new Bounds(
-            new Vector3(transform.position.x, FrontY + size.y * 0.5f, transform.position.z),
-            new Vector3(size.x, size.y, 0.2f));
+    public Vector3 Size => new(width, groundDepth, VisibleHeight);
+    public float Width => width;
+    // Bottom-pivot sprites share this stable foot position, independent of animation bounds.
+    public Vector2 GroundAnchor => transform.position;
+    public float FrontY => GroundAnchor.y;
+    public float DepthY => GroundAnchor.y;
+    public Bounds FootprintBounds => new(
+        new Vector3(GroundAnchor.x, GroundAnchor.y + groundDepth * 0.5f, transform.position.z),
+        new Vector3(width, groundDepth, 0.2f));
 
     public Bounds ProjectedBounds => new(
         spriteRenderer is not null ? spriteRenderer.bounds.center : transform.position,
-        new Vector3(size.x, size.z, 0.2f));
+        new Vector3(width, VisibleHeight, 0.2f));
 
     public void GetProjectedPolygon(List<Vector2> points)
     {
@@ -48,6 +47,12 @@ public sealed class Virtual3DSize : MonoBehaviour
         }
     }
 
+    public void SetGroundAnchor(Vector2 position)
+    {
+        var delta = position - GroundAnchor;
+        transform.position += new Vector3(delta.x, delta.y, 0f);
+    }
+
     private void Awake()
     {
         bodyCollider = GetComponent<CapsuleCollider2D>();
@@ -65,8 +70,20 @@ public sealed class Virtual3DSize : MonoBehaviour
 
     private void SynchronizeWithCollider()
     {
-        Vector2 footprintSize = bodyCollider.bounds.size;
-        float visibleHeight = spriteRenderer.bounds.size.y;
-        size = new Vector3(footprintSize.x, footprintSize.y, visibleHeight);
+        var localFootprint = transform.InverseTransformVector(
+            new Vector3(width, groundDepth, 0f));
+        bodyCollider.direction = CapsuleDirection2D.Horizontal;
+        bodyCollider.size = new Vector2(
+            Mathf.Abs(localFootprint.x),
+            Mathf.Abs(localFootprint.y));
+
+        bodyCollider.offset = new Vector2(0f, Mathf.Abs(localFootprint.y) * 0.5f);
     }
+
+    private float VisibleHeight => spriteRenderer is not null
+        && spriteRenderer.sprite is not null
+        ? spriteRenderer.bounds.size.y
+        : bodyCollider is not null
+            ? bodyCollider.bounds.size.y
+            : width;
 }

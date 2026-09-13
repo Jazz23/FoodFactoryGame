@@ -7,6 +7,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 [RequireComponent(typeof(Movement), typeof(NetworkTransform), typeof(Rigidbody2D))]
+[RequireComponent(typeof(Virtual3DSize))]
 public sealed class PlayerSceneTransition : NetworkBehaviour
 {
     private InputAction interact = null!;
@@ -15,6 +16,7 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
     private Movement movement = null!;
     private NetworkTransform networkTransform = null!;
     private Rigidbody2D body = null!;
+    private Virtual3DSize groundSize = null!;
     private bool isTransitioning;
     private bool elevatorPromptOpen;
     private uint lastCompletedTransitionSequence;
@@ -31,6 +33,7 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         movement = GetComponent<Movement>();
         networkTransform = GetComponent<NetworkTransform>();
         body = GetComponent<Rigidbody2D>();
+        groundSize = GetComponent<Virtual3DSize>();
     }
 
     public override void OnStartClient()
@@ -104,7 +107,7 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         }
 
         if (InsideFactoryElevator.TryGetForScene(gameObject.scene, out var elevator)
-            && elevator.CanUse(transform.position)
+            && elevator.CanUse(groundSize.GroundAnchor)
             && elevator.CanOpenPrompt)
         {
             activeElevator = elevator;
@@ -114,7 +117,10 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
             return;
         }
 
-        if (!ScenePortal.TryGetClosest(gameObject.scene, transform.position, out var portal))
+        if (!ScenePortal.TryGetClosest(
+                gameObject.scene,
+                groundSize.GroundAnchor,
+                out var portal))
         {
             return;
         }
@@ -153,8 +159,15 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
     private void RequestTransitionServerRpc(uint buildingInstanceId)
     {
         var portalExists = buildingInstanceId == 0
-            ? ScenePortal.TryGetClosest(gameObject.scene, transform.position, out var portal)
-            : ScenePortal.TryGetBuilding(gameObject.scene, transform.position, buildingInstanceId, out portal);
+            ? ScenePortal.TryGetClosest(
+                gameObject.scene,
+                groundSize.GroundAnchor,
+                out var portal)
+            : ScenePortal.TryGetBuilding(
+                gameObject.scene,
+                groundSize.GroundAnchor,
+                buildingInstanceId,
+                out portal);
         if (!portalExists)
         {
             TargetSetTransitionState(Owner, false);
@@ -186,7 +199,7 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
             gameObject.scene,
             out var elevator);
         if (!elevatorExists
-            || !elevator.CanUse(transform.position)
+            || !elevator.CanUse(groundSize.GroundAnchor)
             || !elevator.IsFloorAvailable(targetFloorIndex)
             || !GameSceneManager.Instance.RequestFloorTransition(NetworkObject, targetFloorIndex))
         {
@@ -196,8 +209,7 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
 
     public void ServerTeleport(Vector3 position)
     {
-        body.position = position;
-        transform.SetPositionAndRotation(position, Quaternion.identity);
+        TeleportGroundAnchor(position);
     }
 
     public void ServerBeginTransition()
@@ -855,8 +867,7 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         }
 
         lastCompletedTransitionSequence = sequence;
-        body.position = position;
-        transform.SetPositionAndRotation(position, Quaternion.identity);
+        TeleportGroundAnchor(position);
         networkTransform.Teleport();
         CloseElevatorPrompt();
         SetTransitionState(false);
@@ -875,6 +886,15 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
     {
         isTransitioning = value;
         movement.SetTransitioning(value);
+    }
+
+    private void TeleportGroundAnchor(Vector3 position)
+    {
+        groundSize.SetGroundAnchor(new Vector2(position.x, position.y));
+        var groundedPosition = transform.position;
+        groundedPosition.z = position.z;
+        transform.SetPositionAndRotation(groundedPosition, Quaternion.identity);
+        body.position = new Vector2(groundedPosition.x, groundedPosition.y);
     }
 
     private void CloseElevatorPrompt()

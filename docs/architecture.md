@@ -13,6 +13,8 @@
 - `FactoryWorldSqliteStore.Inspect`, `PlanMigration`, `ApplyMigration`, `Read`, and `Save` keep schema inspection, migration, loading, and writing explicit.
 - `OutsideTestFloorPresentation` and related views render explicit building/floor state; they are not authoritative state owners.
 - `OutsideTestFloorDebugPanel` is a UI client of the current player/floor binding and should not be used as the primary API for domain tests.
+- `Virtual3DSize` uses the player's transform origin as the stable bottom-pivot foot anchor. A shallow horizontal capsule extends upward from that anchor with independent world-space width and ground depth (player prefab: 0.6 × 0.3); animation bounds never move the collider. Transitions, interior containment, and depth sorting consume that same anchor.
+- `SceneGrid.CellSize` scales world-space presentation only. `IndoorGrid`, `InsideFactoryVisuals`, and factory entity views continue to use saved logical cell coordinates and configured building sizes.
 
 ## Canonical Assets
 

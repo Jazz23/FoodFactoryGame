@@ -104,6 +104,7 @@ public sealed class InsideFactoryVisuals : MonoBehaviour
     {
         var floorObject = new GameObject("Industrial Floor");
         floorObject.transform.SetParent(generatedRoot, false);
+        floorObject.transform.localScale = Vector3.one * grid.CellSize;
         var tilemap = floorObject.AddComponent<Tilemap>();
         var renderer = floorObject.AddComponent<TilemapRenderer>();
         renderer.sortingOrder = floorSortingOrder;
@@ -152,8 +153,8 @@ public sealed class InsideFactoryVisuals : MonoBehaviour
         line.useWorldSpace = false;
         line.loop = true;
         line.positionCount = 4;
-        line.startWidth = outlineWidth;
-        line.endWidth = outlineWidth;
+        line.startWidth = outlineWidth * grid.CellSize;
+        line.endWidth = outlineWidth * grid.CellSize;
         line.startColor = wallOutlineColor;
         line.endColor = wallOutlineColor;
         line.material = material;
@@ -224,7 +225,8 @@ public sealed class InsideFactoryVisuals : MonoBehaviour
         renderer.sprite = doorSprite;
         renderer.color = Color.white;
         renderer.sortingOrder = doorSortingOrder;
-        doorObject.transform.localScale = Vector3.one * (doorWidth / doorSprite.bounds.size.x);
+        doorObject.transform.localScale = Vector3.one
+            * (doorWidth * grid.CellSize / doorSprite.bounds.size.x);
     }
 
     private void CreateQuad(
