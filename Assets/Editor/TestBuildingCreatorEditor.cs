@@ -56,6 +56,7 @@ public sealed class TestBuildingCreatorEditor : Editor
     private void OnDisable()
     {
         Undo.undoRedoPerformed -= UndoRedoPerformed;
+        EditorApplication.delayCall -= DelayedEditorViewRefresh;
         hasFirstCorner = false;
         hasHoveredCell = false;
         hasHoveredDoorWall = false;
@@ -1504,6 +1505,23 @@ public sealed class TestBuildingCreatorEditor : Editor
     }
 
     private void RequestEditorViewRefresh()
+    {
+        RefreshEditorViews();
+        EditorApplication.delayCall -= DelayedEditorViewRefresh;
+        EditorApplication.delayCall += DelayedEditorViewRefresh;
+    }
+
+    private void DelayedEditorViewRefresh()
+    {
+        if (target is not TestBuildingCreator || !target)
+        {
+            return;
+        }
+
+        RefreshEditorViews();
+    }
+
+    private void RefreshEditorViews()
     {
         EditorApplication.QueuePlayerLoopUpdate();
         UnityEditorInternal.InternalEditorUtility.RepaintAllViews();
