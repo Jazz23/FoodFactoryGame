@@ -11,9 +11,12 @@ public sealed class TestBuildingCreatorEditor : Editor
 {
     private static readonly Color PreviewFillColor = new(0.35f, 1f, 0.45f, 0.18f);
     private static readonly Color PreviewLineColor = new(0.35f, 1f, 0.45f, 1f);
+    private static readonly Color SelectedBuildingLineColor = new(1f, 0.8f, 0.1f, 1f);
 
     private readonly List<TestBuildingCreator.ExteriorWallSpan> wallSpans = new();
     private readonly List<BuildingRecord> buildingRecords = new();
+    private readonly List<Vector2> wallSpansWorldPoints = new();
+    private Vector3[] selectedBuildingOutlinePoints = System.Array.Empty<Vector3>();
     private Vector3Int firstCorner;
     private Vector3Int hoveredCell;
     private TestBuildingCreator.ExteriorWallSpan hoveredDoorWall;
@@ -25,6 +28,7 @@ public sealed class TestBuildingCreatorEditor : Editor
     private bool doorPlacementMode;
     private string statusMessage = string.Empty;
     private string selectedSavePath = string.Empty;
+    private uint selectedBuildingInstanceId;
     private uint selectedTopologyBuildingId;
     private FactoryBuildingTopologyPlan topologyPlan = null!;
 
@@ -38,6 +42,7 @@ public sealed class TestBuildingCreatorEditor : Editor
         }
 
         Undo.undoRedoPerformed += UndoRedoPerformed;
+        Selection.selectionChanged += SelectionChanged;
         if (string.IsNullOrWhiteSpace(selectedSavePath))
         {
             selectedSavePath = FactoryWorldPaths.GetDefaultDatabasePath();
@@ -50,12 +55,14 @@ public sealed class TestBuildingCreatorEditor : Editor
         }
         MigrateLegacyDoors();
         RefreshGeneratedBuildings();
+        SelectionChanged();
         RequestEditorViewRefresh();
     }
 
     private void OnDisable()
     {
         Undo.undoRedoPerformed -= UndoRedoPerformed;
+        Selection.selectionChanged -= SelectionChanged;
         EditorApplication.delayCall -= DelayedEditorViewRefresh;
         hasFirstCorner = false;
         hasHoveredCell = false;
@@ -83,7 +90,7 @@ public sealed class TestBuildingCreatorEditor : Editor
         EditorGUILayout.HelpBox(
             "Select the creator, then click two opposite ground cells in Scene View. "
             + "Each completed selection creates walls, floor/ceiling slabs, collision, and no door. "
-            + "Use Place Door in Scene View to add one or more interior entrances.",
+            + "Use a building's Place Door action to add one or more interior entrances.",
             MessageType.Info);
 
         if (hasFirstCorner)
@@ -112,25 +119,8 @@ public sealed class TestBuildingCreatorEditor : Editor
             }
         }
 
-        DrawStoryControls();
         DrawBuildingList();
         DrawSaveTopologyControls();
-
-        using (new EditorGUI.DisabledScope(Application.isPlaying))
-        {
-            if (GUILayout.Button(doorPlacementMode
-                    ? "Cancel Door Placement"
-                    : "Place Door in Scene View"))
-            {
-                doorPlacementMode = !doorPlacementMode;
-                hasHoveredDoorWall = false;
-                statusMessage = doorPlacementMode
-                    ? "Click visible straight exterior walls to place doors; right-click or Escape when finished."
-                    : string.Empty;
-                SceneView.RepaintAll();
-                Repaint();
-            }
-        }
 
         if (doorPlacementMode)
         {
@@ -149,23 +139,66 @@ public sealed class TestBuildingCreatorEditor : Editor
         foreach (var record in records)
         {
             var interior = BuildingFootprint.GetUsableInteriorSize(record.FootprintSize);
+            var isSelected = selectedBuildingInstanceId == record.BuildingInstanceId;
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
             EditorGUILayout.BeginHorizontal();
+            if (isSelected)
+            {
+                EditorGUILayout.LabelField("Selected", EditorStyles.miniBoldLabel, GUILayout.Width(55f));
+            }
+
             EditorGUILayout.LabelField(
                 $"{record.BuildingInstanceId} · ({record.AnchorCell.x}, {record.AnchorCell.y}) · "
                 + $"{record.FootprintSize.x} x {record.FootprintSize.y} · "
                 + $"{interior.x} x {interior.y} · {record.StoryCount} stories");
+            EditorGUILayout.EndHorizontal();
+            EditorGUILayout.BeginHorizontal();
             if (GUILayout.Button("Select", GUILayout.Width(55f)))
             {
-                SelectLayout(record.BuildingInstanceId);
+                SelectLayout(record.BuildingInstanceId, false);
             }
 
             if (GUILayout.Button("Frame", GUILayout.Width(50f)))
             {
-                SelectLayout(record.BuildingInstanceId);
+                SelectLayout(record.BuildingInstanceId, true);
             }
 
             using (new EditorGUI.DisabledScope(Application.isPlaying))
             {
+                if (GUILayout.Button("Add Story", GUILayout.Width(80f)))
+                {
+                    UpdateAuthoredStoryCount(record, record.StoryCount + 1, "Add Authored Story");
+                    GUIUtility.ExitGUI();
+                }
+
+                using (new EditorGUI.DisabledScope(record.StoryCount <= 1))
+                {
+                    if (GUILayout.Button("Delete Top", GUILayout.Width(85f)))
+                    {
+                        if (!EditorUtility.DisplayDialog(
+                                "Delete authored top story?",
+                                $"Delete authored story {record.StoryCount - 1} from building {record.BuildingInstanceId}?",
+                                "Delete Authored Top Story",
+                                "Cancel"))
+                        {
+                            GUIUtility.ExitGUI();
+                        }
+
+                        UpdateAuthoredStoryCount(record, record.StoryCount - 1, "Delete Authored Top Story");
+                        GUIUtility.ExitGUI();
+                    }
+                }
+
+                if (GUILayout.Button("Place Door", GUILayout.Width(80f)))
+                {
+                    SelectLayout(record.BuildingInstanceId, false);
+                    doorPlacementMode = true;
+                    hasHoveredDoorWall = false;
+                    statusMessage = "Click a visible straight exterior wall to place a door; right-click or Escape when finished.";
+                    SceneView.RepaintAll();
+                    Repaint();
+                }
+
                 if (GUILayout.Button("Delete...", GUILayout.Width(65f)))
                 {
                     var layout = FindLayout(record.BuildingInstanceId);
@@ -179,6 +212,7 @@ public sealed class TestBuildingCreatorEditor : Editor
             }
 
             EditorGUILayout.EndHorizontal();
+            EditorGUILayout.EndVertical();
         }
 
         if (records.Count == 0)
@@ -274,65 +308,6 @@ public sealed class TestBuildingCreatorEditor : Editor
         }
     }
 
-    private void DrawStoryControls()
-    {
-        EditorGUILayout.Space();
-        EditorGUILayout.LabelField("Building Stories", EditorStyles.boldLabel);
-        var records = Creator.GetAuthoredBuildingRecords();
-        if (records.Count == 0)
-        {
-            EditorGUILayout.HelpBox(
-                "Create a building to manage its shared-template interior floors.",
-                MessageType.Info);
-            return;
-        }
-
-        foreach (var record in records)
-        {
-            EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField(
-                $"Building {record.BuildingInstanceId} ({record.FootprintSize.x} x {record.FootprintSize.y})",
-                $"{record.StoryCount} {((record.StoryCount == 1) ? "story" : "stories")}");
-            var isBlocked = Application.isPlaying;
-            using (new EditorGUI.DisabledScope(isBlocked))
-            {
-            if (GUILayout.Button("Add Story", GUILayout.Width(80f)))
-            {
-                UpdateAuthoredStoryCount(record, record.StoryCount + 1, "Add Authored Story");
-
-                GUIUtility.ExitGUI();
-            }
-
-            var canDelete = record.StoryCount > 1;
-            using (new EditorGUI.DisabledScope(!canDelete))
-            {
-                if (GUILayout.Button("Delete Top", GUILayout.Width(90f)))
-                {
-                    if (!EditorUtility.DisplayDialog(
-                            "Delete authored top story?",
-                            $"Delete authored story {record.StoryCount - 1} from building {record.BuildingInstanceId}?",
-                            "Delete Authored Top Story",
-                            "Cancel"))
-                    {
-                        GUIUtility.ExitGUI();
-                    }
-
-                    UpdateAuthoredStoryCount(record, record.StoryCount - 1, "Delete Authored Top Story");
-
-                    Repaint();
-                    SceneView.RepaintAll();
-                    GUIUtility.ExitGUI();
-                }
-            }
-            }
-
-            EditorGUILayout.EndHorizontal();
-            EditorGUILayout.LabelField(
-                "Interior",
-                $"Shared template ({record.StoryCount} {(record.StoryCount == 1 ? "floor" : "floors")})");
-        }
-    }
-
     private void UpdateAuthoredStoryCount(
         BuildingRecord record,
         int storyCount,
@@ -412,6 +387,18 @@ public sealed class TestBuildingCreatorEditor : Editor
             return;
         }
 
+        if (currentEvent.type == EventType.MouseDown
+            && currentEvent.button == 0
+            && !currentEvent.alt
+            && TryGetBuildingAtPosition(currentEvent.mousePosition, out var clickedLayout))
+        {
+            SelectLayout(clickedLayout.BuildingInstanceId, false);
+            currentEvent.Use();
+            sceneView?.Repaint();
+            Repaint();
+            return;
+        }
+
         if (TryGetCell(currentEvent.mousePosition, out var cell))
         {
             if (!hasHoveredCell || hoveredCell != cell)
@@ -443,9 +430,14 @@ public sealed class TestBuildingCreatorEditor : Editor
             return;
         }
 
-        if (currentEvent.type == EventType.Repaint && hasHoveredCell)
+        if (currentEvent.type == EventType.Repaint)
         {
-            DrawPreview();
+            if (hasHoveredCell)
+            {
+                DrawPreview();
+            }
+
+            DrawSelectedBuilding();
         }
     }
 
@@ -474,7 +466,32 @@ public sealed class TestBuildingCreatorEditor : Editor
         return null!;
     }
 
-    private void SelectLayout(uint buildingInstanceId)
+    private bool TryGetBuildingAtPosition(
+        Vector2 guiPosition,
+        out TestBuildingLayout layout)
+    {
+        layout = null!;
+        var pickedObject = HandleUtility.PickGameObject(guiPosition, false);
+        if (pickedObject is null || !pickedObject)
+        {
+            return false;
+        }
+
+        var pickedLayout = pickedObject.GetComponentInParent<TestBuildingLayout>();
+        if (pickedLayout is null
+            || !pickedLayout
+            || Creator.GeneratedBuildings is null
+            || !Creator.GeneratedBuildings
+            || !pickedLayout.transform.IsChildOf(Creator.GeneratedBuildings))
+        {
+            return false;
+        }
+
+        layout = pickedLayout;
+        return true;
+    }
+
+    private void SelectLayout(uint buildingInstanceId, bool frame)
     {
         var layout = FindLayout(buildingInstanceId);
         if (layout is null || !layout)
@@ -482,8 +499,108 @@ public sealed class TestBuildingCreatorEditor : Editor
             return;
         }
 
-        Selection.activeGameObject = layout.gameObject;
-        SceneView.lastActiveSceneView?.FrameSelected();
+        selectedBuildingInstanceId = buildingInstanceId;
+        if (frame)
+        {
+            FrameLayout(layout);
+        }
+
+        SceneView.RepaintAll();
+        Repaint();
+    }
+
+    private void SelectionChanged()
+    {
+        if (target is not TestBuildingCreator || !target)
+        {
+            return;
+        }
+
+        var activeObject = Selection.activeGameObject;
+        if (activeObject is null || !activeObject)
+        {
+            return;
+        }
+
+        var layout = activeObject.GetComponentInParent<TestBuildingLayout>();
+        if (layout is null
+            || !layout
+            || Creator.GeneratedBuildings is null
+            || !Creator.GeneratedBuildings
+            || !layout.transform.IsChildOf(Creator.GeneratedBuildings))
+        {
+            return;
+        }
+
+        selectedBuildingInstanceId = layout.BuildingInstanceId;
+        SceneView.RepaintAll();
+        Repaint();
+    }
+
+    private void FrameLayout(TestBuildingLayout layout)
+    {
+        var bounds = new Bounds(layout.transform.position, Vector3.zero);
+        var hasBounds = false;
+        foreach (var renderer in layout.GetComponentsInChildren<Renderer>(true))
+        {
+            if (!renderer.enabled)
+            {
+                continue;
+            }
+
+            if (!hasBounds)
+            {
+                bounds = renderer.bounds;
+                hasBounds = true;
+                continue;
+            }
+
+            bounds.Encapsulate(renderer.bounds);
+        }
+
+        var sceneView = SceneView.lastActiveSceneView;
+        if (hasBounds && sceneView is not null)
+        {
+            sceneView.Frame(bounds, false);
+        }
+    }
+
+    private void DrawSelectedBuilding()
+    {
+        if (selectedBuildingInstanceId == 0)
+        {
+            return;
+        }
+
+        var layout = FindLayout(selectedBuildingInstanceId);
+        if (layout is null || !layout)
+        {
+            return;
+        }
+
+        layout.GetWorldFootprint(Creator.Grid, wallSpansWorldPoints);
+        if (wallSpansWorldPoints.Count < 4)
+        {
+            return;
+        }
+
+        if (selectedBuildingOutlinePoints.Length != wallSpansWorldPoints.Count + 1)
+        {
+            selectedBuildingOutlinePoints = new Vector3[wallSpansWorldPoints.Count + 1];
+        }
+
+        for (var index = 0; index < wallSpansWorldPoints.Count; index++)
+        {
+            selectedBuildingOutlinePoints[index] = new Vector3(
+                wallSpansWorldPoints[index].x,
+                wallSpansWorldPoints[index].y,
+                Creator.Grid.transform.position.z - 0.01f);
+        }
+
+        selectedBuildingOutlinePoints[^1] = selectedBuildingOutlinePoints[0];
+        Handles.color = SelectedBuildingLineColor;
+        Handles.DrawAAPolyLine(5f, selectedBuildingOutlinePoints);
+        Handles.Label(selectedBuildingOutlinePoints[0], $"Building {selectedBuildingInstanceId}");
     }
 
     private bool TryGetCell(Vector2 guiPosition, out Vector3Int cell)
@@ -585,6 +702,7 @@ public sealed class TestBuildingCreatorEditor : Editor
             }
             else
             {
+                SelectLayout(layout.BuildingInstanceId, false);
                 PlaceDoor(layout, wall, normalizedOffset);
             }
 
@@ -864,6 +982,7 @@ public sealed class TestBuildingCreatorEditor : Editor
             1);
         if (Creator.HasAuthoredLayout)
         {
+            selectedBuildingInstanceId = buildingInstanceId;
             var authoredBefore = Creator.AuthoredLayout.CloneRecords();
             Undo.RecordObject(Creator.AuthoredLayout, "Create authored building");
             var rebuildError = string.Empty;
@@ -905,6 +1024,7 @@ public sealed class TestBuildingCreatorEditor : Editor
 
         Undo.RegisterCreatedObjectUndo(buildingObject, "Create test building");
         var layout = buildingObject.GetComponent<TestBuildingLayout>();
+        selectedBuildingInstanceId = buildingInstanceId;
         EditorUtility.SetDirty(layout);
         EditorSceneManager.MarkSceneDirty(Creator.gameObject.scene);
         var generatedPersisted = PersistAuthoredBuildings(new[] { buildingInstanceId });
@@ -1079,6 +1199,7 @@ public sealed class TestBuildingCreatorEditor : Editor
             statusMessage = "Authoring is disabled in Play Mode.";
             return;
         }
+
         if (!EditorUtility.DisplayDialog(
                 "Delete authored building?",
                 $"Delete building {record.BuildingInstanceId} at ({record.AnchorCell.x}, {record.AnchorCell.y})? "
@@ -1088,6 +1209,11 @@ public sealed class TestBuildingCreatorEditor : Editor
                 "Cancel"))
         {
             return;
+        }
+
+        if (selectedBuildingInstanceId == record.BuildingInstanceId)
+        {
+            selectedBuildingInstanceId = 0;
         }
 
         var undoGroup = Undo.GetCurrentGroup();
@@ -1347,17 +1473,6 @@ public sealed class TestBuildingCreatorEditor : Editor
         }
 
         var authoredRecords = Creator.GetAuthoredBuildingRecords();
-        if (!FactoryBuildingEditService.TryCreateTopologyPlan(
-                selectedSavePath,
-                authoredRecords,
-                Creator.DoorCornerExclusionDistance,
-                out var plan,
-                out var planError))
-        {
-            statusMessage = $"Database topology save failed: {planError}";
-            return false;
-        }
-
         var selectedIds = new HashSet<uint>();
         if (!applyAllChanges && changedBuildingIds is not null)
         {
@@ -1370,24 +1485,8 @@ public sealed class TestBuildingCreatorEditor : Editor
             }
         }
 
-        foreach (var change in plan.Changes)
-        {
-            if (!change.IsDelete
-                || (!applyAllChanges && !selectedIds.Contains(change.BuildingInstanceId)))
-            {
-                continue;
-            }
-
-            if (!confirmDestructiveDeletes)
-            {
-                statusMessage = $"Database topology save refused: deleting building {change.BuildingInstanceId} requires confirmation.";
-                return false;
-            }
-        }
-
-        if (!FactoryBuildingEditService.TryApplyTopologyPlan(
+        if (!FactoryBuildingEditService.TryApplyTopologyToDatabase(
                 selectedSavePath,
-                plan,
                 authoredRecords,
                 applyAllChanges ? null : selectedIds,
                 confirmDestructiveDeletes,

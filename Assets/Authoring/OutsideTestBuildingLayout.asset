@@ -59,10 +59,10 @@ MonoBehaviour:
       normalizedOffset: 0.6167631
     - wallId: South:5:1:0
       normalizedOffset: 0.6175575
-  - buildingInstanceId: 11
-    anchorCell: {x: -5, y: -11, z: 0}
-    footprintSize: {x: 3, y: 5}
-    storyCount: 1
+  - buildingInstanceId: 13
+    anchorCell: {x: -12, y: -5, z: 0}
+    footprintSize: {x: 6, y: 3}
+    storyCount: 2
     doors:
-    - wallId: West:-5:-8:0
-      normalizedOffset: 0.5863962
+    - wallId: South:-8:-5:0
+      normalizedOffset: 0.6987529

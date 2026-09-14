@@ -321,6 +321,7 @@ public static class FactoryBuildingEditService
                     proposedRecord,
                     doorCornerExclusionDistance,
                     change,
+                    null!,
                     out var changeError))
             {
                 AddChangeError(plan, change, changeError);
@@ -484,6 +485,7 @@ public static class FactoryBuildingEditService
                          appliedChange.ProposedRecord,
                          doorCornerExclusionDistance,
                          appliedChange,
+                         result,
                          out error))
             {
                 return false;
@@ -529,6 +531,25 @@ public static class FactoryBuildingEditService
         out FactoryBuildingTopologyApplyResult result,
         out string error)
     {
+        return TryApplyTopologyToDatabase(
+            databasePath,
+            authoredRecords,
+            selectedBuildingIds,
+            false,
+            doorCornerExclusionDistance,
+            out result,
+            out error);
+    }
+
+    public static bool TryApplyTopologyToDatabase(
+        string databasePath,
+        IEnumerable<BuildingRecord> authoredRecords,
+        IEnumerable<uint> selectedBuildingIds,
+        bool confirmDestructiveDeletes,
+        float doorCornerExclusionDistance,
+        out FactoryBuildingTopologyApplyResult result,
+        out string error)
+    {
         result = new FactoryBuildingTopologyApplyResult
         {
             DatabasePath = NormalizeDatabasePath(databasePath)
@@ -549,6 +570,7 @@ public static class FactoryBuildingEditService
                     authoredRecords,
                     selectedBuildingIds,
                     doorCornerExclusionDistance,
+                    confirmDestructiveDeletes,
                     out var updated,
                     out result,
                     out error))
@@ -563,7 +585,7 @@ public static class FactoryBuildingEditService
                 return true;
             }
 
-            if (result.DeletedBuildingIds.Count > 0)
+            if (result.DeletedBuildingIds.Count > 0 && !confirmDestructiveDeletes)
             {
                 error = "Whole-building deletion requires destructive confirmation.";
                 return false;
@@ -814,6 +836,7 @@ public static class FactoryBuildingEditService
         BuildingRecord proposedRecord,
         float doorCornerExclusionDistance,
         FactoryBuildingTopologyChange change,
+        FactoryBuildingTopologyApplyResult topologyResult,
         out string error)
     {
         error = string.Empty;
@@ -879,13 +902,46 @@ public static class FactoryBuildingEditService
         var retainedFloors = new List<FloorPlacementState>();
         for (var floorIndex = 0; floorIndex < proposedRecord.StoryCount; floorIndex++)
         {
-            var floor = existingFloors.TryGetValue(floorIndex, out var existingFloor)
+            var hasExistingFloor = existingFloors.TryGetValue(floorIndex, out var existingFloor);
+            var floor = hasExistingFloor
                 ? existingFloor.Clone()
                 : CreateDefaultWorldFloor(
-                    proposedRecord.BuildingInstanceId,
-                    targetBuildingGuid,
-                    floorIndex,
-                    proposedRecord.FootprintSize);
+                      proposedRecord.BuildingInstanceId,
+                      targetBuildingGuid,
+                      floorIndex,
+                      proposedRecord.FootprintSize);
+            if (!hasExistingFloor && topologyResult is not null)
+            {
+                topologyResult.CreatedFloorGuids.Add(floor.Guid);
+                foreach (var entity in floor.Entities)
+                {
+                    if (entity is not null)
+                    {
+                        topologyResult.CreatedEntityGuids.Add(entity.Guid);
+                    }
+                }
+            }
+
+            if (!hasExistingFloor)
+            {
+                AddMigrationMapping(
+                    snapshot,
+                    "floor",
+                    $"{proposedRecord.BuildingInstanceId}:{floorIndex}",
+                    floor.Guid);
+                foreach (var entity in floor.Entities)
+                {
+                    if (entity is not null)
+                    {
+                        AddMigrationMapping(
+                            snapshot,
+                            "entity",
+                            $"{proposedRecord.BuildingInstanceId}:{floorIndex}:{entity.LegacyEntityId}",
+                            entity.Guid);
+                    }
+                }
+            }
+
             floor.SetState(
                 floor.Label,
                 floor.ProductionRate,

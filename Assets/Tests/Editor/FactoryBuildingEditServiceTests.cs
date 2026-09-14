@@ -237,6 +237,70 @@ public sealed class FactoryBuildingEditServiceTests
     }
 
     [Test]
+    public void DirectTopologySavePersistsAddedStoryAndDoor()
+    {
+        var path = Path.Combine(
+            Application.temporaryCachePath,
+            "factory-topology-story-door-" + Guid.NewGuid() + ".db");
+        var buildingGuid = Guid.NewGuid();
+        var snapshot = CreateSnapshot(
+            buildingGuid,
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            new Vector2Int(5, 3));
+        var authored = new List<BuildingRecord>
+        {
+            new(
+                2,
+                new Vector3Int(3, -1, 0),
+                new Vector2Int(5, 3),
+                3,
+                new[]
+                {
+                    new BuildingRecord.DoorPlacement("South:5:-1:0", 0.5f)
+                })
+        };
+        var store = new FactoryWorldSqliteStore(path);
+        store.Save(snapshot);
+
+        try
+        {
+            var applied = FactoryBuildingEditService.TryApplyTopologyToDatabase(
+                path,
+                authored,
+                new[] { 2u },
+                false,
+                0.15f,
+                out var result,
+                out var error);
+
+            Assert.That(applied, Is.True, error);
+            var persisted = store.Load();
+            var persistedBuilding = persisted.Buildings.Find(
+                building => building.LegacyBuildingId == 2);
+            Assert.That(result.Saved, Is.True);
+            Assert.That(persistedBuilding.StoryCount, Is.EqualTo(3));
+            Assert.That(persistedBuilding.Doors, Has.Count.EqualTo(1));
+            Assert.That(persisted.Floors, Has.Count.EqualTo(3));
+            Assert.That(result.CreatedFloorGuids, Has.Count.EqualTo(1));
+            Assert.That(result.CreatedEntityGuids, Has.Count.EqualTo(1));
+        }
+        finally
+        {
+            foreach (var suffix in new[] { "", "-wal", "-shm" })
+            {
+                var candidate = path + suffix;
+                if (File.Exists(candidate))
+                {
+                    File.Delete(candidate);
+                }
+            }
+        }
+    }
+
+    [Test]
     public void DefaultDatabasePathIsProjectLocalInEditor()
     {
         var expected = Path.Combine(
