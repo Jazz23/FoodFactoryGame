@@ -15,6 +15,7 @@ public sealed class GridRoof : MonoBehaviour
     [SerializeField] private Color sideColor = new(0.16f, 0.21f, 0.26f, 1f);
     [SerializeField] private Material material = null!;
     [SerializeField] private int sortingOrder = 1000;
+    [SerializeField] private bool renderTopSurface = true;
 
     private Mesh mesh = null!;
     private bool rebuildRequested;
@@ -29,6 +30,7 @@ public sealed class GridRoof : MonoBehaviour
     public Color TopColor => topColor;
     public Color SideColor => sideColor;
     public Material Material => material;
+    public bool RenderTopSurface => renderTopSurface;
 
     public void Configure(
         Vector2 newLogicalMin,
@@ -39,7 +41,8 @@ public sealed class GridRoof : MonoBehaviour
         Color newTopColor,
         Color newSideColor,
         Material newMaterial,
-        int newSortingOrder)
+        int newSortingOrder,
+        bool newRenderTopSurface = true)
     {
         logicalMin = newLogicalMin;
         logicalMax = newLogicalMax;
@@ -50,6 +53,7 @@ public sealed class GridRoof : MonoBehaviour
         sideColor = newSideColor;
         material = newMaterial;
         sortingOrder = newSortingOrder;
+        renderTopSurface = newRenderTopSurface;
         rebuildRequested = true;
         RebuildIfRequired();
     }
@@ -143,6 +147,11 @@ public sealed class GridRoof : MonoBehaviour
             {
                 var logicalStart = edgePoints[segmentIndex];
                 var logicalEnd = edgePoints[segmentIndex + 1];
+                if (baseHeight > 0f && index == 3)
+                {
+                    continue;
+                }
+
                 var start = ToWorld(grid, logicalStart);
                 var end = ToWorld(grid, logicalEnd);
                 var sideVertices = new List<Vector3>();
@@ -183,47 +192,50 @@ public sealed class GridRoof : MonoBehaviour
             }
         }
 
-        var topVertices = new List<Vector3>();
-        var topTriangles = new List<int>();
-        var topColors = new List<Color>();
-        AddQuad(
-            topVertices,
-            topTriangles,
-            topColors,
-            footprint[0] + Vector3.up * topHeight,
-            footprint[1] + Vector3.up * topHeight,
-            footprint[2] + Vector3.up * topHeight,
-            footprint[3] + Vector3.up * topHeight,
-            topColor);
-        AddQuad(
-            vertices,
-            triangles,
-            colors,
-            footprint[0] + Vector3.up * topHeight,
-            footprint[1] + Vector3.up * topHeight,
-            footprint[2] + Vector3.up * topHeight,
-            footprint[3] + Vector3.up * topHeight,
-            topColor);
-        var minimumDepth = float.PositiveInfinity;
-        foreach (var point in logicalFootprint)
+        if (renderTopSurface)
         {
-            minimumDepth = Mathf.Min(minimumDepth, point.x + point.y);
-        }
+            var topVertices = new List<Vector3>();
+            var topTriangles = new List<int>();
+            var topColors = new List<Color>();
+            AddQuad(
+                topVertices,
+                topTriangles,
+                topColors,
+                footprint[0] + Vector3.up * topHeight,
+                footprint[1] + Vector3.up * topHeight,
+                footprint[2] + Vector3.up * topHeight,
+                footprint[3] + Vector3.up * topHeight,
+                topColor);
+            AddQuad(
+                vertices,
+                triangles,
+                colors,
+                footprint[0] + Vector3.up * topHeight,
+                footprint[1] + Vector3.up * topHeight,
+                footprint[2] + Vector3.up * topHeight,
+                footprint[3] + Vector3.up * topHeight,
+                topColor);
+            var minimumDepth = float.PositiveInfinity;
+            foreach (var point in logicalFootprint)
+            {
+                minimumDepth = Mathf.Min(minimumDepth, point.x + point.y);
+            }
 
-        var topSortingOrder = GridWall.GetTopSortingOrderAtDepth(
-            minimumDepth - WallCellGeometry.ThicknessInCells * 0.5f,
-            baseHeight,
-            sortingOrder) + 1;
-        CreateSurface(
-            "Top",
-            topVertices,
-            topTriangles,
-            topColors,
-            topSortingOrder,
-            footprint,
-            GetPolygonCenter(footprint),
-            logicalFootprint[0],
-            logicalFootprint[2]);
+            var topSortingOrder = GridWall.GetTopSortingOrderAtDepth(
+                minimumDepth - WallCellGeometry.ThicknessInCells * 0.5f,
+                baseHeight,
+                sortingOrder) + 1;
+            CreateSurface(
+                "Top",
+                topVertices,
+                topTriangles,
+                topColors,
+                topSortingOrder,
+                footprint,
+                GetPolygonCenter(footprint),
+                logicalFootprint[0],
+                logicalFootprint[2]);
+        }
 
         mesh.vertices = vertices.ToArray();
         mesh.triangles = triangles.ToArray();

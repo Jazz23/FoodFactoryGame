@@ -208,6 +208,7 @@ public sealed class BuildingShellAssembler
                 newRecord.AnchorCell,
                 newRecord.FootprintSize,
                 storyIndex,
+                storyIndex == newRecord.StoryCount - 1,
                 newCreator);
         }
 
@@ -326,7 +327,8 @@ public sealed class BuildingShellAssembler
                 || roof.TopColor != newCreator.RoofTopColor
                 || roof.SideColor != newCreator.RoofSideColor
                 || roof.Material != newCreator.Material
-                || roof.SortingOrder != newCreator.RoofSortingOrder)
+                || roof.SortingOrder != newCreator.RoofSortingOrder
+                || roof.RenderTopSurface != (storyIndex == roofs.Length - 1))
             {
                 return true;
             }
@@ -477,6 +479,7 @@ public sealed class BuildingShellAssembler
         Vector3Int anchorCell,
         Vector2Int size,
         int storyIndex,
+        bool renderTopSurface,
         TestBuildingCreator newCreator)
     {
         var roofObject = new GameObject($"Grid Floor Ceiling {storyIndex}");
@@ -496,7 +499,8 @@ public sealed class BuildingShellAssembler
             newCreator.RoofTopColor,
             newCreator.RoofSideColor,
             newCreator.Material,
-            newCreator.RoofSortingOrder);
+            newCreator.RoofSortingOrder,
+            renderTopSurface);
     }
 
     private static void RebuildCollision(

@@ -7,6 +7,24 @@
 3. Use registered `factory_*` commands for recurring factory workflows.
 4. Serialize live mutations, compilation, and test execution. Parallelize independent reads only.
 
+## Visual Defect Verification
+
+For a visual defect such as the Building 13 dark triangle:
+
+1. Capture a baseline with the exact scene, camera, zoom, lighting, gizmos, resolution, and region of interest recorded.
+2. Use `Food Factory/Visual Regression/Capture Building 13 Baseline` and keep the generated manifest beside the PNG. The default artifact directory is `TestResults/VisualRegression/Building13`.
+3. When delegated work is supported, assign independent evidence gathering or review with explicit ownership and a disjoint scope.
+4. Make one controlled change at a time and keep Unity mutations, compilation, and tests serialized under one owner.
+5. Use `Food Factory/Visual Regression/Capture Building 13 After + Compare` to restore the recorded view, capture the after image, and compare the declared ROI. A changed pixel inside the ROI fails the comparison unless the manifest tolerance explicitly allows it.
+6. Treat a still-visible artifact as a failed acceptance result. Stop speculative edits.
+7. Use `Food Factory/Visual Regression/Write Building 13 Evidence Packet` to package the screenshots, comparison, hierarchy path, renderer/material/shader names, mesh bounds, attempted change, console state, and view configuration for independent review or escalation.
+
+The hard acceptance test is: **“In this exact Building 13 view, the dark triangle is absent.”** The implementer must not be the sole authority for visual pass/fail. An independent reviewer must record a name, verdict, and notes in the evidence packet; a pixel comparison pass without that review remains pending. Recurring defects should use the deterministic editor capture and comparison with documented tolerances.
+
+The default capture resolves Building 13 from `Assets/Authoring/OutsideTestBuildingLayout.asset` / `OutsideTest.unity` by stable building ID, records the active SceneView camera and view flags, and renders both images at the same dimensions. The captured renderer evidence includes hierarchy paths, renderer/material/shader names, and world mesh bounds. If the intended camera framing or ROI is unknown, stop at evidence collection and request those values; do not infer a visual pass from an unrelated camera.
+
+The artifact contract is `baseline.png`, `after.png`, `view-manifest.json`, `comparison.json`, and `evidence.json`. `comparison.json` is the machine-readable verdict and includes dimensions, requested/clamped ROI, tolerance, differing-pixel count, maximum channel delta, and failure reason. `evidence.json` is not accepted until `reviewGate.verdict` is `approved` with reviewer notes; the utility leaves it `pending-review` by default.
+
 ## Verification Contract
 
 `factory_verify` starts one named verification profile and returns a run ID. Poll its status command until it reaches `passed`, `failed`, or `infrastructure_failed`.

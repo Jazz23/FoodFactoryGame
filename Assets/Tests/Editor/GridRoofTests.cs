@@ -78,6 +78,38 @@ public sealed class GridRoofTests
     }
 
     [Test]
+    public void UpperStorySlabsOmitTheHiddenBackEdge()
+    {
+        var roof = CreateRoof(
+            new Vector2(-0.75f, -0.75f),
+            new Vector2(1.75f, 1.75f),
+            4f,
+            0.1f,
+            2f);
+
+        Assert.That(roof.transform.Find("Roof Side 3 Segment 0"), Is.Null);
+        Assert.That(roof.transform.Find("Roof Side 0 Segment 0"), Is.Not.Null);
+    }
+
+    [Test]
+    public void IntermediateRoofsCanOmitTheirFilledTopSurface()
+    {
+        var roof = CreateRoof(
+            new Vector2(-0.75f, -0.75f),
+            new Vector2(1.75f, 1.75f),
+            2f,
+            0.1f);
+        var serializedObject = new SerializedObject(roof);
+        serializedObject.FindProperty("renderTopSurface").boolValue = false;
+        serializedObject.ApplyModifiedProperties();
+        roof.enabled = false;
+        roof.enabled = true;
+
+        Assert.That(roof.transform.Find("Roof Top"), Is.Null);
+        Assert.That(roof.transform.Find("Roof Side 0 Segment 0"), Is.Not.Null);
+    }
+
+    [Test]
     public void SlabSurfacesFollowTheirLogicalDepthAndSortAfterTheMatchingWall()
     {
         var logicalMin = new Vector2(-0.75f, -0.75f);

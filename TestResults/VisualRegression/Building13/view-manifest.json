@@ -1,0 +1,47 @@
+{
+    "targetBuildingInstanceId": 13,
+    "scenePath": "Assets/Scenes/OutsideTest.unity",
+    "selectedHierarchyPath": "Test Building Creator/Generated Buildings/Test Building (-12, -5) 6x3",
+    "acceptanceText": "In this exact Building 13 view, the dark triangle is absent.",
+    "consoleState": "errors=0;warnings=0;logs=0;compiling=False;playing=False",
+    "baselinePath": "TestResults/VisualRegression/Building13/baseline.png",
+    "afterPath": "TestResults/VisualRegression/Building13/after.png",
+    "comparisonPath": "TestResults/VisualRegression/Building13/comparison.json",
+    "evidencePath": "TestResults/VisualRegression/Building13/evidence.json",
+    "camera": {
+        "position": {
+            "x": -4.877896308898926,
+            "y": -4.25,
+            "z": -12.225618362426758
+        },
+        "eulerAngles": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "projection": "Orthographic",
+        "orthographic": true,
+        "fieldOfView": 60.0,
+        "orthographicSize": 6.112809181213379,
+        "nearClipPlane": 0.06112809106707573,
+        "farClipPlane": 12225.6181640625,
+        "aspect": 2.073446273803711,
+        "cullingMask": -1
+    },
+    "sceneView": {
+        "drawGizmos": true,
+        "sceneLighting": true,
+        "showGrid": true,
+        "in2DMode": true
+    },
+    "resolution": {
+        "width": 1468,
+        "height": 708
+    },
+    "roi": {
+        "x": 0,
+        "y": 0,
+        "width": 1468,
+        "height": 708
+    }
+}

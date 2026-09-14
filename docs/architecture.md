@@ -18,6 +18,8 @@
 - `FactoryWorldSqliteStore.Inspect`, `PlanMigration`, `ApplyMigration`, `Read`, and `Save` keep schema inspection, migration, loading, and writing explicit.
 - `OutsideTestFloorPresentation` and related views render explicit building/floor state; they are not authoritative state owners.
 - `OutsideTestFloorDebugPanel` is a UI client of the current player/floor binding and should not be used as the primary API for domain tests.
+- `VisualRegressionEvidence` owns deterministic Building 13 SceneView capture, ROI comparison, and evidence-packet metadata. It is editor-only verification infrastructure; it does not author gameplay geometry or decide independent visual review.
+- `BuildingShellAssembler` marks only the topmost story roof for filled-top presentation; intermediate story roofs retain their side geometry without an exterior top surface so they cannot project through upper-story walls.
 - `Virtual3DSize` uses the player's transform origin as the stable bottom-pivot foot anchor. A shallow horizontal capsule extends upward from that anchor with independent world-space width and ground depth (player prefab: 0.6 × 0.3); animation bounds never move the collider. Transitions, interior containment, and depth sorting consume that same anchor.
 - `SceneGrid.CellSize` scales world-space presentation only. `IndoorGrid`, `InsideFactoryVisuals`, and factory entity views continue to use saved logical cell coordinates and configured building sizes.
 
@@ -42,3 +44,12 @@
 - Extract bounded application services before introducing new assembly boundaries.
 - Keep database inspection, migration planning, migration application, and saving as distinct operations.
 - Saved topology has runtime precedence over authored shell dimensions. Authoring deletion removes the authored record and generated shell, then removes that building and its dependent state from the selected database after destructive confirmation; other saves retain their buildings. Creator IDs use a persisted high-water mark and are not recycled after deletion.
+
+## Visual Verification Ownership
+
+- Building 13 is the authored record with stable ID 13 in `OutsideTestBuildingLayout.asset`; generated shell children remain derived output.
+- `VisualRegressionEvidence` writes only under `TestResults/VisualRegression/Building13` and never mutates scene or prefab YAML.
+- A baseline manifest is the source of truth for camera, resolution, culling, view flags, and ROI. The after capture restores that manifest before rendering so the two images are comparable.
+- Pixel comparison is scoped to the declared ROI and reports dimensions, differing pixels, maximum channel delta, tolerance, and artifact paths. A mismatch is a failed acceptance result, not a prompt to stack another code hypothesis.
+- Renderer evidence is diagnostic only. Controlled isolation remains a manual, serialized step: disable one renderer/material/mesh group, capture, restore it, and record which isolated change removes the artifact.
+- Evidence packets require an independent reviewer record (`pending`, `approved`, or `failed`) before a visual result can be considered accepted.

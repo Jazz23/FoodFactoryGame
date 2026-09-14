@@ -13,6 +13,7 @@
 - Factory reconciliation must preserve identities and gameplay state. Overflow equipment remains recoverable and must never be silently deleted.
 - Stateful tests must use isolated save paths and must not modify the application database.
 - Establish a baseline before attributing a regression; after a failure, capture diagnostics and state an evidence-backed hypothesis before adding waits or changing authoring.
+- When delegated work is supported, assign explicit ownership and disjoint write scopes, and require evidence-based acceptance and independent review for high-risk or visual changes.
 - Serialize live Editor mutations, compilation, and test execution. Parallelize only independent repository reads.
 - Do not change gameplay authoring to satisfy test fixture assumptions; use isolated test fixtures for test-specific dimensions and records.
 - Verification must report its requested filter, run identity, matched test count, and artifact path. Zero matched tests are a failure.
