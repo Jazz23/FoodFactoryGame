@@ -49,14 +49,14 @@ Zero matched tests, compile failures, runner initialization failures, and timeou
 - `factory_validate_building_layout` checks the asset schema, topology, and generated-layout match.
 - `factory_rebuild_outside_shells --dry_run true` verifies deterministic shell output without changing the scene.
 
-## Explicit Topology Workflow
+## Immediate Topology Workflow
 
 - Use the Test Building Creator list to inspect ID, anchor, exterior size, usable interior, and stories.
-- Use `Preview Changes...` with an explicitly selected full database path before applying authored dimensions.
-- Use `Apply Selected Save...` only against an isolated SQLite copy unless application-save authorization has been given. The operation is atomic, reload-verified, reports preserved entities and relocations, and rejects stale authored/database fingerprints.
-- New authored buildings are persisted as `Create` operations with deterministic building, floor, and entity identities; selected creates preserve unrelated save-only buildings.
-- Authored story removal is labelled `Delete Authored Top Story`; authored building removal is labelled `Delete Authored Building` and does not alter existing saves. Persisted whole-building deletion is a separate destructive purge requiring confirmation and reports all dependent floors, entities, connections, routes, and trucks.
-- Do not use inspector selection, repaint, startup migration, or generated-shell refresh as persistence operations. Existing saves retain buildings deleted from authoring.
+- Select the full database path in the creator's `Selected Save Topology` section; successful building creation, door placement, story changes, and topology updates are saved there immediately.
+- `Preview Changes...` remains available for inspecting differences that existed before an edit. `Apply Selected Save...` is for manually resolving those pre-existing differences.
+- Immediate writes use the atomic, reload-verified topology service, preserve unrelated save-only buildings for selected create/update operations, and reject stale authored/database fingerprints.
+- Authored story removal is labelled `Delete Authored Top Story`; entity state is relocated when possible and the edit fails when it cannot be retained. Authored building removal is labelled `Delete Authored Building` and, after destructive confirmation, purges that building's dependent floors, entities, connections, routes, and trucks from the selected database.
+- `Clear Authored Buildings` applies the same confirmed purge to all exterior buildings in the selected database. Inspector selection, repaint, startup migration, undo/redo, and generated-shell refresh are not persistence operations.
 - For an isolated database copy, use `FactoryWorldSqliteStore.CreateConsistentBackup` or SQLite `VACUUM INTO`; do not copy only the main file while WAL data may be active.
 - The Unity Editor default database is `<project-root>/factory-world.db`; production uses `Application.persistentDataPath/factory-world.db`. Keep the project-local database out of source control.
 - `factory_reconcile_save` is position-only reconciliation. Run it with an explicit isolated path and dry-run first; it does not apply authored dimensions.

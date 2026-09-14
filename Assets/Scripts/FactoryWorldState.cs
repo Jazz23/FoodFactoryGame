@@ -2002,6 +2002,7 @@ public sealed class FactoryWorldState
         if (!TryValidateRemoteRoleAvailability(
                 route.Source,
                 route.Destination,
+                existingRoutes,
                 out error))
         {
             return false;
@@ -2030,7 +2031,20 @@ public sealed class FactoryWorldState
         FactoryEntityEndpoint destination,
         out string error)
     {
-        foreach (var route in truckRoutes)
+        return TryValidateRemoteRoleAvailability(
+            source,
+            destination,
+            truckRoutes,
+            out error);
+    }
+
+    private static bool TryValidateRemoteRoleAvailability(
+        FactoryEntityEndpoint source,
+        FactoryEntityEndpoint destination,
+        IEnumerable<FactoryTruckRouteRecord> existingRoutes,
+        out string error)
+    {
+        foreach (var route in existingRoutes)
         {
             if (EndpointsMatch(route.Source, source))
             {

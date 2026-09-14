@@ -955,6 +955,7 @@ public sealed class GameSceneManager : MonoBehaviour
     {
         if (args.ConnectionState == LocalConnectionState.Started)
         {
+            ResetOutsideTestRuntimeState();
             EnsureStateManagerSpawned();
             EnsureOutsideTestStateLoaded();
             BroadcastOutsideTestFloorStates();
@@ -963,10 +964,25 @@ public sealed class GameSceneManager : MonoBehaviour
 
         if (args.ConnectionState == LocalConnectionState.Stopped)
         {
+            ResetOutsideTestRuntimeState();
             transitionCoordinator.Clear();
             players.Clear();
             awaitingInitialSpawn.Clear();
         }
+    }
+
+    private void ResetOutsideTestRuntimeState()
+    {
+        outsideTestStateLoaded = false;
+        outsideTestStateLoadedFromDisk = false;
+        outsideTestStateLoadFailed = false;
+        outsideTestStateNeedsSave = false;
+        outsideTestWorldReconciled = false;
+        registeredOutsideTestSceneHandle = default;
+        clientOutsideTestLoadedInteriorCount = 0;
+        nextOutsideTestBroadcastTime = 0f;
+        lastOutsideTestError = string.Empty;
+        duplicateOutsideTestBuildingWarnings.Clear();
     }
 
     private void BroadcastOutsideTestFloorStates()

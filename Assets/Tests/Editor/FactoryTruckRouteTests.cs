@@ -396,6 +396,27 @@ public sealed class FactoryTruckRouteTests
     }
 
     [Test]
+    public void RestoringRoutesReplacesExistingRuntimeRoutes()
+    {
+        var owner = CreateRoutedWorld(out _, out _, 10, 0);
+        var savedRoute = owner.TruckRoutes[0].Clone();
+        Assert.That(owner.TryGetTruck(savedRoute.TruckGuid, out var truck), Is.True);
+        var savedTruck = truck.Clone();
+
+        Assert.That(owner.TruckRouteCount, Is.EqualTo(1));
+        Assert.That(
+            owner.TryRestoreTruckRoutes(
+                new[] { savedRoute },
+                new[] { savedTruck },
+                out var error),
+            Is.True,
+            error);
+        Assert.That(owner.TruckRouteCount, Is.EqualTo(1));
+        Assert.That(owner.TruckRoutes[0].Guid, Is.EqualTo(savedRoute.Guid));
+        Assert.That(owner.Trucks[0].Guid, Is.EqualTo(savedTruck.Guid));
+    }
+
+    [Test]
     public void RestoreDistinguishesDeliberatelyBlockedRoutesFromMalformedData()
     {
         var owner = CreateRoutedWorld(out var senderFloor, out _, 10, 0);

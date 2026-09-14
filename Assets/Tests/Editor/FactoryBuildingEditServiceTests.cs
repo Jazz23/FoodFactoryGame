@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -163,6 +164,76 @@ public sealed class FactoryBuildingEditServiceTests
         Assert.That(result.CreatedFloorGuids, Has.Count.EqualTo(2));
         Assert.That(result.CreatedEntityGuids, Has.Count.EqualTo(2));
         Assert.That(result.PreservedEntityCount, Is.EqualTo(2));
+    }
+
+    [Test]
+    public void SelectedTopologyPlanPersistsAtomicUpdateAndPreservesState()
+    {
+        var path = Path.Combine(
+            Application.temporaryCachePath,
+            "factory-topology-immediate-" + Guid.NewGuid() + ".db");
+        var buildingGuid = Guid.NewGuid();
+        var entityGuid = Guid.NewGuid();
+        var snapshot = CreateSnapshot(
+            buildingGuid,
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            entityGuid,
+            Guid.NewGuid(),
+            new Vector2Int(5, 3));
+        var authored = new List<BuildingRecord>
+        {
+            new(2, new Vector3Int(3, -1, 0), new Vector2Int(6, 5), 2)
+        };
+        var store = new FactoryWorldSqliteStore(path);
+        store.Save(snapshot);
+
+        try
+        {
+            Assert.That(
+                FactoryBuildingEditService.TryCreateTopologyPlan(
+                    path,
+                    authored,
+                    0.15f,
+                    out var plan,
+                    out var planError),
+                Is.True,
+                planError);
+            Assert.That(
+                FactoryBuildingEditService.TryApplyTopologyPlan(
+                    path,
+                    plan,
+                    authored,
+                    new[] { 2u },
+                    false,
+                    0.15f,
+                    out var result,
+                    out var error),
+                Is.True,
+                error);
+
+            var persisted = store.Load();
+            var persistedBuilding = persisted.Buildings.Find(
+                building => building.LegacyBuildingId == 2);
+            Assert.That(result.Saved, Is.True);
+            Assert.That(persistedBuilding.FootprintSize, Is.EqualTo(new Vector2Int(6, 5)));
+            Assert.That(persistedBuilding.StoryCount, Is.EqualTo(2));
+            Assert.That(
+                persisted.Floors.SelectMany(floor => floor.Entities)
+                    .Any(entity => entity.Guid == entityGuid),
+                Is.True);
+        }
+        finally
+        {
+            foreach (var suffix in new[] { "", "-wal", "-shm" })
+            {
+                var candidate = path + suffix;
+                if (File.Exists(candidate))
+                {
+                    File.Delete(candidate);
+                }
+            }
+        }
     }
 
     [Test]
