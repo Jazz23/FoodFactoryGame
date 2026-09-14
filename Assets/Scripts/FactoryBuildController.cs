@@ -25,12 +25,13 @@ public sealed class FactoryBuildController : MonoBehaviour
     private uint recoveryId;
     private string status = "Place sources, belts, and storage inside. Place shipping and receiving docks outside.";
     private readonly string[] labels = { "1 Source", "2 Conveyor", "3 Storage", "4 Shipping dock", "5 Receiving dock" };
-    private readonly string[] arrows = { "East >", "North ^", "West <", "South v" };
+    private readonly string[] arrows = { "East >", "South v", "West <", "North ^" };
+    private readonly int[] conveyorDefinitionIndices = { 0, 3, 2, 1 };
     private string Definition => selection == 0 ? FactoryEntityDefinitions.TestMachineDefinitionId
         : selection == 2 ? FactoryEntityDefinitions.TestStorageDefinitionId
         : selection == 3 ? FactoryEntityDefinitions.ShippingDockDefinitionId
         : selection == 4 ? FactoryEntityDefinitions.ReceivingDockDefinitionId
-        : FactoryConveyor.Definitions[direction];
+        : FactoryConveyor.Definitions[conveyorDefinitionIndices[direction]];
     private bool IsConveyorSelection => selection == 1;
     private bool IsDockSelection => selection is 3 or 4;
 

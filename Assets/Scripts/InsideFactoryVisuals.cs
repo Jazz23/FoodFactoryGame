@@ -188,12 +188,14 @@ public sealed class InsideFactoryVisuals : MonoBehaviour
             new Vector2(right, size.y + wallThickness),
             elevatorColor,
             elevatorSortingOrder);
+        // Keep the center slit behind the player sprite at the north-wall overlap.
+        var elevatorCenterGapSortingOrder = elevatorSortingOrder - 1;
         CreateQuad(
             "Elevator Center Gap",
             new Vector2(middle - halfGap, size.y),
             new Vector2(middle + halfGap, size.y + wallThickness),
             elevatorGapColor,
-            elevatorSortingOrder + 1);
+            elevatorCenterGapSortingOrder);
 
         HasElevatorVisual = true;
     }

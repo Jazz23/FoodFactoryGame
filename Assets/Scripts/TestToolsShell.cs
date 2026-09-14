@@ -255,9 +255,11 @@ public sealed class TestToolsShell : MonoBehaviour
     {
         var panel = new Rect(Screen.width - 476f, 16f, 460f, Mathf.Max(260f, Screen.height - 160f));
         var launcher = new Rect(Screen.width - 164f, 8f, 148f, 44f);
+        var networkButtons = new Rect(16f, 16f, 396f, 34f);
         var buildBar = new Rect(12f, Screen.height - 124f, Screen.width - 24f, 112f);
         var recovery = new Rect(16f, Screen.height - 304f, 460f, 168f);
-        return launcher.Contains(guiPoint) || buildBar.Contains(guiPoint) || recovery.Contains(guiPoint)
+        return launcher.Contains(guiPoint) || networkButtons.Contains(guiPoint)
+            || buildBar.Contains(guiPoint) || recovery.Contains(guiPoint)
             || (Instance is not null && Instance.expanded && TestUIVisibility.Visible && panel.Contains(guiPoint));
     }
 
@@ -428,13 +430,6 @@ public sealed class TestToolsShell : MonoBehaviour
             TextAnchor.MiddleLeft, TextPrimary);
         SetTopRect(networkClientText.rectTransform, 16f, 78f, 396f, 28f);
 
-        var startServer = CreateButton("Start Server", "START SERVER", root.transform, 16f, 116f, 190f, 34f,
-            ToggleServer);
-        startServer.GetComponent<Image>().color = TealMuted;
-        var startClient = CreateButton("Start Client", "START CLIENT", root.transform, 222f, 116f, 190f, 34f,
-            ToggleClient);
-        startClient.GetComponent<Image>().color = TealMuted;
-
         var addressLabel = CreateText("Server Address Label", root.transform, "SERVER ADDRESS", 12,
             TextAnchor.MiddleLeft, TextSecondary);
         SetTopRect(addressLabel.rectTransform, 16f, 164f, 150f, 24f);
@@ -447,6 +442,13 @@ public sealed class TestToolsShell : MonoBehaviour
 
     private void CreatePersistentControls()
     {
+        var startServer = CreateButton("Start Server", "START SERVER", persistentCanvas.transform, 16f, 16f, 190f, 34f,
+            ToggleServer);
+        startServer.GetComponent<Image>().color = TealMuted;
+        var startClient = CreateButton("Start Client", "START CLIENT", persistentCanvas.transform, 222f, 16f, 190f, 34f,
+            ToggleClient);
+        startClient.GetComponent<Image>().color = TealMuted;
+
         launcherButton = CreateButton(
             "Test Tools Launcher",
             "TEST TOOLS",
