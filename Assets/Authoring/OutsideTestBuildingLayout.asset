@@ -23,15 +23,6 @@ MonoBehaviour:
       normalizedOffset: 0.71132755
     - wallId: South:0:3:0
       normalizedOffset: 0.64002466
-  - buildingInstanceId: 2
-    anchorCell: {x: 3, y: -1, z: 0}
-    footprintSize: {x: 6, y: 5}
-    storyCount: 2
-    doors:
-    - wallId: West:3:0:0
-      normalizedOffset: 0.52817106
-    - wallId: South:5:-1:0
-      normalizedOffset: 0.68434715
   - buildingInstanceId: 3
     anchorCell: {x: 4, y: -7, z: 0}
     footprintSize: {x: 4, y: 4}
@@ -59,3 +50,21 @@ MonoBehaviour:
     doors:
     - wallId: South:-6:0:0
       normalizedOffset: 0.6571293
+  - buildingInstanceId: 6
+    anchorCell: {x: 4, y: 1, z: 0}
+    footprintSize: {x: 5, y: 5}
+    storyCount: 2
+    doors:
+    - wallId: West:4:2:0
+      normalizedOffset: 0.6167631
+    - wallId: South:5:1:0
+      normalizedOffset: 0.6175575
+  - buildingInstanceId: 7
+    anchorCell: {x: -4, y: -3, z: 0}
+    footprintSize: {x: 4, y: 4}
+    storyCount: 1
+    doors:
+    - wallId: West:-4:-1:0
+      normalizedOffset: 0.6460682
+    - wallId: South:-3:-3:0
+      normalizedOffset: 0.61356854

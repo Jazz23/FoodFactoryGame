@@ -11,6 +11,11 @@ using UnityEngine.UI;
 
 public sealed class FactoryTestWorld
 {
+    private const uint FloorTransitionFixtureBuildingId = 2;
+    private const int FloorTransitionFixtureStoryCount = 2;
+    private static readonly Vector3Int FloorTransitionFixtureAnchor = new(20, 20, 0);
+    private static readonly Vector2Int FloorTransitionFixtureFootprint = new(6, 5);
+
     private readonly List<string> consoleErrors = new();
 
     public NetworkManager NetworkManager { get; private set; } = null!;
@@ -37,9 +42,14 @@ public sealed class FactoryTestWorld
         yield return WaitForCondition(
             () => NetworkManager.ServerManager.Started
                 && NetworkManager.ClientManager.Started
-                && PlayerSceneTransition.LocalOwner is not null,
+                && PlayerSceneTransition.LocalOwner is not null
+                && PlayerSceneTransition.LocalOwner.gameObject.scene.name == "OutsideTest"
+                && GameSceneManager.Instance is not null
+                && GameSceneManager.Instance.StateManager is not null
+                && GameSceneManager.Instance.StateManager.IsInitialized,
             10f,
             "FishNet host/client player did not start.");
+        EnsureFloorTransitionFixture();
     }
 
     public IEnumerator TearDown()
@@ -85,6 +95,59 @@ public sealed class FactoryTestWorld
         {
             consoleErrors.Add(message);
         }
+    }
+
+    private static void EnsureFloorTransitionFixture()
+    {
+        var sceneManager = GameSceneManager.Instance;
+        var stateManager = sceneManager.StateManager;
+        if (stateManager.TryGetBuildingRecord(FloorTransitionFixtureBuildingId, out _))
+        {
+            return;
+        }
+
+        var creators = UnityEngine.Object.FindObjectsByType<TestBuildingCreator>(
+            FindObjectsInactive.Include,
+            FindObjectsSortMode.None);
+        TestBuildingCreator creator = null!;
+        foreach (var candidate in creators)
+        {
+            if (candidate.gameObject.scene.name == "OutsideTest")
+            {
+                creator = candidate;
+                break;
+            }
+        }
+
+        Assert.That(creator, Is.Not.Null, "The OutsideTest fixture requires a building creator.");
+        Assert.That(
+            TestBuildingCreator.TryGetDefaultEntrance(
+                FloorTransitionFixtureAnchor,
+                FloorTransitionFixtureFootprint,
+                out var entrance,
+                out var entranceError),
+            Is.True,
+            entranceError);
+        var record = new BuildingRecord(
+            FloorTransitionFixtureBuildingId,
+            FloorTransitionFixtureAnchor,
+            FloorTransitionFixtureFootprint,
+            FloorTransitionFixtureStoryCount,
+            new[] { entrance });
+        Assert.That(
+            stateManager.TryRegisterBuilding(record, out var registrationError),
+            Is.True,
+            registrationError);
+
+        var shell = new BuildingShellAssembler().CreateShell(
+            record,
+            creator,
+            creator.GeneratedBuildings);
+        Assert.That(shell, Is.Not.Null, "The isolated OutsideTest fixture shell could not be created.");
+        Assert.That(
+            sceneManager.SaveOutsideTestFloorState(),
+            Is.True,
+            sceneManager.LastOutsideTestError);
     }
 
     private void WriteFailureDiagnostics()

@@ -34,7 +34,7 @@ Zero matched tests, compile failures, runner initialization failures, and timeou
 - Domain tests call application commands directly and use isolated `FactoryTestWorld` state.
 - Scene/network tests cover ownership, transitions, sharing, isolation, and disconnect behavior.
 - UI tests deliberately verify binding, readiness, and displayed state.
-- PlayMode fixtures own temporary database paths, network lifecycle, static/UI reset, stable identities, and cleanup.
+- PlayMode fixtures own temporary database paths, network lifecycle, static/UI reset, stable identities, and cleanup. `FactoryTestWorld` provisions the two-floor building-2 transition fixture in the isolated runtime world instead of depending on authored OutsideTest building IDs.
 - Tests must not resize gameplay buildings or modify the application database.
 
 ## Transition Verification
@@ -48,6 +48,18 @@ Zero matched tests, compile failures, runner initialization failures, and timeou
 - `factory_export_building_layout --confirm true --assign true` writes `Assets/Authoring/OutsideTestBuildingLayout.asset` and assigns it to `TestBuildingCreator`.
 - `factory_validate_building_layout` checks the asset schema, topology, and generated-layout match.
 - `factory_rebuild_outside_shells --dry_run true` verifies deterministic shell output without changing the scene.
+
+## Explicit Topology Workflow
+
+- Use the Test Building Creator list to inspect ID, anchor, exterior size, usable interior, and stories.
+- Use `Preview Changes...` with an explicitly selected full database path before applying authored dimensions.
+- Use `Apply Selected Save...` only against an isolated SQLite copy unless application-save authorization has been given. The operation is atomic, reload-verified, reports preserved entities and relocations, and rejects stale authored/database fingerprints.
+- New authored buildings are persisted as `Create` operations with deterministic building, floor, and entity identities; selected creates preserve unrelated save-only buildings.
+- Authored story removal is labelled `Delete Authored Top Story`; authored building removal is labelled `Delete Authored Building` and does not alter existing saves. Persisted whole-building deletion is a separate destructive purge requiring confirmation and reports all dependent floors, entities, connections, routes, and trucks.
+- Do not use inspector selection, repaint, startup migration, or generated-shell refresh as persistence operations. Existing saves retain buildings deleted from authoring.
+- For an isolated database copy, use `FactoryWorldSqliteStore.CreateConsistentBackup` or SQLite `VACUUM INTO`; do not copy only the main file while WAL data may be active.
+- The Unity Editor default database is `<project-root>/factory-world.db`; production uses `Application.persistentDataPath/factory-world.db`. Keep the project-local database out of source control.
+- `factory_reconcile_save` is position-only reconciliation. Run it with an explicit isolated path and dry-run first; it does not apply authored dimensions.
 
 ## Presentation-Scale Verification
 

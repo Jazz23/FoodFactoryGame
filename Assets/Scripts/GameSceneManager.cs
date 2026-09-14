@@ -1417,32 +1417,16 @@ public sealed class GameSceneManager : MonoBehaviour
             }
         }
 
-        if (importSceneLayouts
-            && !BuildingShellValidation.TryValidateRecords(
+        if (!FactoryBuildingTopologyResolver.TryResolveImports(
+                stateManager.BuildingRecords,
                 layoutRecords,
+                creator.HasAuthoredLayout,
+                importSceneLayouts,
                 creator.DoorCornerExclusionDistance,
+                out var recordsToImport,
                 out error))
         {
             return false;
-        }
-
-        var recordsToImport = new List<BuildingRecord>();
-        foreach (var record in layoutRecords)
-        {
-            if (stateManager.TryGetBuildingRecord(
-                    record.BuildingInstanceId,
-                    out var existingRecord))
-            {
-                if (importSceneLayouts && !existingRecord.HasSameTopology(record))
-                {
-                    error = $"Duplicate building ID {record.BuildingInstanceId} has conflicting layout data.";
-                    return false;
-                }
-
-                continue;
-            }
-
-            recordsToImport.Add(record);
         }
 
         if (recordsToImport.Count > 0)

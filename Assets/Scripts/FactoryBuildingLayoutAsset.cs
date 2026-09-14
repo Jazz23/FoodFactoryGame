@@ -36,6 +36,75 @@ public sealed class FactoryBuildingLayoutAsset : ScriptableObject
         schemaVersion = CurrentSchemaVersion;
     }
 
+    public bool TryAddRecord(BuildingRecord record, out string error)
+    {
+        error = string.Empty;
+        if (record is null)
+        {
+            error = "A building record is required.";
+            return false;
+        }
+
+        if (record.BuildingInstanceId == 0)
+        {
+            error = "A building record ID must be greater than zero.";
+            return false;
+        }
+
+        if (TryGetRecord(record.BuildingInstanceId, out _))
+        {
+            error = $"Building {record.BuildingInstanceId} already exists in the authored layout.";
+            return false;
+        }
+
+        var records = CloneRecords();
+        records.Add(record);
+        ReplaceRecords(records);
+        return true;
+    }
+
+    public bool TryUpdateRecord(BuildingRecord record, out string error)
+    {
+        error = string.Empty;
+        if (record is null)
+        {
+            error = "A building record is required.";
+            return false;
+        }
+
+        var records = CloneRecords();
+        for (var index = 0; index < records.Count; index++)
+        {
+            if (records[index].BuildingInstanceId != record.BuildingInstanceId)
+            {
+                continue;
+            }
+
+            records[index] = record.Clone();
+            ReplaceRecords(records);
+            return true;
+        }
+
+        error = $"Building {record.BuildingInstanceId} was not found in the authored layout.";
+        return false;
+    }
+
+    public bool TryRemoveRecord(uint buildingInstanceId, out string error)
+    {
+        error = string.Empty;
+        var records = CloneRecords();
+        var removed = records.RemoveAll(
+            record => record.BuildingInstanceId == buildingInstanceId) > 0;
+        if (!removed)
+        {
+            error = $"Building {buildingInstanceId} was not found in the authored layout.";
+            return false;
+        }
+
+        ReplaceRecords(records);
+        return true;
+    }
+
     public List<BuildingRecord> CloneRecords()
     {
         var clone = new List<BuildingRecord>(Count);

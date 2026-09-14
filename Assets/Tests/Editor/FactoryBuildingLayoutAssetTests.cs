@@ -72,4 +72,26 @@ public sealed class FactoryBuildingLayoutAssetTests
             Object.DestroyImmediate(asset);
         }
     }
+
+    [Test]
+    public void RecordMutationsAreClonedAndKeepStableOrdering()
+    {
+        var asset = ScriptableObject.CreateInstance<FactoryBuildingLayoutAsset>();
+        var first = new BuildingRecord(2, new Vector3Int(2, 2), new Vector2Int(5, 5), 1);
+        var second = new BuildingRecord(1, new Vector3Int(0, 0), new Vector2Int(4, 4), 2);
+        try
+        {
+            Assert.That(asset.TryAddRecord(first, out var addError), Is.True, addError);
+            Assert.That(asset.TryUpdateRecord(second, out var missingError), Is.False);
+            Assert.That(missingError, Does.Contain("was not found"));
+            Assert.That(asset.TryAddRecord(second, out addError), Is.True, addError);
+            Assert.That(asset.TryRemoveRecord(2, out var removeError), Is.True, removeError);
+            Assert.That(asset.Count, Is.EqualTo(1));
+            Assert.That(asset.BuildingRecords[0].BuildingInstanceId, Is.EqualTo(1));
+        }
+        finally
+        {
+            Object.DestroyImmediate(asset);
+        }
+    }
 }

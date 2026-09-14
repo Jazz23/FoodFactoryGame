@@ -5,7 +5,7 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public sealed class TestBuildingCreator : MonoBehaviour
 {
-    public const int CurrentSettingsVersion = 4;
+    public const int CurrentSettingsVersion = 5;
     public const int DefaultRoofSortingOrder = 1000;
     public const float DefaultDoorCornerExclusionDistance = 0.15f;
     public const float RoofBoundaryInset = 0.5f + WallCellGeometry.ThicknessInCells * 0.5f;
@@ -61,6 +61,7 @@ public sealed class TestBuildingCreator : MonoBehaviour
     [SerializeField] private BuildingVisualStyle visualStyle = null!;
     [SerializeField, Min(0.01f)] private float doorCornerExclusionDistance = DefaultDoorCornerExclusionDistance;
     [SerializeField] private FactoryBuildingLayoutAsset authoredLayout = null!;
+    [SerializeField, HideInInspector] private uint nextBuildingInstanceId;
     [SerializeField, HideInInspector] private int settingsVersion;
 
     public SceneGrid Grid => grid;
@@ -76,6 +77,7 @@ public sealed class TestBuildingCreator : MonoBehaviour
     public float DoorCornerExclusionDistance => doorCornerExclusionDistance;
     public FactoryBuildingLayoutAsset AuthoredLayout => authoredLayout;
     public bool HasAuthoredLayout => authoredLayout is not null && authoredLayout;
+    public uint NextBuildingInstanceId => nextBuildingInstanceId;
 
     public List<BuildingRecord> GetAuthoredBuildingRecords()
     {
@@ -106,20 +108,14 @@ public sealed class TestBuildingCreator : MonoBehaviour
     public uint GetNextBuildingInstanceId()
     {
         var maximumId = 0u;
-        foreach (var layout in generatedBuildings.GetComponentsInChildren<TestBuildingLayout>(true))
+        if (generatedBuildings is not null && generatedBuildings)
         {
-            if (layout.BuildingInstanceId > maximumId)
+            foreach (var layout in generatedBuildings.GetComponentsInChildren<TestBuildingLayout>(true))
             {
-                maximumId = layout.BuildingInstanceId;
-            }
-        }
-
-        if (GameSceneManager.Instance is not null)
-        {
-            var stateNextId = GameSceneManager.Instance.GetNextOutsideTestBuildingId();
-            if (stateNextId > maximumId)
-            {
-                maximumId = stateNextId - 1u;
+                if (layout.BuildingInstanceId > maximumId)
+                {
+                    maximumId = layout.BuildingInstanceId;
+                }
             }
         }
 
@@ -134,7 +130,47 @@ public sealed class TestBuildingCreator : MonoBehaviour
             }
         }
 
+        if (Application.isPlaying && GameSceneManager.Instance is not null)
+        {
+            var stateNextId = GameSceneManager.Instance.GetNextOutsideTestBuildingId();
+            if (stateNextId > maximumId)
+            {
+                maximumId = stateNextId - 1u;
+            }
+        }
+
+        if (nextBuildingInstanceId != 0 && nextBuildingInstanceId > maximumId)
+        {
+            return nextBuildingInstanceId;
+        }
+
         return maximumId == uint.MaxValue ? 0u : maximumId + 1u;
+    }
+
+    public bool TryReserveBuildingInstanceId(out uint buildingInstanceId)
+    {
+        buildingInstanceId = GetNextBuildingInstanceId();
+        if (buildingInstanceId == 0)
+        {
+            return false;
+        }
+
+        nextBuildingInstanceId = buildingInstanceId == uint.MaxValue
+            ? 0u
+            : buildingInstanceId + 1u;
+        return true;
+    }
+
+    public bool EnsureBuildingInstanceIdHighWaterMark()
+    {
+        var nextId = GetNextBuildingInstanceId();
+        if (nextId == 0 || nextBuildingInstanceId == nextId)
+        {
+            return false;
+        }
+
+        nextBuildingInstanceId = nextId;
+        return true;
     }
 
     public static Vector3Int GetAnchorCell(Vector3Int firstCorner, Vector3Int secondCorner)

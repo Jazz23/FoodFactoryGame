@@ -5,7 +5,6 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
-using OutsideTestFloorStateOwner = FactoryWorldState;
 
 [CustomEditor(typeof(TestBuildingCreator))]
 public sealed class TestBuildingCreatorEditor : Editor
@@ -25,14 +24,11 @@ public sealed class TestBuildingCreatorEditor : Editor
     private bool hasHoveredDoorWall;
     private bool doorPlacementMode;
     private string statusMessage = string.Empty;
+    private string selectedSavePath = string.Empty;
+    private uint selectedTopologyBuildingId;
+    private FactoryBuildingTopologyPlan topologyPlan = null!;
 
     private TestBuildingCreator Creator => (TestBuildingCreator)target;
-
-    private static string EditorPreviewStatePath => Path.Combine(
-        FactoryWorldPaths.GetProjectRoot(),
-        "Temp",
-        "factory-editor-preview",
-        GameSceneManager.OutsideTestStateFileName);
 
     private void OnEnable()
     {
@@ -42,11 +38,18 @@ public sealed class TestBuildingCreatorEditor : Editor
         }
 
         Undo.undoRedoPerformed += UndoRedoPerformed;
+        if (string.IsNullOrWhiteSpace(selectedSavePath))
+        {
+            selectedSavePath = FactoryWorldPaths.GetDefaultDatabasePath();
+        }
         MigrateLegacySettings();
         EnsureBuildingInstanceIds();
+        if (Creator.EnsureBuildingInstanceIdHighWaterMark())
+        {
+            EditorUtility.SetDirty(Creator);
+        }
         MigrateLegacyDoors();
         RefreshGeneratedBuildings();
-        PersistAuthoredBuildings();
         SceneView.RepaintAll();
     }
 
@@ -69,8 +72,12 @@ public sealed class TestBuildingCreatorEditor : Editor
 
         serializedObject.Update();
         DrawPropertiesExcluding(serializedObject, "m_Script");
-        serializedObject.ApplyModifiedProperties();
-        RefreshGeneratedBuildings();
+        var propertiesChanged = serializedObject.ApplyModifiedProperties();
+        if (propertiesChanged)
+        {
+            topologyPlan = null!;
+            RefreshGeneratedBuildings();
+        }
 
         EditorGUILayout.HelpBox(
             "Select the creator, then click two opposite ground cells in Scene View. "
@@ -96,24 +103,32 @@ public sealed class TestBuildingCreatorEditor : Editor
             SceneView.RepaintAll();
         }
 
-        if (GUILayout.Button("Clear Generated Buildings"))
+        using (new EditorGUI.DisabledScope(Application.isPlaying))
         {
-            ClearGeneratedBuildings();
+            if (GUILayout.Button("Clear Authored Buildings"))
+            {
+                ClearGeneratedBuildings();
+            }
         }
 
         DrawStoryControls();
+        DrawBuildingList();
+        DrawSaveTopologyControls();
 
-        if (GUILayout.Button(doorPlacementMode
-                ? "Cancel Door Placement"
-                : "Place Door in Scene View"))
+        using (new EditorGUI.DisabledScope(Application.isPlaying))
         {
-            doorPlacementMode = !doorPlacementMode;
-            hasHoveredDoorWall = false;
-            statusMessage = doorPlacementMode
-                ? "Click visible straight exterior walls to place doors; right-click or Escape when finished."
-                : string.Empty;
-            SceneView.RepaintAll();
-            Repaint();
+            if (GUILayout.Button(doorPlacementMode
+                    ? "Cancel Door Placement"
+                    : "Place Door in Scene View"))
+            {
+                doorPlacementMode = !doorPlacementMode;
+                hasHoveredDoorWall = false;
+                statusMessage = doorPlacementMode
+                    ? "Click visible straight exterior walls to place doors; right-click or Escape when finished."
+                    : string.Empty;
+                SceneView.RepaintAll();
+                Repaint();
+            }
         }
 
         if (doorPlacementMode)
@@ -125,12 +140,141 @@ public sealed class TestBuildingCreatorEditor : Editor
         }
     }
 
+    private void DrawBuildingList()
+    {
+        EditorGUILayout.Space();
+        EditorGUILayout.LabelField("Authored Buildings", EditorStyles.boldLabel);
+        var records = Creator.GetAuthoredBuildingRecords();
+        foreach (var record in records)
+        {
+            var interior = BuildingFootprint.GetUsableInteriorSize(record.FootprintSize);
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField(
+                $"{record.BuildingInstanceId} · ({record.AnchorCell.x}, {record.AnchorCell.y}) · "
+                + $"{record.FootprintSize.x} x {record.FootprintSize.y} · "
+                + $"{interior.x} x {interior.y} · {record.StoryCount} stories");
+            if (GUILayout.Button("Select", GUILayout.Width(55f)))
+            {
+                SelectLayout(record.BuildingInstanceId);
+            }
+
+            if (GUILayout.Button("Frame", GUILayout.Width(50f)))
+            {
+                SelectLayout(record.BuildingInstanceId);
+            }
+
+            using (new EditorGUI.DisabledScope(Application.isPlaying))
+            {
+                if (GUILayout.Button("Delete...", GUILayout.Width(65f)))
+                {
+                    var layout = FindLayout(record.BuildingInstanceId);
+                    if (layout is not null && layout)
+                    {
+                        DeleteBuilding(layout);
+                    }
+
+                    GUIUtility.ExitGUI();
+                }
+            }
+
+            EditorGUILayout.EndHorizontal();
+        }
+
+        if (records.Count == 0)
+        {
+            EditorGUILayout.HelpBox("No authored buildings.", MessageType.Info);
+        }
+    }
+
+    private void DrawSaveTopologyControls()
+    {
+        EditorGUILayout.Space();
+        EditorGUILayout.LabelField("Selected Save Topology", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField(
+            "Target",
+            string.IsNullOrWhiteSpace(selectedSavePath) ? "Not selected" : selectedSavePath);
+        if (GUILayout.Button("Select Save Database..."))
+        {
+            var initialDirectory = string.IsNullOrWhiteSpace(selectedSavePath)
+                ? FactoryWorldPaths.GetProjectRoot()
+                : Path.GetDirectoryName(selectedSavePath);
+            var path = EditorUtility.OpenFilePanel(
+                "Select factory database",
+                initialDirectory,
+                "db");
+            if (!string.IsNullOrWhiteSpace(path))
+            {
+                selectedSavePath = Path.GetFullPath(path);
+                topologyPlan = null!;
+                statusMessage = $"Selected save target: {selectedSavePath}";
+            }
+        }
+
+        using (new EditorGUI.DisabledScope(string.IsNullOrWhiteSpace(selectedSavePath)))
+        {
+            if (GUILayout.Button("Preview Changes..."))
+            {
+                PreviewTopologyChanges();
+            }
+        }
+
+        if (topologyPlan is not null && topologyPlan.HasChanges)
+        {
+            foreach (var change in topologyPlan.Changes)
+            {
+                EditorGUILayout.BeginHorizontal();
+                var changeLabel = change.IsDelete
+                    ? $"Delete building {change.BuildingInstanceId}: {change.EquipmentCount} entities, "
+                      + $"{change.AffectedFloorGuids.Count} floors, {change.AffectedConnectionGuids.Count} connections, "
+                      + $"{change.AffectedRouteGuids.Count} routes, {change.AffectedTruckGuids.Count} trucks"
+                    : change.IsCreate
+                        ? $"Create building {change.BuildingInstanceId}: "
+                          + $"{change.ProposedRecord.FootprintSize.x}x{change.ProposedRecord.FootprintSize.y}, "
+                          + $"{change.ProposedRecord.StoryCount} floors"
+                        : $"Building {change.BuildingInstanceId}: "
+                          + $"{change.CurrentRecord.FootprintSize.x}x{change.CurrentRecord.FootprintSize.y} "
+                          + $"-> {change.ProposedRecord.FootprintSize.x}x{change.ProposedRecord.FootprintSize.y}, "
+                          + $"{change.EquipmentCount} entities";
+                EditorGUILayout.LabelField(changeLabel);
+                if (GUILayout.Button(
+                        selectedTopologyBuildingId == change.BuildingInstanceId ? "Selected" : "Select",
+                        GUILayout.Width(65f)))
+                {
+                    selectedTopologyBuildingId = change.BuildingInstanceId;
+                }
+
+                EditorGUILayout.EndHorizontal();
+            }
+
+            var playModeBlocksEdit = IsSelectedSaveActiveInPlayMode();
+            using (new EditorGUI.DisabledScope(
+                       playModeBlocksEdit || selectedTopologyBuildingId == 0))
+            {
+                if (GUILayout.Button("Apply Selected Save..."))
+                {
+                    ApplySelectedTopology();
+                }
+            }
+
+            if (playModeBlocksEdit)
+            {
+                EditorGUILayout.HelpBox(
+                    "Offline database editing is disabled while this save is active in Play Mode.",
+                    MessageType.Warning);
+            }
+        }
+        else if (topologyPlan is not null)
+        {
+            EditorGUILayout.HelpBox("The selected save already matches authored topology.", MessageType.Info);
+        }
+    }
+
     private void DrawStoryControls()
     {
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("Building Stories", EditorStyles.boldLabel);
-        var layouts = Creator.GeneratedBuildings.GetComponentsInChildren<TestBuildingLayout>(true);
-        if (layouts.Length == 0)
+        var records = Creator.GetAuthoredBuildingRecords();
+        if (records.Count == 0)
         {
             EditorGUILayout.HelpBox(
                 "Create a building to manage its shared-template interior floors.",
@@ -138,58 +282,86 @@ public sealed class TestBuildingCreatorEditor : Editor
             return;
         }
 
-        foreach (var layout in layouts)
+        foreach (var record in records)
         {
             EditorGUILayout.BeginHorizontal();
             EditorGUILayout.LabelField(
-                $"Building {layout.BuildingInstanceId} ({layout.Size.x} x {layout.Size.y})",
-                $"{layout.StoryCount} {((layout.StoryCount == 1) ? "story" : "stories")}");
+                $"Building {record.BuildingInstanceId} ({record.FootprintSize.x} x {record.FootprintSize.y})",
+                $"{record.StoryCount} {((record.StoryCount == 1) ? "story" : "stories")}");
+            var isBlocked = Application.isPlaying;
+            using (new EditorGUI.DisabledScope(isBlocked))
+            {
             if (GUILayout.Button("Add Story", GUILayout.Width(80f)))
             {
-                Undo.RegisterCompleteObjectUndo(layout, "Add test building story");
-                layout.SetStoryCount(layout.StoryCount + 1);
-                EditorUtility.SetDirty(layout);
-                RefreshGeneratedBuildings();
-                PersistAuthoredBuildings();
-                EditorSceneManager.MarkSceneDirty(Creator.gameObject.scene);
-                statusMessage = $"Added story {layout.StoryCount - 1} to building {layout.BuildingInstanceId}.";
+                UpdateAuthoredStoryCount(record, record.StoryCount + 1, "Add Authored Story");
 
                 GUIUtility.ExitGUI();
             }
 
-            var canDelete = layout.StoryCount > 1;
+            var canDelete = record.StoryCount > 1;
             using (new EditorGUI.DisabledScope(!canDelete))
             {
                 if (GUILayout.Button("Delete Top", GUILayout.Width(90f)))
                 {
                     if (!EditorUtility.DisplayDialog(
-                            "Delete top story?",
-                            $"Delete story {layout.StoryCount - 1}?",
-                            "Delete",
+                            "Delete authored top story?",
+                            $"Delete authored story {record.StoryCount - 1} from building {record.BuildingInstanceId}?",
+                            "Delete Authored Top Story",
                             "Cancel"))
                     {
                         GUIUtility.ExitGUI();
                     }
 
-                    Undo.RegisterCompleteObjectUndo(layout, "Delete test building story");
-                    layout.SetStoryCount(layout.StoryCount - 1);
-                    EditorUtility.SetDirty(layout);
-                    RefreshGeneratedBuildings();
-                    PersistAuthoredBuildings();
-                    EditorSceneManager.MarkSceneDirty(Creator.gameObject.scene);
-                    statusMessage = $"Deleted the top story from building {layout.BuildingInstanceId}.";
+                    UpdateAuthoredStoryCount(record, record.StoryCount - 1, "Delete Authored Top Story");
 
                     Repaint();
                     SceneView.RepaintAll();
                     GUIUtility.ExitGUI();
                 }
             }
+            }
 
             EditorGUILayout.EndHorizontal();
             EditorGUILayout.LabelField(
                 "Interior",
-                $"Shared template ({layout.StoryCount} {(layout.StoryCount == 1 ? "floor" : "floors")})");
+                $"Shared template ({record.StoryCount} {(record.StoryCount == 1 ? "floor" : "floors")})");
         }
+    }
+
+    private void UpdateAuthoredStoryCount(
+        BuildingRecord record,
+        int storyCount,
+        string undoName)
+    {
+        if (!Creator.HasAuthoredLayout || Application.isPlaying)
+        {
+            return;
+        }
+
+        var updatedRecord = record.Clone();
+        updatedRecord.SetTopology(
+            record.BuildingInstanceId,
+            record.AnchorCell,
+            record.FootprintSize,
+            storyCount);
+        var authoredBefore = Creator.AuthoredLayout.CloneRecords();
+        Undo.RecordObject(Creator.AuthoredLayout, undoName);
+        var rebuildError = string.Empty;
+        if (!Creator.AuthoredLayout.TryUpdateRecord(updatedRecord, out var assetError)
+            || !TryReconcileGeneratedBuildings(
+                Creator.AuthoredLayout.CloneRecords(),
+                out rebuildError))
+        {
+            Creator.AuthoredLayout.ReplaceRecords(authoredBefore);
+            statusMessage = string.IsNullOrWhiteSpace(assetError) ? rebuildError : assetError;
+            return;
+        }
+
+        EditorUtility.SetDirty(Creator.AuthoredLayout);
+        topologyPlan = null!;
+        EditorSceneManager.MarkSceneDirty(Creator.gameObject.scene);
+        statusMessage = $"Updated authored story count for building {record.BuildingInstanceId}.";
+        SceneView.RepaintAll();
     }
 
     private void OnSceneGUI()
@@ -270,13 +442,39 @@ public sealed class TestBuildingCreatorEditor : Editor
 
     private bool IsReady()
     {
-        return Creator.gameObject.scene == SceneManager.GetActiveScene()
+        return !Application.isPlaying
+            && Creator.gameObject.scene == SceneManager.GetActiveScene()
             && Creator.Grid is not null
             && Creator.Grid
             && Creator.Material is not null
             && Creator.Material
             && Creator.GeneratedBuildings is not null
             && Creator.GeneratedBuildings;
+    }
+
+    private TestBuildingLayout FindLayout(uint buildingInstanceId)
+    {
+        foreach (var layout in Creator.GeneratedBuildings.GetComponentsInChildren<TestBuildingLayout>(true))
+        {
+            if (layout.BuildingInstanceId == buildingInstanceId)
+            {
+                return layout;
+            }
+        }
+
+        return null!;
+    }
+
+    private void SelectLayout(uint buildingInstanceId)
+    {
+        var layout = FindLayout(buildingInstanceId);
+        if (layout is null || !layout)
+        {
+            return;
+        }
+
+        Selection.activeGameObject = layout.gameObject;
+        SceneView.lastActiveSceneView?.FrameSelected();
     }
 
     private bool TryGetCell(Vector2 guiPosition, out Vector3Int cell)
@@ -548,6 +746,44 @@ public sealed class TestBuildingCreatorEditor : Editor
         float normalizedOffset)
     {
         var previousRecord = layout.ExportBuildingRecord();
+        if (Creator.HasAuthoredLayout)
+        {
+            var updatedRecord = previousRecord.Clone();
+            foreach (var existingDoor in updatedRecord.Doors)
+            {
+                if (existingDoor.WallId == wall.StableId
+                    && Mathf.Approximately(existingDoor.NormalizedOffset, normalizedOffset))
+                {
+                    statusMessage = "A door is already placed at that position.";
+                    return;
+                }
+            }
+
+            var door = new BuildingRecord.DoorPlacement(wall.StableId, normalizedOffset);
+            var doors = new List<BuildingRecord.DoorPlacement>(updatedRecord.Doors)
+            {
+                door
+            };
+            updatedRecord.SetDoors(doors);
+            var authoredBefore = Creator.AuthoredLayout.CloneRecords();
+            Undo.RecordObject(Creator.AuthoredLayout, "Place authored building door");
+            var rebuildError = string.Empty;
+            if (!Creator.AuthoredLayout.TryUpdateRecord(updatedRecord, out var assetError)
+                || !TryReconcileGeneratedBuildings(
+                    Creator.AuthoredLayout.CloneRecords(),
+                    out rebuildError))
+            {
+                Creator.AuthoredLayout.ReplaceRecords(authoredBefore);
+                statusMessage = string.IsNullOrWhiteSpace(assetError) ? rebuildError : assetError;
+                return;
+            }
+
+            EditorUtility.SetDirty(Creator.AuthoredLayout);
+            topologyPlan = null!;
+            statusMessage = $"Placed a door on the {wall.Direction} exterior wall.";
+            return;
+        }
+
         Undo.RegisterCompleteObjectUndo(layout, "Place test building door");
         if (!layout.AddDoor(wall, normalizedOffset))
         {
@@ -596,6 +832,42 @@ public sealed class TestBuildingCreatorEditor : Editor
 
         var undoGroup = Undo.GetCurrentGroup();
         Undo.SetCurrentGroupName("Create test building");
+        Undo.RegisterCompleteObjectUndo(Creator, "Reserve test building ID");
+        if (!Creator.TryReserveBuildingInstanceId(out buildingInstanceId))
+        {
+            statusMessage = "No building IDs are available.";
+            return;
+        }
+
+        record = new BuildingRecord(
+            buildingInstanceId,
+            anchor,
+            size,
+            1);
+        if (Creator.HasAuthoredLayout)
+        {
+            var authoredBefore = Creator.AuthoredLayout.CloneRecords();
+            Undo.RecordObject(Creator.AuthoredLayout, "Create authored building");
+            var rebuildError = string.Empty;
+            if (!Creator.AuthoredLayout.TryAddRecord(record, out var assetError)
+                || !TryReconcileGeneratedBuildings(
+                    Creator.AuthoredLayout.CloneRecords(),
+                    out rebuildError))
+            {
+                Creator.AuthoredLayout.ReplaceRecords(authoredBefore);
+                statusMessage = string.IsNullOrWhiteSpace(assetError) ? rebuildError : assetError;
+                return;
+            }
+
+            EditorUtility.SetDirty(Creator.AuthoredLayout);
+            topologyPlan = null!;
+            EditorSceneManager.MarkSceneDirty(Creator.gameObject.scene);
+            Undo.CollapseUndoOperations(undoGroup);
+            Selection.activeGameObject = Creator.gameObject;
+            statusMessage = $"Created {size.x} x {size.y} test building {buildingInstanceId}.";
+            return;
+        }
+
         var assembler = new BuildingShellAssembler();
         var buildingObject = assembler.CreateShell(
             record,
@@ -621,6 +893,18 @@ public sealed class TestBuildingCreatorEditor : Editor
     {
         if (Creator.GeneratedBuildings is null || !Creator.GeneratedBuildings)
         {
+            return;
+        }
+
+        if (Creator.HasAuthoredLayout)
+        {
+            if (!TryReconcileGeneratedBuildings(
+                    Creator.AuthoredLayout.CloneRecords(),
+                    out var authoredError))
+            {
+                statusMessage = authoredError;
+            }
+
             return;
         }
 
@@ -654,6 +938,84 @@ public sealed class TestBuildingCreatorEditor : Editor
         }
     }
 
+    private bool TryReconcileGeneratedBuildings(
+        IEnumerable<BuildingRecord> records,
+        out string error)
+    {
+        error = string.Empty;
+        var desiredRecords = new List<BuildingRecord>();
+        foreach (var record in records)
+        {
+            if (record is not null)
+            {
+                desiredRecords.Add(record.Clone());
+            }
+        }
+
+        if (!BuildingShellValidation.TryValidateRecords(
+                desiredRecords,
+                Creator.DoorCornerExclusionDistance,
+                out error))
+        {
+            return false;
+        }
+
+        var existingLayouts = new Dictionary<uint, TestBuildingLayout>();
+        foreach (var layout in Creator.GeneratedBuildings.GetComponentsInChildren<TestBuildingLayout>(true))
+        {
+            if (!existingLayouts.TryAdd(layout.BuildingInstanceId, layout))
+            {
+                error = $"Duplicate generated building ID {layout.BuildingInstanceId} was found.";
+                return false;
+            }
+        }
+
+        var desiredIds = new HashSet<uint>();
+        var assembler = new BuildingShellAssembler();
+        foreach (var record in desiredRecords)
+        {
+            desiredIds.Add(record.BuildingInstanceId);
+            if (existingLayouts.TryGetValue(record.BuildingInstanceId, out var layout))
+            {
+                if (!assembler.TryRebuildShell(
+                        record,
+                        Creator,
+                        layout.transform,
+                        out _))
+                {
+                    error = $"Generated shell for building {record.BuildingInstanceId} could not be rebuilt.";
+                    return false;
+                }
+
+                EditorUtility.SetDirty(layout);
+                continue;
+            }
+
+            var buildingObject = assembler.CreateShell(
+                record,
+                Creator,
+                Creator.GeneratedBuildings);
+            if (buildingObject is null || !buildingObject)
+            {
+                error = $"Generated shell for building {record.BuildingInstanceId} could not be created.";
+                return false;
+            }
+
+            Undo.RegisterCreatedObjectUndo(buildingObject, "Create generated test building shell");
+        }
+
+        foreach (var pair in existingLayouts)
+        {
+            if (!desiredIds.Contains(pair.Key))
+            {
+                Undo.DestroyObjectImmediate(pair.Value.gameObject);
+            }
+        }
+
+        EditorSceneManager.MarkSceneDirty(Creator.gameObject.scene);
+        return true;
+    }
+
     private bool TryValidateEditorRecord(
         BuildingRecord record,
         TestBuildingLayout ignoredLayout,
@@ -677,6 +1039,162 @@ public sealed class TestBuildingCreatorEditor : Editor
             out error);
     }
 
+    private void DeleteBuilding(TestBuildingLayout layout)
+    {
+        var record = layout.ExportBuildingRecord();
+        if (Application.isPlaying)
+        {
+            statusMessage = "Authoring is disabled in Play Mode.";
+            return;
+        }
+        if (!EditorUtility.DisplayDialog(
+                "Delete authored building?",
+                $"Delete building {record.BuildingInstanceId} at ({record.AnchorCell.x}, {record.AnchorCell.y})? "
+                + "This changes authoring only; existing saves retain the building.",
+                "Delete Authored Building",
+                "Cancel"))
+        {
+            return;
+        }
+
+        var undoGroup = Undo.GetCurrentGroup();
+        Undo.SetCurrentGroupName("Delete authored test building");
+        if (Creator.HasAuthoredLayout)
+        {
+            var authoredBefore = Creator.AuthoredLayout.CloneRecords();
+            Undo.RecordObject(Creator.AuthoredLayout, "Delete authored building");
+            var rebuildError = string.Empty;
+            if (!Creator.AuthoredLayout.TryRemoveRecord(record.BuildingInstanceId, out var assetError)
+                || !TryReconcileGeneratedBuildings(
+                    Creator.AuthoredLayout.CloneRecords(),
+                    out rebuildError))
+            {
+                Creator.AuthoredLayout.ReplaceRecords(authoredBefore);
+                statusMessage = string.IsNullOrWhiteSpace(assetError) ? rebuildError : assetError;
+                return;
+            }
+
+            EditorUtility.SetDirty(Creator.AuthoredLayout);
+            topologyPlan = null!;
+            EditorSceneManager.MarkSceneDirty(Creator.gameObject.scene);
+            Undo.CollapseUndoOperations(undoGroup);
+            statusMessage = $"Deleted authored building {record.BuildingInstanceId}. Existing saves were not changed.";
+            topologyPlan = null!;
+            SceneView.RepaintAll();
+            Repaint();
+            return;
+        }
+
+        Undo.DestroyObjectImmediate(layout.gameObject);
+        SyncAuthoringAsset();
+        EditorSceneManager.MarkSceneDirty(Creator.gameObject.scene);
+        Undo.CollapseUndoOperations(undoGroup);
+        statusMessage = $"Deleted authored building {record.BuildingInstanceId}. Existing saves were not changed.";
+        topologyPlan = null!;
+        SceneView.RepaintAll();
+        Repaint();
+    }
+
+    private void PreviewTopologyChanges()
+    {
+        topologyPlan = null!;
+        selectedTopologyBuildingId = 0;
+        if (!FactoryBuildingEditService.TryCreateTopologyPlan(
+                selectedSavePath,
+                Creator.GetAuthoredBuildingRecords(),
+                Creator.DoorCornerExclusionDistance,
+                out var plan,
+                out var error))
+        {
+            topologyPlan = plan;
+            statusMessage = error;
+            return;
+        }
+
+        topologyPlan = plan;
+        if (plan.HasChanges)
+        {
+            selectedTopologyBuildingId = plan.Changes[0].BuildingInstanceId;
+            statusMessage = $"Previewed {plan.Changes.Count} topology change(s) for {plan.DatabasePath}.";
+        }
+        else
+        {
+            statusMessage = "The selected save already matches authored topology.";
+        }
+    }
+
+    private void ApplySelectedTopology()
+    {
+        if (topologyPlan is null
+            || selectedTopologyBuildingId == 0
+            || IsSelectedSaveActiveInPlayMode())
+        {
+            return;
+        }
+
+        if (!topologyPlan.TryGetChange(selectedTopologyBuildingId, out var change))
+        {
+            statusMessage = "Select a valid topology change before applying.";
+            return;
+        }
+
+        var confirmation = change.IsDelete
+            ? EditorUtility.DisplayDialog(
+                "Permanently delete building from save?",
+                $"This permanently removes building {change.BuildingInstanceId}, its floors, entities, connections, routes, and trucks from:\n{selectedSavePath}",
+                "Delete From Save",
+                "Cancel")
+            : EditorUtility.DisplayDialog(
+                "Apply topology to selected save?",
+                $"Apply building {change.BuildingInstanceId} to:\n{selectedSavePath}\n\n"
+                + "This changes the selected save only and preserves existing state where possible.",
+                "Apply",
+                "Cancel");
+        if (!confirmation)
+        {
+            return;
+        }
+
+        if (!FactoryBuildingEditService.TryApplyTopologyPlan(
+                selectedSavePath,
+                topologyPlan,
+                Creator.GetAuthoredBuildingRecords(),
+                new[] { selectedTopologyBuildingId },
+                change.IsDelete,
+                Creator.DoorCornerExclusionDistance,
+                out var result,
+                out var error))
+        {
+            statusMessage = $"Topology application failed: {error}";
+            return;
+        }
+
+        statusMessage = $"Applied building {selectedTopologyBuildingId} to {result.DatabasePath}. "
+            + $"Preserved {result.PreservedEntityCount} entities; relocated {result.Relocations.Count}.";
+        PreviewTopologyChanges();
+    }
+
+    private bool IsSelectedSaveActiveInPlayMode()
+    {
+        if (!Application.isPlaying || string.IsNullOrWhiteSpace(selectedSavePath))
+        {
+            return false;
+        }
+
+        var activePath = GameSceneManager.Instance is not null
+            ? GameSceneManager.Instance.OutsideTestStatePath
+            : GameSceneManager.GetDefaultOutsideTestStatePath();
+        return string.Equals(
+            Path.GetFullPath(activePath),
+            Path.GetFullPath(selectedSavePath),
+            System.StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void SyncAuthoringAsset()
+    {
+        PersistCompactLayoutAsset();
+    }
+
     private void ClearGeneratedBuildings()
     {
         if (Creator.GeneratedBuildings is null || !Creator.GeneratedBuildings)
@@ -684,92 +1202,62 @@ public sealed class TestBuildingCreatorEditor : Editor
             return;
         }
 
-        var authoredBuildingIds = new List<uint>();
-        foreach (var layout in Creator.GeneratedBuildings.GetComponentsInChildren<TestBuildingLayout>(true))
+        if (!EditorUtility.DisplayDialog(
+                "Clear authored buildings?",
+                "This removes only authored building records and preview shells. Existing saved databases are unchanged.",
+                "Clear Authored Buildings",
+                "Cancel"))
         {
-            if (layout.BuildingInstanceId != 0)
-            {
-                authoredBuildingIds.Add(layout.BuildingInstanceId);
-            }
+            return;
         }
 
         var undoGroup = Undo.GetCurrentGroup();
         Undo.SetCurrentGroupName("Clear test buildings");
+        if (Creator.HasAuthoredLayout)
+        {
+            var authoredBefore = Creator.AuthoredLayout.CloneRecords();
+            Undo.RecordObject(Creator.AuthoredLayout, "Clear authored buildings");
+            Creator.AuthoredLayout.ReplaceRecords(System.Array.Empty<BuildingRecord>());
+            if (!TryReconcileGeneratedBuildings(
+                    Creator.AuthoredLayout.CloneRecords(),
+                    out var rebuildError))
+            {
+                Creator.AuthoredLayout.ReplaceRecords(authoredBefore);
+                statusMessage = rebuildError;
+                return;
+            }
+
+            EditorUtility.SetDirty(Creator.AuthoredLayout);
+            topologyPlan = null!;
+            EditorSceneManager.MarkSceneDirty(Creator.gameObject.scene);
+            Undo.CollapseUndoOperations(undoGroup);
+            statusMessage = "Cleared authored buildings. Existing saves were not changed.";
+            Repaint();
+            SceneView.RepaintAll();
+            return;
+        }
+
         for (var index = Creator.GeneratedBuildings.childCount - 1; index >= 0; index--)
         {
             Undo.DestroyObjectImmediate(Creator.GeneratedBuildings.GetChild(index).gameObject);
         }
 
-        PersistCompactLayoutAsset();
-        RemoveAuthoredBuildingsFromSave(authoredBuildingIds);
+        SyncAuthoringAsset();
         EditorSceneManager.MarkSceneDirty(Creator.gameObject.scene);
         Undo.CollapseUndoOperations(undoGroup);
-        statusMessage = "Cleared generated test buildings and persisted their removal from floor data.";
+        statusMessage = "Cleared authored buildings. Existing saves were not changed.";
         Repaint();
         SceneView.RepaintAll();
     }
 
     private void PersistAuthoredBuildings()
     {
-        var path = EditorPreviewStatePath;
-        var owner = new OutsideTestFloorStateOwner(GameSceneManager.LegacyOutsideTestBuildingId);
-        if (File.Exists(path)
-            && !owner.LoadFromFile(path, Creator.DoorCornerExclusionDistance))
-        {
-            statusMessage = "Could not update the OutsideTest save because its existing state is invalid.";
-            return;
-        }
-
-        foreach (var layout in Creator.GeneratedBuildings.GetComponentsInChildren<TestBuildingLayout>(true))
-        {
-            if (!owner.TryUpdateBuildingRecord(
-                    layout.ExportBuildingRecord(),
-                    Creator.DoorCornerExclusionDistance,
-                    out var error))
-            {
-                statusMessage = error;
-                return;
-            }
-        }
-
-        if (!owner.SaveToFile(path))
-        {
-            statusMessage = "Could not persist authored OutsideTest building records.";
-            return;
-        }
-
-        PersistCompactLayoutAsset();
-    }
-
-    private void RemoveAuthoredBuildingsFromSave(IEnumerable<uint> buildingIds)
-    {
-        var path = EditorPreviewStatePath;
-        if (!File.Exists(path))
-        {
-            return;
-        }
-
-        var owner = new OutsideTestFloorStateOwner(GameSceneManager.LegacyOutsideTestBuildingId);
-        if (!owner.LoadFromFile(path, Creator.DoorCornerExclusionDistance))
-        {
-            statusMessage = "Could not update the OutsideTest save because its existing state is invalid.";
-            return;
-        }
-
-        foreach (var buildingId in buildingIds)
-        {
-            owner.RemoveBuildingAndFloors(buildingId);
-        }
-
-        if (!owner.SaveToFile(path))
-        {
-            statusMessage = "Could not remove authored OutsideTest building records.";
-        }
+        SyncAuthoringAsset();
     }
 
     private void PersistCompactLayoutAsset()
     {
-        if (!Creator.HasAuthoredLayout)
+        if (Creator.HasAuthoredLayout)
         {
             return;
         }
@@ -780,9 +1268,13 @@ public sealed class TestBuildingCreatorEditor : Editor
             records.Add(layout.ExportBuildingRecord());
         }
 
+        if (Creator.HasAuthoredLayout)
+        {
+            Undo.RecordObject(Creator.AuthoredLayout, "Sync authored building layout");
+        }
+
         Creator.AuthoredLayout.ReplaceRecords(records);
         EditorUtility.SetDirty(Creator.AuthoredLayout);
-        AssetDatabase.SaveAssets();
     }
 
     private void EnsureBuildingInstanceIds()
@@ -877,6 +1369,7 @@ public sealed class TestBuildingCreatorEditor : Editor
             return;
         }
 
+        topologyPlan = null!;
         RefreshGeneratedBuildings();
         SceneView.RepaintAll();
         Repaint();

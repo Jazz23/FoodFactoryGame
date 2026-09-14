@@ -7,9 +7,13 @@
 - `NAIStateManager` owns the authoritative factory snapshot, simulation, and runtime persistence coordination.
 - `FactoryWorldState` owns building, floor, entity, connection, route, and truck records.
 - `FactoryBuildingEditService` owns validated topology edits, deterministic equipment relocation, and endpoint rebinding.
+- `FactoryBuildingEditService.TryCreateTopologyPlan` compares compact authored records with one selected schema-9 save; plans contain `Create`, `Update`, or destructive `Delete` operations plus authored/database fingerprints. `TryApplyTopologyPlan` applies the exact confirmed plan or rejects it as stale.
+- `FactoryBuildingTopologyResolver` owns authored-versus-persisted source selection and conflict comparison; saved topology remains authoritative once loaded.
 - `FactoryBuildingLayoutAsset` stores compact authored building topology (identity, footprint, stories, and doors); generated shell children remain rebuildable output.
-- `TestBuildingCreator` and `GameSceneManager` consume the compact layout when it is assigned; `BuildingShellAssembler` is the deterministic geometry adapter.
+- `TestBuildingCreator` and `GameSceneManager` consume the compact layout when it is assigned; `BuildingShellAssembler` is the deterministic geometry adapter and reports rebuild success separately from whether geometry changed.
 - `FactoryWorldSqliteStore` is the persistence adapter. Database roles are application save, authoring data, test fixture, and temporary preview.
+- `TestBuildingCreatorEditor` mutates the compact asset first and reconciles generated preview shells by stable building ID. It never writes a world database during inspector selection, repaint, undo/redo, or ordinary authoring edits. Save topology operations require an explicit full-path target, preview, confirmation, and are blocked when that target is active in Play Mode.
+- The default `factory-world.db` is project-local while running in the Unity Editor and uses `Application.persistentDataPath` in production. The project-local database is development state and is not source-controlled.
 - `FactoryWorldSqliteStore.Inspect`, `PlanMigration`, `ApplyMigration`, `Read`, and `Save` keep schema inspection, migration, loading, and writing explicit.
 - `OutsideTestFloorPresentation` and related views render explicit building/floor state; they are not authoritative state owners.
 - `OutsideTestFloorDebugPanel` is a UI client of the current player/floor binding and should not be used as the primary API for domain tests.
@@ -36,3 +40,4 @@
 - Keep authored building intent compact and reproducible; do not hand-edit generated scene YAML when live Editor commands can apply the change.
 - Extract bounded application services before introducing new assembly boundaries.
 - Keep database inspection, migration planning, migration application, and saving as distinct operations.
+- Saved topology has runtime precedence over authored shell dimensions. Authoring deletion removes only the authored record and generated shell; existing saves retain their buildings. Creator IDs use a persisted high-water mark and are not recycled after deletion.

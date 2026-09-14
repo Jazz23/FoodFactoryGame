@@ -63,7 +63,7 @@ public sealed class BuildingShellAssembler
         layout.ApplyBuildingRecord(newRecord);
         EnsureGeneratedHierarchy(layout, out _, out _, out _);
         var presentation = buildingObject.GetComponent<TestBuildingPresentation>();
-        RebuildShell(newRecord, newCreator, buildingObject.transform, true);
+        RebuildShell(newRecord, newCreator, buildingObject.transform, true, out _);
         presentation.RefreshRenderers();
         return buildingObject;
     }
@@ -90,7 +90,22 @@ public sealed class BuildingShellAssembler
         TestBuildingCreator newCreator,
         Transform shell)
     {
-        return RebuildShell(newRecord, newCreator, shell, false);
+        return RebuildShell(newRecord, newCreator, shell, false, out _);
+    }
+
+    public bool TryRebuildShell(
+        BuildingRecord newRecord,
+        TestBuildingCreator newCreator,
+        Transform shell,
+        out bool changed)
+    {
+        var rebuilt = RebuildShell(
+            newRecord,
+            newCreator,
+            shell,
+            false,
+            out changed);
+        return rebuilt || !NeedsRebuild(newRecord, newCreator, shell);
     }
 
     public static bool NeedsRebuild(
@@ -123,8 +138,10 @@ public sealed class BuildingShellAssembler
         BuildingRecord newRecord,
         TestBuildingCreator newCreator,
         Transform shell,
-        bool force)
+        bool force,
+        out bool changed)
     {
+        changed = false;
         if (!TryValidateInputs(
                 newRecord,
                 newCreator,
@@ -143,6 +160,7 @@ public sealed class BuildingShellAssembler
 
         var topologyChanged = !layout.ExportBuildingRecord().HasSameTopology(newRecord);
         layout.ApplyBuildingRecord(newRecord);
+        shell.name = GetBuildingName(newRecord);
         var hierarchyChanged = EnsureGeneratedHierarchy(
             layout,
             out var generatedVisuals,
@@ -160,6 +178,7 @@ public sealed class BuildingShellAssembler
                 generatedCollision,
                 visualDoors))
         {
+            changed = false;
             return false;
         }
 
@@ -208,6 +227,7 @@ public sealed class BuildingShellAssembler
             presentation.RefreshRenderers();
         }
 
+        changed = true;
         return true;
     }
 
@@ -631,7 +651,7 @@ public sealed class BuildingShellAssembler
             out error);
     }
 
-    private static string GetBuildingName(BuildingRecord newRecord)
+    public static string GetBuildingName(BuildingRecord newRecord)
     {
         return $"Test Building ({newRecord.AnchorCell.x}, {newRecord.AnchorCell.y}) "
             + $"{newRecord.FootprintSize.x}x{newRecord.FootprintSize.y}";

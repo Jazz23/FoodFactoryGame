@@ -456,6 +456,90 @@ public sealed class FactoryWorldSqliteStore
         });
     }
 
+    public void SaveAtomically(FactoryWorldSnapshot snapshot)
+    {
+        var targetPath = System.IO.Path.GetFullPath(Path);
+        var directory = System.IO.Path.GetDirectoryName(targetPath);
+        if (!string.IsNullOrWhiteSpace(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        var temporaryPath = targetPath + ".tmp-" + Guid.NewGuid().ToString("N");
+        try
+        {
+            Save(temporaryPath, snapshot);
+            var persisted = Read(temporaryPath);
+            if (!FactoryWorldValidation.TryValidate(persisted, out var error))
+            {
+                throw new InvalidDataException(error);
+            }
+
+            if (File.Exists(targetPath))
+            {
+                File.Replace(temporaryPath, targetPath, null);
+            }
+            else
+            {
+                File.Move(temporaryPath, targetPath);
+            }
+        }
+        finally
+        {
+            DeleteTemporaryDatabaseFiles(temporaryPath);
+        }
+    }
+
+    public static void CreateConsistentBackup(
+        string sourcePath,
+        string destinationPath)
+    {
+        var source = System.IO.Path.GetFullPath(sourcePath ?? string.Empty);
+        var destination = System.IO.Path.GetFullPath(destinationPath ?? string.Empty);
+        if (string.IsNullOrWhiteSpace(sourcePath)
+            || string.IsNullOrWhiteSpace(destinationPath))
+        {
+            throw new ArgumentException("Source and destination database paths are required.");
+        }
+
+        if (!File.Exists(source))
+        {
+            throw new FileNotFoundException("The source factory database does not exist.", source);
+        }
+
+        if (string.Equals(source, destination, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("A database cannot be backed up onto itself.");
+        }
+
+        var directory = System.IO.Path.GetDirectoryName(destination);
+        if (!string.IsNullOrWhiteSpace(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        if (File.Exists(destination))
+        {
+            File.Delete(destination);
+        }
+
+        using (var database = new SQLiteConnection(source))
+        {
+            var escapedDestination = destination.Replace("'", "''");
+            database.Execute($"VACUUM INTO '{escapedDestination}'");
+        }
+
+        try
+        {
+            new FactoryWorldSqliteStore(destination).Read();
+        }
+        catch
+        {
+            DeleteTemporaryDatabaseFiles(destination);
+            throw;
+        }
+    }
+
     public static bool HasSchema(string path)
     {
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
@@ -660,6 +744,17 @@ public sealed class FactoryWorldSqliteStore
         }
     }
 
+    private static void DeleteTemporaryDatabaseFiles(string path)
+    {
+        foreach (var candidate in new[] { path, path + "-wal", path + "-shm" })
+        {
+            if (File.Exists(candidate))
+            {
+                File.Delete(candidate);
+            }
+        }
+    }
+
     [Table("factory_metadata")]
     private sealed class MetadataRow
     {
@@ -792,7 +887,11 @@ public static class FactoryWorldPaths
 {
     public static string GetDefaultDatabasePath()
     {
+#if UNITY_EDITOR
+        return System.IO.Path.Combine(GetProjectRoot(), FactoryWorldSqliteStore.DatabaseFileName);
+#else
         return System.IO.Path.Combine(UnityEngine.Application.persistentDataPath, FactoryWorldSqliteStore.DatabaseFileName);
+#endif
     }
 
     public static string GetProjectRoot()
