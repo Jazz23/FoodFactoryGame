@@ -30,6 +30,15 @@ public sealed class FactoryTruckMarkerView : MonoBehaviour
             return;
         }
 
+        var localPlayer = PlayerSceneTransition.LocalOwner;
+        if (localPlayer is not null
+            && localPlayer
+            && localPlayer.TryGetCurrentOutsideTestFloor(out _, out _))
+        {
+            ClearMarkers();
+            return;
+        }
+
         if (!SceneGrid.TryGetForScene(gameObject.scene, out var grid))
         {
             ClearMarkers();

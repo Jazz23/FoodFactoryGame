@@ -141,9 +141,11 @@ public sealed class FactoryTruckRoutePlayModeTests
             "Truck did not depart with a full load.");
         var markerView = UnityEngine.Object.FindFirstObjectByType<FactoryTruckMarkerView>();
         Assert.That(markerView, Is.Not.Null);
+        yield return null;
         Assert.That(
-            markerView.GetComponentInChildren<TextMesh>(true),
-            Is.Not.Null);
+            markerView.GetComponentsInChildren<TextMesh>(true),
+            Is.Empty,
+            "Truck markers should be hidden while the player is inside a factory.");
 
         // Gameplay controls stay usable while the test overlays are hidden.
         TestUIVisibility.SetVisible(false);
@@ -160,6 +162,12 @@ public sealed class FactoryTruckRoutePlayModeTests
 
         Assert.That(stateManager.SaveWorld(), Is.True);
         yield return ExitMachineTestBuilding();
+        yield return WaitForCondition(
+            () => UnityEngine.Object.FindFirstObjectByType<FactoryTruckMarkerView>()
+                is { } currentMarkerView
+                && currentMarkerView.GetComponentInChildren<TextMesh>(true) is not null,
+            5f,
+            "Truck markers did not reappear after the player left the factory.");
         yield return RestartHost();
         player = PlayerSceneTransition.LocalOwner;
         stateManager = NotAI.NAIStateManager.Instance;
