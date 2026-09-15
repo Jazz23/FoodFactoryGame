@@ -65,6 +65,12 @@ namespace NotAI
         private static NAIStateManager instance = null!;
         private static string configuredDatabasePath = string.Empty;
 
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetConfiguredDatabasePath()
+        {
+            configuredDatabasePath = string.Empty;
+        }
+
         private readonly Dictionary<Vector2, Guid> occupiedTiles = new();
         private readonly Dictionary<Guid, NAIBuildable> buildableViews = new();
         private readonly HashSet<Guid> viewGuids = new();
