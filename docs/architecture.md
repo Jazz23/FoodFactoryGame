@@ -22,6 +22,8 @@
 - `BuildingShellAssembler` marks only the topmost story roof for filled-top presentation; intermediate story roofs retain their side geometry without an exterior top surface so they cannot project through upper-story walls.
 - `Virtual3DSize` uses the player's transform origin as the stable bottom-pivot foot anchor. A shallow horizontal capsule extends upward from that anchor with independent world-space width and ground depth (player prefab: 0.6 × 0.3); animation bounds never move the collider. Transitions, interior containment, and depth sorting consume that same anchor.
 - `SceneGrid.CellSize` scales world-space presentation only. `IndoorGrid`, `InsideFactoryVisuals`, and factory entity views continue to use saved logical cell coordinates and configured building sizes.
+- `IndoorGrid` owns the generated interior test-line presentation and its `FactoryBuild/ToggleTestLines` Input System action; hiding the lines only deactivates their derived renderers and does not affect the boundary collider.
+- `FactoryTruckMarkerView` owns truck marker presentation, including switching a marker to a wireframe cube when its projected footprint is behind a configured building occlusion surface.
 
 ## Canonical Assets
 

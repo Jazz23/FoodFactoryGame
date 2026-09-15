@@ -1491,6 +1491,15 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
+                },
+                {
+                    "name": "ToggleTestLines",
+                    "type": "Button",
+                    "id": "ea4a13a9-4216-4a9d-86fb-24a32fddaf10",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -1634,6 +1643,17 @@
                     "processors": "",
                     "groups": "Keyboard&Mouse",
                     "action": "ToggleTruckRoutes",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "d97d577f-a2d2-4396-9607-563e83dfe8ed",
+                    "path": "<Keyboard>/l",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
+                    "action": "ToggleTestLines",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

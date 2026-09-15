@@ -113,6 +113,11 @@ public sealed class TestBuildingCreatorEditor : Editor
 
         using (new EditorGUI.DisabledScope(Application.isPlaying))
         {
+            if (GUILayout.Button("Rebuild Shells"))
+            {
+                RebuildShells();
+            }
+
             if (GUILayout.Button("Clear Authored Buildings"))
             {
                 ClearGeneratedBuildings();
@@ -1088,6 +1093,17 @@ public sealed class TestBuildingCreatorEditor : Editor
         }
 
         RequestEditorViewRefresh();
+    }
+
+    private void RebuildShells()
+    {
+        topologyPlan = null!;
+        statusMessage = string.Empty;
+        RefreshGeneratedBuildings();
+        if (string.IsNullOrEmpty(statusMessage))
+        {
+            statusMessage = "Rebuilt generated building shells.";
+        }
     }
 
     private bool TryReconcileGeneratedBuildings(

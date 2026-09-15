@@ -70,6 +70,7 @@ Zero matched tests, compile failures, runner initialization failures, and timeou
 ## Immediate Topology Workflow
 
 - Use the Test Building Creator list to inspect ID, anchor, exterior size, usable interior, and stories.
+- Use `Rebuild Shells` in the Test Building Creator inspector to manually regenerate its visual, collision, and door shell output.
 - Select the full database path in the creator's `Selected Save Topology` section; successful building creation, door placement, story changes, and topology updates are saved there immediately.
 - `Preview Changes...` remains available for inspecting differences that existed before an edit. `Apply Selected Save...` is for manually resolving those pre-existing differences.
 - Immediate writes use the direct atomic, reload-verified topology path, preserve unrelated save-only buildings for selected create/update operations, track newly created floors/equipment/migration mappings during story additions, and avoid the extra preview-plan database load. Preview/apply still uses authored and database fingerprints to reject stale changes.
@@ -82,6 +83,8 @@ Zero matched tests, compile failures, runner initialization failures, and timeou
 ## Presentation-Scale Verification
 
 - `InteriorSizingTests` covers logical-to-world scaling plus generated interior floor-cell and doorway proportions.
+- Press `L` in an interior to toggle the generated test grid lines. The toggle is an Input System action and leaves the interior boundary collision enabled.
+- Truck route presentation should show a solid marker in front of building surfaces and a wireframe marker when the route carries it behind a building; the truck route play-mode smoke test remains the gameplay regression check.
 - The `outside_floor` profile covers isolated-save transition, movement, interaction, and equipment tests across `OutsideTest` and `insidefactory0`.
 - `InteractEntersBuildingFromExteriorArrival` exercises the configured E binding after physics settles at the exterior arrival, enters and exits through portal selection/RPCs, and verifies the return position remains usable. Direct scene-manager transition calls do not cover interaction reachability. Captures are `Temp/player-ground-interior.png` and `Temp/player-ground-exterior.png`.
 - The `truck_route` profile covers the isolated-save equipment, dock, transition, reload, and delivery route smoke test.

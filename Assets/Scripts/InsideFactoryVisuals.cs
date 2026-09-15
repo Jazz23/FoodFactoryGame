@@ -214,6 +214,9 @@ public sealed class InsideFactoryVisuals : MonoBehaviour
             GridEdgeDirection.West => new Vector2(0f, interiorPosition.y),
             _ => interiorPosition
         };
+        var doorScale = doorWidth * grid.CellSize / doorSprite.bounds.size.x;
+        wallPosition += GetInteriorOffset(direction)
+            * (-doorSprite.bounds.size.y * doorScale / grid.CellSize * 0.5f);
 
         var doorObject = new GameObject($"Interior Door {index + 1}");
         doorObject.transform.SetParent(generatedRoot, false);
@@ -228,7 +231,19 @@ public sealed class InsideFactoryVisuals : MonoBehaviour
         renderer.color = Color.white;
         renderer.sortingOrder = doorSortingOrder;
         doorObject.transform.localScale = Vector3.one
-            * (doorWidth * grid.CellSize / doorSprite.bounds.size.x);
+            * doorScale;
+    }
+
+    private static Vector2 GetInteriorOffset(GridEdgeDirection direction)
+    {
+        return direction switch
+        {
+            GridEdgeDirection.South => Vector2.up,
+            GridEdgeDirection.East => Vector2.left,
+            GridEdgeDirection.North => Vector2.down,
+            GridEdgeDirection.West => Vector2.right,
+            _ => Vector2.zero
+        };
     }
 
     private void CreateQuad(

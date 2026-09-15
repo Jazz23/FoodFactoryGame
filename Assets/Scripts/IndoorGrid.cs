@@ -1,5 +1,6 @@
 // Generates and rebuilds the floor grid and boundary collision for interior scenes.
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 
 [RequireComponent(typeof(SceneGrid), typeof(EdgeCollider2D))]
@@ -11,13 +12,55 @@ public sealed class IndoorGrid : MonoBehaviour
     [SerializeField, Min(0.005f)] private float lineWidth = 0.025f;
     [SerializeField] private Color lineColor = new(0.17f, 0.21f, 0.27f, 1f);
     [SerializeField] private int sortingOrder = -10;
+    [SerializeField] private bool testLinesVisible = true;
+    private InputAction toggleLines = null!;
     private Transform generatedRoot = null!;
 
     public Vector2Int Size => size;
+    public bool TestLinesVisible => testLinesVisible;
 
     private void Awake()
     {
         Rebuild();
+    }
+
+    private void Start()
+    {
+        var actions = InputSystem.actions;
+        if (actions is null)
+        {
+            return;
+        }
+
+        toggleLines = actions.FindAction("FactoryBuild/ToggleTestLines", false)?.Clone();
+        if (toggleLines is null)
+        {
+            return;
+        }
+
+        toggleLines.Enable();
+    }
+
+    private void Update()
+    {
+        if (toggleLines is not null && toggleLines.WasPressedThisFrame())
+        {
+            SetTestLinesVisible(!testLinesVisible);
+        }
+    }
+
+    private void OnDestroy()
+    {
+        toggleLines?.Dispose();
+    }
+
+    public void SetTestLinesVisible(bool visible)
+    {
+        testLinesVisible = visible;
+        if (generatedRoot is not null && generatedRoot)
+        {
+            generatedRoot.gameObject.SetActive(visible);
+        }
     }
 
     public void ConfigureSize(Vector2Int newSize)
@@ -79,6 +122,7 @@ public sealed class IndoorGrid : MonoBehaviour
     {
         generatedRoot = GetGeneratedRoot();
         ClearGeneratedLines();
+        generatedRoot.gameObject.SetActive(testLinesVisible);
 
         var grid = GetComponent<SceneGrid>();
         var edgeCollider = GetComponent<EdgeCollider2D>();

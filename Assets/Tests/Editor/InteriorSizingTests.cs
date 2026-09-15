@@ -56,6 +56,11 @@ public sealed class InteriorSizingTests
             var generatedRoot = gridObject.transform.Find("Generated Grid Lines");
             Assert.That(indoorGrid.Size, Is.EqualTo(new Vector2Int(4, 3)));
             Assert.That(generatedRoot.childCount, Is.EqualTo(9));
+            indoorGrid.SetTestLinesVisible(false);
+            Assert.That(indoorGrid.TestLinesVisible, Is.False);
+            Assert.That(generatedRoot.gameObject.activeSelf, Is.False);
+            indoorGrid.SetTestLinesVisible(true);
+            Assert.That(generatedRoot.gameObject.activeSelf, Is.True);
             Assert.That(edgeCollider.points, Is.EqualTo(new[]
             {
                 new Vector2(0f, 0f),
@@ -297,6 +302,13 @@ public sealed class InteriorSizingTests
             Assert.That(
                 door.GetComponent<SpriteRenderer>().bounds.size.x,
                 Is.EqualTo(1.2f).Within(0.001f));
+            var doorLogicalPosition = sceneGrid.WorldToLogical(door.position);
+            Assert.That(doorLogicalPosition.x, Is.EqualTo(2f).Within(0.001f));
+            Assert.That(doorLogicalPosition.y, Is.EqualTo(-0.2f).Within(0.001f));
+            var roomFacingDoorEdge = sceneGrid.WorldToLogical(new Vector2(
+                door.position.x,
+                door.GetComponent<SpriteRenderer>().bounds.max.y));
+            Assert.That(roomFacingDoorEdge.y, Is.EqualTo(0f).Within(0.001f));
         }
         finally
         {
