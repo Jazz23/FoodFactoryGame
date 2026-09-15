@@ -5,6 +5,7 @@
 - Treat required serialized references as configured. Add null checks only when `null` is valid or lifecycle-dependent.
 - Use null pattern matching, such as `player is not null`, instead of `player != null`.
 - Add a concise purpose comment at the top of every project-authored C# file.
+- Do not use the `unity-mcp-efficient` skill or its facade workflow in this project; use the Unity CLI MCP and registered project-specific `factory_*` commands below.
 - Use Unity CLI MCP (`unity mcp --project-path E:\Projects\Unity\FoodFactoryGame`) for live Editor operations. Do not manually edit scene or prefab YAML when MCP can make the change safely.
 - Prefer registered project-specific `factory_*` `[CliCommand]` commands over equivalent generic MCP sequences or ad hoc `eval` code. Use `unity list` to discover their arguments.
 - Run `factory_reconcile_save` as a dry run first and provide an explicit isolated database path unless the user explicitly requests modification of the application database.
