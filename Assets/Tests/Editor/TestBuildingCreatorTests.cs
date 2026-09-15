@@ -436,7 +436,8 @@ public sealed class TestBuildingCreatorTests
             Assert.That(player.FrontY, Is.GreaterThan(depth));
             Assert.That(resolve.Invoke(coordinator, new object[] { surface, player, depth }), Is.True);
 
-            playerObject.transform.position += Vector3.down;
+            // Move beyond the corner's front edge so the prior behind state clears hysteresis.
+            playerObject.transform.position += Vector3.down * 1.5f;
             Physics2D.SyncTransforms();
             depth = surface.GetDepthKey(player.GroundAnchor);
             Assert.That(resolve.Invoke(coordinator, new object[] { surface, player, depth }), Is.False);
