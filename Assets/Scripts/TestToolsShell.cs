@@ -41,11 +41,13 @@ public sealed class TestToolsShell : MonoBehaviour
     private Canvas persistentCanvas = null!;
     private GameObject toolsCanvasObject = null!;
     private GameObject persistentCanvasObject = null!;
+    private GameObject controlArea = null!;
     private GameObject toolsPanel = null!;
+    private GameObject buildPanel = null!;
     private GameObject recoveryPanel = null!;
     private Transform recoveryContent = null!;
-    private Button launcherButton = null!;
-    private Button collapseButton = null!;
+    private Button buildToolsButton = null!;
+    private Button testToolsButton = null!;
     private Button buildButton = null!;
     private Button rotateButton = null!;
     private Button recoveryToggle = null!;
@@ -66,6 +68,7 @@ public sealed class TestToolsShell : MonoBehaviour
     private FactoryBuildController builder = null!;
     private PlayerSceneTransition player = null!;
     private bool expanded;
+    private bool buildExpanded;
     private bool recoveryExpanded;
     private bool eventSubscribed;
     private TestToolsTab selectedTab = TestToolsTab.Network;
@@ -175,6 +178,7 @@ public sealed class TestToolsShell : MonoBehaviour
         SetTabAvailability(TestToolsTab.Machines, false, "Connect as the local player to edit equipment.");
         SetTabAvailability(TestToolsTab.Routes, false, "Connect as the local host to manage truck routes.");
         ApplyTabState();
+        ApplySectionState();
     }
 
     public void BindBuilder(FactoryBuildController newBuilder)
@@ -222,8 +226,11 @@ public sealed class TestToolsShell : MonoBehaviour
             TabChanged(tab);
         }
 
+        buildExpanded = false;
+        recoveryExpanded = false;
         expanded = true;
         ApplyTabState();
+        ApplySectionState();
     }
 
     public void ToggleTab(TestToolsTab tab)
@@ -240,27 +247,43 @@ public sealed class TestToolsShell : MonoBehaviour
     public void Collapse()
     {
         expanded = false;
+        buildExpanded = false;
         recoveryExpanded = false;
         EventSystem.current?.SetSelectedGameObject(null);
         ApplyTabState();
+        ApplySectionState();
     }
 
     public void Expand()
     {
+        buildExpanded = false;
+        recoveryExpanded = false;
         expanded = true;
         ApplyTabState();
+        ApplySectionState();
     }
 
     public static bool ContainsPointer(Vector2 guiPoint)
     {
-        var panel = new Rect(Screen.width - 476f, 16f, 460f, Mathf.Max(260f, Screen.height - 160f));
-        var launcher = new Rect(Screen.width - 164f, 8f, 148f, 44f);
-        var networkButtons = new Rect(16f, 16f, 396f, 34f);
-        var buildBar = new Rect(12f, Screen.height - 124f, Screen.width - 24f, 112f);
-        var recovery = new Rect(16f, Screen.height - 304f, 460f, 168f);
-        return launcher.Contains(guiPoint) || networkButtons.Contains(guiPoint)
-            || buildBar.Contains(guiPoint) || recovery.Contains(guiPoint)
-            || (Instance is not null && Instance.expanded && TestUIVisibility.Visible && panel.Contains(guiPoint));
+        if (Instance is null)
+        {
+            return false;
+        }
+
+        var screenPoint = new Vector2(guiPoint.x, Screen.height - guiPoint.y);
+        return ContainsPointer(Instance.controlArea, screenPoint)
+            || (TestUIVisibility.Visible && Instance.expanded
+                && ContainsPointer(Instance.toolsPanel, screenPoint))
+            || (TestUIVisibility.Visible && Instance.buildExpanded
+                && (ContainsPointer(Instance.buildPanel, screenPoint)
+                    || (Instance.recoveryExpanded && ContainsPointer(Instance.recoveryPanel, screenPoint))));
+    }
+
+    public static bool IsPointerOverExpandedCard(Vector2 screenPoint)
+    {
+        return Instance is not null && TestUIVisibility.Visible
+            && ((Instance.expanded && ContainsPointer(Instance.toolsPanel, screenPoint))
+                || (Instance.buildExpanded && ContainsPointer(Instance.buildPanel, screenPoint)));
     }
 
     public static bool IsTextInputFocused
@@ -284,13 +307,15 @@ public sealed class TestToolsShell : MonoBehaviour
         buildEquipmentLabels.Clear();
         toolsCanvasObject = CreateCanvas("Test Tools Canvas", 221, out toolsCanvas);
         persistentCanvasObject = CreateCanvas("Test Tools Persistent Canvas", 220, out persistentCanvas);
+        CreateControlArea();
         CreateToolsPanel();
         CreateNetworkContent();
-        CreatePersistentControls();
+        CreateBuildPanel();
         SetTabAvailability(TestToolsTab.Floors, false, "Connect as the local player to inspect floors.");
         SetTabAvailability(TestToolsTab.Machines, false, "Connect as the local player to edit equipment.");
         SetTabAvailability(TestToolsTab.Routes, false, "Connect as the local host to manage truck routes.");
         ApplyTabState();
+        ApplySectionState();
     }
 
     private void EnsureInterface()
@@ -308,7 +333,7 @@ public sealed class TestToolsShell : MonoBehaviour
     private void CreateToolsPanel()
     {
         toolsPanel = CreateImage("Test Tools Panel", toolsCanvas.transform, Charcoal);
-        SetTopRect(toolsPanel.GetComponent<RectTransform>(), 16f, 16f, 460f, 520f);
+        SetTopRect(toolsPanel.GetComponent<RectTransform>(), 16f, 116f, 460f, 520f);
 
         var title = CreateText(
             "Test Tools Title",
@@ -328,7 +353,7 @@ public sealed class TestToolsShell : MonoBehaviour
             TextSecondary);
         SetTopRect(selectedTabText.rectTransform, 16f, 39f, 240f, 18f);
 
-        collapseButton = CreateButton(
+        var collapseButton = CreateButton(
             "Collapse Test Tools",
             "COLLAPSE",
             toolsPanel.transform,
@@ -363,6 +388,127 @@ public sealed class TestToolsShell : MonoBehaviour
         CreateTabPage(TestToolsTab.Floors, body.transform);
         CreateTabPage(TestToolsTab.Machines, body.transform);
         CreateTabPage(TestToolsTab.Routes, body.transform);
+        var toolsScrollRelay = toolsPanel.AddComponent<UiScrollRelay>();
+        toolsScrollRelay.Initialize(() => tabPages[selectedTab].GetComponent<ScrollRect>());
+    }
+
+    private void CreateControlArea()
+    {
+        controlArea = CreateImage("Developer Controls", persistentCanvas.transform, Charcoal);
+        SetTopRect(controlArea.GetComponent<RectTransform>(), 16f, 16f, 428f, 88f);
+
+        var startServer = CreateButton("Start Server", "START SERVER", controlArea.transform, 12f, 10f, 190f, 34f,
+            ToggleServer);
+        startServer.GetComponent<Image>().color = TealMuted;
+        var startClient = CreateButton("Start Client", "START CLIENT", controlArea.transform, 218f, 10f, 190f, 34f,
+            ToggleClient);
+        startClient.GetComponent<Image>().color = TealMuted;
+
+        buildToolsButton = CreateButton(
+            "Build Tools",
+            "BUILD TOOLS",
+            controlArea.transform,
+            12f,
+            50f,
+            190f,
+            30f,
+            ToggleBuildTools);
+        testToolsButton = CreateButton(
+            "Test Tools",
+            "TEST TOOLS",
+            controlArea.transform,
+            218f,
+            50f,
+            190f,
+            30f,
+            ToggleTestTools);
+    }
+
+    private void CreateBuildPanel()
+    {
+        buildPanel = CreateImage("Factory Build Tools", toolsCanvas.transform, Charcoal);
+        SetTopRect(buildPanel.GetComponent<RectTransform>(), 16f, 116f, 1248f, 150f);
+
+        var heading = CreateText("Build Tools Heading", buildPanel.transform, "BUILD TOOLS", 16,
+            TextAnchor.MiddleLeft, Teal);
+        SetTopRect(heading.rectTransform, 12f, 7f, 260f, 28f);
+        var collapseBuildButton = CreateButton("Collapse Build Tools", "COLLAPSE", buildPanel.transform,
+            1118f, 6f, 114f, 32f, Collapse);
+        collapseBuildButton.GetComponent<Image>().color = TealMuted;
+
+        var buildHeading = CreateText("Build Bar Heading", buildPanel.transform, "BUILD", 13,
+            TextAnchor.MiddleLeft, Teal);
+        SetTopRect(buildHeading.rectTransform, 12f, 47f, 58f, 30f);
+        buildButton = CreateButton("Build Toggle", "B: BUILD", buildPanel.transform, 72f, 45f, 94f, 32f,
+            ToggleBuild);
+        buildButton.GetComponent<Image>().color = TealMuted;
+        var labels = new[] { "SOURCE", "BELT", "STORAGE", "SHIP DOCK", "RECEIVE DOCK" };
+        for (var index = 0; index < labels.Length; index++)
+        {
+            var capturedIndex = index;
+            var button = CreateButton(
+                $"Build {labels[index]}",
+                labels[index],
+                buildPanel.transform,
+                172f + index * 93f,
+                45f,
+                88f,
+                32f,
+                () => SelectBuildEquipment(capturedIndex));
+            buildEquipmentButtons.Add(button);
+            buildEquipmentLabels.Add(button.GetComponentInChildren<Text>());
+        }
+
+        rotateButton = CreateButton("Build Rotation", "R: EAST", buildPanel.transform, 642f, 45f, 96f, 32f,
+            RotateBuild);
+        rotateButton.GetComponent<Image>().color = TealMuted;
+        recoveryToggle = CreateButton("Overflow Recovery", "RECOVER OVERFLOW", buildPanel.transform,
+            1118f, 45f, 114f, 32f, ToggleRecovery);
+        recoveryToggle.GetComponent<Image>().color = Destructive;
+        buildHintText = CreateText("Build Instructions", buildPanel.transform, string.Empty, 11,
+            TextAnchor.MiddleLeft, TextPrimary);
+        SetTopRect(buildHintText.rectTransform, 12f, 83f, 1100f, 22f);
+        buildStatusText = CreateText("Build Status", buildPanel.transform, string.Empty, 11,
+            TextAnchor.MiddleLeft, TextSecondary);
+        SetTopRect(buildStatusText.rectTransform, 12f, 108f, 1100f, 22f);
+
+        recoveryPanel = CreateImage("Overflow Recovery Panel", buildPanel.transform, CharcoalRaised);
+        SetTopRect(recoveryPanel.GetComponent<RectTransform>(), 12f, 142f, 460f, 176f);
+        var recoveryHeader = CreateText("Overflow Recovery Heading", recoveryPanel.transform, "OVERFLOW RECOVERY",
+            13, TextAnchor.MiddleLeft, Teal);
+        SetTopRect(recoveryHeader.rectTransform, 12f, 8f, 300f, 24f);
+        recoveryTitleText = CreateText("Overflow Recovery Count", recoveryPanel.transform, string.Empty, 11,
+            TextAnchor.MiddleRight, TextSecondary);
+        SetTopRect(recoveryTitleText.rectTransform, 306f, 8f, 140f, 24f);
+        var viewport = new GameObject(
+            "Overflow Recovery Viewport",
+            typeof(RectTransform),
+            typeof(CanvasRenderer),
+            typeof(Image),
+            typeof(RectMask2D));
+        viewport.transform.SetParent(recoveryPanel.transform, false);
+        SetTopRect(viewport.GetComponent<RectTransform>(), 8f, 38f, 444f, 128f);
+        viewport.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.001f);
+        var scroll = recoveryPanel.AddComponent<ScrollRect>();
+        scroll.horizontal = false;
+        scroll.vertical = true;
+        scroll.movementType = ScrollRect.MovementType.Clamped;
+        scroll.scrollSensitivity = 28f;
+        scroll.viewport = viewport.GetComponent<RectTransform>();
+        var buildScrollRelay = buildPanel.AddComponent<UiScrollRelay>();
+        buildScrollRelay.Initialize(() => recoveryExpanded && recoveryPanel.activeInHierarchy
+            ? recoveryPanel.GetComponent<ScrollRect>()
+            : null);
+        recoveryContent = new GameObject("Overflow Recovery Content", typeof(RectTransform)).transform;
+        recoveryContent.SetParent(viewport.transform, false);
+        var recoveryRect = recoveryContent.GetComponent<RectTransform>();
+        recoveryRect.anchorMin = new Vector2(0f, 1f);
+        recoveryRect.anchorMax = new Vector2(1f, 1f);
+        recoveryRect.pivot = new Vector2(0f, 1f);
+        recoveryRect.sizeDelta = new Vector2(0f, 128f);
+        scroll.content = recoveryRect;
+        recoveryPanel.SetActive(false);
+        buildPanel.SetActive(false);
     }
 
     private void CreateTabPage(TestToolsTab tab, Transform parent)
@@ -440,96 +586,6 @@ public sealed class TestToolsShell : MonoBehaviour
         SetTopRect(networkHintText.rectTransform, 16f, 238f, 396f, 52f);
     }
 
-    private void CreatePersistentControls()
-    {
-        var startServer = CreateButton("Start Server", "START SERVER", persistentCanvas.transform, 16f, 16f, 190f, 34f,
-            ToggleServer);
-        startServer.GetComponent<Image>().color = TealMuted;
-        var startClient = CreateButton("Start Client", "START CLIENT", persistentCanvas.transform, 222f, 16f, 190f, 34f,
-            ToggleClient);
-        startClient.GetComponent<Image>().color = TealMuted;
-
-        launcherButton = CreateButton(
-            "Test Tools Launcher",
-            "TEST TOOLS",
-            persistentCanvas.transform,
-            1116f,
-            16f,
-            148f,
-            38f,
-            LauncherClicked);
-        launcherButton.GetComponent<Image>().color = TealMuted;
-
-        var buildBar = CreateImage("Factory Build Bar", persistentCanvas.transform, Charcoal);
-        SetBottomStretch(buildBar.GetComponent<RectTransform>(), 16f, 16f, 104f);
-        var buildHeading = CreateText("Build Bar Heading", buildBar.transform, "BUILD", 13,
-            TextAnchor.MiddleLeft, Teal);
-        SetTopRect(buildHeading.rectTransform, 12f, 7f, 58f, 22f);
-        buildButton = CreateButton("Build Toggle", "B: BUILD", buildBar.transform, 72f, 6f, 94f, 32f,
-            ToggleBuild);
-        buildButton.GetComponent<Image>().color = TealMuted;
-        var labels = new[] { "SOURCE", "BELT", "STORAGE", "SHIP DOCK", "RECEIVE DOCK" };
-        for (var index = 0; index < labels.Length; index++)
-        {
-            var capturedIndex = index;
-            var button = CreateButton(
-                $"Build {labels[index]}",
-                labels[index],
-                buildBar.transform,
-                172f + index * 93f,
-                6f,
-                88f,
-                32f,
-                () => SelectBuildEquipment(capturedIndex));
-            buildEquipmentButtons.Add(button);
-            buildEquipmentLabels.Add(button.GetComponentInChildren<Text>());
-        }
-
-        rotateButton = CreateButton("Build Rotation", "R: EAST", buildBar.transform, 642f, 6f, 96f, 32f,
-            RotateBuild);
-        rotateButton.GetComponent<Image>().color = TealMuted;
-        buildHintText = CreateText("Build Instructions", buildBar.transform, string.Empty, 11,
-            TextAnchor.MiddleLeft, TextPrimary);
-        SetTopRect(buildHintText.rectTransform, 12f, 48f, 950f, 22f);
-        buildStatusText = CreateText("Build Status", buildBar.transform, string.Empty, 11,
-            TextAnchor.MiddleLeft, TextSecondary);
-        SetTopRect(buildStatusText.rectTransform, 12f, 73f, 1110f, 22f);
-        recoveryToggle = CreateButton("Overflow Recovery", "RECOVER OVERFLOW", buildBar.transform, 1128f, 48f,
-            128f, 42f, ToggleRecovery);
-        recoveryToggle.GetComponent<Image>().color = Destructive;
-
-        recoveryPanel = CreateImage("Overflow Recovery Panel", persistentCanvas.transform, CharcoalRaised);
-        SetBottomRect(recoveryPanel.GetComponent<RectTransform>(), 16f, 128f, 460f, 176f);
-        var recoveryHeader = CreateText("Overflow Recovery Heading", recoveryPanel.transform, "OVERFLOW RECOVERY",
-            13, TextAnchor.MiddleLeft, Teal);
-        SetTopRect(recoveryHeader.rectTransform, 12f, 8f, 300f, 24f);
-        recoveryTitleText = CreateText("Overflow Recovery Count", recoveryPanel.transform, string.Empty, 11,
-            TextAnchor.MiddleRight, TextSecondary);
-        SetTopRect(recoveryTitleText.rectTransform, 306f, 8f, 140f, 24f);
-        var viewport = new GameObject(
-            "Overflow Recovery Viewport",
-            typeof(RectTransform),
-            typeof(CanvasRenderer),
-            typeof(Image),
-            typeof(RectMask2D));
-        viewport.transform.SetParent(recoveryPanel.transform, false);
-        SetTopRect(viewport.GetComponent<RectTransform>(), 8f, 38f, 444f, 128f);
-        viewport.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.001f);
-        var scroll = recoveryPanel.AddComponent<ScrollRect>();
-        scroll.horizontal = false;
-        scroll.vertical = true;
-        scroll.viewport = viewport.GetComponent<RectTransform>();
-        recoveryContent = new GameObject("Overflow Recovery Content", typeof(RectTransform)).transform;
-        recoveryContent.SetParent(viewport.transform, false);
-        var recoveryRect = recoveryContent.GetComponent<RectTransform>();
-        recoveryRect.anchorMin = new Vector2(0f, 1f);
-        recoveryRect.anchorMax = new Vector2(1f, 1f);
-        recoveryRect.pivot = new Vector2(0f, 1f);
-        recoveryRect.sizeDelta = new Vector2(0f, 128f);
-        scroll.content = recoveryRect;
-        recoveryPanel.SetActive(false);
-    }
-
     private void CreateActions()
     {
         floorToggle = InputSystem.actions.FindAction("OutsideTest/ToggleDebug", true).Clone();
@@ -561,26 +617,52 @@ public sealed class TestToolsShell : MonoBehaviour
 
     private void CancelPerformed(InputAction.CallbackContext _)
     {
-        if (!IsTextInputFocused && expanded)
+        if (!IsTextInputFocused && (expanded || buildExpanded))
         {
             Collapse();
         }
     }
 
-    private void LauncherClicked()
+    private void ToggleBuildTools()
     {
+        var wasVisible = TestUIVisibility.Visible;
         if (!TestUIVisibility.Visible)
         {
             TestUIVisibility.SetVisible(true);
         }
 
-        if (expanded)
+        if (wasVisible && buildExpanded)
         {
             Collapse();
             return;
         }
 
-        Expand();
+        expanded = false;
+        buildExpanded = true;
+        recoveryExpanded = false;
+        ApplyTabState();
+        ApplySectionState();
+    }
+
+    private void ToggleTestTools()
+    {
+        var wasVisible = TestUIVisibility.Visible;
+        if (!TestUIVisibility.Visible)
+        {
+            TestUIVisibility.SetVisible(true);
+        }
+
+        if (wasVisible && expanded)
+        {
+            Collapse();
+            return;
+        }
+
+        buildExpanded = false;
+        recoveryExpanded = false;
+        expanded = true;
+        ApplyTabState();
+        ApplySectionState();
     }
 
     private void ToggleBuild()
@@ -611,6 +693,7 @@ public sealed class TestToolsShell : MonoBehaviour
     {
         recoveryExpanded = !recoveryExpanded;
         recoveryPanel.SetActive(recoveryExpanded && builder is not null);
+        ResizeBuildPanel();
         EventSystem.current?.SetSelectedGameObject(null);
     }
 
@@ -777,7 +860,9 @@ public sealed class TestToolsShell : MonoBehaviour
             buildButton.GetComponentInChildren<Text>().text = "B: BUILD";
             rotateButton.GetComponentInChildren<Text>().text = "R: EAST";
             recoveryToggle.interactable = false;
+            recoveryExpanded = false;
             recoveryPanel.SetActive(false);
+            ResizeBuildPanel();
             return;
         }
 
@@ -793,7 +878,9 @@ public sealed class TestToolsShell : MonoBehaviour
         recoveryToggle.interactable = active && builder.RecoveryCount > 0;
         if (!active)
         {
+            recoveryExpanded = false;
             recoveryPanel.SetActive(false);
+            ResizeBuildPanel();
         }
     }
 
@@ -846,8 +933,12 @@ public sealed class TestToolsShell : MonoBehaviour
             rowIndex++;
         }
 
+        var contentRect = recoveryContent.GetComponent<RectTransform>();
+        contentRect.sizeDelta = new Vector2(contentRect.sizeDelta.x, Mathf.Max(128f, rowIndex * 34f));
         recoveryTitleText.text = $"{rowIndex} item(s) outside the usable interior";
-        recoveryPanel.SetActive(recoveryExpanded && rowIndex > 0);
+        recoveryExpanded = recoveryExpanded && rowIndex > 0;
+        recoveryPanel.SetActive(recoveryExpanded);
+        ResizeBuildPanel();
     }
 
     private void VisibilityChanged(bool _)
@@ -859,13 +950,13 @@ public sealed class TestToolsShell : MonoBehaviour
     {
         var visible = TestUIVisibility.Visible;
         toolsCanvas.enabled = visible;
-        toolsPanel.SetActive(visible && expanded);
         if (!visible)
         {
             EventSystem.current?.SetSelectedGameObject(null);
         }
 
         ApplyTabState();
+        ApplySectionState();
     }
 
     private void ApplyTabState()
@@ -893,6 +984,34 @@ public sealed class TestToolsShell : MonoBehaviour
                 button.GetComponent<Image>().color = selected ? Teal : TealMuted;
             }
         }
+    }
+
+    private void ApplySectionState()
+    {
+        var visible = TestUIVisibility.Visible;
+        toolsPanel.SetActive(visible && expanded);
+        buildPanel.SetActive(visible && buildExpanded);
+        buildToolsButton.GetComponent<Image>().color = buildExpanded ? Teal : TealMuted;
+        testToolsButton.GetComponent<Image>().color = expanded ? Teal : TealMuted;
+        if (!buildExpanded)
+        {
+            recoveryPanel.SetActive(false);
+        }
+
+        ResizeBuildPanel();
+    }
+
+    private void ResizeBuildPanel()
+    {
+        var rect = buildPanel.GetComponent<RectTransform>();
+        rect.sizeDelta = new Vector2(rect.sizeDelta.x, recoveryExpanded ? 326f : 150f);
+    }
+
+    private static bool ContainsPointer(GameObject target, Vector2 screenPoint)
+    {
+        return target is not null && target.activeInHierarchy
+            && RectTransformUtility.RectangleContainsScreenPoint(
+                target.GetComponent<RectTransform>(), screenPoint);
     }
 
     private bool IsTabAvailable(TestToolsTab tab)

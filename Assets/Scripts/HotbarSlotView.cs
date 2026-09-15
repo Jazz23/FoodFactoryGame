@@ -15,9 +15,6 @@ public sealed class HotbarSlotView : MonoBehaviour, IPointerClickHandler
 
     public void OnPointerClick(PointerEventData eventData)
     {
-        if (eventData.button == PointerEventData.InputButton.Left)
-        {
-            inventory.SelectHotbarSlot(slotIndex);
-        }
+        inventory.ClickHotbarSlot(slotIndex, eventData.button == PointerEventData.InputButton.Right);
     }
 }

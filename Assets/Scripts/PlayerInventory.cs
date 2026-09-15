@@ -28,6 +28,7 @@ public sealed class PlayerInventory : NetworkBehaviour
     };
 
     private readonly InventoryStack?[] slots = new InventoryStack?[SlotCount];
+    private readonly string?[] hotbarItemIds = new string?[HotbarSlotCount];
     private readonly List<SlotVisual> slotVisuals = new();
     private readonly List<HotbarSlotVisual> hotbarSlotVisuals = new();
     private SQLiteConnection database = null!;
@@ -37,9 +38,15 @@ public sealed class PlayerInventory : NetworkBehaviour
     private InputAction transferStackModifier = null!;
     private InputAction transferAllModifier = null!;
     private InputAction hotbarSelect = null!;
+    private InputAction pointerPosition = null!;
     private InputActionMap buildActions = null!;
     private GameObject inventoryRoot = null!;
     private GameObject hotbarRoot = null!;
+    private GameObject cursorItemVisual = null!;
+    private RectTransform inventoryCanvasRect = null!;
+    private Image cursorItemBackground = null!;
+    private Text cursorItemIcon = null!;
+    private Text cursorItemCount = null!;
     private GameObject? createdEventSystem;
     private Text cursorText = null!;
     private Text tooltipText = null!;
@@ -47,14 +54,14 @@ public sealed class PlayerInventory : NetworkBehaviour
     private InventoryStack? cursorStack;
     private int cursorSourceSlot = -1;
     private int hoveredSlot = -1;
-    private int selectedHotbarSlot;
+    private int selectedHotbarSlot = -1;
     private bool isOpen;
 
     public static PlayerInventory LocalOwner = null!;
     public bool IsOpen => isOpen;
     public int SelectedHotbarSlot => selectedHotbarSlot;
-    public string? SelectedHotbarItemId => slots[selectedHotbarSlot]?.ItemId;
-    public int SelectedHotbarCount => slots[selectedHotbarSlot]?.Count ?? 0;
+    public string? SelectedHotbarItemId => selectedHotbarSlot < 0 ? null : hotbarItemIds[selectedHotbarSlot];
+    public int SelectedHotbarCount => GetInventoryItemCount(SelectedHotbarItemId);
 
     public override void OnStartClient()
     {
@@ -67,6 +74,7 @@ public sealed class PlayerInventory : NetworkBehaviour
         database = new SQLiteConnection(Path.Combine(Application.persistentDataPath, "food-factory-inventory.db"));
         database.CreateTable<PlayerInventoryProfile>();
         database.CreateTable<PlayerInventoryRecord>();
+        database.CreateTable<PlayerHotbarBinding>();
         LoadInventory();
         CreateEventSystem();
         CreateInterface();
@@ -77,6 +85,7 @@ public sealed class PlayerInventory : NetworkBehaviour
         transferStackModifier = InputSystem.actions.FindAction("Inventory/TransferStackModifier", true);
         transferAllModifier = InputSystem.actions.FindAction("Inventory/TransferAllModifier", true);
         hotbarSelect = InputSystem.actions.FindAction("Hotbar/Select", true);
+        pointerPosition = InputSystem.actions.FindAction("UI/Point", true).Clone();
         buildActions = InputSystem.actions.FindActionMap("Build", true);
         toggle.performed += TogglePerformed;
         close.performed += ClosePerformed;
@@ -88,6 +97,7 @@ public sealed class PlayerInventory : NetworkBehaviour
         hotbarSelect.Enable();
         transferStackModifier.Enable();
         transferAllModifier.Enable();
+        pointerPosition.Enable();
     }
 
     public override void OnStopClient()
@@ -112,6 +122,9 @@ public sealed class PlayerInventory : NetworkBehaviour
         hotbarSelect.Disable();
         transferStackModifier.Disable();
         transferAllModifier.Disable();
+        isOpen = false;
+        pointerPosition.Disable();
+        pointerPosition.Dispose();
         buildActions.Enable();
         SaveInventory();
         database.Dispose();
@@ -119,6 +132,30 @@ public sealed class PlayerInventory : NetworkBehaviour
         if (createdEventSystem is not null)
         {
             Destroy(createdEventSystem);
+        }
+    }
+
+    private void Update()
+    {
+        if (cursorItemVisual is null)
+        {
+            return;
+        }
+
+        if (cursorStack is null || !isOpen)
+        {
+            cursorItemVisual.SetActive(false);
+            return;
+        }
+
+        cursorItemVisual.SetActive(true);
+        if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
+            inventoryCanvasRect,
+            pointerPosition.ReadValue<Vector2>() + new Vector2(20f, -20f),
+            null,
+            out var localPoint))
+        {
+            cursorItemVisual.GetComponent<RectTransform>().anchoredPosition = localPoint;
         }
     }
 
@@ -144,6 +181,55 @@ public sealed class PlayerInventory : NetworkBehaviour
         RefreshInterface();
     }
 
+    public void ClickHotbarSlot(int hotbarIndex, bool rightClick)
+    {
+        if (hotbarIndex < 0 || hotbarIndex >= HotbarSlotCount)
+        {
+            return;
+        }
+
+        if (rightClick)
+        {
+            ClearHotbarSlot(hotbarIndex);
+            return;
+        }
+
+        if (cursorStack is null)
+        {
+            SelectHotbarSlot(hotbarIndex);
+            return;
+        }
+
+        var itemId = cursorStack.ItemId;
+        hotbarItemIds[hotbarIndex] = itemId;
+        if (selectedHotbarSlot == hotbarIndex && PlayerSceneTransition.LocalOwner is not null)
+        {
+            PlayerSceneTransition.LocalOwner.EquipHotbarItem(itemId);
+        }
+
+        ReturnCursorToInventory();
+        statusText.text = $"Hotbar {GetHotbarKey(hotbarIndex)} shortcut added. The item remains in your inventory.";
+        SaveInventory();
+        RefreshInterface();
+    }
+
+    public void ClearHotbarSlot(int hotbarIndex)
+    {
+        if (hotbarIndex < 0 || hotbarIndex >= HotbarSlotCount || hotbarItemIds[hotbarIndex] is null)
+        {
+            return;
+        }
+
+        hotbarItemIds[hotbarIndex] = null;
+        if (selectedHotbarSlot == hotbarIndex && PlayerSceneTransition.LocalOwner is not null)
+        {
+            PlayerSceneTransition.LocalOwner.EquipHotbarItem(null);
+        }
+        statusText.text = $"Removed the shortcut from hotbar {GetHotbarKey(hotbarIndex)}.";
+        SaveInventory();
+        RefreshInterface();
+    }
+
     public void HoverSlot(int index)
     {
         hoveredSlot = index;
@@ -162,7 +248,7 @@ public sealed class PlayerInventory : NetworkBehaviour
         }
 
         hoveredSlot = -1;
-        tooltipText.text = "Left click: stack   Right click: half / one   Q: return cursor";
+        tooltipText.text = "Left click: stack   Right click: half / one   Click item, then hotbar: shortcut   Q: return cursor";
         RefreshSlotVisuals();
     }
 
@@ -174,6 +260,10 @@ public sealed class PlayerInventory : NetworkBehaviour
         }
 
         selectedHotbarSlot = index;
+        if (PlayerSceneTransition.LocalOwner is not null)
+        {
+            PlayerSceneTransition.LocalOwner.EquipHotbarItem(SelectedHotbarItemId);
+        }
         RefreshSlotVisuals();
     }
 
@@ -210,12 +300,6 @@ public sealed class PlayerInventory : NetworkBehaviour
 
     private void HotbarSelectPerformed(InputAction.CallbackContext context)
     {
-        if (PlayerSceneTransition.LocalOwner is not null
-            && PlayerSceneTransition.LocalOwner.IsFactoryBuildContextActive)
-        {
-            return;
-        }
-
         if (int.TryParse(context.control.displayName, out var slotNumber))
         {
             SelectHotbarSlot(slotNumber == 0 ? HotbarSlotCount - 1 : slotNumber - 1);
@@ -226,7 +310,7 @@ public sealed class PlayerInventory : NetworkBehaviour
     {
         isOpen = true;
         inventoryRoot.SetActive(true);
-        hotbarRoot.SetActive(false);
+        hotbarRoot.SetActive(true);
         buildActions.Disable();
         statusText.text = "Personal inventory";
         RefreshInterface();
@@ -372,6 +456,9 @@ public sealed class PlayerInventory : NetworkBehaviour
     private void LoadInventory()
     {
         Array.Clear(slots, 0, slots.Length);
+        Array.Fill(hotbarItemIds, null);
+        cursorStack = null;
+        cursorSourceSlot = -1;
         var hasProfile = database.Find<PlayerInventoryProfile>(PlayerSteamId) is not null;
         var records = database.Query<PlayerInventoryRecord>(
             "SELECT * FROM PlayerInventoryRecord WHERE PlayerId = ?",
@@ -379,6 +466,18 @@ public sealed class PlayerInventory : NetworkBehaviour
         if (!hasProfile)
         {
             database.Insert(new PlayerInventoryProfile { PlayerId = PlayerSteamId });
+        }
+
+        var bindings = database.Query<PlayerHotbarBinding>(
+            "SELECT * FROM PlayerHotbarBinding WHERE PlayerId = ?",
+            PlayerSteamId);
+        foreach (var binding in bindings)
+        {
+            if (binding.SlotIndex >= 0 && binding.SlotIndex < HotbarSlotCount
+                && ItemDefinitions.ContainsKey(binding.ItemId))
+            {
+                hotbarItemIds[binding.SlotIndex] = binding.ItemId;
+            }
         }
 
         foreach (var record in records)
@@ -401,19 +500,48 @@ public sealed class PlayerInventory : NetworkBehaviour
             }
         }
 
-        if (hasProfile || records.Count > 0)
+        var shouldSave = !hasProfile && records.Count == 0;
+        if (shouldSave)
         {
-            return;
+            slots[0] = new InventoryStack("iron-plate", 100);
+            slots[1] = new InventoryStack("copper-plate", 100);
+            slots[2] = new InventoryStack("stone-brick", 60);
+            slots[3] = new InventoryStack("conveyor-belt", 100);
+            slots[4] = new InventoryStack("wall", 50);
+            slots[5] = new InventoryStack("factory-building", 10);
+            slots[6] = new InventoryStack("iron-plate", 45);
         }
 
-        slots[0] = new InventoryStack("iron-plate", 100);
-        slots[1] = new InventoryStack("copper-plate", 100);
-        slots[2] = new InventoryStack("stone-brick", 60);
-        slots[3] = new InventoryStack("conveyor-belt", 100);
-        slots[4] = new InventoryStack("wall", 50);
-        slots[5] = new InventoryStack("factory-building", 10);
-        slots[6] = new InventoryStack("iron-plate", 45);
-        SaveInventory();
+        if (EnsureStarterBelts())
+        {
+            shouldSave = true;
+        }
+
+        if (shouldSave)
+        {
+            SaveInventory();
+        }
+    }
+
+    private bool EnsureStarterBelts()
+    {
+        if (GetInventoryItemCount("conveyor-belt") > 0)
+        {
+            return false;
+        }
+
+        for (var index = 0; index < SlotCount; index++)
+        {
+            if (slots[index] is not null)
+            {
+                continue;
+            }
+
+            slots[index] = new InventoryStack("conveyor-belt", 100);
+            return true;
+        }
+
+        return false;
     }
 
     private void SaveInventory()
@@ -453,6 +581,29 @@ public sealed class PlayerInventory : NetworkBehaviour
         {
             database.InsertAll(records);
         }
+
+        database.Execute("DELETE FROM PlayerHotbarBinding WHERE PlayerId = ?", PlayerSteamId);
+        var bindings = new List<PlayerHotbarBinding>();
+        for (var index = 0; index < HotbarSlotCount; index++)
+        {
+            var itemId = hotbarItemIds[index];
+            if (itemId is null)
+            {
+                continue;
+            }
+
+            bindings.Add(new PlayerHotbarBinding
+            {
+                PlayerId = PlayerSteamId,
+                SlotIndex = index,
+                ItemId = itemId
+            });
+        }
+
+        if (bindings.Count > 0)
+        {
+            database.InsertAll(bindings);
+        }
     }
 
     private void CreateEventSystem()
@@ -471,7 +622,8 @@ public sealed class PlayerInventory : NetworkBehaviour
         canvasObject.transform.SetParent(transform, false);
         var canvas = canvasObject.GetComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvas.sortingOrder = 100;
+        canvas.sortingOrder = 250;
+        inventoryCanvasRect = canvasObject.GetComponent<RectTransform>();
         var scaler = canvasObject.GetComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
         scaler.referenceResolution = new Vector2(1280f, 720f);
@@ -482,8 +634,8 @@ public sealed class PlayerInventory : NetworkBehaviour
         var windowRect = window.GetComponent<RectTransform>();
         windowRect.anchorMin = new Vector2(0.5f, 0.5f);
         windowRect.anchorMax = new Vector2(0.5f, 0.5f);
-        windowRect.sizeDelta = new Vector2(740f, 630f);
-        windowRect.anchoredPosition = Vector2.zero;
+        windowRect.sizeDelta = new Vector2(740f, 570f);
+        windowRect.anchoredPosition = new Vector2(0f, 50f);
 
         CreateText("Title", window.transform, "INVENTORY", 28, TextAnchor.MiddleLeft, new Color(0.91f, 0.94f, 0.96f));
         var titleRect = window.transform.Find("Title")!.GetComponent<RectTransform>();
@@ -532,7 +684,7 @@ public sealed class PlayerInventory : NetworkBehaviour
         statusRect.offsetMin = new Vector2(28f, 21f);
         statusRect.offsetMax = new Vector2(-28f, 48f);
 
-        var controls = CreateText("Controls", window.transform, "TAB / ESC Close    Hotbar: 1–9 / 0    Q Return Cursor    Shift / Ctrl Transfer", 13, TextAnchor.MiddleCenter, new Color(0.55f, 0.62f, 0.68f));
+        var controls = CreateText("Controls", window.transform, "TAB / ESC Close    1–9 / 0 Equip Hotbar    Q Return Cursor    Click Item, then Hotbar", 13, TextAnchor.MiddleCenter, new Color(0.55f, 0.62f, 0.68f));
         var controlsRect = controls.GetComponent<RectTransform>();
         controlsRect.anchorMin = new Vector2(0f, 0f);
         controlsRect.anchorMax = new Vector2(1f, 0f);
@@ -550,6 +702,30 @@ public sealed class PlayerInventory : NetworkBehaviour
         {
             CreateHotbarSlot(hotbarRoot.transform, index);
         }
+
+        cursorItemVisual = CreateImage("Held Item Cursor Icon", canvasObject.transform, new Color(0.06f, 0.08f, 0.1f, 0.96f));
+        var cursorVisualRect = cursorItemVisual.GetComponent<RectTransform>();
+        cursorVisualRect.anchorMin = new Vector2(0.5f, 0.5f);
+        cursorVisualRect.anchorMax = new Vector2(0.5f, 0.5f);
+        cursorVisualRect.pivot = Vector2.zero;
+        cursorVisualRect.sizeDelta = new Vector2(44f, 44f);
+        var cursorCanvas = cursorItemVisual.AddComponent<Canvas>();
+        cursorCanvas.overrideSorting = true;
+        cursorCanvas.sortingOrder = 300;
+        cursorItemBackground = cursorItemVisual.GetComponent<Image>();
+        cursorItemBackground.raycastTarget = false;
+        cursorItemIcon = CreateText("Item Icon", cursorItemVisual.transform, string.Empty, 18,
+            TextAnchor.MiddleCenter, Color.white);
+        Stretch(cursorItemIcon.GetComponent<RectTransform>()!);
+        cursorItemIcon.raycastTarget = false;
+        cursorItemCount = CreateText("Item Count", cursorItemVisual.transform, string.Empty, 11,
+            TextAnchor.LowerRight, Color.white);
+        var cursorCountRect = cursorItemCount.GetComponent<RectTransform>();
+        Stretch(cursorCountRect);
+        cursorCountRect.offsetMin = new Vector2(3f, 2f);
+        cursorCountRect.offsetMax = new Vector2(-3f, -1f);
+        cursorItemCount.raycastTarget = false;
+        cursorItemVisual.SetActive(false);
 
         inventoryRoot.SetActive(false);
         RefreshInterface();
@@ -613,7 +789,17 @@ public sealed class PlayerInventory : NetworkBehaviour
             : $"CURSOR: {ItemDefinitions[cursorStack.ItemId].Name} x{cursorStack.Count}";
         if (hoveredSlot == -1)
         {
-            tooltipText.text = "Left click: stack   Right click: half / one   Q: return cursor";
+            tooltipText.text = "Left click: stack   Right click: half / one   Click item, then hotbar: shortcut   Q: return cursor";
+        }
+
+        cursorItemVisual.SetActive(isOpen && cursorStack is not null);
+        if (cursorStack is not null)
+        {
+            var definition = ItemDefinitions[cursorStack.ItemId];
+            cursorItemIcon.text = definition.Abbreviation;
+            cursorItemIcon.color = definition.Color;
+            cursorItemCount.text = cursorStack.Count == 1 ? string.Empty : cursorStack.Count.ToString();
+            cursorItemBackground.color = new Color(0.06f, 0.08f, 0.1f, 0.96f);
         }
     }
 
@@ -635,15 +821,41 @@ public sealed class PlayerInventory : NetworkBehaviour
 
         for (var index = 0; index < HotbarSlotCount; index++)
         {
-            var slot = slots[index];
+            var itemId = hotbarItemIds[index];
+            var count = GetInventoryItemCount(itemId);
+            var hasItem = itemId is not null && count > 0;
             var visual = hotbarSlotVisuals[index];
             visual.Background.color = index == selectedHotbarSlot
                 ? new Color(0.49f, 0.39f, 0.19f)
-                : slot is null ? new Color(0.18f, 0.21f, 0.24f) : new Color(0.25f, 0.29f, 0.33f);
-            visual.Item.text = slot is null ? string.Empty : ItemDefinitions[slot.ItemId].Abbreviation;
-            visual.Item.color = slot is null ? Color.white : ItemDefinitions[slot.ItemId].Color;
-            visual.Count.text = slot is null || slot.Count == 1 ? string.Empty : slot.Count.ToString();
+                : hasItem ? new Color(0.25f, 0.29f, 0.33f) : new Color(0.18f, 0.21f, 0.24f);
+            visual.Item.text = hasItem ? ItemDefinitions[itemId!].Abbreviation : string.Empty;
+            visual.Item.color = hasItem ? ItemDefinitions[itemId!].Color : Color.white;
+            visual.Count.text = !hasItem || count == 1 ? string.Empty : count.ToString();
         }
+    }
+
+    private int GetInventoryItemCount(string? itemId)
+    {
+        if (itemId is null)
+        {
+            return 0;
+        }
+
+        var count = cursorStack is not null && cursorStack.ItemId == itemId ? cursorStack.Count : 0;
+        foreach (var slot in slots)
+        {
+            if (slot is not null && slot.ItemId == itemId)
+            {
+                count += slot.Count;
+            }
+        }
+
+        return count;
+    }
+
+    private static string GetHotbarKey(int index)
+    {
+        return index == HotbarSlotCount - 1 ? "0" : (index + 1).ToString();
     }
 
     private static GameObject CreateImage(string name, Transform parent, Color color)
@@ -746,6 +958,19 @@ public sealed class PlayerInventory : NetworkBehaviour
         public string ItemId { get; set; } = string.Empty;
         public int Count { get; set; }
         public int CursorSourceSlot { get; set; } = -1;
+    }
+
+    [Table("PlayerHotbarBinding")]
+    private sealed class PlayerHotbarBinding
+    {
+        [PrimaryKey, AutoIncrement]
+        public int Id { get; set; }
+
+        [Indexed]
+        public string PlayerId { get; set; } = string.Empty;
+
+        public int SlotIndex { get; set; }
+        public string ItemId { get; set; } = string.Empty;
     }
 
     [Table("PlayerInventoryProfile")]

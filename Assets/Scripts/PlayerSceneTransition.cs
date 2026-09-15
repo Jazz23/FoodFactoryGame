@@ -29,6 +29,14 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
     public bool IsTransitioning => isTransitioning;
     public bool IsFactoryBuildContextActive => factoryBuilder is not null && factoryBuilder.IsBuildContextActive;
 
+    public void EquipHotbarItem(string? itemId)
+    {
+        if (factoryBuilder is not null)
+        {
+            factoryBuilder.EquipHotbarItem(itemId);
+        }
+    }
+
     private void Awake()
     {
         movement = GetComponent<Movement>();

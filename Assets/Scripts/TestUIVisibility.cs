@@ -1,4 +1,4 @@
-// Owns F2 visibility for developer tools while leaving the shared launcher and build bar available.
+// Owns F2 visibility for the expanded developer tools while leaving their shared control area available.
 using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -10,7 +10,7 @@ public sealed class TestUIVisibility : MonoBehaviour
 
     private InputAction toggle = null!;
 
-    public static Rect ButtonRect => new(Screen.width - 164f, 8f, 148f, 44f);
+    public static Rect ButtonRect => new(16f, 16f, 428f, 88f);
 
     public static void SetVisible(bool visible)
     {

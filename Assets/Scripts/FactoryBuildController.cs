@@ -24,7 +24,7 @@ public sealed class FactoryBuildController : MonoBehaviour
     private uint hoveredId;
     private uint recoveryId;
     private string status = "Place sources, belts, and storage inside. Place shipping and receiving docks outside.";
-    private readonly string[] labels = { "1 Source", "2 Conveyor", "3 Storage", "4 Shipping dock", "5 Receiving dock" };
+    private readonly string[] labels = { "Source", "Conveyor", "Storage", "Shipping dock", "Receiving dock" };
     private readonly string[] arrows = { "East >", "South v", "West <", "North ^" };
     private readonly int[] conveyorDefinitionIndices = { 0, 3, 2, 1 };
     private string Definition => selection == 0 ? FactoryEntityDefinitions.TestMachineDefinitionId
@@ -96,6 +96,28 @@ public sealed class FactoryBuildController : MonoBehaviour
         building = true;
     }
 
+    public void EquipHotbarItem(string? itemId)
+    {
+        if (!IsBuildContextActive)
+        {
+            return;
+        }
+
+        if (itemId is null)
+        {
+            building = false;
+            return;
+        }
+
+        if (itemId == "conveyor-belt")
+        {
+            SelectEquipment(1);
+            return;
+        }
+
+        building = false;
+    }
+
     public void RotateBuilding()
     {
         if (IsBuildContextActive)
@@ -159,8 +181,6 @@ public sealed class FactoryBuildController : MonoBehaviour
             return;
         if (actions["Toggle"].WasPressedThisFrame()) building = !building;
         if (actions["Cancel"].WasPressedThisFrame()) building = false;
-        for (var index = 0; index < labels.Length; index++)
-            if (actions[$"Select{index + 1}"].WasPressedThisFrame()) { selection = index; building = true; }
         if (actions["Rotate"].WasPressedThisFrame()) direction = (direction + 1) % 4;
         preview.SetActive(building);
         if (!building) return;

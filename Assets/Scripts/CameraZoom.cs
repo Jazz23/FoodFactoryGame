@@ -11,26 +11,35 @@ public sealed class CameraZoom : MonoBehaviour
 
     private Camera _sceneCamera;
     private InputAction _scrollWheel;
+    private InputAction _pointerPosition;
 
     private void Awake()
     {
         _sceneCamera = GetComponent<Camera>();
-        _scrollWheel = InputSystem.actions["ScrollWheel"];
+        _scrollWheel = InputSystem.actions.FindAction("UI/ScrollWheel", true);
+        _pointerPosition = InputSystem.actions.FindAction("UI/Point", true).Clone();
     }
 
     private void OnEnable()
     {
         _scrollWheel.Enable();
+        _pointerPosition.Enable();
     }
 
     private void OnDisable()
     {
         _scrollWheel.Disable();
+        _pointerPosition.Disable();
     }
 
     private void Update()
     {
         if (PlayerInventory.LocalOwner is not null && PlayerInventory.LocalOwner.IsOpen)
+        {
+            return;
+        }
+
+        if (TestToolsShell.IsPointerOverExpandedCard(_pointerPosition.ReadValue<Vector2>()))
         {
             return;
         }

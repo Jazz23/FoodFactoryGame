@@ -3,8 +3,8 @@
 ## Runtime Ownership
 
 - `GameSceneManager` adapts FishNet scene callbacks and portal/elevator requests to the transition service.
-- `PlayerInventory` owns the local player's persisted 80-slot inventory, Tab-opened grid UI, and 10-slot hotbar; the hotbar mirrors inventory slots 1–10 and exposes the selected item/count for gameplay consumers.
-- `CameraFollow` follows the local player and applies a scene grid's default orthographic zoom only when entering that grid; `CameraZoom` owns scroll-wheel zoom for the bootstrap camera and ignores scroll while the inventory is open.
+- `PlayerInventory` owns the local player's persisted 80-slot inventory, Tab-opened grid UI, and 10-slot hotbar; every inventory slot is ordinary storage, while persistent hotbar shortcuts refer to item types and expose the selected item/count for gameplay consumers.
+- `CameraFollow` follows the local player and applies a scene grid's default orthographic zoom only when entering that grid; `CameraZoom` owns scroll-wheel zoom for the bootstrap camera and ignores scroll while the inventory or expanded build/test tools cards have pointer focus.
 - `GameSceneManager` resets OutsideTest load and reconciliation state at each server start/stop so disabled Enter Play Mode reload options cannot retain stale scene topology.
 - `FloorTransitionCoordinator` owns transition phases, sequence validation, pending floor loads, loaded-floor reuse, return-floor state, and unload guards.
 - `NAIStateManager` owns the authoritative factory snapshot, simulation, and runtime persistence coordination.
