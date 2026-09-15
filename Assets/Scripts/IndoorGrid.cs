@@ -7,6 +7,13 @@ using UnityEngine.SceneManagement;
 public sealed class IndoorGrid : MonoBehaviour
 {
     private const string GeneratedRootName = "Generated Grid Lines";
+    private static bool? requestedTestLinesVisibility;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetTestLinesVisibility()
+    {
+        requestedTestLinesVisibility = null;
+    }
 
     [SerializeField] private Vector2Int size = new(2, 2);
     [SerializeField, Min(0.005f)] private float lineWidth = 0.025f;
@@ -21,6 +28,11 @@ public sealed class IndoorGrid : MonoBehaviour
 
     private void Awake()
     {
+        if (requestedTestLinesVisibility.HasValue)
+        {
+            testLinesVisible = requestedTestLinesVisibility.Value;
+        }
+
         Rebuild();
     }
 
@@ -60,6 +72,32 @@ public sealed class IndoorGrid : MonoBehaviour
         if (generatedRoot is not null && generatedRoot)
         {
             generatedRoot.gameObject.SetActive(visible);
+        }
+    }
+
+    public static bool AreAllTestLinesVisible()
+    {
+        var grids = FindObjectsByType<IndoorGrid>(FindObjectsInactive.Include);
+        var foundGrid = false;
+        foreach (var grid in grids)
+        {
+            foundGrid = true;
+            if (!grid.TestLinesVisible)
+            {
+                return false;
+            }
+        }
+
+        return foundGrid ? true : requestedTestLinesVisibility ?? true;
+    }
+
+    public static void SetAllTestLinesVisible(bool visible)
+    {
+        requestedTestLinesVisibility = visible;
+        var grids = FindObjectsByType<IndoorGrid>(FindObjectsInactive.Include);
+        foreach (var grid in grids)
+        {
+            grid.SetTestLinesVisible(visible);
         }
     }
 

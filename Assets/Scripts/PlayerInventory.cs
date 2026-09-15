@@ -23,6 +23,8 @@ public sealed class PlayerInventory : NetworkBehaviour
         { "copper-plate", new("Copper Plate", "Cu", 100, new Color(0.88f, 0.48f, 0.25f)) },
         { "stone-brick", new("Stone Brick", "BR", 100, new Color(0.62f, 0.58f, 0.52f)) },
         { "conveyor-belt", new("Conveyor Belt", "CV", 100, new Color(0.79f, 0.68f, 0.28f)) },
+        { FactoryEntityDefinitions.ElevatorTopItemId, new("Elevator Top", "ET", 20, new Color(0.75f, 0.5f, 1f)) },
+        { FactoryEntityDefinitions.ElevatorBottomItemId, new("Elevator Bottom", "EB", 20, new Color(1f, 0.7f, 0.3f)) },
         { "wall", new("Wall", "WL", 50, new Color(0.52f, 0.56f, 0.61f)) },
         { "factory-building", new("Factory Building", "FB", 20, new Color(0.36f, 0.72f, 0.59f)) }
     };
@@ -517,6 +519,11 @@ public sealed class PlayerInventory : NetworkBehaviour
             shouldSave = true;
         }
 
+        if (EnsureStarterElevatorItems())
+        {
+            shouldSave = true;
+        }
+
         if (shouldSave)
         {
             SaveInventory();
@@ -538,6 +545,34 @@ public sealed class PlayerInventory : NetworkBehaviour
             }
 
             slots[index] = new InventoryStack("conveyor-belt", 100);
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool EnsureStarterElevatorItems()
+    {
+        var addedTop = EnsureStarterItem(FactoryEntityDefinitions.ElevatorTopItemId);
+        var addedBottom = EnsureStarterItem(FactoryEntityDefinitions.ElevatorBottomItemId);
+        return addedTop || addedBottom;
+    }
+
+    private bool EnsureStarterItem(string itemId)
+    {
+        if (GetInventoryItemCount(itemId) > 0)
+        {
+            return false;
+        }
+
+        for (var index = 0; index < SlotCount; index++)
+        {
+            if (slots[index] is not null)
+            {
+                continue;
+            }
+
+            slots[index] = new InventoryStack(itemId, 1);
             return true;
         }
 

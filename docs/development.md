@@ -50,6 +50,7 @@ Zero matched tests, compile failures, runner initialization failures, and timeou
 ## Test Boundaries
 
 - Domain tests call application commands directly and use isolated `FactoryTestWorld` state.
+- `FactoryElevatorTransferTests` verifies paired-floor elevator buffering and item conservation in EditMode without opening or writing a save database.
 - Scene/network tests cover ownership, transitions, sharing, isolation, and disconnect behavior.
 - UI tests deliberately verify binding, readiness, and displayed state.
 - PlayMode fixtures own temporary database paths, network lifecycle, static/UI reset, stable identities, and cleanup. `FactoryTestWorld` provisions the two-floor building-2 transition fixture in the isolated runtime world instead of depending on authored OutsideTest building IDs.

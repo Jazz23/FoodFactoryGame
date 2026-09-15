@@ -126,10 +126,15 @@ public sealed class FactoryEntityRecord : IFactoryItemTransferInventory
     public bool IsShippingDock => FactoryEntityDefinitions.Get(definitionId).IsShippingDock;
     public bool IsReceivingDock => FactoryEntityDefinitions.Get(definitionId).IsReceivingDock;
     public bool IsDock => FactoryEntityDefinitions.Get(definitionId).IsDock;
+    public bool IsElevator => FactoryEntityDefinitions.Get(definitionId).IsElevator;
     public bool IsTerminal => FactoryEntityDefinitions.Get(definitionId).IsTerminal;
     public string SuppliedItemId => FactoryEntityDefinitions.Get(definitionId).SuppliedItemId;
-    public int InventoryCount => IsTerminal || IsStorage ? outputCount : 0;
-    public int InventoryCapacity => IsTerminal || IsStorage ? OutputCapacity : 0;
+    public int InventoryCount => IsElevator
+        ? inputCount + outputCount
+        : IsTerminal || IsStorage ? outputCount : 0;
+    public int InventoryCapacity => IsElevator
+        ? InputCapacity + OutputCapacity
+        : IsTerminal || IsStorage ? OutputCapacity : 0;
     public bool IsProducingMachine => IsProducer;
 
     public static FactoryEntityRecord CreateDefault(
@@ -261,7 +266,7 @@ public sealed class FactoryEntityRecord : IFactoryItemTransferInventory
             conveyorQueue.Advance(deltaTime);
             return;
         }
-        if (IsStorage || IsDock)
+        if (IsStorage || IsDock || IsElevator)
         {
             return;
         }
@@ -337,14 +342,14 @@ public sealed class FactoryEntityRecord : IFactoryItemTransferInventory
             return conveyorQueue.HasEntranceSpace ? 1 : 0;
         }
 
-        return IsProcessor
+        return IsProcessor || IsElevator
             ? InputCapacity - inputCount
             : OutputCapacity - outputCount;
     }
 
     public int AddInput(int quantity)
     {
-        if (!IsProcessor || quantity <= 0)
+        if ((!IsProcessor && !IsElevator) || quantity <= 0)
         {
             return 0;
         }
@@ -369,7 +374,7 @@ public sealed class FactoryEntityRecord : IFactoryItemTransferInventory
             else if (quantity > InputCount) conveyorQueue.Accept(quantity - InputCount);
             return;
         }
-        inputCount = IsProcessor
+        inputCount = IsProcessor || IsElevator
             ? Mathf.Clamp(quantity, 0, InputCapacity)
             : 0;
     }
@@ -381,7 +386,7 @@ public sealed class FactoryEntityRecord : IFactoryItemTransferInventory
             return 0;
         }
 
-        return IsProcessor ? AddInput(quantity) : AddOutput(quantity);
+        return IsProcessor || IsElevator ? AddInput(quantity) : AddOutput(quantity);
     }
 
     public bool TryAcceptItem(string itemId, int quantity, out int accepted)
@@ -418,7 +423,7 @@ public sealed class FactoryEntityRecord : IFactoryItemTransferInventory
             return false;
         }
 
-        if (IsProcessor)
+        if (IsProcessor || IsElevator)
         {
             return TryRemoveInput(quantity, out removed);
         }
@@ -435,13 +440,29 @@ public sealed class FactoryEntityRecord : IFactoryItemTransferInventory
             removed = quantity;
             return true;
         }
-        if (!IsProcessor || quantity <= 0 || inputCount < quantity)
+        if ((!IsProcessor && !IsElevator) || quantity <= 0 || inputCount < quantity)
         {
             return false;
         }
 
         inputCount -= quantity;
         removed = quantity;
+        return true;
+    }
+
+    public bool TryTransferElevatorInputTo(FactoryEntityRecord destination)
+    {
+        if (!IsElevator
+            || destination is null
+            || !destination.IsElevator
+            || inputCount <= 0
+            || destination.outputCount >= OutputCapacity)
+        {
+            return false;
+        }
+
+        inputCount--;
+        destination.outputCount++;
         return true;
     }
 

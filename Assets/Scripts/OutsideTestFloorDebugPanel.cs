@@ -35,7 +35,10 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
     private Button addStorageButton = null!;
     private Button addProcessorButton = null!;
     private Button addPackedStorageButton = null!;
+    private Button addElevatorTopButton = null!;
+    private Button addElevatorBottomButton = null!;
     private Button removeMachineButton = null!;
+    private Button removeAllMachinesButton = null!;
     private Button drainOutputButton = null!;
     private Button nextMachineButton = null!;
     private Button connectButton = null!;
@@ -172,10 +175,41 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
         owner.RequestAddCurrentFloorPackedStorage(new Vector2(x, y));
     }
 
+    private void AddElevatorTopClicked()
+    {
+        AddElevatorClicked(FactoryEntityDefinitions.ElevatorTopDefinitionId);
+    }
+
+    private void AddElevatorBottomClicked()
+    {
+        AddElevatorClicked(FactoryEntityDefinitions.ElevatorBottomDefinitionId);
+    }
+
+    private void AddElevatorClicked(string definitionId)
+    {
+        if (!float.TryParse(machineXInput.text, NumberStyles.Float, CultureInfo.InvariantCulture, out var x)
+            || !float.TryParse(machineYInput.text, NumberStyles.Float, CultureInfo.InvariantCulture, out var y))
+        {
+            machineStatusText.text = "X and Y must be finite numbers.";
+            return;
+        }
+
+        machineStatusText.text = $"Adding {definitionId}...";
+        owner.RequestPlaceEquipment(definitionId, new Vector2(x, y));
+    }
+
     private void RemoveMachineClicked()
     {
         machineStatusText.text = "Removing machine...";
         owner.RequestRemoveCurrentFloorMachine(selectedMachineId);
+    }
+
+    private void RemoveAllMachinesClicked()
+    {
+        if (owner is not null && owner)
+        {
+            owner.RequestRemoveAllCurrentFloorEntities();
+        }
     }
 
     private void DrainOutputClicked()
@@ -290,6 +324,11 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
                         ? $"INVENTORY: {entity.InventoryCount}/{entity.InventoryCapacity} "
                             + $"{entity.AcceptedItemId}\n"
                             + "DOCK: receives and supplies test-product"
+                        : entity.IsElevator
+                        ? $"INPUT: {entity.InputCount}/{FactoryEntityRecord.InputCapacity} "
+                            + $"{entity.AcceptedItemId}\n"
+                            + $"OUTPUT: {entity.OutputCount}/{FactoryEntityRecord.OutputCapacity} "
+                            + $"{entity.SuppliedItemId}\nELEVATOR: transfers to its paired floor"
                         : entity.IsProcessor
                         ? $"INPUT: {entity.InputCount}/{FactoryEntityRecord.InputCapacity} "
                             + $"{entity.AcceptedItemId}\n"
@@ -337,8 +376,11 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
         addStorageButton.interactable = canEdit;
         addProcessorButton.interactable = canEdit;
         addPackedStorageButton.interactable = canEdit;
+        addElevatorTopButton.interactable = canEdit;
+        addElevatorBottomButton.interactable = canEdit;
         nextMachineButton.interactable = canEdit && count > 0;
         removeMachineButton.interactable = canEdit && selected;
+        removeAllMachinesButton.interactable = canEdit && count > 0;
         drainOutputButton.interactable = canEdit && selected;
         RefreshConnectionControls(
             canEdit,
@@ -1289,19 +1331,26 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
             12f, 80f, 190f, 32f, AddProcessorClicked);
         addPackedStorageButton = CreateButton("Add Packed Storage", "ADD PACKED STORAGE", machineContent,
             208f, 80f, 190f, 32f, AddPackedStorageClicked);
+        addElevatorTopButton = CreateButton("Add Elevator Top", "ADD ELEVATOR TOP", machineContent,
+            12f, 118f, 190f, 32f, AddElevatorTopClicked);
+        addElevatorBottomButton = CreateButton("Add Elevator Bottom", "ADD ELEVATOR BOTTOM", machineContent,
+            208f, 118f, 190f, 32f, AddElevatorBottomClicked);
         machineSelectionText = CreateText("Machine Selection", machineContent, string.Empty, 13,
             TextAnchor.MiddleLeft, TestToolsShell.TextPrimary);
-        SetTopRect(machineSelectionText.rectTransform, 12f, 120f, 396f, 32f);
+        SetTopRect(machineSelectionText.rectTransform, 12f, 158f, 396f, 32f);
         machineDetailsText = CreateText("Machine Details", machineContent, string.Empty, 12,
             TextAnchor.UpperLeft, TestToolsShell.TextPrimary);
-        SetTopRect(machineDetailsText.rectTransform, 12f, 156f, 396f, 52f);
+        SetTopRect(machineDetailsText.rectTransform, 12f, 194f, 396f, 52f);
         nextMachineButton = CreateButton("Next Machine", "SELECT NEXT", machineContent,
-            12f, 216f, 190f, 32f, NextMachineClicked);
+            12f, 252f, 190f, 32f, NextMachineClicked);
         removeMachineButton = CreateButton("Remove Machine", "REMOVE SELECTED", machineContent,
-            208f, 216f, 190f, 32f, RemoveMachineClicked);
+            208f, 252f, 190f, 32f, RemoveMachineClicked);
         removeMachineButton.GetComponent<Image>().color = TestToolsShell.Destructive;
         drainOutputButton = CreateButton("Drain Output", "DRAIN OUTPUT", machineContent,
-            12f, 254f, 396f, 32f, DrainOutputClicked);
+            12f, 290f, 190f, 32f, DrainOutputClicked);
+        removeAllMachinesButton = CreateButton("Remove All Machines", "REMOVE ALL", machineContent,
+            208f, 290f, 190f, 32f, RemoveAllMachinesClicked);
+        removeAllMachinesButton.GetComponent<Image>().color = TestToolsShell.Destructive;
         connectionText = CreateText("Connection Text", machineContent, "CONNECTION: select an entity", 12,
             TextAnchor.UpperLeft, TestToolsShell.TextSecondary);
         connectionsToggle = CreateButton(

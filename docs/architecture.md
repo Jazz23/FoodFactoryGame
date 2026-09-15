@@ -26,6 +26,10 @@
 - `Virtual3DSize` uses the player's transform origin as the stable bottom-pivot foot anchor. A shallow horizontal capsule extends upward from that anchor with independent world-space width and ground depth (player prefab: 0.6 × 0.3); animation bounds never move the collider. Transitions, interior containment, and depth sorting consume that same anchor.
 - `SceneGrid.CellSize` scales world-space presentation only. `IndoorGrid`, `InsideFactoryVisuals`, and factory entity views continue to use saved logical cell coordinates and configured building sizes.
 - `IndoorGrid` owns the generated interior test-line presentation and its `FactoryBuild/ToggleTestLines` Input System action; hiding the lines only deactivates their derived renderers and does not affect the boundary collider.
+- `IndoorGrid.SetAllTestLinesVisible` applies the Test Tools toggle to every loaded floor and carries the chosen visibility into subsequently loaded interiors.
+- `TestToolsShell` owns the Test Tools and expanded Build Tools runtime controls; `FactoryBuildController` owns equipment selection, elevator connection previews, and expanded-build right-click removal.
+- `FactoryElevatorTransfer` pairs persisted elevator-bottom/top entities by building, adjacent floor indices, and matching logical cell. It moves elevator input buffers to the paired floor's output buffer so existing adjacent conveyor handoffs carry items onward in either direction.
+- `PlayerInventory` grants one elevator top and bottom as starter equipment when each item is missing, and the hotbar selects those parts through the existing build controller.
 - `FactoryTruckMarkerView` owns truck marker presentation, including switching a marker to a wireframe cube when its projected footprint is behind a configured building occlusion surface.
 
 ## Canonical Assets

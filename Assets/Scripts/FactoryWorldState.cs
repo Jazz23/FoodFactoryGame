@@ -390,7 +390,7 @@ public sealed class FactoryWorldState
             entityId,
             safeDefinitionId,
             position,
-            definition.IsStorage ? 0f : 1f,
+            definition.IsStorage || definition.IsElevator ? 0f : 1f,
             0f,
             0,
             0,
@@ -1185,6 +1185,8 @@ public sealed class FactoryWorldState
             FactoryConveyor.TransferAdjacent(
                 state.GetUsableEntities(GetInteriorSize(state.BuildingInstanceId)));
         }
+
+        FactoryElevatorTransfer.TransferPairedElevators(floorStates.Values);
 
         AdvanceTruckRoutes(deltaTime);
     }

@@ -178,6 +178,12 @@ public sealed class OutsideTestFloorPresentation : MonoBehaviour
                     + $"Inventory {entity.InventoryCount}/{entity.InventoryCapacity} "
                     + $"{entity.AcceptedItemId}\n"
                     + "Receives + supplies"
+                : entity.IsElevator
+                ? $"{entity.DefinitionId}\n"
+                    + $"Input {entity.InputCount}/{FactoryEntityRecord.InputCapacity} "
+                    + $"{entity.AcceptedItemId}\n"
+                    + $"Output {entity.OutputCount}/{FactoryEntityRecord.OutputCapacity} "
+                    + $"{entity.SuppliedItemId}\nElevator"
                 : entity.IsProcessor
                 ? $"{entity.DefinitionId}\n"
                     + $"Input {entity.InputCount}/{FactoryEntityRecord.InputCapacity} "
@@ -270,6 +276,8 @@ public sealed class OutsideTestFloorPresentation : MonoBehaviour
             "test-machine-ground" => new Color(0.95f, 0.58f, 0.2f, 1f),
             "test-machine-upper" => new Color(0.95f, 0.35f, 0.72f, 1f),
             FactoryEntityRecord.StorageDefinitionId => new Color(0.25f, 0.75f, 0.95f, 1f),
+            FactoryEntityDefinitions.ElevatorTopDefinitionId => new Color(0.75f, 0.5f, 1f, 1f),
+            FactoryEntityDefinitions.ElevatorBottomDefinitionId => new Color(1f, 0.7f, 0.3f, 1f),
             FactoryEntityDefinitions.ShippingDockDefinitionId => new Color(0.25f, 0.95f, 0.55f, 1f),
             FactoryEntityDefinitions.ReceivingDockDefinitionId => new Color(0.35f, 0.65f, 1f, 1f),
             _ => new Color(0.95f, 0.78f, 0.25f, 1f)

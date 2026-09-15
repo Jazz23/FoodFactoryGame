@@ -10,7 +10,8 @@ public static class FactoryConveyor
     public static readonly string[] Definitions = { "conveyor-east", "conveyor-north", "conveyor-west", "conveyor-south" };
 
     public static bool IsConveyor(string definitionId) => System.Array.IndexOf(Definitions, definitionId) >= 0;
-    public static bool IsPlaceable(string definitionId) => IsConveyor(definitionId)
+    public static bool IsPlaceable(string definitionId) => FactoryEntityDefinitions.IsElevator(definitionId)
+        || IsConveyor(definitionId)
         || definitionId == FactoryEntityDefinitions.TestMachineDefinitionId
         || definitionId == FactoryEntityDefinitions.TestStorageDefinitionId
         || definitionId == FactoryEntityDefinitions.ShippingDockDefinitionId

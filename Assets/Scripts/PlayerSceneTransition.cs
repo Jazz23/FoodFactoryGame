@@ -371,6 +371,22 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         RequestRemoveCurrentFloorMachine(entityId);
     }
 
+    public void RequestRemoveAllCurrentFloorEntities()
+    {
+        if (IsOwner)
+        {
+            RequestRemoveAllCurrentFloorEntitiesServerRpc();
+        }
+    }
+
+    public void RequestRemoveExteriorDock(uint buildingInstanceId, uint entityId)
+    {
+        if (IsOwner)
+        {
+            RequestRemoveExteriorDockServerRpc(buildingInstanceId, entityId);
+        }
+    }
+
     public void RequestDrainCurrentFloorMachine(uint entityId)
     {
         if (IsOwner)
@@ -486,6 +502,29 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
     {
         var removed = GameSceneManager.Instance.TryRemoveCurrentFloorMachine(this, entityId, out var error);
         TargetReceiveMachineEditResult(Owner, removed ? $"Removed machine {entityId}." : error);
+    }
+
+    [ServerRpc]
+    private void RequestRemoveAllCurrentFloorEntitiesServerRpc()
+    {
+        var removed = GameSceneManager.Instance.TryRemoveAllCurrentFloorMachines(
+            this,
+            out var removedCount,
+            out var error);
+        TargetReceiveMachineEditResult(
+            Owner,
+            removed ? $"Removed {removedCount} machine(s) from this floor." : error);
+    }
+
+    [ServerRpc]
+    private void RequestRemoveExteriorDockServerRpc(uint buildingInstanceId, uint entityId)
+    {
+        var removed = GameSceneManager.Instance.TryRemoveExteriorDock(
+            this,
+            buildingInstanceId,
+            entityId,
+            out var error);
+        TargetReceiveMachineEditResult(Owner, removed ? $"Removed dock {entityId}." : error);
     }
 
     [ServerRpc]

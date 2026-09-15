@@ -31,16 +31,17 @@ public readonly struct FactoryEntityDefinition
     public bool IsShippingDock => DefinitionId == FactoryEntityDefinitions.ShippingDockDefinitionId;
     public bool IsReceivingDock => DefinitionId == FactoryEntityDefinitions.ReceivingDockDefinitionId;
     public bool IsDock => IsShippingDock || IsReceivingDock;
+    public bool IsElevator => FactoryEntityDefinitions.IsElevator(DefinitionId);
     public bool IsSendingTerminal => IsShippingDock;
     public bool IsReceivingTerminal => IsReceivingDock;
     public bool IsTerminal => IsDock;
-    public bool IsSupplier => IsProducer || IsDock;
+    public bool IsSupplier => IsProducer || IsDock || IsElevator;
     public string SuppliedItemId => IsProducer
         ? ProducedItemId
-        : IsDock
+        : IsDock || IsElevator
             ? AcceptedItemId
             : string.Empty;
-    public bool IsStorage => IsReceiver && !IsProducer && !IsProcessor && !IsDock;
+    public bool IsStorage => IsReceiver && !IsProducer && !IsProcessor && !IsDock && !IsElevator;
 }
 
 public static class FactoryEntityDefinitions
@@ -51,6 +52,10 @@ public static class FactoryEntityDefinitions
     public const string PackedStorageDefinitionId = "packed-storage";
     public const string ShippingDockDefinitionId = "shipping-dock";
     public const string ReceivingDockDefinitionId = "receiving-dock";
+    public const string ElevatorTopDefinitionId = "elevator-top";
+    public const string ElevatorBottomDefinitionId = "elevator-bottom";
+    public const string ElevatorTopItemId = ElevatorTopDefinitionId;
+    public const string ElevatorBottomItemId = ElevatorBottomDefinitionId;
     public const string SendingTerminalDefinitionId = ShippingDockDefinitionId;
     public const string ReceivingTerminalDefinitionId = ReceivingDockDefinitionId;
     public const string TestProductId = "test-product";
@@ -96,6 +101,17 @@ public static class FactoryEntityDefinitions
                 0f);
         }
 
+        if (IsElevator(definitionId))
+        {
+            return new FactoryEntityDefinition(
+                definitionId,
+                TestProductId,
+                string.Empty,
+                0,
+                0,
+                0f);
+        }
+
         if (definitionId == ShippingDockDefinitionId
             || definitionId == ReceivingDockDefinitionId)
         {
@@ -128,5 +144,11 @@ public static class FactoryEntityDefinitions
             "receiving-terminal" => ReceivingDockDefinitionId,
             _ => definitionId
         };
+    }
+
+    public static bool IsElevator(string definitionId)
+    {
+        return definitionId == ElevatorTopDefinitionId
+            || definitionId == ElevatorBottomDefinitionId;
     }
 }

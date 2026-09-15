@@ -51,6 +51,7 @@ public sealed class TestToolsShell : MonoBehaviour
     private Button buildButton = null!;
     private Button rotateButton = null!;
     private Button recoveryToggle = null!;
+    private Button testLinesToggle = null!;
     private Text buildHintText = null!;
     private Text buildStatusText = null!;
     private Text recoveryTitleText = null!;
@@ -83,6 +84,7 @@ public sealed class TestToolsShell : MonoBehaviour
     public GameObject PersistentCanvasObject => persistentCanvasObject;
     public TestToolsTab SelectedTab => selectedTab;
     public bool IsExpanded => expanded;
+    public bool IsBuildToolsExpanded => buildExpanded && TestUIVisibility.Visible;
     public bool IsFloorToolsVisible => expanded
         && selectedTab == TestToolsTab.Floors
         && TestUIVisibility.Visible;
@@ -133,6 +135,7 @@ public sealed class TestToolsShell : MonoBehaviour
             nextNetworkRefresh = Time.unscaledTime + 0.1f;
             RefreshNetworkUi();
             RefreshBuildUi();
+            RefreshTestLinesUi();
         }
 
         if (Time.unscaledTime >= nextHudScan)
@@ -342,7 +345,16 @@ public sealed class TestToolsShell : MonoBehaviour
             18,
             TextAnchor.MiddleLeft,
             TextPrimary);
-        SetTopRect(title.rectTransform, 16f, 10f, 250f, 32f);
+        SetTopRect(title.rectTransform, 16f, 10f, 180f, 32f);
+        testLinesToggle = CreateButton(
+            "Toggle All Test Lines",
+            "LINES: ON",
+            toolsPanel.transform,
+            206f,
+            12f,
+            116f,
+            32f,
+            ToggleTestLines);
 
         selectedTabText = CreateText(
             "Selected Tab",
@@ -442,7 +454,10 @@ public sealed class TestToolsShell : MonoBehaviour
         buildButton = CreateButton("Build Toggle", "B: BUILD", buildPanel.transform, 72f, 45f, 94f, 32f,
             ToggleBuild);
         buildButton.GetComponent<Image>().color = TealMuted;
-        var labels = new[] { "SOURCE", "BELT", "STORAGE", "SHIP DOCK", "RECEIVE DOCK" };
+        var labels = new[]
+        {
+            "SOURCE", "BELT", "STORAGE", "SHIP DOCK", "RECEIVE DOCK", "ELEVATOR TOP", "ELEVATOR BOTTOM"
+        };
         for (var index = 0; index < labels.Length; index++)
         {
             var capturedIndex = index;
@@ -450,16 +465,16 @@ public sealed class TestToolsShell : MonoBehaviour
                 $"Build {labels[index]}",
                 labels[index],
                 buildPanel.transform,
-                172f + index * 93f,
+                172f + index * 96f,
                 45f,
-                88f,
+                92f,
                 32f,
                 () => SelectBuildEquipment(capturedIndex));
             buildEquipmentButtons.Add(button);
             buildEquipmentLabels.Add(button.GetComponentInChildren<Text>());
         }
 
-        rotateButton = CreateButton("Build Rotation", "R: EAST", buildPanel.transform, 642f, 45f, 96f, 32f,
+        rotateButton = CreateButton("Build Rotation", "R: EAST", buildPanel.transform, 846f, 45f, 96f, 32f,
             RotateBuild);
         rotateButton.GetComponent<Image>().color = TealMuted;
         recoveryToggle = CreateButton("Overflow Recovery", "RECOVER OVERFLOW", buildPanel.transform,
@@ -882,6 +897,21 @@ public sealed class TestToolsShell : MonoBehaviour
             recoveryPanel.SetActive(false);
             ResizeBuildPanel();
         }
+    }
+
+    private void RefreshTestLinesUi()
+    {
+        if (testLinesToggle is not null && testLinesToggle)
+        {
+            testLinesToggle.GetComponentInChildren<Text>().text =
+                IndoorGrid.AreAllTestLinesVisible() ? "LINES: ON" : "LINES: OFF";
+        }
+    }
+
+    private void ToggleTestLines()
+    {
+        IndoorGrid.SetAllTestLinesVisible(!IndoorGrid.AreAllTestLinesVisible());
+        RefreshTestLinesUi();
     }
 
     private void RefreshRecoveryUi()

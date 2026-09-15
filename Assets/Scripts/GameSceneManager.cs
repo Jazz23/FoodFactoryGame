@@ -548,6 +548,77 @@ public sealed class GameSceneManager : MonoBehaviour
         return true;
     }
 
+    public bool TryRemoveAllCurrentFloorMachines(
+        PlayerSceneTransition player,
+        out int removedCount,
+        out string error)
+    {
+        removedCount = 0;
+        error = "Only the local host inside a floor can edit machines; wait for travel to finish.";
+        if (!CanEditCurrentFloorMachines(player)
+            || !player.TryGetCurrentOutsideTestFloor(out var buildingId, out var floorIndex)
+            || !stateManager.TryGetFloorState(buildingId, floorIndex, out var floor))
+        {
+            return false;
+        }
+
+        var entityIds = new List<uint>();
+        foreach (var entity in floor.Entities)
+        {
+            entityIds.Add(entity.EntityId);
+        }
+
+        if (entityIds.Count == 0)
+        {
+            error = "There are no machines on this floor.";
+            return false;
+        }
+
+        foreach (var entityId in entityIds)
+        {
+            if (stateManager.TryRemoveTestMachine(buildingId, floorIndex, entityId, out _))
+            {
+                removedCount++;
+            }
+        }
+
+        BroadcastOutsideTestFloorState(buildingId, floorIndex);
+        outsideTestStateNeedsSave = true;
+        error = string.Empty;
+        return removedCount > 0;
+    }
+
+    public bool TryRemoveExteriorDock(
+        PlayerSceneTransition player,
+        uint buildingInstanceId,
+        uint entityId,
+        out string error)
+    {
+        error = "Only the host outside the factory can remove an exterior dock.";
+        if (!CanManageTruckRoutes(player) || player.gameObject.scene.name != "OutsideTest")
+        {
+            return false;
+        }
+
+        EnsureOutsideTestStateLoaded();
+        if (!stateManager.TryGetFloorState(buildingInstanceId, 0, out var floor)
+            || !floor.TryGetEntity(entityId, out var entity)
+            || !entity.IsDock)
+        {
+            error = "The selected exterior dock no longer exists.";
+            return false;
+        }
+
+        if (!stateManager.TryRemoveTestMachine(buildingInstanceId, 0, entityId, out error))
+        {
+            return false;
+        }
+
+        BroadcastOutsideTestFloorState(buildingInstanceId, 0);
+        outsideTestStateNeedsSave = true;
+        return true;
+    }
+
     public bool TryRemoveCurrentFloorEntity(
         PlayerSceneTransition player,
         uint entityId,
