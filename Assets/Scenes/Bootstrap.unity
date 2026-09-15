@@ -132,6 +132,7 @@ GameObject:
   - component: {fileID: 1754204358}
   - component: {fileID: 1754204360}
   - component: {fileID: 1754204362}
+  - component: {fileID: 1754204365}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -300,6 +301,21 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 0570b6f7f713dc44a90463654bbcd8d0, type: 3}
+--- !u!114 &1754204365
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1754204357}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b6b07676e9fbb3842a538c282326062c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: FoodFactoryGame.Runtime::CameraZoom
+  zoomSpeed: 100
+  minOrthographicSize: 2
+  maxOrthographicSize: 20
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

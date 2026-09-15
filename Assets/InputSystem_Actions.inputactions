@@ -1280,6 +1280,133 @@
             ]
         },
         {
+            "name": "Hotbar",
+            "id": "ad3cf297-b2ad-4c0c-9bd7-0f1baedcb743",
+            "actions": [
+                {
+                    "name": "Select",
+                    "type": "Button",
+                    "id": "008223ed-77c2-43ba-839b-8da010c39c96",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "Press",
+                    "initialStateCheck": false
+                }
+            ],
+            "bindings": [
+                {
+                    "name": "1",
+                    "id": "b7ad4023-b118-4fa1-9924-434ad8f2fc9c",
+                    "path": "<Keyboard>/1",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
+                    "action": "Select",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "2",
+                    "id": "c96f5c61-b4ba-4f19-936f-da39735d7ee7",
+                    "path": "<Keyboard>/2",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
+                    "action": "Select",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "3",
+                    "id": "f3c11b93-8c3b-43c6-9291-4a7cb62f4cf6",
+                    "path": "<Keyboard>/3",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
+                    "action": "Select",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "4",
+                    "id": "839d8145-206d-4272-82c1-2d2fc11600d7",
+                    "path": "<Keyboard>/4",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
+                    "action": "Select",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "5",
+                    "id": "0d40678c-0d02-43d5-809e-33389215c5e9",
+                    "path": "<Keyboard>/5",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
+                    "action": "Select",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "6",
+                    "id": "c9b1831a-754b-4bd8-a69c-040ed05ad254",
+                    "path": "<Keyboard>/6",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
+                    "action": "Select",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "7",
+                    "id": "b5166ac9-5a98-4760-9a27-c8d3a4a55943",
+                    "path": "<Keyboard>/7",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
+                    "action": "Select",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "8",
+                    "id": "63f87f56-a01e-473e-8c67-7f51759d3084",
+                    "path": "<Keyboard>/8",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
+                    "action": "Select",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "9",
+                    "id": "53ce7728-b4b1-459f-ba2d-494b39937e71",
+                    "path": "<Keyboard>/9",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
+                    "action": "Select",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "0",
+                    "id": "c1e5260a-a7cc-496e-a051-2aaf98023be6",
+                    "path": "<Keyboard>/0",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
+                    "action": "Select",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                }
+            ]
+        },
+        {
             "name": "OutsideTest",
             "id": "7b8b6d7d-11f6-4f26-8d0f-2ea6ab2a0e95",
             "actions": [

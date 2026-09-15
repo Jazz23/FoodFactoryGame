@@ -15,6 +15,7 @@ public sealed class PlayerInventory : NetworkBehaviour
     private const string PlayerSteamId = "76561198000000000";
     private const int SlotCount = 80;
     private const int Columns = 10;
+    private const int HotbarSlotCount = 10;
 
     private static readonly Dictionary<string, ItemDefinition> ItemDefinitions = new()
     {
@@ -28,14 +29,17 @@ public sealed class PlayerInventory : NetworkBehaviour
 
     private readonly InventoryStack?[] slots = new InventoryStack?[SlotCount];
     private readonly List<SlotVisual> slotVisuals = new();
+    private readonly List<HotbarSlotVisual> hotbarSlotVisuals = new();
     private SQLiteConnection database = null!;
     private InputAction toggle = null!;
     private InputAction close = null!;
     private InputAction clearCursor = null!;
     private InputAction transferStackModifier = null!;
     private InputAction transferAllModifier = null!;
+    private InputAction hotbarSelect = null!;
     private InputActionMap buildActions = null!;
     private GameObject inventoryRoot = null!;
+    private GameObject hotbarRoot = null!;
     private GameObject? createdEventSystem;
     private Text cursorText = null!;
     private Text tooltipText = null!;
@@ -43,10 +47,14 @@ public sealed class PlayerInventory : NetworkBehaviour
     private InventoryStack? cursorStack;
     private int cursorSourceSlot = -1;
     private int hoveredSlot = -1;
+    private int selectedHotbarSlot;
     private bool isOpen;
 
     public static PlayerInventory LocalOwner = null!;
     public bool IsOpen => isOpen;
+    public int SelectedHotbarSlot => selectedHotbarSlot;
+    public string? SelectedHotbarItemId => slots[selectedHotbarSlot]?.ItemId;
+    public int SelectedHotbarCount => slots[selectedHotbarSlot]?.Count ?? 0;
 
     public override void OnStartClient()
     {
@@ -68,13 +76,16 @@ public sealed class PlayerInventory : NetworkBehaviour
         clearCursor = InputSystem.actions.FindAction("Inventory/ClearCursor", true);
         transferStackModifier = InputSystem.actions.FindAction("Inventory/TransferStackModifier", true);
         transferAllModifier = InputSystem.actions.FindAction("Inventory/TransferAllModifier", true);
+        hotbarSelect = InputSystem.actions.FindAction("Hotbar/Select", true);
         buildActions = InputSystem.actions.FindActionMap("Build", true);
         toggle.performed += TogglePerformed;
         close.performed += ClosePerformed;
         clearCursor.performed += ClearCursorPerformed;
+        hotbarSelect.performed += HotbarSelectPerformed;
         toggle.Enable();
         close.Enable();
         clearCursor.Enable();
+        hotbarSelect.Enable();
         transferStackModifier.Enable();
         transferAllModifier.Enable();
     }
@@ -94,9 +105,11 @@ public sealed class PlayerInventory : NetworkBehaviour
         toggle.performed -= TogglePerformed;
         close.performed -= ClosePerformed;
         clearCursor.performed -= ClearCursorPerformed;
+        hotbarSelect.performed -= HotbarSelectPerformed;
         toggle.Disable();
         close.Disable();
         clearCursor.Disable();
+        hotbarSelect.Disable();
         transferStackModifier.Disable();
         transferAllModifier.Disable();
         buildActions.Enable();
@@ -153,6 +166,17 @@ public sealed class PlayerInventory : NetworkBehaviour
         RefreshSlotVisuals();
     }
 
+    public void SelectHotbarSlot(int index)
+    {
+        if (index < 0 || index >= HotbarSlotCount)
+        {
+            return;
+        }
+
+        selectedHotbarSlot = index;
+        RefreshSlotVisuals();
+    }
+
     private void TogglePerformed(InputAction.CallbackContext _)
     {
         if (isOpen)
@@ -184,10 +208,25 @@ public sealed class PlayerInventory : NetworkBehaviour
         RefreshInterface();
     }
 
+    private void HotbarSelectPerformed(InputAction.CallbackContext context)
+    {
+        if (PlayerSceneTransition.LocalOwner is not null
+            && PlayerSceneTransition.LocalOwner.IsFactoryBuildContextActive)
+        {
+            return;
+        }
+
+        if (int.TryParse(context.control.displayName, out var slotNumber))
+        {
+            SelectHotbarSlot(slotNumber == 0 ? HotbarSlotCount - 1 : slotNumber - 1);
+        }
+    }
+
     private void OpenInventory()
     {
         isOpen = true;
         inventoryRoot.SetActive(true);
+        hotbarRoot.SetActive(false);
         buildActions.Disable();
         statusText.text = "Personal inventory";
         RefreshInterface();
@@ -197,6 +236,7 @@ public sealed class PlayerInventory : NetworkBehaviour
     {
         isOpen = false;
         inventoryRoot.SetActive(false);
+        hotbarRoot.SetActive(true);
         buildActions.Enable();
         SaveInventory();
     }
@@ -492,12 +532,24 @@ public sealed class PlayerInventory : NetworkBehaviour
         statusRect.offsetMin = new Vector2(28f, 21f);
         statusRect.offsetMax = new Vector2(-28f, 48f);
 
-        var controls = CreateText("Controls", window.transform, "TAB / ESC Close    Q Return Cursor    Shift / Ctrl Transfer when a container is open", 13, TextAnchor.MiddleCenter, new Color(0.55f, 0.62f, 0.68f));
+        var controls = CreateText("Controls", window.transform, "TAB / ESC Close    Hotbar: 1–9 / 0    Q Return Cursor    Shift / Ctrl Transfer", 13, TextAnchor.MiddleCenter, new Color(0.55f, 0.62f, 0.68f));
         var controlsRect = controls.GetComponent<RectTransform>();
         controlsRect.anchorMin = new Vector2(0f, 0f);
         controlsRect.anchorMax = new Vector2(1f, 0f);
         controlsRect.offsetMin = new Vector2(28f, 3f);
         controlsRect.offsetMax = new Vector2(-28f, 26f);
+
+        hotbarRoot = CreateImage("Hotbar", canvasObject.transform, new Color(0.08f, 0.1f, 0.12f, 0.94f));
+        var hotbarRect = hotbarRoot.GetComponent<RectTransform>();
+        hotbarRect.anchorMin = new Vector2(0.5f, 0f);
+        hotbarRect.anchorMax = new Vector2(0.5f, 0f);
+        hotbarRect.pivot = new Vector2(0.5f, 0f);
+        hotbarRect.sizeDelta = new Vector2(654f, 66f);
+        hotbarRect.anchoredPosition = new Vector2(0f, 16f);
+        for (var index = 0; index < HotbarSlotCount; index++)
+        {
+            CreateHotbarSlot(hotbarRoot.transform, index);
+        }
 
         inventoryRoot.SetActive(false);
         RefreshInterface();
@@ -518,6 +570,39 @@ public sealed class PlayerInventory : NetworkBehaviour
         countRect.offsetMax = new Vector2(-4f, -1f);
         countText.raycastTarget = false;
         slotVisuals.Add(new SlotVisual(slot.GetComponent<Image>(), itemText, countText));
+    }
+
+    private void CreateHotbarSlot(Transform parent, int index)
+    {
+        var slot = CreateImage($"Hotbar Slot {index + 1}", parent, new Color(0.18f, 0.21f, 0.24f));
+        var slotRect = slot.GetComponent<RectTransform>();
+        slotRect.anchorMin = Vector2.zero;
+        slotRect.anchorMax = Vector2.zero;
+        slotRect.pivot = Vector2.zero;
+        slotRect.sizeDelta = new Vector2(60f, 50f);
+        slotRect.anchoredPosition = new Vector2(6f + index * 64f, 8f);
+        var slotView = slot.AddComponent<HotbarSlotView>();
+        slotView.Initialize(this, index);
+
+        var keyText = CreateText("Key", slot.transform, index == HotbarSlotCount - 1 ? "0" : (index + 1).ToString(), 12, TextAnchor.UpperLeft, new Color(0.75f, 0.79f, 0.82f));
+        var keyRect = keyText.GetComponent<RectTransform>();
+        keyRect.anchorMin = new Vector2(0f, 1f);
+        keyRect.anchorMax = new Vector2(0f, 1f);
+        keyRect.pivot = new Vector2(0f, 1f);
+        keyRect.anchoredPosition = new Vector2(4f, -3f);
+        keyRect.sizeDelta = new Vector2(18f, 15f);
+        keyText.raycastTarget = false;
+
+        var itemText = CreateText("Item", slot.transform, string.Empty, 17, TextAnchor.MiddleCenter, Color.white);
+        Stretch(itemText.GetComponent<RectTransform>()!);
+        itemText.raycastTarget = false;
+        var countText = CreateText("Count", slot.transform, string.Empty, 13, TextAnchor.LowerRight, Color.white);
+        var countRect = countText.GetComponent<RectTransform>();
+        Stretch(countRect);
+        countRect.offsetMin = new Vector2(3f, 2f);
+        countRect.offsetMax = new Vector2(-4f, -1f);
+        countText.raycastTarget = false;
+        hotbarSlotVisuals.Add(new HotbarSlotVisual(slot.GetComponent<Image>(), itemText, countText));
     }
 
     private void RefreshInterface()
@@ -543,6 +628,18 @@ public sealed class PlayerInventory : NetworkBehaviour
                 : index == cursorSourceSlot && cursorStack is not null
                     ? new Color(0.49f, 0.36f, 0.17f)
                     : slot is null ? new Color(0.18f, 0.21f, 0.24f) : new Color(0.25f, 0.29f, 0.33f);
+            visual.Item.text = slot is null ? string.Empty : ItemDefinitions[slot.ItemId].Abbreviation;
+            visual.Item.color = slot is null ? Color.white : ItemDefinitions[slot.ItemId].Color;
+            visual.Count.text = slot is null || slot.Count == 1 ? string.Empty : slot.Count.ToString();
+        }
+
+        for (var index = 0; index < HotbarSlotCount; index++)
+        {
+            var slot = slots[index];
+            var visual = hotbarSlotVisuals[index];
+            visual.Background.color = index == selectedHotbarSlot
+                ? new Color(0.49f, 0.39f, 0.19f)
+                : slot is null ? new Color(0.18f, 0.21f, 0.24f) : new Color(0.25f, 0.29f, 0.33f);
             visual.Item.text = slot is null ? string.Empty : ItemDefinitions[slot.ItemId].Abbreviation;
             visual.Item.color = slot is null ? Color.white : ItemDefinitions[slot.ItemId].Color;
             visual.Count.text = slot is null || slot.Count == 1 ? string.Empty : slot.Count.ToString();
@@ -611,6 +708,20 @@ public sealed class PlayerInventory : NetworkBehaviour
     private readonly struct SlotVisual
     {
         public SlotVisual(Image background, Text item, Text count)
+        {
+            Background = background;
+            Item = item;
+            Count = count;
+        }
+
+        public Image Background { get; }
+        public Text Item { get; }
+        public Text Count { get; }
+    }
+
+    private readonly struct HotbarSlotVisual
+    {
+        public HotbarSlotVisual(Image background, Text item, Text count)
         {
             Background = background;
             Item = item;

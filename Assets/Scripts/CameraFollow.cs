@@ -6,6 +6,7 @@ public sealed class CameraFollow : MonoBehaviour
     [SerializeField] private Vector3 offset = new(0f, 0.4f, -10f);
 
     private Camera sceneCamera = null!;
+    private SceneGrid followedGrid = null!;
 
     private void Awake()
     {
@@ -23,9 +24,11 @@ public sealed class CameraFollow : MonoBehaviour
         var position = player.transform.position + offset;
         transform.position = position;
 
-        if (SceneGrid.TryGetForScene(player.gameObject.scene, out var grid))
+        if (SceneGrid.TryGetForScene(player.gameObject.scene, out var grid)
+            && followedGrid != grid)
         {
             sceneCamera.orthographicSize = grid.OrthographicSize;
+            followedGrid = grid;
         }
     }
 }

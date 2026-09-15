@@ -27,6 +27,7 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
 
     public static PlayerSceneTransition LocalOwner = null!;
     public bool IsTransitioning => isTransitioning;
+    public bool IsFactoryBuildContextActive => factoryBuilder is not null && factoryBuilder.IsBuildContextActive;
 
     private void Awake()
     {

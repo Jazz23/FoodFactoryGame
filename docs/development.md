@@ -54,6 +54,7 @@ Zero matched tests, compile failures, runner initialization failures, and timeou
 - UI tests deliberately verify binding, readiness, and displayed state.
 - PlayMode fixtures own temporary database paths, network lifecycle, static/UI reset, stable identities, and cleanup. `FactoryTestWorld` provisions the two-floor building-2 transition fixture in the isolated runtime world instead of depending on authored OutsideTest building IDs.
 - Runtime database-path overrides are session-scoped: `NAIStateManager` resets the static override at `SubsystemRegistration`; tests configure their isolated path afterward. When checking bootstrap against project data, verify the selected path first and use a consistent isolated database backup for any operation that can write.
+- `PlayerInventory` writes to `Application.persistentDataPath/food-factory-inventory.db`; stateful inventory play-mode checks require a fixture-provided isolated path. The hotbar action map binds slots 1–9 and 0 to the first ten inventory slots.
 - Tests must not resize gameplay buildings or modify the application database.
 
 ## Transition Verification
