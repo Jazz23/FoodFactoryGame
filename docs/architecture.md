@@ -29,6 +29,8 @@
 - `IndoorGrid.SetAllTestLinesVisible` applies the Test Tools toggle to every loaded floor and carries the chosen visibility into subsequently loaded interiors.
 - `TestToolsShell` owns the Test Tools and expanded Build Tools runtime controls; `FactoryBuildController` owns equipment selection, elevator connection previews, and expanded-build right-click removal.
 - `FactoryElevatorTransfer` pairs persisted elevator-bottom/top entities by building, adjacent floor indices, and matching logical cell. It moves elevator input buffers to the paired floor's output buffer so existing adjacent conveyor handoffs carry items onward in either direction.
+- `FactorySpatialAdapter` maps stable logical factory locations to either the existing 2D projection or 3D XZ coordinates; floor elevation is presentation-only and is never persisted.
+- `Factory3DPrototypeController` owns the reversible `Factory3DPrototype` scene slice: fixed camera, primitive floor/equipment views, adapter-based picking, discrete elevator floor cycling, and an isolated save/load smoke fixture. It does not replace the 2D movement, transition, or authoring systems.
 - `PlayerInventory` grants one elevator top and bottom as starter equipment when each item is missing, and the hotbar selects those parts through the existing build controller.
 - `FactoryTruckMarkerView` owns truck marker presentation, including switching a marker to a wireframe cube when its projected footprint is behind a configured building occlusion surface.
 
@@ -37,6 +39,7 @@
 - Runtime bootstrap: `Assets/Scenes/Bootstrap.unity`
 - Gameplay authoring scene: `Assets/Scenes/OutsideTest.unity`
 - Shared interior template: `Assets/Scenes/insidefactory0.unity`
+- 3D experiment scene: `Assets/Scenes/Factory3DPrototype.unity`
 - Authoring and persistence commands: `Assets/Editor/FactoryPipelineCommands.cs`
 
 ## Identity Rules

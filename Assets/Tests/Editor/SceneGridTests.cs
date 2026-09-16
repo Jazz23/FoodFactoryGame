@@ -98,6 +98,55 @@ public sealed class SceneGridTests
     }
 
     [Test]
+    public void SpatialAdapterPreservesTheCurrent2DProjection()
+    {
+        var gridObject = new GameObject("Spatial Adapter Grid");
+        SceneManager.MoveGameObjectToScene(gridObject, scene);
+        var grid = gridObject.AddComponent<SceneGrid>();
+        var serializedGrid = new SerializedObject(grid);
+        serializedGrid.FindProperty("projection").enumValueIndex = (int)GridProjection.Dimetric;
+        serializedGrid.FindProperty("logicalOrigin").vector2Value = new Vector2(-2f, 3f);
+        serializedGrid.FindProperty("visualOrigin").vector2Value = new Vector2(4f, -1f);
+        serializedGrid.FindProperty("cellSize").floatValue = 1.5f;
+        serializedGrid.ApplyModifiedPropertiesWithoutUndo();
+
+        var location = new FactoryLogicalLocation(13, 1, new Vector2(2.5f, -0.5f));
+        var adapter = grid.CreateSpatialAdapter();
+
+        Assert.That(
+            adapter.LogicalToWorld2D(location),
+            Is.EqualTo(grid.LogicalToWorld(location.FloorPosition)));
+    }
+
+    [Test]
+    public void SpatialAdapterRoundTripsA3DLocationWithoutPersistingWorldHeight()
+    {
+        var gridObject = new GameObject("3D Spatial Adapter Grid");
+        SceneManager.MoveGameObjectToScene(gridObject, scene);
+        var grid = gridObject.AddComponent<SceneGrid>();
+        var serializedGrid = new SerializedObject(grid);
+        serializedGrid.FindProperty("projection").enumValueIndex = (int)GridProjection.Dimetric;
+        serializedGrid.FindProperty("logicalOrigin").vector2Value = new Vector2(1f, -2f);
+        serializedGrid.FindProperty("visualOrigin").vector2Value = new Vector2(-3f, 5f);
+        serializedGrid.FindProperty("cellSize").floatValue = 2f;
+        serializedGrid.ApplyModifiedPropertiesWithoutUndo();
+
+        var location = new FactoryLogicalLocation(21, 2, new Vector2(4.5f, 1.25f));
+        var adapter = grid.CreateSpatialAdapter();
+        var worldPosition = adapter.LogicalToWorld3D(location, 7.5f);
+        var roundTrip = adapter.WorldToLogical3D(
+            worldPosition,
+            location.BuildingInstanceId,
+            location.FloorIndex);
+
+        Assert.That(worldPosition.y, Is.EqualTo(7.5f));
+        Assert.That(roundTrip.BuildingInstanceId, Is.EqualTo(location.BuildingInstanceId));
+        Assert.That(roundTrip.FloorIndex, Is.EqualTo(location.FloorIndex));
+        Assert.That(roundTrip.FloorPosition.x, Is.EqualTo(location.FloorPosition.x).Within(0.0001f));
+        Assert.That(roundTrip.FloorPosition.y, Is.EqualTo(location.FloorPosition.y).Within(0.0001f));
+    }
+
+    [Test]
     public void TryGetForSceneResolvesItsExactEnabledGrid()
     {
         var gridObject = new GameObject("Grid");

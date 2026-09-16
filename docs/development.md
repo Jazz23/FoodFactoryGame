@@ -83,6 +83,12 @@ Zero matched tests, compile failures, runner initialization failures, and timeou
 - The Unity Editor default database is `<project-root>/factory-world.db`; production uses `Application.persistentDataPath/factory-world.db`. Keep the project-local database out of source control.
 - `factory_reconcile_save` is position-only reconciliation. Run it with an explicit isolated path and dry-run first; it does not apply authored dimensions.
 
+## Fixed-Camera 3D Prototype
+
+- Open `Assets/Scenes/Factory3DPrototype.unity` to evaluate the reversible 3D slice. It uses a two-floor in-memory fixture, adapter-based logical picking, Input System movement, and discrete floor cycling through the existing Build/Rotate action.
+- The prototype's save/load check writes only to `Application.temporaryCachePath/food-factory-3d-prototype.db`; it must never use the application database. The edit-mode acceptance test is `Factory3DPrototypeFixtureTests.TwoFloorFixturePreservesTopologyThroughIsolatedSaveLoad`.
+- Keep the 2D systems authoritative while comparing the slice. Continuous vertical movement, ramps, NavMesh, voxel occupancy, and free-camera controls are intentionally outside this first experiment.
+
 ## Presentation-Scale Verification
 
 - `InteriorSizingTests` covers logical-to-world scaling plus generated interior floor-cell and doorway proportions.

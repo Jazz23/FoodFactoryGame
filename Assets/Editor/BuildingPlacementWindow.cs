@@ -795,15 +795,12 @@ public sealed class BuildingPlacementWindow : EditorWindow
     private bool TryGetCell(Vector2 guiPosition, out Vector3Int cell)
     {
         var ray = HandleUtility.GUIPointToWorldRay(guiPosition);
-        var plane = new Plane(Vector3.forward, ground.transform.position.z);
-        if (!plane.Raycast(ray, out var distance))
+        if (SceneGrid.TryGetForScene(ground.gameObject.scene, out var grid))
         {
-            cell = default;
-            return false;
+            return grid.CreateSpatialAdapter().TryGetCellFrom2DRay(ray, ground, out cell);
         }
 
-        cell = ground.WorldToCell(ray.GetPoint(distance));
-        return true;
+        return FactorySpatialAdapter.TryGetCellFrom2DPlaneRay(ray, ground, out cell);
     }
 
     private bool IsReady()

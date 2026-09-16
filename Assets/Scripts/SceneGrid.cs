@@ -36,6 +36,11 @@ public sealed class SceneGrid : MonoBehaviour
     public float VerticalMovementMultiplier => verticalMovementMultiplier;
     public float OrthographicSize => orthographicSize;
 
+    public FactorySpatialAdapter CreateSpatialAdapter()
+    {
+        return new FactorySpatialAdapter(this);
+    }
+
     public static Vector2 CellCenterLogical(Vector2Int cell)
     {
         return (Vector2)cell + new Vector2(0.5f, 0.5f);
