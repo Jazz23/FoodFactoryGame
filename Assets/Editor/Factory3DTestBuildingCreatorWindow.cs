@@ -393,12 +393,33 @@ public sealed class Factory3DTestBuildingCreatorWindow : EditorWindow
             return;
         }
 
+        var cellDelta = new Vector2Int(
+            pendingAnchor.x - selectedRecord.AnchorCell.x,
+            pendingAnchor.y - selectedRecord.AnchorCell.y);
+        var movedDoors = new List<BuildingRecord.DoorPlacement>(selectedRecord.Doors.Count);
+        foreach (var door in selectedRecord.Doors)
+        {
+            if (door is null
+                || !TestBuildingCreator.TryTranslateWallSpanId(
+                    door.WallId,
+                    cellDelta,
+                    out var translatedWallId))
+            {
+                statusMessage = $"Building {selectedRecord.BuildingInstanceId} has a door with an invalid wall span ID.";
+                return;
+            }
+
+            movedDoors.Add(new BuildingRecord.DoorPlacement(
+                translatedWallId,
+                door.NormalizedOffset));
+        }
+
         var updatedRecord = new BuildingRecord(
             selectedRecord.BuildingInstanceId,
             pendingAnchor,
             selectedRecord.FootprintSize,
             selectedRecord.StoryCount,
-            selectedRecord.Doors);
+            movedDoors);
         var candidateRecords = records
             .Where(record => record.BuildingInstanceId != selectedRecord.BuildingInstanceId)
             .Select(record => record.Clone())

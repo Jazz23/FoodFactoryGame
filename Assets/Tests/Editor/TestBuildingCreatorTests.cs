@@ -54,6 +54,18 @@ public sealed class TestBuildingCreatorTests
     }
 
     [Test]
+    public void WallSpanIdsTranslateWithAWholeBuildingMove()
+    {
+        Assert.That(
+            TestBuildingCreator.TryTranslateWallSpanId(
+                "South:-2:3:0",
+                new Vector2Int(4, -5),
+                out var translatedWallId),
+            Is.True);
+        Assert.That(translatedWallId, Is.EqualTo("South:2:-2:0"));
+    }
+
+    [Test]
     public void SingleCellSelectionCreatesFourCornerWallPieces()
     {
         var placements = new List<TestBuildingCreator.WallPlacement>();

@@ -276,6 +276,26 @@ public sealed class TestBuildingCreator : MonoBehaviour
         }
     }
 
+    public static bool TryTranslateWallSpanId(
+        string wallId,
+        Vector2Int cellDelta,
+        out string translatedWallId)
+    {
+        translatedWallId = string.Empty;
+        var parts = wallId?.Split(':');
+        if (parts is null
+            || parts.Length != 4
+            || !int.TryParse(parts[1], out var x)
+            || !int.TryParse(parts[2], out var y)
+            || !int.TryParse(parts[3], out _))
+        {
+            return false;
+        }
+
+        translatedWallId = $"{parts[0]}:{x + cellDelta.x}:{y + cellDelta.y}:{parts[3]}";
+        return true;
+    }
+
     public static bool TryGetDefaultEntrance(
         Vector3Int anchorCell,
         Vector2Int size,
