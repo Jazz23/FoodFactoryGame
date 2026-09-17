@@ -89,6 +89,13 @@ Zero matched tests, compile failures, runner initialization failures, and timeou
 - The prototype's save/load check writes only to `Application.temporaryCachePath/food-factory-3d-prototype.db`; it must never use the application database. The edit-mode acceptance test is `Factory3DPrototypeFixtureTests.TwoFloorFixturePreservesTopologyThroughIsolatedSaveLoad`.
 - Keep the 2D systems authoritative while comparing the slice. Continuous vertical movement, ramps, NavMesh, voxel occupancy, and free-camera controls are intentionally outside this first experiment.
 
+## 3D Test Building Creator Companion
+
+- Open `Food Factory/3D Test Building Creator` while `OutsideTest.unity` is active. The window discovers the scene's `TestBuildingCreator`, or accepts one through its Object Field.
+- Select a building from the list or Scene View, choose its active floor, and enable Move to preview a snapped footprint drag. Commit Move records the new logical anchor with Undo support and rebuilds the existing generated shell; Cancel Move discards the preview.
+- Use `Frame Selected` for the fixed-angle orthographic Scene View. Floor elevation and 3D handles are derived presentation; authored building IDs, anchors, footprints, stories, and doors remain the source of truth.
+- `Apply Authored Topology to Selected Save` is the only database write in this companion. Point it at an isolated save for experiments; selection, camera framing, preview, shell rebuild, and Undo do not write a database.
+
 ## Presentation-Scale Verification
 
 - `InteriorSizingTests` covers logical-to-world scaling plus generated interior floor-cell and doorway proportions.

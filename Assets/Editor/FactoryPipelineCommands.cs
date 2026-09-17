@@ -167,6 +167,7 @@ public static class FactoryPipelineCommands
     public const string OutsideTestScenePath = "Assets/Scenes/OutsideTest.unity";
     public const string BootstrapScenePath = "Assets/Scenes/Bootstrap.unity";
     public const string InsideFactoryTemplatePath = "Assets/Scenes/insidefactory0.unity";
+    public const string Factory3DPrototypeScenePath = "Assets/Scenes/Factory3DPrototype.unity";
 
     private static FactoryVerifyCallback activeVerification;
 
@@ -1189,10 +1190,14 @@ public static class FactoryAuthoringPipelineService
             FactoryPipelineCommands.OutsideTestScenePath,
             FactoryPipelineCommands.InsideFactoryTemplatePath
         };
+        var allowedPaths = new HashSet<string>(expectedPaths)
+        {
+            FactoryPipelineCommands.Factory3DPrototypeScenePath
+        };
         var buildScenes = EditorBuildSettings.scenes;
         foreach (var scene in buildScenes)
         {
-            if (!scene.enabled || expectedPaths.Contains(scene.path))
+            if (!scene.enabled || allowedPaths.Contains(scene.path))
             {
                 continue;
             }

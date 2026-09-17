@@ -187,11 +187,21 @@ public sealed class OutsideTestConformanceTests
         var buildScenes = EditorBuildSettings.scenes;
         Assert.That(
             buildScenes.Select(scene => scene.path),
-            Is.EquivalentTo(new[]
+            Does.Contain("Assets/Scenes/Bootstrap.unity"));
+        Assert.That(
+            buildScenes.Select(scene => scene.path),
+            Does.Contain("Assets/Scenes/OutsideTest.unity"));
+        Assert.That(
+            buildScenes.Select(scene => scene.path),
+            Does.Contain("Assets/Scenes/insidefactory0.unity"));
+        Assert.That(
+            buildScenes.Select(scene => scene.path),
+            Is.SubsetOf(new[]
             {
                 "Assets/Scenes/Bootstrap.unity",
                 "Assets/Scenes/OutsideTest.unity",
-                "Assets/Scenes/insidefactory0.unity"
+                "Assets/Scenes/insidefactory0.unity",
+                "Assets/Scenes/Factory3DPrototype.unity"
             }));
         Assert.That(buildScenes.All(scene => scene.enabled), Is.True);
     }

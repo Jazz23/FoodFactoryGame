@@ -36,6 +36,8 @@
 
 ## Canonical Assets
 
+- The editor-only `Factory3DTestBuildingCreatorWindow` is a companion to `TestBuildingCreator`: it reads the same authored records, previews derived 3D shells in the Scene View, supports active-floor selection and snapped move preview/commit/cancel, and writes a save only through its explicit topology-apply action.
+
 - Runtime bootstrap: `Assets/Scenes/Bootstrap.unity`
 - Gameplay authoring scene: `Assets/Scenes/OutsideTest.unity`
 - Shared interior template: `Assets/Scenes/insidefactory0.unity`
