@@ -44,6 +44,7 @@ public sealed class GameSceneManager : MonoBehaviour
     private bool outsideTestStateNeedsSave;
     private FactoryTruckMarkerView truckMarkerView = null!;
     private FactoryDockExteriorView dockExteriorView = null!;
+    private Factory3DRouteAuthorityPresenter routeAuthorityPresenter = null!;
     private SceneHandle registeredOutsideTestSceneHandle;
     private bool outsideTestWorldReconciled;
     private int clientOutsideTestLoadedInteriorCount;
@@ -162,6 +163,7 @@ public sealed class GameSceneManager : MonoBehaviour
     private void Update()
     {
         EnsureOutsideTestStateLoaded();
+        EnsureRouteAuthorityPresenter();
         EnsureTruckMarkerView();
         EnsureDockExteriorView();
 
@@ -177,6 +179,27 @@ public sealed class GameSceneManager : MonoBehaviour
 
         nextOutsideTestBroadcastTime = Time.unscaledTime + OutsideTestBroadcastInterval;
         BroadcastOutsideTestFloorStates();
+    }
+
+    private void EnsureRouteAuthorityPresenter()
+    {
+        if (routeAuthorityPresenter is not null && routeAuthorityPresenter)
+        {
+            return;
+        }
+
+        routeAuthorityPresenter = FindFirstObjectByType<Factory3DRouteAuthorityPresenter>(
+            FindObjectsInactive.Include);
+        if (routeAuthorityPresenter is not null && routeAuthorityPresenter)
+        {
+            return;
+        }
+
+        routeAuthorityPresenter = GetComponent<Factory3DRouteAuthorityPresenter>();
+        if (routeAuthorityPresenter is null || !routeAuthorityPresenter)
+        {
+            routeAuthorityPresenter = gameObject.AddComponent<Factory3DRouteAuthorityPresenter>();
+        }
     }
 
     private void EnsureTruckMarkerView()

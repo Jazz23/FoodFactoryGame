@@ -228,7 +228,9 @@ public sealed class Factory3DOutsideTestProxyAssembler
         var removedNodeCount = 0;
         if (grid is null || !grid)
         {
-            removedNodeCount += RemoveChildrenNotIn(targetRoot, new HashSet<string>());
+            removedNodeCount += RemoveChildrenNotIn(
+                targetRoot,
+                new HashSet<string> { Factory3DOutsideTestProxyView.RouteProxyRootName });
             return new Factory3DOutsideTestProxyBuildResult(
                 0,
                 0,
@@ -267,6 +269,7 @@ public sealed class Factory3DOutsideTestProxyAssembler
         {
             desiredBuildingNames.Add(GetBuildingName(record.BuildingInstanceId));
         }
+        desiredBuildingNames.Add(Factory3DOutsideTestProxyView.RouteProxyRootName);
 
         removedNodeCount += RemoveChildrenNotIn(targetRoot, desiredBuildingNames);
         foreach (var record in validRecords)
@@ -313,7 +316,9 @@ public sealed class Factory3DOutsideTestProxyAssembler
             return;
         }
 
-        RemoveChildrenNotIn(targetRoot, new HashSet<string>());
+        RemoveChildrenNotIn(
+            targetRoot,
+            new HashSet<string> { Factory3DOutsideTestProxyView.RouteProxyRootName });
     }
 
     public static string GetBuildingName(uint buildingInstanceId)

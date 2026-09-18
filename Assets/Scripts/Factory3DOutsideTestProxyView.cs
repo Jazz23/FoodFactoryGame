@@ -7,6 +7,8 @@ using UnityEngine.SceneManagement;
 [DisallowMultipleComponent]
 public sealed class Factory3DOutsideTestProxyView : MonoBehaviour
 {
+    public const string RouteProxyRootName = Factory3DRouteProxyAssembler.RootName;
+
     private Factory3DOutsideTestProxyAssembler assembler = null!;
     private Material fallbackMaterial = null!;
 
@@ -138,6 +140,90 @@ public sealed class Factory3DOutsideTestProxyView : MonoBehaviour
         }
 
         assembler.Clear(transform);
+    }
+
+    public Factory3DRouteProxyView GetOrCreateRouteProxyView()
+    {
+        var routeView = (Factory3DRouteProxyView)null!;
+        var duplicateRoots = new List<GameObject>();
+        for (var index = 0; index < transform.childCount; index++)
+        {
+            var child = transform.GetChild(index);
+            if (child.name != RouteProxyRootName)
+            {
+                continue;
+            }
+
+            var candidate = child.GetComponent<Factory3DRouteProxyView>();
+            if (routeView is null || !routeView)
+            {
+                routeView = candidate;
+                if (routeView is null || !routeView)
+                {
+                    routeView = child.gameObject.AddComponent<Factory3DRouteProxyView>();
+                }
+
+                continue;
+            }
+
+            duplicateRoots.Add(child.gameObject);
+        }
+
+        foreach (var duplicateRoot in duplicateRoots)
+        {
+            DestroyGeneratedObject(duplicateRoot);
+        }
+
+        if (routeView is null || !routeView)
+        {
+            var routeRoot = new GameObject(RouteProxyRootName);
+            routeRoot.transform.SetParent(transform, false);
+            ConfigureDisposableFlags(routeRoot);
+            routeView = routeRoot.AddComponent<Factory3DRouteProxyView>();
+        }
+
+        ConfigureDisposableFlags(routeView.gameObject);
+        return routeView;
+    }
+
+    public Factory3DRouteProxyView FindRouteProxyView()
+    {
+        for (var index = 0; index < transform.childCount; index++)
+        {
+            var child = transform.GetChild(index);
+            if (child.name != RouteProxyRootName)
+            {
+                continue;
+            }
+
+            var routeView = child.GetComponent<Factory3DRouteProxyView>();
+            if (routeView is not null && routeView)
+            {
+                return routeView;
+            }
+        }
+
+        return null!;
+    }
+
+    public static Factory3DOutsideTestProxyView FindExisting(Scene scene)
+    {
+        if (!scene.IsValid())
+        {
+            return null!;
+        }
+
+        foreach (var candidate in Resources.FindObjectsOfTypeAll<Factory3DOutsideTestProxyView>())
+        {
+            if (candidate is not null
+                && candidate
+                && candidate.gameObject.scene == scene)
+            {
+                return candidate;
+            }
+        }
+
+        return null!;
     }
 
     public static Factory3DOutsideTestProxyView FindOrCreate(Scene scene)

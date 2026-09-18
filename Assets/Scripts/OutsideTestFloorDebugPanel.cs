@@ -1,4 +1,5 @@
 // Provides temporary local controls for inspecting and editing the OutsideTest floor proof of concept.
+using System;
 using System.Globalization;
 using System.Collections.Generic;
 using UnityEngine;
@@ -69,8 +70,28 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
     private uint connectionSourceMachineId;
     private bool initialized;
     private bool connectionsExpanded;
+    private bool hasExplicitFloorSelection;
 
     public bool IsOpen => shell is not null && shell.IsFloorToolsVisible;
+    public uint SelectedBuildingInstanceId => selectedBuildingInstanceId;
+    public int SelectedFloorIndex => selectedFloor;
+    public bool HasExplicitFloorSelection => hasExplicitFloorSelection;
+
+    public event Action<uint, int> FloorSelected;
+
+    public bool TryGetSelectedFloor(
+        out uint buildingInstanceId,
+        out int floorIndex)
+    {
+        buildingInstanceId = selectedBuildingInstanceId;
+        floorIndex = selectedFloor;
+        return initialized
+            && selectedBuildingInstanceId != 0
+            && selectedFloor >= 0
+            && GameSceneManager.Instance.IsValidOutsideTestFloor(
+                selectedBuildingInstanceId,
+                selectedFloor);
+    }
 
     public string GetMachineEditDiagnostics()
     {
@@ -805,7 +826,9 @@ public sealed class OutsideTestFloorDebugPanel : MonoBehaviour
 
         selectedBuildingInstanceId = buildingInstanceId;
         selectedFloor = floorIndex;
+        hasExplicitFloorSelection = true;
         statusMessage = $"Selected building {buildingInstanceId}, floor {selectedFloor}";
+        FloorSelected?.Invoke(buildingInstanceId, floorIndex);
         Refresh();
     }
 

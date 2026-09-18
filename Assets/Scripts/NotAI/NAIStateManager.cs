@@ -114,6 +114,11 @@ namespace NotAI
         public bool TryGetFloorState(uint buildingInstanceId, int floorIndex, out OutsideTestFloorRecord state)
             => factoryState.TryGetFloorState(buildingInstanceId, floorIndex, out state);
 
+        public Factory3DRouteSnapshot BuildRoutePresentationSnapshot(
+            SceneGrid grid,
+            float storyHeight = 3f)
+            => Factory3DRouteSnapshotBuilder.Build(factoryState, grid, storyHeight);
+
         public bool TryRelocateEntity(
             uint buildingInstanceId,
             int floorIndex,

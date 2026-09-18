@@ -129,9 +129,16 @@ public sealed class Factory3DOutsideTestProxyPlayModeLifecycleTests
         Assert.That(runtimeRecord!.AnchorCell, Is.EqualTo(RuntimeAnchor));
 
         yield return WaitForCondition(
-            () => HasProxyChildren(fixtureScene),
+            () => HasProxyChildren(fixtureScene) && HasProxySlab(fixtureScene),
             5f,
             "EditorApplication.update did not rebuild the proxy after runtime authority initialization.");
+        var runtimeProxy = FindProxy(fixtureScene);
+        Assert.That(runtimeProxy, Is.Not.Null);
+        var runtimeRouteProxy = runtimeProxy!.FindRouteProxyView();
+        Assert.That(runtimeRouteProxy, Is.Not.Null);
+        Assert.That(runtimeRouteProxy!.Snapshot, Is.Not.Null);
+        Assert.That(runtimeRouteProxy.Snapshot!.Buildings, Has.Count.EqualTo(1));
+        Assert.That(runtimeRouteProxy.Snapshot.Floors, Has.Count.EqualTo(1));
         var runtimeCenter = GetSlabCenter(fixtureScene);
         var expectedRuntimeCenter = GetExpectedSlabCenter(RuntimeAnchor);
         Assert.That(runtimeCenter.x, Is.EqualTo(expectedRuntimeCenter.x).Within(0.0001f));
@@ -157,6 +164,12 @@ public sealed class Factory3DOutsideTestProxyPlayModeLifecycleTests
         var restoredCenter = GetSlabCenter(fixtureScene);
         Assert.That(restoredCenter.x, Is.EqualTo(authoredCenter.x).Within(0.0001f));
         Assert.That(restoredCenter.z, Is.EqualTo(authoredCenter.z).Within(0.0001f));
+        var clearedRouteProxy = FindProxy(fixtureScene)!.FindRouteProxyView();
+        if (clearedRouteProxy is not null && clearedRouteProxy)
+        {
+            Assert.That(clearedRouteProxy.Snapshot, Is.Null);
+            Assert.That(clearedRouteProxy.transform.childCount, Is.Zero);
+        }
         Assert.That(lifecycleErrors, Is.Empty, string.Join("\n", lifecycleErrors));
     }
 
@@ -392,6 +405,17 @@ public sealed class Factory3DOutsideTestProxyPlayModeLifecycleTests
         return proxy is not null
             && proxy
             && proxy.transform.childCount > 0;
+    }
+
+    private bool HasProxySlab(Scene scene)
+    {
+        var proxy = FindProxy(scene);
+        return proxy is not null
+            && proxy
+            && proxy.transform.Find(
+                $"{Factory3DOutsideTestProxyAssembler.GetBuildingName(LifecycleBuildingId)}/"
+                + $"{Factory3DOutsideTestProxyAssembler.GetFloorName(0)}/"
+                + Factory3DOutsideTestProxyAssembler.FloorSlabName) is not null;
     }
 
     private static IEnumerator WaitForCondition(
