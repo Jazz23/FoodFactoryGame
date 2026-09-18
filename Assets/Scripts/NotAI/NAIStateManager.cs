@@ -551,6 +551,26 @@ namespace NotAI
         public bool TryGetBuildingInfo(uint buildingInstanceId, out OutsideTestBuildingInfo info)
             => factoryState.TryGetBuildingInfo(buildingInstanceId, out info);
 
+        public bool TryGetOutsideTestBuildingInteriorSemantics(
+            uint buildingInstanceId,
+            out bool isInteriorOnly,
+            out Vector2Int usableInteriorSize)
+        {
+            isInteriorOnly = false;
+            usableInteriorSize = Vector2Int.zero;
+            if (buildingInstanceId == 0
+                || !factoryState.TryGetBuildingRecord(
+                    buildingInstanceId,
+                    out var record))
+            {
+                return false;
+            }
+
+            usableInteriorSize = factoryState.GetInteriorSize(record);
+            isInteriorOnly = usableInteriorSize == record.FootprintSize;
+            return true;
+        }
+
         public bool TryGetBuildingRecord(uint buildingInstanceId, out BuildingRecord record)
             => factoryState.TryGetBuildingRecord(buildingInstanceId, out record);
 

@@ -12,6 +12,7 @@ public sealed class Factory3DTestBuildingCreatorWindow : EditorWindow
     private readonly List<Vector3> outlinePoints = new();
     private TestBuildingCreator creator = null!;
     private FactorySpatialAdapter spatialAdapter = null!;
+    private Factory3DOutsideTestProxyView proxyView = null!;
     private uint selectedBuildingId;
     private int activeFloor;
     private bool moveTool;
@@ -21,6 +22,14 @@ public sealed class Factory3DTestBuildingCreatorWindow : EditorWindow
     private Vector2Int dragOffset;
     private string selectedSavePath = string.Empty;
     private string statusMessage = string.Empty;
+    private bool proxyLifecycleInitialized;
+    private bool proxyLifecycleTransition;
+    private bool lastRuntimeAuthorityRequired;
+    private bool lastRuntimeAuthorityReady;
+    private NotAI.NAIStateManager lastRuntimeAuthority = null!;
+    private TestBuildingCreator lastProxyCreator = null!;
+    private SceneGrid lastProxyGrid = null!;
+    private SceneHandle lastProxySceneHandle;
 
     [MenuItem("Food Factory/3D Test Building Creator")]
     public static void Open()
@@ -30,9 +39,18 @@ public sealed class Factory3DTestBuildingCreatorWindow : EditorWindow
 
     private void OnEnable()
     {
+        SceneView.duringSceneGui -= DuringSceneGui;
         SceneView.duringSceneGui += DuringSceneGui;
+        Selection.selectionChanged -= SelectionChanged;
         Selection.selectionChanged += SelectionChanged;
+        Undo.undoRedoPerformed -= UndoRedoPerformed;
         Undo.undoRedoPerformed += UndoRedoPerformed;
+        EditorApplication.playModeStateChanged -= HandlePlayModeStateChanged;
+        EditorApplication.playModeStateChanged += HandlePlayModeStateChanged;
+        EditorApplication.update -= HandleEditorUpdate;
+        EditorApplication.update += HandleEditorUpdate;
+        proxyLifecycleInitialized = false;
+        proxyLifecycleTransition = false;
         selectedSavePath = FactoryWorldPaths.GetDefaultDatabasePath();
         ResolveCreator();
         RefreshRecords();
@@ -43,6 +61,17 @@ public sealed class Factory3DTestBuildingCreatorWindow : EditorWindow
         SceneView.duringSceneGui -= DuringSceneGui;
         Selection.selectionChanged -= SelectionChanged;
         Undo.undoRedoPerformed -= UndoRedoPerformed;
+        UnregisterProxyLifecycleCallbacks();
+        proxyLifecycleInitialized = false;
+        proxyLifecycleTransition = false;
+        dragging = false;
+        hasPendingMove = false;
+        DestroyProxyView();
+    }
+
+    private void OnDestroy()
+    {
+        UnregisterProxyLifecycleCallbacks();
     }
 
     private void OnGUI()
@@ -57,11 +86,13 @@ public sealed class Factory3DTestBuildingCreatorWindow : EditorWindow
         if (EditorGUI.EndChangeCheck())
         {
             selectedBuildingId = 0;
+            DestroyProxyView();
             RefreshRecords();
         }
 
         if (creator is null || !creator)
         {
+            DestroyProxyView();
             EditorGUILayout.HelpBox(
                 "Open the 2D Test Building Creator scene or assign its creator component.",
                 MessageType.Info);
@@ -70,6 +101,7 @@ public sealed class Factory3DTestBuildingCreatorWindow : EditorWindow
 
         if (creator.Grid is null || !creator.Grid)
         {
+            DestroyProxyView();
             EditorGUILayout.HelpBox("The assigned creator has no SceneGrid.", MessageType.Error);
             return;
         }
@@ -194,16 +226,19 @@ public sealed class Factory3DTestBuildingCreatorWindow : EditorWindow
     {
         if (creator is null || !creator || creator.gameObject.scene != SceneManager.GetActiveScene())
         {
+            DestroyProxyView();
             return;
         }
 
         if (creator.Grid is null || !creator.Grid)
         {
+            DestroyProxyView();
             return;
         }
 
         spatialAdapter = creator.Grid.CreateSpatialAdapter();
         RefreshRecords();
+        RefreshProxyPresentation();
         DrawRecords();
         HandleSceneInput(sceneView);
     }
@@ -393,33 +428,15 @@ public sealed class Factory3DTestBuildingCreatorWindow : EditorWindow
             return;
         }
 
-        var cellDelta = new Vector2Int(
-            pendingAnchor.x - selectedRecord.AnchorCell.x,
-            pendingAnchor.y - selectedRecord.AnchorCell.y);
-        var movedDoors = new List<BuildingRecord.DoorPlacement>(selectedRecord.Doors.Count);
-        foreach (var door in selectedRecord.Doors)
+        if (!TryCreateMovedRecord(
+                selectedRecord,
+                pendingAnchor,
+                out var updatedRecord,
+                out var moveError))
         {
-            if (door is null
-                || !TestBuildingCreator.TryTranslateWallSpanId(
-                    door.WallId,
-                    cellDelta,
-                    out var translatedWallId))
-            {
-                statusMessage = $"Building {selectedRecord.BuildingInstanceId} has a door with an invalid wall span ID.";
-                return;
-            }
-
-            movedDoors.Add(new BuildingRecord.DoorPlacement(
-                translatedWallId,
-                door.NormalizedOffset));
+            statusMessage = moveError;
+            return;
         }
-
-        var updatedRecord = new BuildingRecord(
-            selectedRecord.BuildingInstanceId,
-            pendingAnchor,
-            selectedRecord.FootprintSize,
-            selectedRecord.StoryCount,
-            movedDoors);
         var candidateRecords = records
             .Where(record => record.BuildingInstanceId != selectedRecord.BuildingInstanceId)
             .Select(record => record.Clone())
@@ -621,6 +638,329 @@ public sealed class Factory3DTestBuildingCreatorWindow : EditorWindow
         {
             selectedBuildingId = 0;
         }
+    }
+
+    private void RefreshProxyPresentation()
+    {
+        if (proxyLifecycleTransition
+            || (!Application.isPlaying && EditorApplication.isPlayingOrWillChangePlaymode))
+        {
+            ClearProxyPresentation();
+            return;
+        }
+
+        RefreshProxyPresentationForMode(
+            Application.isPlaying,
+            NotAI.NAIStateManager.Instance);
+    }
+
+    internal void HandlePlayModeStateChanged(PlayModeStateChange stateChange)
+    {
+        switch (stateChange)
+        {
+            case PlayModeStateChange.ExitingEditMode:
+                proxyLifecycleTransition = true;
+                proxyLifecycleInitialized = false;
+                ClearProxyPresentation();
+                return;
+            case PlayModeStateChange.EnteredPlayMode:
+                proxyLifecycleTransition = false;
+                proxyLifecycleInitialized = false;
+                RefreshProxyPresentationForMode(true, NotAI.NAIStateManager.Instance);
+                RememberProxyLifecycleState(true, NotAI.NAIStateManager.Instance);
+                return;
+            case PlayModeStateChange.ExitingPlayMode:
+                proxyLifecycleTransition = true;
+                proxyLifecycleInitialized = false;
+                ClearProxyPresentation();
+                return;
+            case PlayModeStateChange.EnteredEditMode:
+                proxyLifecycleTransition = false;
+                proxyLifecycleInitialized = false;
+                RefreshProxyPresentationForMode(false, null!);
+                RememberProxyLifecycleState(false, null!);
+                return;
+        }
+    }
+
+    private void HandleEditorUpdate()
+    {
+        var previousCreator = creator;
+        ResolveCreator();
+        if (!ReferenceEquals(previousCreator, creator))
+        {
+            RefreshRecords();
+        }
+
+        var activeScene = SceneManager.GetActiveScene();
+        var creatorIsValid = creator is not null && creator;
+        var grid = creatorIsValid ? creator.Grid : null!;
+        var gridIsValid = grid is not null && grid;
+        var creatorIsInActiveScene = creatorIsValid
+            && activeScene.IsValid()
+            && creator.gameObject.scene == activeScene;
+        if (!creatorIsValid || !gridIsValid || !creatorIsInActiveScene)
+        {
+            proxyLifecycleInitialized = false;
+            DestroyProxyView();
+            return;
+        }
+
+        if (proxyLifecycleTransition
+            || (!Application.isPlaying && EditorApplication.isPlayingOrWillChangePlaymode))
+        {
+            ClearProxyPresentation();
+            return;
+        }
+
+        var proxyContextChanged = !proxyLifecycleInitialized
+            || !ReferenceEquals(creator, lastProxyCreator)
+            || !ReferenceEquals(grid, lastProxyGrid)
+            || activeScene.handle != lastProxySceneHandle
+            || proxyView is null
+            || !proxyView
+            || proxyView.gameObject.scene != activeScene;
+        var runtimeAuthorityRequired = Application.isPlaying;
+        var stateManager = runtimeAuthorityRequired
+            ? NotAI.NAIStateManager.Instance
+            : null!;
+        var runtimeAuthorityReady = runtimeAuthorityRequired
+            && stateManager is { IsInitialized: true };
+        if (proxyLifecycleInitialized
+            && !proxyContextChanged
+            && runtimeAuthorityRequired == lastRuntimeAuthorityRequired
+            && runtimeAuthorityReady == lastRuntimeAuthorityReady
+            && ReferenceEquals(stateManager, lastRuntimeAuthority))
+        {
+            return;
+        }
+
+        RefreshProxyPresentationForMode(runtimeAuthorityRequired, stateManager);
+        RememberProxyLifecycleState(runtimeAuthorityRequired, stateManager);
+    }
+
+    private void RememberProxyLifecycleState(
+        bool runtimeAuthorityRequired,
+        NotAI.NAIStateManager stateManager)
+    {
+        proxyLifecycleInitialized = true;
+        lastRuntimeAuthorityRequired = runtimeAuthorityRequired;
+        lastRuntimeAuthorityReady = runtimeAuthorityRequired
+            && stateManager is { IsInitialized: true };
+        lastRuntimeAuthority = runtimeAuthorityRequired ? stateManager : null!;
+        var currentCreatorIsValid = creator is not null && creator;
+        lastProxyCreator = currentCreatorIsValid ? creator : null!;
+        lastProxyGrid = currentCreatorIsValid && creator.Grid is not null && creator.Grid
+            ? creator.Grid
+            : null!;
+        lastProxySceneHandle = currentCreatorIsValid
+            ? creator.gameObject.scene.handle
+            : default;
+    }
+
+    private void ClearProxyPresentation()
+    {
+        if (creator is null || !creator
+            || creator.Grid is null || !creator.Grid)
+        {
+            DestroyProxyView();
+            return;
+        }
+
+        if (proxyView is not null
+            && proxyView
+            && proxyView.gameObject.scene != creator.gameObject.scene)
+        {
+            DestroyProxyView();
+        }
+
+        if (proxyView is null || !proxyView)
+        {
+            proxyView = Factory3DOutsideTestProxyView.FindOrCreate(creator.gameObject.scene);
+        }
+
+        proxyView.Clear();
+    }
+
+    private void UnregisterProxyLifecycleCallbacks()
+    {
+        EditorApplication.playModeStateChanged -= HandlePlayModeStateChanged;
+        EditorApplication.update -= HandleEditorUpdate;
+    }
+
+    internal void RefreshProxyPresentationForMode(
+        bool runtimeAuthorityRequired,
+        NotAI.NAIStateManager stateManager)
+    {
+        if (creator is null || !creator
+            || creator.Grid is null || !creator.Grid)
+        {
+            DestroyProxyView();
+            return;
+        }
+
+        if (proxyView is not null
+            && proxyView
+            && proxyView.gameObject.scene != creator.gameObject.scene)
+        {
+            DestroyProxyView();
+        }
+
+        proxyView = Factory3DOutsideTestProxyView.FindOrCreate(creator.gameObject.scene);
+        if (!TryGetProxyBuildingSources(
+                runtimeAuthorityRequired,
+                stateManager,
+                out var proxyBuildings))
+        {
+            proxyView.Clear();
+            return;
+        }
+
+        proxyView.Rebuild(
+            creator.Grid,
+            proxyBuildings,
+            GetProxyFloorStates(runtimeAuthorityRequired, stateManager),
+            creator.WallHeight,
+            creator.DoorCornerExclusionDistance);
+    }
+
+    private bool TryGetProxyBuildingSources(
+        bool runtimeAuthorityRequired,
+        NotAI.NAIStateManager stateManager,
+        out List<Factory3DOutsideTestProxyBuildingSource> result)
+    {
+        result = new List<Factory3DOutsideTestProxyBuildingSource>();
+        if (runtimeAuthorityRequired)
+        {
+            if (stateManager is not { IsInitialized: true })
+            {
+                statusMessage = "Runtime factory authority is unavailable; the 3D proxy was cleared.";
+                Repaint();
+                return false;
+            }
+
+            foreach (var record in stateManager.BuildingRecords)
+            {
+                if (!stateManager.TryGetOutsideTestBuildingInteriorSemantics(
+                        record.BuildingInstanceId,
+                        out var isInteriorOnly,
+                        out var usableInteriorSize))
+                {
+                    statusMessage = $"Building {record.BuildingInstanceId} is missing from the authoritative world state; "
+                        + "the 3D proxy was cleared.";
+                    Repaint();
+                    return false;
+                }
+
+                result.Add(new Factory3DOutsideTestProxyBuildingSource(
+                    record.Clone(),
+                    isInteriorOnly,
+                    usableInteriorSize));
+            }
+
+            result.Sort((left, right) =>
+                left.Record.BuildingInstanceId.CompareTo(right.Record.BuildingInstanceId));
+            return true;
+        }
+
+        foreach (var record in records)
+        {
+            if (hasPendingMove
+                && record.BuildingInstanceId == selectedBuildingId
+                && pendingAnchor != record.AnchorCell
+                && TryCreateMovedRecord(
+                    record,
+                    pendingAnchor,
+                    out var movedRecord,
+                    out _))
+            {
+                result.Add(new Factory3DOutsideTestProxyBuildingSource(
+                    movedRecord,
+                    false,
+                    BuildingFootprint.GetUsableInteriorSize(movedRecord.FootprintSize)));
+                continue;
+            }
+
+            var clonedRecord = record.Clone();
+            result.Add(new Factory3DOutsideTestProxyBuildingSource(
+                clonedRecord,
+                false,
+                BuildingFootprint.GetUsableInteriorSize(clonedRecord.FootprintSize)));
+        }
+
+        return true;
+    }
+
+    private System.Collections.Generic.IEnumerable<OutsideTestFloorRecord> GetProxyFloorStates(
+        bool runtimeAuthorityRequired,
+        NotAI.NAIStateManager stateManager)
+    {
+        if (runtimeAuthorityRequired
+            && stateManager is { IsInitialized: true })
+        {
+            return stateManager.FloorStates;
+        }
+
+        return System.Array.Empty<OutsideTestFloorRecord>();
+    }
+
+    private bool TryCreateMovedRecord(
+        BuildingRecord sourceRecord,
+        Vector3Int newAnchor,
+        out BuildingRecord movedRecord,
+        out string error)
+    {
+        movedRecord = null!;
+        error = string.Empty;
+        var cellDelta = new Vector2Int(
+            newAnchor.x - sourceRecord.AnchorCell.x,
+            newAnchor.y - sourceRecord.AnchorCell.y);
+        var movedDoors = new List<BuildingRecord.DoorPlacement>(sourceRecord.Doors.Count);
+        foreach (var door in sourceRecord.Doors)
+        {
+            if (door is null
+                || !TestBuildingCreator.TryTranslateWallSpanId(
+                    door.WallId,
+                    cellDelta,
+                    out var translatedWallId))
+            {
+                error = $"Building {sourceRecord.BuildingInstanceId} has a door with an invalid wall span ID.";
+                return false;
+            }
+
+            movedDoors.Add(new BuildingRecord.DoorPlacement(
+                translatedWallId,
+                door.NormalizedOffset));
+        }
+
+        movedRecord = new BuildingRecord(
+            sourceRecord.BuildingInstanceId,
+            newAnchor,
+            sourceRecord.FootprintSize,
+            sourceRecord.StoryCount,
+            movedDoors);
+        return true;
+    }
+
+    private void DestroyProxyView()
+    {
+        if (proxyView is null || !proxyView)
+        {
+            proxyView = null!;
+            return;
+        }
+
+        proxyView.Clear();
+        if (Application.isPlaying)
+        {
+            Destroy(proxyView.gameObject);
+        }
+        else
+        {
+            DestroyImmediate(proxyView.gameObject);
+        }
+
+        proxyView = null!;
     }
 
     private void SelectionChanged()

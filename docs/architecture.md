@@ -31,12 +31,14 @@
 - `FactoryElevatorTransfer` pairs persisted elevator-bottom/top entities by building, adjacent floor indices, and matching logical cell. It moves elevator input buffers to the paired floor's output buffer so existing adjacent conveyor handoffs carry items onward in either direction.
 - `FactorySpatialAdapter` maps stable logical factory locations to either the existing 2D projection or 3D XZ coordinates; floor elevation is presentation-only and is never persisted.
 - `Factory3DPrototypeController` owns the reversible `Factory3DPrototype` scene slice: fixed camera, primitive floor/equipment views, adapter-based picking, discrete elevator floor cycling, and an isolated save/load smoke fixture. It does not replace the 2D movement, transition, or authoring systems.
+- `Factory3DOutsideTestProxyAssembler` derives disposable 3D OutsideTest blockouts from authoritative `BuildingRecord` and `OutsideTestFloorRecord` data. It reuses `BuildingShellValidation`, `TestBuildingCreator` wall placements/spans, `BuildingCoordinates`, and `FactorySpatialAdapter`; proxy hierarchy names are stable logical building/floor identities, not persisted proxy identities. Building-level doors are presented on floor 0, matching the existing record model and 2D shell semantics. The `FactoryWorldState` overload and the narrow `NAIStateManager.TryGetOutsideTestBuildingInteriorSemantics` seam carry explicit interior-only classification plus `FactoryWorldState.GetInteriorSize` output so interior-only equipment is not shell-inset; a missing ID is rejected rather than defaulted.
+- `Factory3DOutsideTestProxyView` owns only the transient proxy root and forwards reconciliation to the assembler. It never writes `FactoryWorldState`, save records, authored layout, shell objects, 3D coordinates, elevation, or proxy state. Generated slab meshes are reused when geometry is unchanged and explicitly released when disposable proxy nodes are removed. In Play Mode the editor companion renders only from an initialized `NAIStateManager`; an absent or not-ready runtime authority clears the proxy instead of falling back to authored records, while editor preview remains authored-record based. The companion observes `EditorApplication.playModeStateChanged` and `EditorApplication.update`; the update callback validates creator, grid, active-scene, and proxy-root identity before its authority no-churn fast path, so invalidation cleanup does not depend on a Scene View repaint. Both callbacks are removed on disable/destroy.
 - `PlayerInventory` grants one elevator top and bottom as starter equipment when each item is missing, and the hotbar selects those parts through the existing build controller.
 - `FactoryTruckMarkerView` owns truck marker presentation, including switching a marker to a wireframe cube when its projected footprint is behind a configured building occlusion surface.
 
 ## Canonical Assets
 
-- The editor-only `Factory3DTestBuildingCreatorWindow` is a companion to `TestBuildingCreator`: it reads the same authored records, previews derived 3D shells in the Scene View, supports active-floor selection and snapped move preview/commit/cancel, and writes a save only through its explicit topology-apply action.
+- The editor-only `Factory3DTestBuildingCreatorWindow` is a companion to `TestBuildingCreator`: it reads the same authored records, asks the disposable `Factory3DOutsideTestProxyView` to present derived 3D floor slabs/walls/doors/equipment, supports active-floor selection and snapped move preview/commit/cancel, and writes a save only through its explicit topology-apply action.
 
 - Runtime bootstrap: `Assets/Scenes/Bootstrap.unity`
 - Gameplay authoring scene: `Assets/Scenes/OutsideTest.unity`
@@ -51,6 +53,7 @@
 - Shell buildings include wall cells; usable interior size is `max(footprint - (2, 2), zero)`.
 - Interior-only buildings retain their configured dimensions.
 - Reconciliation and test teardown must preserve recoverable equipment and must not silently delete state.
+- The 3D proxy applies the shell-to-interior one-cell translation only while presenting equipment; it does not rewrite equipment records or create a second occupancy authority.
 
 ## Change Boundaries
 
