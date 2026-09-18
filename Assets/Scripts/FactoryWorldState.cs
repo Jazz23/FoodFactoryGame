@@ -51,15 +51,27 @@ public readonly struct OutsideTestBuildingInfo
         BuildingInstanceId = newBuildingInstanceId;
         StoryCount = newStoryCount;
         InteriorSize = newInteriorSize;
+        IsInteriorOnly = true;
         AnchorCell = Vector3Int.zero;
         FootprintSize = newInteriorSize;
     }
 
     public OutsideTestBuildingInfo(BuildingRecord record)
+        : this(
+            record,
+            BuildingFootprint.GetUsableInteriorSize(record.FootprintSize)
+                == record.FootprintSize)
+    {
+    }
+
+    public OutsideTestBuildingInfo(BuildingRecord record, bool newIsInteriorOnly)
     {
         BuildingInstanceId = record.BuildingInstanceId;
         StoryCount = record.StoryCount;
-        InteriorSize = BuildingFootprint.GetUsableInteriorSize(record.FootprintSize);
+        InteriorSize = newIsInteriorOnly
+            ? record.FootprintSize
+            : BuildingFootprint.GetUsableInteriorSize(record.FootprintSize);
+        IsInteriorOnly = newIsInteriorOnly;
         AnchorCell = record.AnchorCell;
         FootprintSize = record.FootprintSize;
     }
@@ -67,6 +79,7 @@ public readonly struct OutsideTestBuildingInfo
     public uint BuildingInstanceId { get; }
     public int StoryCount { get; }
     public Vector2Int InteriorSize { get; }
+    public bool IsInteriorOnly { get; }
     public Vector3Int AnchorCell { get; }
     public Vector2Int FootprintSize { get; }
 }
@@ -237,7 +250,9 @@ public sealed class FactoryWorldState
     {
         if (buildingRecords.TryGetValue(buildingInstanceId, out var record))
         {
-            info = new OutsideTestBuildingInfo(record);
+            info = new OutsideTestBuildingInfo(
+                record,
+                interiorOnlyBuildingIds.Contains(buildingInstanceId));
             return true;
         }
 
@@ -271,6 +286,22 @@ public sealed class FactoryWorldState
 
         interiorSize = GetInteriorSize(record);
         return true;
+    }
+
+    public bool TryGetInteriorSemantics(
+        uint buildingInstanceId,
+        out bool isInteriorOnly,
+        out Vector2Int interiorSize)
+    {
+        isInteriorOnly = false;
+        interiorSize = Vector2Int.zero;
+        if (!buildingRecords.ContainsKey(buildingInstanceId))
+        {
+            return false;
+        }
+
+        isInteriorOnly = interiorOnlyBuildingIds.Contains(buildingInstanceId);
+        return TryGetInteriorSize(buildingInstanceId, out interiorSize);
     }
 
     public uint GetNextBuildingId()
@@ -1572,7 +1603,9 @@ public sealed class FactoryWorldState
     {
         foreach (var record in buildingRecords.Values)
         {
-            yield return new OutsideTestBuildingInfo(record);
+            yield return new OutsideTestBuildingInfo(
+                record,
+                interiorOnlyBuildingIds.Contains(record.BuildingInstanceId));
         }
     }
 

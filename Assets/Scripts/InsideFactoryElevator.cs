@@ -60,6 +60,21 @@ public sealed class InsideFactoryElevator : MonoBehaviour
             <= interactionRadius * interactionRadius;
     }
 
+    public bool CanUse(Vector3 playerFootAnchor, FactorySpatialAdapter adapter)
+    {
+        if (!isConfigured || adapter is null)
+        {
+            return false;
+        }
+
+        var interactionPosition = adapter.LogicalToWorld3D(
+            new FactoryLogicalLocation(buildingInstanceId, floorIndex, InteractionLogicalPosition),
+            0f);
+        var delta = new Vector2(playerFootAnchor.x, playerFootAnchor.z)
+            - new Vector2(interactionPosition.x, interactionPosition.z);
+        return delta.sqrMagnitude <= interactionRadius * interactionRadius;
+    }
+
     public void OpenPrompt()
     {
         if (!CanOpenPrompt)

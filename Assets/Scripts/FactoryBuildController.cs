@@ -2,6 +2,7 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 public sealed class FactoryBuildController : MonoBehaviour
@@ -193,6 +194,13 @@ public sealed class FactoryBuildController : MonoBehaviour
             && !owner.IsTransitioning
             && gameObject.scene.name == "OutsideTest";
         if (!activeFloor && !activeExterior)
+        {
+            preview.SetActive(false);
+            building = false;
+            return;
+        }
+
+        if (Factory3DConstructionController.IsConstructionActiveIn3D(gameObject.scene))
         {
             preview.SetActive(false);
             building = false;

@@ -180,7 +180,7 @@ public sealed class OutsideTestFloorTransitionTests
     }
 
     [UnityTest]
-    public IEnumerator ConfiguredMovementKeepsTheCompactGroundAnchorAligned()
+    public IEnumerator ConfiguredMovementKeepsTheProduction3DFootAnchorAligned()
     {
         yield return WaitForCondition(
             () => PlayerSceneTransition.LocalOwner.gameObject.scene.name == "OutsideTest",
@@ -188,12 +188,13 @@ public sealed class OutsideTestFloorTransitionTests
             "Player did not reach the world.");
 
         var player = PlayerSceneTransition.LocalOwner;
-        var body = player.GetComponent<Rigidbody2D>();
-        var collider = player.GetComponent<CapsuleCollider2D>();
+        var traversal = player.GetComponent<Factory3DTraversalController>();
         var groundSize = player.GetComponent<Virtual3DSize>();
         var renderer = player.GetComponent<SpriteRenderer>();
         var outsideWidth = groundSize.Width;
-        var startPosition = body.position;
+        Assert.That(traversal, Is.Not.Null);
+        Assert.That(traversal.OwnsPlayer, Is.True);
+        var startPosition = traversal.FootAnchor;
         Assert.That(outsideWidth, Is.LessThan(renderer.bounds.size.x));
         var keyboard = Keyboard.current;
         var addedKeyboard = keyboard is null;
@@ -204,7 +205,7 @@ public sealed class OutsideTestFloorTransitionTests
             InputSystem.QueueStateEvent(keyboard, new KeyboardState(Key.D));
             InputSystem.Update();
             yield return new WaitForSeconds(0.25f);
-            var movedPosition = body.position;
+            var movedPosition = traversal.FootAnchor;
 
             Assert.That(movedPosition.x, Is.GreaterThan(startPosition.x + 0.1f));
         }
@@ -219,17 +220,13 @@ public sealed class OutsideTestFloorTransitionTests
         }
 
         Assert.That(groundSize.GroundAnchor.x, Is.EqualTo(renderer.bounds.center.x).Within(0.0001f));
-        Assert.That(groundSize.GroundAnchor.y, Is.EqualTo(renderer.bounds.min.y).Within(0.0001f));
-        Assert.That(groundSize.GroundAnchor, Is.EqualTo((Vector2)player.transform.position));
+        Assert.That(groundSize.GroundAnchor.y, Is.EqualTo(traversal.FootAnchor.z).Within(0.0001f));
         Assert.That(
-            collider.size.x * Mathf.Abs(collider.transform.lossyScale.x),
-            Is.EqualTo(groundSize.Width).Within(0.0001f));
-        Assert.That(
-            collider.size.y * Mathf.Abs(collider.transform.lossyScale.y),
-            Is.EqualTo(groundSize.Size.y).Within(0.0001f));
-        var colliderBottom = collider.transform.TransformPoint(
-            new Vector2(collider.offset.x, collider.offset.y - collider.size.y * 0.5f)).y;
-        Assert.That(colliderBottom, Is.EqualTo(groundSize.GroundAnchor.y).Within(0.0001f));
+            groundSize.GroundAnchor,
+            Is.EqualTo(new Vector2(traversal.FootAnchor.x, traversal.FootAnchor.z)));
+        var collider = player.GetComponentInChildren<CapsuleCollider>();
+        Assert.That(collider, Is.Not.Null);
+        Assert.That(collider.radius * 2f, Is.EqualTo(groundSize.Width).Within(0.0001f));
         Assert.That(groundSize.Size.y, Is.LessThan(groundSize.Width));
 
         yield return EnterMachineTestBuilding();
@@ -240,7 +237,8 @@ public sealed class OutsideTestFloorTransitionTests
         Assert.That(insideGrid.CellSize, Is.EqualTo(1.5f).Within(0.0001f));
         Assert.That(groundSize.Width, Is.EqualTo(outsideWidth).Within(0.0001f));
         Assert.That(renderer.bounds.size.x, Is.GreaterThan(groundSize.Width));
-        Assert.That(groundSize.GroundAnchor.y, Is.EqualTo(renderer.bounds.min.y).Within(0.0001f));
+        traversal = player.GetComponent<Factory3DTraversalController>();
+        Assert.That(groundSize.GroundAnchor.y, Is.EqualTo(traversal.FootAnchor.z).Within(0.0001f));
     }
 
     [UnityTest]

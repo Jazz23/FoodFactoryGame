@@ -23,12 +23,14 @@ public sealed class Factory3DInteriorPresenter : MonoBehaviour
     private int lastFingerprint;
     private bool hasFingerprint;
     private Factory3DInteriorProxyBuildResult lastBuild;
+    private Factory3DTraversalCollisionPresenter collisionPresenter = null!;
 
     public float StoryHeight => storyHeight;
     public Transform ProxyRoot => proxyRoot;
     public NAIStateManager Authority => authority;
     public InsideFactoryController ActiveController => activeController;
     public Factory3DInteriorProxyBuildResult LastBuild => lastBuild;
+    public Factory3DTraversalCollisionPresenter CollisionPresenter => collisionPresenter;
     public int ProxyCount => proxyRoot is not null && proxyRoot ? proxyRoot.childCount : 0;
 
     public IReadOnlyList<string> ProxyKeys
@@ -150,6 +152,15 @@ public sealed class Factory3DInteriorPresenter : MonoBehaviour
             runtimeController.CurrentFloor,
             interiorSize,
             settings);
+        EnsureCollisionPresenter();
+        collisionPresenter.Reconcile(
+            snapshot,
+            grid,
+            runtimeController.BuildingInstanceId,
+            runtimeController.CurrentFloor,
+            interiorSize,
+            GetStoryHeight(),
+            true);
         lastFingerprint = fingerprint;
         hasFingerprint = true;
         return lastBuild;
@@ -218,12 +229,30 @@ public sealed class Factory3DInteriorPresenter : MonoBehaviour
     private void ClearPresentation()
     {
         assembler.Clear(proxyRoot);
+        if (collisionPresenter is not null && collisionPresenter)
+        {
+            collisionPresenter.Clear();
+        }
         authority = null!;
         targetGrid = null!;
         activeController = null!;
         lastBuild = default;
         lastFingerprint = 0;
         hasFingerprint = false;
+    }
+
+    private void EnsureCollisionPresenter()
+    {
+        if (collisionPresenter is not null && collisionPresenter)
+        {
+            return;
+        }
+
+        collisionPresenter = GetComponent<Factory3DTraversalCollisionPresenter>();
+        if (collisionPresenter is null || !collisionPresenter)
+        {
+            collisionPresenter = gameObject.AddComponent<Factory3DTraversalCollisionPresenter>();
+        }
     }
 
     private Material GetMaterial()

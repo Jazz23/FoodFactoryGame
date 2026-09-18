@@ -263,10 +263,243 @@ public sealed class FactoryConstructionServiceTests
         var preview = service.PreviewBuildingRemoval(state, 1);
 
         Assert.That(service.TryCommit(state, preview, false, out _, out var rejectedError), Is.False);
-        Assert.That(rejectedError, Does.Contain("destructive confirmation"));
+        Assert.That(rejectedError, Does.Contain("target-specific confirmation"));
         Assert.That(state.TryGetBuildingRecord(1, out _), Is.True);
-        Assert.That(service.TryCommit(state, preview, true, out _, out var deleteError), Is.True, deleteError);
+        Assert.That(
+            service.TryCommit(
+                state,
+                preview,
+                new FactoryConstructionConfirmation(preview),
+                out _,
+                out var deleteError),
+            Is.True,
+            deleteError);
         Assert.That(state.TryGetBuildingRecord(1, out _), Is.False);
+    }
+
+    [Test]
+    public void EntityRemovalRequiresTheSameFreshTargetConfirmationAndRejectsWithoutMutation()
+    {
+        var state = CreateStateWithBuilding(1, Vector3Int.zero, new Vector2Int(6, 6), 1);
+        Assert.That(
+            state.TryAddTestMachine(
+                1,
+                0,
+                new Vector2(1.5f, 1.5f),
+                out var entityId,
+                out var addError),
+            Is.True,
+            addError);
+        var preview = service.PreviewEntityRemoval(state, 1, 0, entityId);
+        var replacementPreview = service.PreviewEntityRemoval(state, 1, 0, entityId);
+        var before = state.CaptureState();
+        service.Cancel();
+        Assert.That(state.CaptureState().Floors, Has.Count.EqualTo(before.Floors.Count));
+
+        Assert.That(
+            service.TryCommit(state, preview, true, out _, out var legacyError),
+            Is.False);
+        Assert.That(legacyError, Does.Contain("fresh target-specific"));
+        Assert.That(
+            service.TryCommit(
+                state,
+                preview,
+                new FactoryConstructionConfirmation(replacementPreview),
+                out _,
+                out var wrongConfirmationError),
+            Is.False);
+        Assert.That(wrongConfirmationError, Does.Contain("fresh target-specific"));
+        Assert.That(state.CaptureState().Floors, Has.Count.EqualTo(before.Floors.Count));
+        Assert.That(state.TryGetFloorState(1, 0, out var floor), Is.True);
+        Assert.That(floor.TryGetEntity(entityId, out _), Is.True);
+
+        Assert.That(
+            service.TryCommit(
+                state,
+                preview,
+                new FactoryConstructionConfirmation(preview),
+                out _,
+                out var confirmationError),
+            Is.True,
+            confirmationError);
+        Assert.That(floor.TryGetEntity(entityId, out _), Is.False);
+    }
+
+    [Test]
+    public void EquipmentPlacementMoveRemovalAndReloadPreserveUnrelatedGameplayState()
+    {
+        var path = Path.Combine(
+            Application.temporaryCachePath,
+            $"factory-construction-flow-{Guid.NewGuid():N}.db");
+        try
+        {
+            var state = CreateStateWithBuilding(1, Vector3Int.zero, new Vector2Int(6, 6), 2);
+            Assert.That(
+                state.TryAddTestMachine(
+                    1,
+                    0,
+                    new Vector2(0.5f, 0.5f),
+                    out var sourceId,
+                    out var sourceError),
+                Is.True,
+                sourceError);
+            Assert.That(
+                state.TryAddTestStorage(
+                    1,
+                    1,
+                    new Vector2(1.5f, 1.5f),
+                    out var destinationId,
+                    out var destinationError),
+                Is.True,
+                destinationError);
+            Assert.That(
+                state.TryAddConnection(
+                    new FactoryEntityEndpoint(1, 0, sourceId),
+                    new FactoryEntityEndpoint(1, 1, destinationId),
+                    out var connectionError),
+                Is.True,
+                connectionError);
+            state.AdvanceProduction(2f);
+            Assert.That(state.TryGetFloorState(1, 0, out var sourceFloor), Is.True);
+            Assert.That(sourceFloor.TryGetEntity(sourceId, out var source), Is.True);
+            var producedBeforeFlow = source.ProducedCount;
+
+            var placement = service.PreviewEquipment(
+                state,
+                1,
+                0,
+                "conveyor-east",
+                new Vector2Int(2, 2));
+            Assert.That(placement.IsValid, Is.True, placement.Error);
+            Assert.That(
+                service.TryCommit(state, placement, false, out var placedEntityId, out var placementError),
+                Is.True,
+                placementError);
+
+            var move = service.PreviewEntityMove(
+                state,
+                1,
+                0,
+                placedEntityId,
+                new Vector2Int(3, 2));
+            Assert.That(move.IsValid, Is.True, move.Error);
+            Assert.That(
+                service.TryCommit(state, move, false, out _, out var moveError),
+                Is.True,
+                moveError);
+
+            var removal = service.PreviewEntityRemoval(state, 1, 0, placedEntityId);
+            Assert.That(removal.IsValid, Is.True, removal.Error);
+            var beforeRemoval = state.CaptureState();
+            service.Cancel();
+            Assert.That(state.ConnectionCount, Is.EqualTo(beforeRemoval.Connections.Count));
+            Assert.That(state.TryGetFloorState(1, 0, out var unchangedFloor), Is.True);
+            Assert.That(unchangedFloor.TryGetEntity(placedEntityId, out _), Is.True);
+
+            Assert.That(
+                service.TryCommit(
+                    state,
+                    removal,
+                    new FactoryConstructionConfirmation(removal),
+                    out _,
+                    out var removalError),
+                Is.True,
+                removalError);
+            Assert.That(state.TryGetFloorState(1, 0, out var finalFloor), Is.True);
+            Assert.That(finalFloor.TryGetEntity(placedEntityId, out _), Is.False);
+            Assert.That(state.ConnectionCount, Is.EqualTo(1));
+            Assert.That(finalFloor.TryGetEntity(sourceId, out var finalSource), Is.True);
+            Assert.That(finalSource.ProducedCount, Is.EqualTo(producedBeforeFlow));
+
+            Assert.That(state.SaveToFile(path), Is.True);
+            var restored = new FactoryWorldState(1);
+            Assert.That(restored.LoadFromFile(path), Is.True);
+            Assert.That(restored.ConnectionCount, Is.EqualTo(1));
+            Assert.That(restored.TryGetFloorState(1, 0, out var restoredFloor), Is.True);
+            Assert.That(restoredFloor.TryGetEntity(placedEntityId, out _), Is.False);
+            Assert.That(restoredFloor.TryGetEntity(sourceId, out var restoredSource), Is.True);
+            Assert.That(restoredSource.ProducedCount, Is.EqualTo(producedBeforeFlow));
+        }
+        finally
+        {
+            foreach (var suffix in new[] { "", "-wal", "-shm" })
+            {
+                var candidate = path + suffix;
+                if (File.Exists(candidate))
+                {
+                    File.Delete(candidate);
+                }
+            }
+        }
+    }
+
+    [Test]
+    public void InteriorOnlySemanticsComeFromAuthorityInsteadOfFootprintEquality()
+    {
+        var state = new FactoryWorldState(1);
+        Assert.That(
+            state.TryRegisterBuilding(
+                new BuildingRecord(
+                    1,
+                    Vector3Int.zero,
+                    new Vector2Int(6, 6),
+                    1,
+                    Array.Empty<BuildingRecord.DoorPlacement>()),
+                out var shellError),
+            Is.True,
+            shellError);
+        Assert.That(
+            state.TryRegisterBuilding(2, 1, new Vector2Int(6, 6), out var legacyError),
+            Is.True,
+            legacyError);
+
+        Assert.That(state.TryGetBuildingInfo(1, out var shellInfo), Is.True);
+        Assert.That(state.TryGetBuildingInfo(2, out var legacyInfo), Is.True);
+        Assert.That(shellInfo.IsInteriorOnly, Is.False);
+        Assert.That(shellInfo.InteriorSize, Is.EqualTo(new Vector2Int(4, 4)));
+        Assert.That(legacyInfo.IsInteriorOnly, Is.True);
+        Assert.That(legacyInfo.InteriorSize, Is.EqualTo(new Vector2Int(6, 6)));
+    }
+
+    [Test]
+    public void ThreeDConstructionOwnershipCanBeDisabledWithoutALiveManager()
+    {
+        var ownerObject = new GameObject("3D Construction Ownership Test");
+        try
+        {
+            var controller = ownerObject.AddComponent<Factory3DConstructionController>();
+            controller.Set3DInputOwnership(true);
+            Assert.That(
+                Factory3DConstructionController.IsInputOwnedBy3D(ownerObject.scene),
+                Is.True);
+            Assert.That(
+                Factory3DConstructionController.IsConstructionActiveIn3D(ownerObject.scene),
+                Is.False);
+            Assert.That(controller.Mode, Is.EqualTo(Factory3DConstructionMode.Idle));
+
+            controller.SetPointerFocusOverride(true);
+            Assert.That(controller.IsPointerFocusBlockingInput, Is.True);
+            controller.SetPointerFocusOverride(false);
+            Assert.That(controller.IsPointerFocusBlockingInput, Is.False);
+
+            controller.enabled = false;
+            Assert.That(
+                Factory3DConstructionController.IsInputOwnedBy3D(ownerObject.scene),
+                Is.False);
+            controller.enabled = true;
+            Assert.That(
+                Factory3DConstructionController.IsInputOwnedBy3D(ownerObject.scene),
+                Is.True);
+
+            controller.Set3DInputOwnership(false);
+            Assert.That(
+                Factory3DConstructionController.IsInputOwnedBy3D(ownerObject.scene),
+                Is.False);
+        }
+        finally
+        {
+            UnityEngine.Object.DestroyImmediate(ownerObject);
+        }
     }
 
     [Test]

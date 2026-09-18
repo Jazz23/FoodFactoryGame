@@ -45,7 +45,9 @@ public sealed class GameSceneManager : MonoBehaviour
     private FactoryTruckMarkerView truckMarkerView = null!;
     private FactoryDockExteriorView dockExteriorView = null!;
     private Factory3DRouteAuthorityPresenter routeAuthorityPresenter = null!;
+    private Factory3DOutsideTestCollisionPresenter outsideCollisionPresenter = null!;
     private Factory3DConstructionController constructionController = null!;
+    private readonly List<Factory3DOutsideTestProxyBuildingSource> outsideCollisionSources = new();
     private SceneHandle registeredOutsideTestSceneHandle;
     private bool outsideTestWorldReconciled;
     private int clientOutsideTestLoadedInteriorCount;
@@ -123,6 +125,10 @@ public sealed class GameSceneManager : MonoBehaviour
         outsideTestStateLoadFailed = false;
         outsideTestStateNeedsSave = false;
         transitionCoordinator.Clear();
+        if (outsideCollisionPresenter is not null && outsideCollisionPresenter)
+        {
+            outsideCollisionPresenter.Clear();
+        }
         registeredOutsideTestSceneHandle = default;
         lastOutsideTestError = string.Empty;
         if (!stateManager.ConfigureLegacyPaths(
@@ -164,6 +170,10 @@ public sealed class GameSceneManager : MonoBehaviour
         networkManager.SceneManager.OnClientPresenceChangeEnd -= ClientPresenceChangeEnd;
 
         transitionCoordinator.Clear();
+        if (outsideCollisionPresenter is not null && outsideCollisionPresenter)
+        {
+            outsideCollisionPresenter.Clear();
+        }
     }
 
     private void OnApplicationQuit()
@@ -175,6 +185,7 @@ public sealed class GameSceneManager : MonoBehaviour
     {
         EnsureOutsideTestStateLoaded();
         EnsureRouteAuthorityPresenter();
+        EnsureOutsideTestCollisionPresenter();
         EnsureInteriorPresenter();
         EnsureTruckMarkerView();
         EnsureDockExteriorView();
@@ -213,6 +224,91 @@ public sealed class GameSceneManager : MonoBehaviour
         {
             routeAuthorityPresenter = gameObject.AddComponent<Factory3DRouteAuthorityPresenter>();
         }
+    }
+
+    private void EnsureOutsideTestCollisionPresenter()
+    {
+        var worldScene = GetOutsideTestWorldScene();
+        if (!worldScene.IsValid()
+            || !worldScene.isLoaded
+            || stateManager is null
+            || !stateManager
+            || !stateManager.IsInitialized
+            || !SceneGrid.TryGetForScene(worldScene, out var grid))
+        {
+            if (outsideCollisionPresenter is not null && outsideCollisionPresenter)
+            {
+                outsideCollisionPresenter.Clear();
+            }
+
+            return;
+        }
+
+        if (outsideCollisionPresenter is null || !outsideCollisionPresenter)
+        {
+            var presenters = FindObjectsByType<Factory3DOutsideTestCollisionPresenter>(
+                FindObjectsInactive.Include,
+                FindObjectsSortMode.None);
+            foreach (var candidate in presenters)
+            {
+                if (candidate is not null
+                    && candidate
+                    && candidate.gameObject.scene == worldScene)
+                {
+                    outsideCollisionPresenter = candidate;
+                    break;
+                }
+            }
+        }
+
+        if (outsideCollisionPresenter is null || !outsideCollisionPresenter)
+        {
+            var presenterObject = new GameObject(
+                "Factory 3D OutsideTest Traversal Collisions");
+            UnitySceneManager.MoveGameObjectToScene(presenterObject, worldScene);
+            outsideCollisionPresenter = presenterObject.AddComponent<
+                Factory3DOutsideTestCollisionPresenter>();
+        }
+
+        outsideCollisionSources.Clear();
+        foreach (var record in stateManager.BuildingRecords)
+        {
+            if (record is null
+                || !stateManager.TryGetOutsideTestBuildingInteriorSemantics(
+                    record.BuildingInstanceId,
+                    out var isInteriorOnly,
+                    out var usableInteriorSize))
+            {
+                continue;
+            }
+
+            outsideCollisionSources.Add(new Factory3DOutsideTestProxyBuildingSource(
+                record,
+                isInteriorOnly,
+                usableInteriorSize));
+        }
+
+        var creator = FindOutsideTestCreator();
+        var wallHeight = creator is null || !creator ? 3f : creator.WallHeight;
+        var doorDistance = creator is null || !creator
+            ? TestBuildingCreator.DefaultDoorCornerExclusionDistance
+            : creator.DoorCornerExclusionDistance;
+        outsideCollisionPresenter.Reconcile(
+            grid,
+            outsideCollisionSources,
+            stateManager.FloorStates,
+            wallHeight,
+            doorDistance);
+    }
+
+    public void EnsureLocalProduction3DPlayer(PlayerSceneTransition player)
+    {
+        if (player is null || !player || !player.IsOwner)
+        {
+            return;
+        }
+
+        player.EnableProduction3DTraversal();
     }
 
     private void EnsureInteriorPresenter()
@@ -1458,6 +1554,41 @@ public sealed class GameSceneManager : MonoBehaviour
         return true;
     }
 
+    public bool TryCommit3DConstruction(
+        FactoryConstructionPreview preview,
+        FactoryConstructionConfirmation confirmation,
+        out uint affectedEntityId,
+        out string error)
+    {
+        affectedEntityId = 0;
+        error = "Only the host can edit the OutsideTest factory.";
+        if (!networkManager.IsServerStarted)
+        {
+            return false;
+        }
+
+        EnsureOutsideTestStateLoaded();
+        if (outsideTestStateLoadFailed)
+        {
+            error = lastOutsideTestError;
+            return false;
+        }
+
+        if (!stateManager.TryCommitConstruction(
+                preview,
+                confirmation,
+                out affectedEntityId,
+                out error))
+        {
+            return false;
+        }
+
+        outsideTestStateNeedsSave = true;
+        BroadcastOutsideTestFloorStates();
+        Refresh3DConstructionPresentation();
+        return true;
+    }
+
     public void Cancel3DConstruction()
     {
         stateManager.CancelConstructionPreview();
@@ -1507,6 +1638,7 @@ public sealed class GameSceneManager : MonoBehaviour
             stateManager.FloorStates,
             wallHeight,
             doorDistance);
+        EnsureOutsideTestCollisionPresenter();
     }
 
     private void Configure3DConstructionBounds()
@@ -2306,7 +2438,12 @@ public sealed class GameSceneManager : MonoBehaviour
         }
 
         var targetPosition = grid.LogicalToWorld(pendingTransition.ArrivalLogicalPosition);
-        pendingTransition.Player.GetComponent<PlayerSceneTransition>().ServerTeleport(targetPosition);
+            pendingTransition.Player.GetComponent<PlayerSceneTransition>().ServerTeleport(
+                targetPosition,
+                pendingTransition.BuildingInstanceId,
+                pendingTransition.StoryCount,
+                pendingTransition.FloorIndex,
+                pendingTransition.ArrivalLogicalPosition);
     }
 
     private void ClientPresenceChangeEnd(ClientPresenceChangeEventArgs args)
@@ -2424,7 +2561,12 @@ public sealed class GameSceneManager : MonoBehaviour
             position,
             Quaternion.identity,
             true);
-        player.GetComponent<PlayerSceneTransition>().ServerTeleport(position);
+        player.GetComponent<PlayerSceneTransition>().ServerTeleport(
+            position,
+            0u,
+            1,
+            0,
+            grid.InitialPlayerLogicalPosition);
 
         UnitySceneManager.MoveGameObjectToScene(player.gameObject, scene);
         networkManager.ServerManager.Spawn(player, connection);

@@ -15,7 +15,19 @@ public sealed class Virtual3DSize : MonoBehaviour
     public Vector3 Size => new(width, groundDepth, VisibleHeight);
     public float Width => width;
     // Bottom-pivot sprites share this stable foot position, independent of animation bounds.
-    public Vector2 GroundAnchor => transform.position;
+    public Vector2 GroundAnchor
+    {
+        get
+        {
+            if (TryGetComponent<Factory3DTraversalController>(out var traversal)
+                && traversal.OwnsPlayer)
+            {
+                return new Vector2(traversal.FootAnchor.x, traversal.FootAnchor.z);
+            }
+
+            return transform.position;
+        }
+    }
     public float FrontY => GroundAnchor.y;
     public float DepthY => GroundAnchor.y;
     public Bounds FootprintBounds => new(

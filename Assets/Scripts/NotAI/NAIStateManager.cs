@@ -569,17 +569,15 @@ namespace NotAI
         {
             isInteriorOnly = false;
             usableInteriorSize = Vector2Int.zero;
-            if (buildingInstanceId == 0
-                || !factoryState.TryGetBuildingRecord(
-                    buildingInstanceId,
-                    out var record))
+            if (buildingInstanceId == 0)
             {
                 return false;
             }
 
-            usableInteriorSize = factoryState.GetInteriorSize(record);
-            isInteriorOnly = usableInteriorSize == record.FootprintSize;
-            return true;
+            return factoryState.TryGetInteriorSemantics(
+                buildingInstanceId,
+                out isInteriorOnly,
+                out usableInteriorSize);
         }
 
         public bool TryGetBuildingRecord(uint buildingInstanceId, out BuildingRecord record)
@@ -660,11 +658,30 @@ namespace NotAI
                 confirmDestructiveRemoval,
                 out affectedEntityId,
                 out error);
-            if (!committed)
-            {
-                return false;
-            }
+            return committed
+                && FinalizeConstructionCommit(preview, affectedEntityId);
+        }
 
+        public bool TryCommitConstruction(
+            FactoryConstructionPreview preview,
+            FactoryConstructionConfirmation confirmation,
+            out uint affectedEntityId,
+            out string error)
+        {
+            var committed = constructionService.TryCommit(
+                factoryState,
+                preview,
+                confirmation,
+                out affectedEntityId,
+                out error);
+            return committed
+                && FinalizeConstructionCommit(preview, affectedEntityId);
+        }
+
+        private bool FinalizeConstructionCommit(
+            FactoryConstructionPreview preview,
+            uint affectedEntityId)
+        {
             if (preview.TargetKind == FactoryConstructionTargetKind.Building
                 && preview.Action == FactoryConstructionAction.Create)
             {

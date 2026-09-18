@@ -6,7 +6,7 @@ using FishNet.Object;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-[RequireComponent(typeof(Movement), typeof(NetworkTransform), typeof(Rigidbody2D))]
+[RequireComponent(typeof(NetworkTransform))]
 [RequireComponent(typeof(Virtual3DSize))]
 public sealed class PlayerSceneTransition : NetworkBehaviour
 {
@@ -24,10 +24,97 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
     private OutsideTestFloorDebugPanel debugPanel = null!;
     private FactoryBuildController factoryBuilder = null!;
     private FactoryTruckRoutePanel routePanel = null!;
+    private bool threeDOwnership;
 
     public static PlayerSceneTransition LocalOwner = null!;
     public bool IsTransitioning => isTransitioning;
     public bool IsFactoryBuildContextActive => factoryBuilder is not null && factoryBuilder.IsBuildContextActive;
+    public bool Is3DTraversalOwner => threeDOwnership;
+    public bool IsElevatorPromptOpen => elevatorPromptOpen;
+
+    public void Set3DTraversalOwnership(bool ownsPlayer)
+    {
+        threeDOwnership = ownsPlayer;
+    }
+
+    public bool EnableProduction3DTraversal()
+    {
+        if (!IsOwner
+            || !TryGetComponent<Factory3DTraversalController>(out var traversal))
+        {
+            return false;
+        }
+
+        traversal.Set3DOwnership(true);
+        ConfigureCurrent3DContext(traversal, 0u, 0);
+        return true;
+    }
+
+    public void Request3DInteraction(Factory3DTraversalController traversal)
+    {
+        if (!threeDOwnership
+            || !IsOwner
+            || traversal is null
+            || !traversal.OwnsPlayer
+            || isTransitioning
+            || !SceneGrid.TryGetForScene(gameObject.scene, out var grid))
+        {
+            return;
+        }
+
+        var adapter = grid.CreateSpatialAdapter();
+        if (InsideFactoryElevator.TryGetForScene(gameObject.scene, out var elevator)
+            && elevator.CanUse(traversal.FootAnchor, adapter)
+            && elevator.CanOpenPrompt)
+        {
+            activeElevator = elevator;
+            activeElevator.OpenPrompt();
+            elevatorPromptOpen = true;
+            movement?.SetTransitioning(true);
+            return;
+        }
+
+        if (!ScenePortal.TryGetClosest(
+                gameObject.scene,
+                traversal.FootAnchor,
+                adapter,
+                out var portal))
+        {
+            return;
+        }
+
+        SetTransitionState(true);
+        RequestTransition3DServerRpc(portal.BuildingInstanceId);
+    }
+
+    public void Request3DElevatorFloor(Vector2 movementInput)
+    {
+        if (!threeDOwnership
+            || !IsOwner
+            || !elevatorPromptOpen
+            || isTransitioning
+            || activeElevator is null)
+        {
+            return;
+        }
+
+        if (movementInput.y > 0.5f && activeElevator.CanGoUp)
+        {
+            RequestElevatorFloor(activeElevator.CurrentFloor + 1);
+        }
+        else if (movementInput.y < -0.5f && activeElevator.CanGoDown)
+        {
+            RequestElevatorFloor(activeElevator.CurrentFloor - 1);
+        }
+    }
+
+    public void Cancel3DInteraction()
+    {
+        if (threeDOwnership && !isTransitioning && elevatorPromptOpen)
+        {
+            CloseElevatorPrompt();
+        }
+    }
 
     public void EquipHotbarItem(string? itemId)
     {
@@ -52,22 +139,38 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
             return;
         }
 
+        SetTransitionState(false);
         LocalOwner = this;
-        interact = InputSystem.actions["Interact"];
-        move = InputSystem.actions["Move"];
-        cancel = InputSystem.actions["UI/Cancel"];
-        interact.Enable();
-        move.Enable();
-        cancel.Enable();
-        interact.performed += InteractPerformed;
-        move.performed += MovePerformed;
-        cancel.performed += CancelPerformed;
         debugPanel = gameObject.AddComponent<OutsideTestFloorDebugPanel>();
         debugPanel.Initialize(this);
         factoryBuilder = gameObject.AddComponent<FactoryBuildController>();
         factoryBuilder.Initialize(this);
         routePanel = gameObject.AddComponent<FactoryTruckRoutePanel>();
         routePanel.Initialize(this);
+
+        if (TryGetComponent<Factory3DTraversalController>(out _))
+        {
+            if (GameSceneManager.Instance is not null && GameSceneManager.Instance)
+            {
+                GameSceneManager.Instance.EnsureLocalProduction3DPlayer(this);
+            }
+            else
+            {
+                EnableProduction3DTraversal();
+            }
+        }
+        else
+        {
+            interact = InputSystem.actions["Interact"];
+            move = InputSystem.actions["Move"];
+            cancel = InputSystem.actions["UI/Cancel"];
+            interact.Enable();
+            move.Enable();
+            cancel.Enable();
+            interact.performed += InteractPerformed;
+            move.performed += MovePerformed;
+            cancel.performed += CancelPerformed;
+        }
     }
 
     public override void OnStopClient()
@@ -77,12 +180,26 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
             return;
         }
 
-        interact.performed -= InteractPerformed;
-        move.performed -= MovePerformed;
-        cancel.performed -= CancelPerformed;
-        interact.Disable();
-        move.Disable();
-        cancel.Disable();
+        SetTransitionState(false);
+        if (interact is not null)
+        {
+            interact.performed -= InteractPerformed;
+            interact.Disable();
+        }
+        if (move is not null)
+        {
+            move.performed -= MovePerformed;
+            move.Disable();
+        }
+        if (cancel is not null)
+        {
+            cancel.performed -= CancelPerformed;
+            cancel.Disable();
+        }
+        if (TryGetComponent<Factory3DTraversalController>(out var traversal))
+        {
+            traversal.Set3DOwnership(false);
+        }
         CloseElevatorPrompt();
         if (debugPanel is not null && debugPanel)
         {
@@ -104,7 +221,7 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
 
     private void InteractPerformed(InputAction.CallbackContext _)
     {
-        if (isTransitioning)
+        if (threeDOwnership || isTransitioning)
         {
             return;
         }
@@ -122,7 +239,7 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
             activeElevator = elevator;
             activeElevator.OpenPrompt();
             elevatorPromptOpen = true;
-            movement.SetTransitioning(true);
+            movement?.SetTransitioning(true);
             return;
         }
 
@@ -140,6 +257,11 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
 
     private void MovePerformed(InputAction.CallbackContext context)
     {
+        if (threeDOwnership)
+        {
+            return;
+        }
+
         if (!elevatorPromptOpen || isTransitioning)
         {
             return;
@@ -198,7 +320,14 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
 
         CloseElevatorPrompt();
         SetTransitionState(true);
-        RequestElevatorFloorServerRpc(targetFloorIndex);
+        if (threeDOwnership)
+        {
+            RequestElevatorFloor3DServerRpc(targetFloorIndex);
+        }
+        else
+        {
+            RequestElevatorFloorServerRpc(targetFloorIndex);
+        }
     }
 
     [ServerRpc]
@@ -218,7 +347,49 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
 
     public void ServerTeleport(Vector3 position)
     {
-        TeleportGroundAnchor(position);
+        var buildingInstanceId = 0u;
+        var floorIndex = 0;
+        var storyCount = 1;
+        if (InsideFactoryController.TryGetForScene(
+                gameObject.scene,
+                out var controller))
+        {
+            buildingInstanceId = controller.BuildingInstanceId;
+            floorIndex = controller.CurrentFloor;
+            storyCount = controller.StoryCount;
+        }
+
+        var logicalPosition = Vector2.zero;
+        if (SceneGrid.TryGetForScene(gameObject.scene, out var grid))
+        {
+            logicalPosition = grid.WorldToLogical(new Vector2(position.x, position.y));
+        }
+
+        ServerTeleport(
+            position,
+            buildingInstanceId,
+            storyCount,
+            floorIndex,
+            logicalPosition);
+    }
+
+    public void ServerTeleport(
+        Vector3 position,
+        uint buildingInstanceId,
+        int storyCount,
+        int floorIndex,
+        Vector2 logicalPosition)
+    {
+        if (!TryTeleport3D(
+                buildingInstanceId,
+                storyCount,
+                floorIndex,
+                logicalPosition))
+        {
+            TeleportGroundAnchor(position);
+        }
+
+        networkTransform.Teleport();
     }
 
     public void ServerBeginTransition()
@@ -376,6 +547,56 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         if (IsOwner)
         {
             RequestRemoveAllCurrentFloorEntitiesServerRpc();
+        }
+    }
+
+    [ServerRpc]
+    private void RequestElevatorFloor3DServerRpc(int targetFloorIndex)
+    {
+        if (!SceneGrid.TryGetForScene(gameObject.scene, out var grid))
+        {
+            TargetSetTransitionState(Owner, false);
+            return;
+        }
+
+        var adapter = grid.CreateSpatialAdapter();
+        var elevatorExists = InsideFactoryElevator.TryGetForScene(
+            gameObject.scene,
+            out var elevator);
+        if (!elevatorExists
+            || !elevator.CanUse(transform.position, adapter)
+            || !elevator.IsFloorAvailable(targetFloorIndex)
+            || !GameSceneManager.Instance.RequestFloorTransition(NetworkObject, targetFloorIndex))
+        {
+            TargetSetTransitionState(Owner, false);
+        }
+    }
+
+    [ServerRpc]
+    private void RequestTransition3DServerRpc(uint buildingInstanceId)
+    {
+        if (!SceneGrid.TryGetForScene(gameObject.scene, out var grid))
+        {
+            TargetSetTransitionState(Owner, false);
+            return;
+        }
+
+        var adapter = grid.CreateSpatialAdapter();
+        var exists = buildingInstanceId == 0
+            ? ScenePortal.TryGetClosest(
+                gameObject.scene,
+                transform.position,
+                adapter,
+                out var portal)
+            : ScenePortal.TryGetBuilding(
+                gameObject.scene,
+                transform.position,
+                adapter,
+                buildingInstanceId,
+                out portal);
+        if (!exists || !GameSceneManager.Instance.RequestTransition(NetworkObject, portal))
+        {
+            TargetSetTransitionState(Owner, false);
         }
     }
 
@@ -915,7 +1136,24 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         }
 
         lastCompletedTransitionSequence = sequence;
-        TeleportGroundAnchor(position);
+        if (IsOwner)
+        {
+            EnableProduction3DTraversal();
+        }
+
+        if (threeDOwnership
+            && TryTeleport3D(
+                buildingInstanceId,
+                storyCount,
+                floorIndex,
+                arrivalLogicalPosition))
+        {
+            // The 3D controller owns the presentation foot anchor after migration.
+        }
+        else
+        {
+            TeleportGroundAnchor(position);
+        }
         networkTransform.Teleport();
         CloseElevatorPrompt();
         SetTransitionState(false);
@@ -933,16 +1171,98 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
     private void SetTransitionState(bool value)
     {
         isTransitioning = value;
-        movement.SetTransitioning(value);
+        movement?.SetTransitioning(value);
+    }
+
+    private void ConfigureCurrent3DContext(
+        Factory3DTraversalController traversal,
+        uint requestedBuildingInstanceId,
+        int requestedFloorIndex)
+    {
+        if (!SceneGrid.TryGetForScene(gameObject.scene, out var grid))
+        {
+            return;
+        }
+
+        var buildingInstanceId = requestedBuildingInstanceId;
+        var floorIndex = Mathf.Max(0, requestedFloorIndex);
+        if (buildingInstanceId == 0
+            && InsideFactoryController.TryGetForScene(
+                gameObject.scene,
+                out var controller))
+        {
+            buildingInstanceId = controller.BuildingInstanceId;
+            floorIndex = controller.CurrentFloor;
+        }
+
+        traversal.ConfigureSpatialContext(
+            grid.CreateSpatialAdapter(),
+            buildingInstanceId,
+            floorIndex,
+            GetStoryHeight());
+    }
+
+    private bool TryTeleport3D(
+        uint buildingInstanceId,
+        int storyCount,
+        int floorIndex,
+        Vector2 logicalPosition)
+    {
+        if (!TryGetComponent<Factory3DTraversalController>(out var traversal)
+            || !SceneGrid.TryGetForScene(gameObject.scene, out var grid))
+        {
+            return false;
+        }
+
+        var safeFloorIndex = Mathf.Clamp(
+            floorIndex,
+            0,
+            Mathf.Max(1, storyCount) - 1);
+        var storyHeight = GetStoryHeight();
+        var adapter = grid.CreateSpatialAdapter();
+        traversal.ConfigureSpatialContext(
+            adapter,
+            buildingInstanceId,
+            safeFloorIndex,
+            storyHeight);
+        var elevation = buildingInstanceId == 0
+            ? 0f
+            : BuildingCoordinates.GetFloorElevation(safeFloorIndex, storyHeight);
+        traversal.Teleport(
+            adapter.LogicalToWorld3D(
+                new FactoryLogicalLocation(
+                    buildingInstanceId,
+                    safeFloorIndex,
+                    logicalPosition),
+                elevation),
+            safeFloorIndex);
+        return true;
+    }
+
+    private float GetStoryHeight()
+    {
+        return GameSceneManager.Instance is not null && GameSceneManager.Instance
+            ? GameSceneManager.Instance.OutsideTestStoryHeight
+            : Factory3DInteriorPresenter.DefaultStoryHeight;
     }
 
     private void TeleportGroundAnchor(Vector3 position)
     {
-        groundSize.SetGroundAnchor(new Vector2(position.x, position.y));
+        if (threeDOwnership
+            && TryGetComponent<Factory3DTraversalController>(out var traversal))
+        {
+            traversal.Teleport(position, traversal.FloorIndex);
+            return;
+        }
+
+        groundSize?.SetGroundAnchor(new Vector2(position.x, position.y));
         var groundedPosition = transform.position;
         groundedPosition.z = position.z;
         transform.SetPositionAndRotation(groundedPosition, Quaternion.identity);
-        body.position = new Vector2(groundedPosition.x, groundedPosition.y);
+        if (body is not null && body)
+        {
+            body.position = new Vector2(groundedPosition.x, groundedPosition.y);
+        }
     }
 
     private void CloseElevatorPrompt()
@@ -956,7 +1276,7 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
         elevatorPromptOpen = false;
         if (!isTransitioning)
         {
-            movement.SetTransitioning(false);
+        movement?.SetTransitioning(false);
         }
     }
 }

@@ -34,6 +34,9 @@ public sealed class Factory3DPrototypeController : MonoBehaviour
     public FactoryWorldState WorldState => worldState;
     public Factory3DPrototypePlayer Player => player;
     public Camera PrototypeCamera => prototypeCamera;
+    public FactorySpatialAdapter SpatialAdapter => spatialAdapter;
+    public float StoryHeight => floorHeight * spatialAdapter.CellSize;
+    public uint BuildingInstanceId => buildingInstanceId;
     public int ActiveFloor => activeFloor;
     public string LastInteraction { get; private set; } = string.Empty;
     public uint LastInteractedEntityId { get; private set; }

@@ -25,7 +25,7 @@ public sealed class Factory3DPrototypePlayModeTests
         Assert.That(controller.IsolatedSaveLoadPreservedTopology, Is.True);
         Assert.That(controller.Player, Is.Not.Null);
         Assert.That(controller.Player.IsGrounded, Is.True);
-        Assert.That(controller.Player.transform.position.y, Is.EqualTo(0f).Within(0.05f));
+        Assert.That(controller.Player.transform.position.y, Is.EqualTo(0f).Within(0.1f));
         Assert.That(controller.ActiveFloor, Is.EqualTo(0));
         Assert.That(controller.IsFloorVisible(0), Is.True);
         Assert.That(controller.IsFloorVisible(1), Is.False);

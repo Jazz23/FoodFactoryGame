@@ -18,6 +18,34 @@ public enum FactoryConstructionAction
     Remove
 }
 
+public sealed class FactoryConstructionConfirmation
+{
+    public FactoryConstructionConfirmation(FactoryConstructionPreview preview)
+    {
+        Preview = preview ?? throw new ArgumentNullException(nameof(preview));
+        TargetKind = preview.TargetKind;
+        BuildingInstanceId = preview.BuildingInstanceId;
+        FloorIndex = preview.FloorIndex;
+        EntityId = preview.EntityId;
+    }
+
+    public FactoryConstructionPreview Preview { get; }
+    public FactoryConstructionTargetKind TargetKind { get; }
+    public uint BuildingInstanceId { get; }
+    public int FloorIndex { get; }
+    public uint EntityId { get; }
+
+    internal bool Matches(FactoryConstructionPreview preview)
+    {
+        return preview is not null
+            && ReferenceEquals(Preview, preview)
+            && TargetKind == preview.TargetKind
+            && BuildingInstanceId == preview.BuildingInstanceId
+            && FloorIndex == preview.FloorIndex
+            && EntityId == preview.EntityId;
+    }
+}
+
 public sealed class FactoryConstructionPreview
 {
     private readonly List<Vector3Int> footprintCells = new();
@@ -311,13 +339,8 @@ public sealed class FactoryConstructionService
         {
             if (preview.Action == FactoryConstructionAction.Remove)
             {
-                if (!confirmDestructiveRemoval)
-                {
-                    error = "Whole-building deletion requires destructive confirmation.";
-                    return false;
-                }
-
-                return state.RemoveBuildingAndFloors(preview.BuildingInstanceId);
+                error = "A fresh target-specific confirmation is required for removal.";
+                return false;
             }
 
             if (preview.Action == FactoryConstructionAction.Create)
@@ -333,13 +356,96 @@ public sealed class FactoryConstructionService
 
         if (preview.Action == FactoryConstructionAction.Remove)
         {
-            return state.TryRemoveTestEntity(
-                preview.BuildingInstanceId,
-                preview.FloorIndex,
-                preview.EntityId,
-                out error);
+            error = "Entity removal requires a fresh target-specific confirmation.";
+            return false;
         }
 
+        return TryCommitNonDestructiveEquipment(
+            state,
+            preview,
+            out affectedEntityId,
+            out error);
+    }
+
+    public bool TryCommit(
+        FactoryWorldState state,
+        FactoryConstructionPreview preview,
+        FactoryConstructionConfirmation confirmation,
+        out uint affectedEntityId,
+        out string error)
+    {
+        affectedEntityId = 0;
+        error = string.Empty;
+        if (state is null)
+        {
+            error = "Factory world state is required.";
+            return false;
+        }
+
+        if (preview is null || !preview.IsValid)
+        {
+            error = preview?.Error ?? "A valid construction preview is required.";
+            return false;
+        }
+
+        if (confirmation is null || !confirmation.Matches(preview))
+        {
+            error = "A fresh target-specific confirmation is required.";
+            return false;
+        }
+
+        if (preview.Action != FactoryConstructionAction.Remove)
+        {
+            error = "Target-specific confirmation is only valid for removal.";
+            return false;
+        }
+
+        if (!IsRemovalTargetCurrent(state, preview))
+        {
+            error = "The confirmed removal target changed or no longer exists.";
+            return false;
+        }
+
+        if (preview.TargetKind == FactoryConstructionTargetKind.Building)
+        {
+            return state.RemoveBuildingAndFloors(preview.BuildingInstanceId);
+        }
+
+        return state.TryRemoveTestEntity(
+            preview.BuildingInstanceId,
+            preview.FloorIndex,
+            preview.EntityId,
+            out error);
+    }
+
+    private static bool IsRemovalTargetCurrent(
+        FactoryWorldState state,
+        FactoryConstructionPreview preview)
+    {
+        if (preview.TargetKind == FactoryConstructionTargetKind.Building)
+        {
+            return state.TryGetBuildingRecord(
+                preview.BuildingInstanceId,
+                out _);
+        }
+
+        return state.TryGetFloorState(
+                preview.BuildingInstanceId,
+                preview.FloorIndex,
+                out var floor)
+            && floor.TryGetEntity(preview.EntityId, out var entity)
+            && entity.DefinitionId == preview.DefinitionId
+            && entity.LogicalPosition == preview.LogicalPosition;
+    }
+
+    private bool TryCommitNonDestructiveEquipment(
+        FactoryWorldState state,
+        FactoryConstructionPreview preview,
+        out uint affectedEntityId,
+        out string error)
+    {
+        affectedEntityId = 0;
+        error = string.Empty;
         if (preview.Action == FactoryConstructionAction.Move)
         {
             var moved = state.TryRelocateEntity(
