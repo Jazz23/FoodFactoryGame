@@ -1,9 +1,9 @@
 ---
 mode: subagent
 description: Gather focused read-only repository evidence without broad rediscovery.
-model: openai/gpt-5.6-luna
+model: openai/gpt-5.6-luna-fast
 variant: medium
-steps: 12
+steps: 10
 permission:
   "*": deny
   external_directory:

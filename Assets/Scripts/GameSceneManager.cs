@@ -164,6 +164,7 @@ public sealed class GameSceneManager : MonoBehaviour
     {
         EnsureOutsideTestStateLoaded();
         EnsureRouteAuthorityPresenter();
+        EnsureInteriorPresenter();
         EnsureTruckMarkerView();
         EnsureDockExteriorView();
 
@@ -199,6 +200,47 @@ public sealed class GameSceneManager : MonoBehaviour
         if (routeAuthorityPresenter is null || !routeAuthorityPresenter)
         {
             routeAuthorityPresenter = gameObject.AddComponent<Factory3DRouteAuthorityPresenter>();
+        }
+    }
+
+    private void EnsureInteriorPresenter()
+    {
+        var controllers = FindObjectsByType<InsideFactoryController>(
+            FindObjectsInactive.Include);
+        var presenters = FindObjectsByType<Factory3DInteriorPresenter>(
+            FindObjectsInactive.Include);
+        foreach (var candidate in controllers)
+        {
+            if (candidate is null
+                || !candidate
+                || !candidate.gameObject.scene.IsValid()
+                || !candidate.gameObject.scene.isLoaded)
+            {
+                continue;
+            }
+
+            var hasPresenter = false;
+            foreach (var presenter in presenters)
+            {
+                if (presenter is not null
+                    && presenter
+                    && presenter.gameObject.scene == candidate.gameObject.scene)
+                {
+                    hasPresenter = true;
+                    break;
+                }
+            }
+
+            if (hasPresenter)
+            {
+                continue;
+            }
+
+            var presenterObject = new GameObject("Factory 3D Interior Presenter");
+            UnitySceneManager.MoveGameObjectToScene(
+                presenterObject,
+                candidate.gameObject.scene);
+            presenterObject.AddComponent<Factory3DInteriorPresenter>();
         }
     }
 

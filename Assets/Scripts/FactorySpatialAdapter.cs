@@ -28,6 +28,9 @@ public sealed class FactorySpatialAdapter
         grid = newGrid;
     }
 
+    public float CellSize => grid.CellSize;
+    public float OrthographicSize => grid.OrthographicSize;
+
     public Vector2 LogicalToWorld2D(FactoryLogicalLocation location)
     {
         return grid.LogicalToWorld(location.FloorPosition);
