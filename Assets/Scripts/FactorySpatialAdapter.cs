@@ -92,4 +92,25 @@ public sealed class FactorySpatialAdapter
         cell = ground.WorldToCell(ray.GetPoint(distance));
         return true;
     }
+
+    public bool TryGetCellFrom3DRay(
+        Ray ray,
+        float floorElevation,
+        out Vector3Int cell)
+    {
+        var plane = new Plane(Vector3.up, new Vector3(0f, floorElevation, 0f));
+        if (!plane.Raycast(ray, out var distance))
+        {
+            cell = default;
+            return false;
+        }
+
+        var point = ray.GetPoint(distance);
+        var logical = grid.WorldToLogical(new Vector2(point.x, point.z));
+        cell = new Vector3Int(
+            Mathf.FloorToInt(logical.x),
+            Mathf.FloorToInt(logical.y),
+            0);
+        return true;
+    }
 }

@@ -85,6 +85,7 @@ namespace NotAI
         private FactoryWorldSnapshot worldSnapshot = new();
         private FactoryWorldSqliteStore worldStore = null!;
         private FactorySimulation simulation = null!;
+        private readonly FactoryConstructionService constructionService = new();
         private bool acceptingMutations;
         private bool worldDirty;
         private bool viewsHydrated;
@@ -110,6 +111,11 @@ namespace NotAI
         public IReadOnlyList<FactoryEntityConnectionRecord> Connections => factoryState.Connections;
 
         public void MarkCurrentStateAsAuthoritative() => factoryState.MarkCurrentStateAsAuthoritative();
+
+        public void ConfigureConstructionBounds(BoundsInt? bounds)
+        {
+            constructionService.SetLogicalBounds(bounds);
+        }
 
         public bool TryGetFloorState(uint buildingInstanceId, int floorIndex, out OutsideTestFloorRecord state)
             => factoryState.TryGetFloorState(buildingInstanceId, floorIndex, out state);
@@ -578,6 +584,160 @@ namespace NotAI
 
         public bool TryGetBuildingRecord(uint buildingInstanceId, out BuildingRecord record)
             => factoryState.TryGetBuildingRecord(buildingInstanceId, out record);
+
+        public FactoryConstructionPreview PreviewConstructionBuilding(
+            uint buildingInstanceId,
+            Vector3Int anchorCell,
+            Vector2Int footprintSize,
+            int storyCount,
+            IEnumerable<BuildingRecord.DoorPlacement> doors,
+            float doorCornerExclusionDistance,
+            bool moving)
+        {
+            return constructionService.PreviewBuilding(
+                factoryState,
+                buildingInstanceId,
+                anchorCell,
+                footprintSize,
+                storyCount,
+                doors,
+                doorCornerExclusionDistance,
+                moving);
+        }
+
+        public FactoryConstructionPreview PreviewConstructionEquipment(
+            uint buildingInstanceId,
+            int floorIndex,
+            string definitionId,
+            Vector2Int cell,
+            uint ignoredEntityId = 0)
+        {
+            return constructionService.PreviewEquipment(
+                factoryState,
+                buildingInstanceId,
+                floorIndex,
+                definitionId,
+                cell,
+                ignoredEntityId);
+        }
+
+        public FactoryConstructionPreview PreviewConstructionEntityMove(
+            uint buildingInstanceId,
+            int floorIndex,
+            uint entityId,
+            Vector2Int cell)
+        {
+            return constructionService.PreviewEntityMove(
+                factoryState,
+                buildingInstanceId,
+                floorIndex,
+                entityId,
+                cell);
+        }
+
+        public FactoryConstructionPreview PreviewConstructionBuildingRemoval(uint buildingInstanceId)
+            => constructionService.PreviewBuildingRemoval(factoryState, buildingInstanceId);
+
+        public FactoryConstructionPreview PreviewConstructionEntityRemoval(
+            uint buildingInstanceId,
+            int floorIndex,
+            uint entityId)
+            => constructionService.PreviewEntityRemoval(
+                factoryState,
+                buildingInstanceId,
+                floorIndex,
+                entityId);
+
+        public bool TryCommitConstruction(
+            FactoryConstructionPreview preview,
+            bool confirmDestructiveRemoval,
+            out uint affectedEntityId,
+            out string error)
+        {
+            var committed = constructionService.TryCommit(
+                factoryState,
+                preview,
+                confirmDestructiveRemoval,
+                out affectedEntityId,
+                out error);
+            if (!committed)
+            {
+                return false;
+            }
+
+            if (preview.TargetKind == FactoryConstructionTargetKind.Building
+                && preview.Action == FactoryConstructionAction.Create)
+            {
+                EnsureFactoryBuildingGuid(preview.BuildingInstanceId);
+                EnsureFactoryFloorGuids(
+                    preview.BuildingInstanceId,
+                    preview.StoryCount);
+            }
+
+            if (preview.TargetKind == FactoryConstructionTargetKind.Equipment
+                && preview.Action == FactoryConstructionAction.Create)
+            {
+                EnsureFactoryEntityGuid(
+                    preview.BuildingInstanceId,
+                    preview.FloorIndex,
+                    affectedEntityId);
+            }
+
+            if (preview.TargetKind == FactoryConstructionTargetKind.Equipment
+                && preview.Action == FactoryConstructionAction.Remove)
+            {
+                factoryEntityGuids.Remove(new RuntimeEntityKey(
+                    preview.BuildingInstanceId,
+                    preview.FloorIndex,
+                    preview.EntityId));
+            }
+
+            if (preview.TargetKind == FactoryConstructionTargetKind.Building
+                && preview.Action == FactoryConstructionAction.Remove)
+            {
+                RemoveRuntimeGuidsForBuilding(preview.BuildingInstanceId);
+            }
+
+            worldDirty = true;
+            return true;
+        }
+
+        public void CancelConstructionPreview()
+        {
+            constructionService.Cancel();
+        }
+
+        private void RemoveRuntimeGuidsForBuilding(uint buildingInstanceId)
+        {
+            factoryBuildingGuids.Remove(buildingInstanceId);
+            var floorKeys = new List<OutsideTestFloorKey>();
+            foreach (var key in factoryFloorGuids.Keys)
+            {
+                if (key.BuildingInstanceId == buildingInstanceId)
+                {
+                    floorKeys.Add(key);
+                }
+            }
+
+            foreach (var key in floorKeys)
+            {
+                factoryFloorGuids.Remove(key);
+            }
+
+            var entityKeys = new List<RuntimeEntityKey>();
+            foreach (var key in factoryEntityGuids.Keys)
+            {
+                if (key.BuildingInstanceId == buildingInstanceId)
+                {
+                    entityKeys.Add(key);
+                }
+            }
+
+            foreach (var key in entityKeys)
+            {
+                factoryEntityGuids.Remove(key);
+            }
+        }
 
         public uint GetNextBuildingId(IEnumerable<uint> additionalIds)
             => factoryState.GetNextBuildingId(additionalIds);

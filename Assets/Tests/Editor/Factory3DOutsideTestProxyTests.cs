@@ -220,6 +220,84 @@ public sealed class Factory3DOutsideTestProxyTests
     }
 
     [Test]
+    public void ReconcileAddsOnlyTheTopStoryRoofAtWallHeight()
+    {
+        var record = new BuildingRecord(
+            27u,
+            Vector3Int.zero,
+            new Vector2Int(5, 4),
+            2,
+            Array.Empty<BuildingRecord.DoorPlacement>());
+        var settings = CreateSettings(3f, 2f);
+        var assembler = new Factory3DOutsideTestProxyAssembler();
+        assembler.Reconcile(
+            proxyRoot.transform,
+            grid,
+            new[] { record },
+            Array.Empty<OutsideTestFloorRecord>(),
+            settings);
+
+        Assert.That(proxyRoot.transform.Find("Building 27/Floor 0/Roof"), Is.Null);
+        var roof = proxyRoot.transform.Find("Building 27/Floor 1/Roof");
+        var mesh = roof!.GetComponent<MeshFilter>()!.sharedMesh;
+        Assert.That(mesh.bounds.min.y, Is.EqualTo(settings.StoryHeight + settings.WallHeight - settings.RoofThickness).Within(0.0001f));
+        Assert.That(mesh.bounds.max.y, Is.EqualTo(settings.StoryHeight + settings.WallHeight).Within(0.0001f));
+    }
+
+    [Test]
+    public void ReconcilePreservesTheDedicatedRouteProxyRoot()
+    {
+        var routeRoot = new GameObject(Factory3DOutsideTestProxyView.RouteProxyRootName);
+        routeRoot.transform.SetParent(proxyRoot.transform, false);
+        var record = new BuildingRecord(
+            29u,
+            Vector3Int.zero,
+            new Vector2Int(5, 4),
+            1,
+            Array.Empty<BuildingRecord.DoorPlacement>());
+        var assembler = new Factory3DOutsideTestProxyAssembler();
+        assembler.Reconcile(
+            proxyRoot.transform,
+            grid,
+            new[] { record },
+            Array.Empty<OutsideTestFloorRecord>(),
+            CreateSettings(3f, 2f));
+
+        Assert.That(proxyRoot.transform.Find(Factory3DOutsideTestProxyView.RouteProxyRootName), Is.SameAs(routeRoot.transform));
+        assembler.Clear(proxyRoot.transform);
+        Assert.That(proxyRoot.transform.Find(Factory3DOutsideTestProxyView.RouteProxyRootName), Is.SameAs(routeRoot.transform));
+    }
+
+    [Test]
+    public void ProxyViewCanIsolateAnActiveFloorAndHideItsOccludingRoof()
+    {
+        var view = proxyRoot.AddComponent<Factory3DOutsideTestProxyView>();
+        var record = new BuildingRecord(
+            28u,
+            Vector3Int.zero,
+            new Vector2Int(5, 4),
+            2,
+            Array.Empty<BuildingRecord.DoorPlacement>());
+        view.Rebuild(
+            grid,
+            new[] { record },
+            Array.Empty<OutsideTestFloorRecord>(),
+            3f,
+            TestBuildingCreator.DefaultDoorCornerExclusionDistance);
+
+        view.SetActiveFloor(1);
+        Assert.That(view.ActiveFloor, Is.EqualTo(1));
+        Assert.That(proxyRoot.transform.Find("Building 28/Floor 0")!.gameObject.activeSelf, Is.False);
+        Assert.That(proxyRoot.transform.Find("Building 28/Floor 1")!.gameObject.activeSelf, Is.True);
+        Assert.That(proxyRoot.transform.Find("Building 28/Floor 1/Roof")!.gameObject.activeSelf, Is.False);
+
+        view.ClearActiveFloor();
+        Assert.That(view.ActiveFloor, Is.EqualTo(-1));
+        Assert.That(proxyRoot.transform.Find("Building 28/Floor 0")!.gameObject.activeSelf, Is.True);
+        Assert.That(proxyRoot.transform.Find("Building 28/Floor 1/Roof")!.gameObject.activeSelf, Is.True);
+    }
+
+    [Test]
     public void ReconcilePreservesInteriorOnlyFootprintAndEquipmentCoordinates()
     {
         var state = new FactoryWorldState(23u);

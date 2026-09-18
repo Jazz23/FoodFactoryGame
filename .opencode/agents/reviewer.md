@@ -32,4 +32,6 @@ Review only the assigned diff, visual artifact, or acceptance packet. For code, 
 
 Verify claims against the original user acceptance criteria as well as the supplied packet and cite paths, symbols, artifact names, or diff locations. If the original criteria are absent, state that as a verification gap. Flag omitted criteria or silent scope contraction as findings. Distinguish confirmed findings from residual risks and missing evidence. Do not propose broad cleanup.
 
+Classify missing evidence as required only when it maps to an explicit acceptance criterion or project instruction. Otherwise report it as optional residual assurance and do not imply that the implementation is incomplete.
+
 Return findings first in severity order. If there are no findings, state that explicitly and list only material residual risks or verification gaps. Aim for 350 words.

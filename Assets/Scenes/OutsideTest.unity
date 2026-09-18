@@ -28671,6 +28671,9 @@ MonoBehaviour:
   verticalMovementMultiplier: 0.5
   orthographicSize: 5.5
   initialPlayerLogicalPosition: {x: 0.5, y: -0.5}
+  hasLogicalBounds: 1
+  logicalBoundsMin: {x: -32, y: -32}
+  logicalBoundsSize: {x: 64, y: 64}
 --- !u!1 &1615112704
 GameObject:
   m_ObjectHideFlags: 0

@@ -45,6 +45,7 @@ public sealed class GameSceneManager : MonoBehaviour
     private FactoryTruckMarkerView truckMarkerView = null!;
     private FactoryDockExteriorView dockExteriorView = null!;
     private Factory3DRouteAuthorityPresenter routeAuthorityPresenter = null!;
+    private Factory3DConstructionController constructionController = null!;
     private SceneHandle registeredOutsideTestSceneHandle;
     private bool outsideTestWorldReconciled;
     private int clientOutsideTestLoadedInteriorCount;
@@ -60,6 +61,16 @@ public sealed class GameSceneManager : MonoBehaviour
     public string OutsideTestStatePath => GetOutsideTestStatePath();
     public string LastOutsideTestError => lastOutsideTestError;
     public NAIStateManager StateManager => stateManager;
+    public float OutsideTestStoryHeight
+    {
+        get
+        {
+            var creator = FindOutsideTestCreator();
+            return creator is null || !creator
+                ? 3f
+                : Mathf.Max(0f, creator.WallHeight);
+        }
+    }
 
     public FloorTransitionStatus GetFloorTransitionStatus(
         PlayerSceneTransition player)
@@ -167,6 +178,7 @@ public sealed class GameSceneManager : MonoBehaviour
         EnsureInteriorPresenter();
         EnsureTruckMarkerView();
         EnsureDockExteriorView();
+        Ensure3DConstructionController();
 
         if (!networkManager.IsServerStarted)
         {
@@ -272,6 +284,31 @@ public sealed class GameSceneManager : MonoBehaviour
         }
 
         EnsureExteriorViewScene(dockExteriorView.gameObject);
+    }
+
+    private void Ensure3DConstructionController()
+    {
+        var worldScene = GetOutsideTestWorldScene();
+        if (!worldScene.IsValid() || !worldScene.isLoaded)
+        {
+            return;
+        }
+
+        if (constructionController is not null && constructionController)
+        {
+            return;
+        }
+
+        constructionController = FindFirstObjectByType<Factory3DConstructionController>(
+            FindObjectsInactive.Include);
+        if (constructionController is null || !constructionController)
+        {
+            var controllerObject = new GameObject("Factory 3D Construction Controller");
+            UnitySceneManager.MoveGameObjectToScene(controllerObject, worldScene);
+            constructionController = controllerObject.AddComponent<Factory3DConstructionController>();
+        }
+
+        constructionController.Initialize(this);
     }
 
     private static void EnsureExteriorViewScene(GameObject view)
@@ -1312,6 +1349,179 @@ public sealed class GameSceneManager : MonoBehaviour
         EnsureOutsideTestStateLoaded();
         return stateManager.GetNextBuildingId(
             GetAuthoredOutsideTestBuildingIds());
+    }
+
+    public FactoryConstructionPreview Preview3DBuilding(
+        uint buildingInstanceId,
+        Vector3Int anchorCell,
+        Vector2Int footprintSize,
+        int storyCount,
+        IEnumerable<BuildingRecord.DoorPlacement> doors,
+        bool moving)
+    {
+        EnsureOutsideTestStateLoaded();
+        Configure3DConstructionBounds();
+        var creator = FindOutsideTestCreator();
+        var doorDistance = creator is null || !creator
+            ? TestBuildingCreator.DefaultDoorCornerExclusionDistance
+            : creator.DoorCornerExclusionDistance;
+        return stateManager.PreviewConstructionBuilding(
+            buildingInstanceId,
+            anchorCell,
+            footprintSize,
+            storyCount,
+            doors,
+            doorDistance,
+            moving);
+    }
+
+    public FactoryConstructionPreview Preview3DEquipment(
+        uint buildingInstanceId,
+        int floorIndex,
+        string definitionId,
+        Vector2Int cell,
+        uint ignoredEntityId = 0)
+    {
+        EnsureOutsideTestStateLoaded();
+        return stateManager.PreviewConstructionEquipment(
+            buildingInstanceId,
+            floorIndex,
+            definitionId,
+            cell,
+            ignoredEntityId);
+    }
+
+    public FactoryConstructionPreview Preview3DEntityMove(
+        uint buildingInstanceId,
+        int floorIndex,
+        uint entityId,
+        Vector2Int cell)
+    {
+        EnsureOutsideTestStateLoaded();
+        return stateManager.PreviewConstructionEntityMove(
+            buildingInstanceId,
+            floorIndex,
+            entityId,
+            cell);
+    }
+
+    public FactoryConstructionPreview Preview3DBuildingRemoval(uint buildingInstanceId)
+    {
+        EnsureOutsideTestStateLoaded();
+        return stateManager.PreviewConstructionBuildingRemoval(buildingInstanceId);
+    }
+
+    public FactoryConstructionPreview Preview3DEntityRemoval(
+        uint buildingInstanceId,
+        int floorIndex,
+        uint entityId)
+    {
+        EnsureOutsideTestStateLoaded();
+        return stateManager.PreviewConstructionEntityRemoval(
+            buildingInstanceId,
+            floorIndex,
+            entityId);
+    }
+
+    public bool TryCommit3DConstruction(
+        FactoryConstructionPreview preview,
+        bool confirmDestructiveRemoval,
+        out uint affectedEntityId,
+        out string error)
+    {
+        affectedEntityId = 0;
+        error = "Only the host can edit the OutsideTest factory.";
+        if (!networkManager.IsServerStarted)
+        {
+            return false;
+        }
+
+        EnsureOutsideTestStateLoaded();
+        if (outsideTestStateLoadFailed)
+        {
+            error = lastOutsideTestError;
+            return false;
+        }
+
+        if (!stateManager.TryCommitConstruction(
+                preview,
+                confirmDestructiveRemoval,
+                out affectedEntityId,
+                out error))
+        {
+            return false;
+        }
+
+        outsideTestStateNeedsSave = true;
+        BroadcastOutsideTestFloorStates();
+        Refresh3DConstructionPresentation();
+        return true;
+    }
+
+    public void Cancel3DConstruction()
+    {
+        stateManager.CancelConstructionPreview();
+    }
+
+    public void Set3DConstructionVisibleFloor(int floorIndex)
+    {
+        var worldScene = GetOutsideTestWorldScene();
+        if (!worldScene.IsValid() || !worldScene.isLoaded)
+        {
+            return;
+        }
+
+        Factory3DOutsideTestProxyView.FindOrCreate(worldScene).SetActiveFloor(floorIndex);
+    }
+
+    public void Clear3DConstructionVisibleFloor()
+    {
+        var worldScene = GetOutsideTestWorldScene();
+        if (!worldScene.IsValid() || !worldScene.isLoaded)
+        {
+            return;
+        }
+
+        Factory3DOutsideTestProxyView.FindOrCreate(worldScene).ClearActiveFloor();
+    }
+
+    private void Refresh3DConstructionPresentation()
+    {
+        var worldScene = GetOutsideTestWorldScene();
+        if (!worldScene.IsValid()
+            || !worldScene.isLoaded
+            || !SceneGrid.TryGetForScene(worldScene, out var grid))
+        {
+            return;
+        }
+
+        var view = Factory3DOutsideTestProxyView.FindOrCreate(worldScene);
+        var creator = FindOutsideTestCreator();
+        var wallHeight = creator is null || !creator ? 3f : creator.WallHeight;
+        var doorDistance = creator is null || !creator
+            ? TestBuildingCreator.DefaultDoorCornerExclusionDistance
+            : creator.DoorCornerExclusionDistance;
+        view.Rebuild(
+            grid,
+            stateManager.BuildingRecords,
+            stateManager.FloorStates,
+            wallHeight,
+            doorDistance);
+    }
+
+    private void Configure3DConstructionBounds()
+    {
+        var worldScene = GetOutsideTestWorldScene();
+        if (worldScene.IsValid()
+            && worldScene.isLoaded
+            && SceneGrid.TryGetForScene(worldScene, out var grid)
+            && grid.HasLogicalBounds)
+        {
+            stateManager.ConfigureConstructionBounds(grid.LogicalBounds);
+            return;
+        }
+
+        stateManager.ConfigureConstructionBounds(null);
     }
 
     public bool TryCreateBuilding(

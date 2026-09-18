@@ -259,6 +259,20 @@ public sealed class FactoryWorldState
         return false;
     }
 
+    public bool TryGetInteriorSize(
+        uint buildingInstanceId,
+        out Vector2Int interiorSize)
+    {
+        if (!buildingRecords.TryGetValue(buildingInstanceId, out var record))
+        {
+            interiorSize = Vector2Int.zero;
+            return false;
+        }
+
+        interiorSize = GetInteriorSize(record);
+        return true;
+    }
+
     public uint GetNextBuildingId()
     {
         return GetNextBuildingId(Array.Empty<uint>());

@@ -12,7 +12,8 @@ public readonly struct Factory3DOutsideTestProxySettings
         float newWallThickness,
         float newMarkerSize,
         float newDoorCornerExclusionDistance,
-        Material newMaterial = null)
+        Material newMaterial = null,
+        float newRoofThickness = 0f)
     {
         StoryHeight = SanitizeNonNegative(newStoryHeight);
         WallHeight = SanitizeNonNegative(newWallHeight);
@@ -21,6 +22,8 @@ public readonly struct Factory3DOutsideTestProxySettings
         MarkerSize = SanitizePositive(newMarkerSize);
         DoorCornerExclusionDistance = SanitizeNonNegative(newDoorCornerExclusionDistance);
         Material = newMaterial;
+        RoofThickness = SanitizePositive(
+            newRoofThickness > 0f ? newRoofThickness : newFloorSlabThickness);
     }
 
     public float StoryHeight { get; }
@@ -30,6 +33,7 @@ public readonly struct Factory3DOutsideTestProxySettings
     public float MarkerSize { get; }
     public float DoorCornerExclusionDistance { get; }
     public Material Material { get; }
+    public float RoofThickness { get; }
 
     public static Factory3DOutsideTestProxySettings ForGrid(
         float wallHeight,
@@ -46,7 +50,8 @@ public readonly struct Factory3DOutsideTestProxySettings
             safeCellSize * WallCellGeometry.ThicknessInCells,
             safeCellSize * 0.7f,
             doorCornerExclusionDistance,
-            material);
+            material,
+            safeCellSize * 0.12f);
     }
 
     private static float SanitizeNonNegative(float value)
@@ -117,6 +122,7 @@ public sealed class Factory3DOutsideTestProxyAssembler
 {
     public const string RootName = "Factory 3D OutsideTest Proxies";
     public const string FloorSlabName = "Floor Slab";
+    public const string RoofName = "Roof";
 
     private const string GeneratedMeshPrefix = "Factory3DOutsideTestProxy";
 
@@ -475,6 +481,10 @@ public sealed class Factory3DOutsideTestProxyAssembler
             floorIndex,
             settings.StoryHeight);
         var desiredNames = new HashSet<string> { FloorSlabName };
+        if (floorIndex == record.StoryCount - 1)
+        {
+            desiredNames.Add(RoofName);
+        }
         var secondCorner = record.AnchorCell + new Vector3Int(
             record.FootprintSize.x - 1,
             record.FootprintSize.y - 1);
@@ -535,6 +545,17 @@ public sealed class Factory3DOutsideTestProxyAssembler
             spatialAdapter,
             elevation,
             settings);
+        if (floorIndex == record.StoryCount - 1)
+        {
+            var roof = GetOrCreateMeshChild(floorRoot, RoofName);
+            ConfigureRoof(
+                roof,
+                record,
+                floorIndex,
+                spatialAdapter,
+                elevation,
+                settings);
+        }
 
         wallSegmentCount = 0;
         foreach (var placement in wallPlacements)
@@ -621,26 +642,11 @@ public sealed class Factory3DOutsideTestProxyAssembler
     {
         slab.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
         slab.localScale = Vector3.one;
-        var corners = new List<Vector3>(4);
-        var logicalCorners = new[]
-        {
-            new Vector2(record.AnchorCell.x, record.AnchorCell.y),
-            new Vector2(record.AnchorCell.x + record.FootprintSize.x, record.AnchorCell.y),
-            new Vector2(
-                record.AnchorCell.x + record.FootprintSize.x,
-                record.AnchorCell.y + record.FootprintSize.y),
-            new Vector2(record.AnchorCell.x, record.AnchorCell.y + record.FootprintSize.y)
-        };
-        foreach (var logicalCorner in logicalCorners)
-        {
-            corners.Add(spatialAdapter.LogicalToWorld3D(
-                new FactoryLogicalLocation(
-                    record.BuildingInstanceId,
-                    floorIndex,
-                    logicalCorner),
-                elevation));
-        }
-
+        var corners = GetWorldFootprintCorners(
+            record,
+            floorIndex,
+            spatialAdapter,
+            elevation);
         var meshFilter = GetOrAddComponent<MeshFilter>(slab.gameObject);
         var meshRenderer = GetOrAddComponent<MeshRenderer>(slab.gameObject);
         var oldMesh = meshFilter.sharedMesh;
@@ -664,6 +670,75 @@ public sealed class Factory3DOutsideTestProxyAssembler
             meshRenderer.sharedMaterial = settings.Material;
         }
         RemoveCollider(slab.gameObject);
+    }
+
+    private static void ConfigureRoof(
+        Transform roof,
+        BuildingRecord record,
+        int floorIndex,
+        FactorySpatialAdapter spatialAdapter,
+        float elevation,
+        Factory3DOutsideTestProxySettings settings)
+    {
+        roof.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
+        roof.localScale = Vector3.one;
+        var top = elevation + settings.WallHeight;
+        var corners = GetWorldFootprintCorners(
+            record,
+            floorIndex,
+            spatialAdapter,
+            top);
+        var meshFilter = GetOrAddComponent<MeshFilter>(roof.gameObject);
+        var meshRenderer = GetOrAddComponent<MeshRenderer>(roof.gameObject);
+        var oldMesh = meshFilter.sharedMesh;
+        BuildPrismGeometry(
+            roof,
+            corners,
+            top - settings.RoofThickness,
+            top,
+            out var vertices,
+            out var triangles);
+        if (!HasGeneratedMeshGeometry(oldMesh, vertices, triangles))
+        {
+            meshFilter.sharedMesh = CreatePrismMesh(
+                $"{GeneratedMeshPrefix} Roof {record.BuildingInstanceId} {floorIndex}",
+                vertices,
+                triangles);
+            DestroyGeneratedMesh(oldMesh);
+        }
+        if (settings.Material is not null)
+        {
+            meshRenderer.sharedMaterial = settings.Material;
+        }
+        RemoveCollider(roof.gameObject);
+    }
+
+    private static List<Vector3> GetWorldFootprintCorners(
+        BuildingRecord record,
+        int floorIndex,
+        FactorySpatialAdapter spatialAdapter,
+        float elevation)
+    {
+        var corners = new List<Vector3>(4);
+        var logicalCorners = new[]
+        {
+            new Vector2(record.AnchorCell.x, record.AnchorCell.y),
+            new Vector2(record.AnchorCell.x + record.FootprintSize.x, record.AnchorCell.y),
+            new Vector2(
+                record.AnchorCell.x + record.FootprintSize.x,
+                record.AnchorCell.y + record.FootprintSize.y),
+            new Vector2(record.AnchorCell.x, record.AnchorCell.y + record.FootprintSize.y)
+        };
+        foreach (var logicalCorner in logicalCorners)
+        {
+            corners.Add(spatialAdapter.LogicalToWorld3D(
+                new FactoryLogicalLocation(
+                    record.BuildingInstanceId,
+                    floorIndex,
+                    logicalCorner),
+                elevation));
+        }
+        return corners;
     }
 
     private static void ConfigureWallSegment(

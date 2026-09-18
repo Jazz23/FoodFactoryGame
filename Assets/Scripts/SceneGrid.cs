@@ -28,6 +28,9 @@ public sealed class SceneGrid : MonoBehaviour
     [SerializeField, Min(0f)] private float verticalMovementMultiplier = 1f;
     [SerializeField, Min(0.1f)] private float orthographicSize = 5f;
     [SerializeField] private Vector2 initialPlayerLogicalPosition;
+    [SerializeField] private bool hasLogicalBounds;
+    [SerializeField] private Vector2Int logicalBoundsMin;
+    [SerializeField] private Vector2Int logicalBoundsSize = new(64, 64);
 
     public GridProjection Projection => projection;
     public Vector2 LogicalOrigin => logicalOrigin;
@@ -35,6 +38,15 @@ public sealed class SceneGrid : MonoBehaviour
     public Vector2 InitialPlayerLogicalPosition => initialPlayerLogicalPosition;
     public float VerticalMovementMultiplier => verticalMovementMultiplier;
     public float OrthographicSize => orthographicSize;
+    public bool HasLogicalBounds => hasLogicalBounds && logicalBoundsSize.x > 0 && logicalBoundsSize.y > 0;
+    public BoundsInt LogicalBounds => new(
+        new Vector3Int(logicalBoundsMin.x, logicalBoundsMin.y, 0),
+        new Vector3Int(logicalBoundsSize.x, logicalBoundsSize.y, 1));
+
+    public bool ContainsLogicalCell(Vector3Int cell)
+    {
+        return !HasLogicalBounds || LogicalBounds.Contains(new Vector3Int(cell.x, cell.y, 0));
+    }
 
     public FactorySpatialAdapter CreateSpatialAdapter()
     {

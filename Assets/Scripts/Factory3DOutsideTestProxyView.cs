@@ -11,6 +11,9 @@ public sealed class Factory3DOutsideTestProxyView : MonoBehaviour
 
     private Factory3DOutsideTestProxyAssembler assembler = null!;
     private Material fallbackMaterial = null!;
+    private int activeFloor = -1;
+
+    public int ActiveFloor => activeFloor;
 
     public Factory3DOutsideTestProxyBuildResult Rebuild(
         SceneGrid grid,
@@ -18,7 +21,7 @@ public sealed class Factory3DOutsideTestProxyView : MonoBehaviour
         float wallHeight,
         float doorCornerExclusionDistance)
     {
-        return state is null
+        var result = state is null
             ? Rebuild(
                 grid,
                 Array.Empty<BuildingRecord>(),
@@ -30,6 +33,8 @@ public sealed class Factory3DOutsideTestProxyView : MonoBehaviour
                 state,
                 wallHeight,
                 doorCornerExclusionDistance);
+        ApplyActiveFloor();
+        return result;
     }
 
     private Factory3DOutsideTestProxyBuildResult RebuildStateAware(
@@ -55,11 +60,12 @@ public sealed class Factory3DOutsideTestProxyView : MonoBehaviour
             grid.CellSize,
             doorCornerExclusionDistance,
             effectiveMaterial);
-        return assembler.Reconcile(
+        var result = assembler.Reconcile(
             transform,
             grid,
             state,
             settings);
+        return result;
     }
 
     public Factory3DOutsideTestProxyBuildResult Rebuild(
@@ -89,12 +95,14 @@ public sealed class Factory3DOutsideTestProxyView : MonoBehaviour
             grid.CellSize,
             doorCornerExclusionDistance,
             effectiveMaterial);
-        return assembler.Reconcile(
+        var result = assembler.Reconcile(
             transform,
             grid,
             records,
             floors,
             settings);
+        ApplyActiveFloor();
+        return result;
     }
 
     public Factory3DOutsideTestProxyBuildResult Rebuild(
@@ -124,12 +132,26 @@ public sealed class Factory3DOutsideTestProxyView : MonoBehaviour
             grid.CellSize,
             doorCornerExclusionDistance,
             effectiveMaterial);
-        return assembler.Reconcile(
+        var result = assembler.Reconcile(
             transform,
             grid,
             buildings,
             floors,
             settings);
+        ApplyActiveFloor();
+        return result;
+    }
+
+    public void SetActiveFloor(int floorIndex)
+    {
+        activeFloor = Mathf.Max(-1, floorIndex);
+        ApplyActiveFloor();
+    }
+
+    public void ClearActiveFloor()
+    {
+        activeFloor = -1;
+        ApplyActiveFloor();
     }
 
     public void Clear()
@@ -140,6 +162,7 @@ public sealed class Factory3DOutsideTestProxyView : MonoBehaviour
         }
 
         assembler.Clear(transform);
+        activeFloor = -1;
     }
 
     public Factory3DRouteProxyView GetOrCreateRouteProxyView()
@@ -296,6 +319,47 @@ public sealed class Factory3DOutsideTestProxyView : MonoBehaviour
             hideFlags = HideFlags.DontSave
         };
         return fallbackMaterial;
+    }
+
+    private void ApplyActiveFloor()
+    {
+        for (var buildingIndex = 0; buildingIndex < transform.childCount; buildingIndex++)
+        {
+            var building = transform.GetChild(buildingIndex);
+            if (building.name == RouteProxyRootName)
+            {
+                continue;
+            }
+
+            for (var floorIndex = 0; floorIndex < building.childCount; floorIndex++)
+            {
+                var floor = building.GetChild(floorIndex);
+                if (!TryParseFloorIndex(floor.name, out var parsedFloorIndex))
+                {
+                    continue;
+                }
+
+                var isVisible = activeFloor < 0 || parsedFloorIndex == activeFloor;
+                floor.gameObject.SetActive(isVisible);
+                var roof = floor.Find(Factory3DOutsideTestProxyAssembler.RoofName);
+                if (roof is not null && roof)
+                {
+                    roof.gameObject.SetActive(isVisible && activeFloor < 0);
+                }
+            }
+        }
+    }
+
+    private static bool TryParseFloorIndex(string floorName, out int floorIndex)
+    {
+        const string prefix = "Floor ";
+        if (!floorName.StartsWith(prefix, StringComparison.Ordinal))
+        {
+            floorIndex = -1;
+            return false;
+        }
+
+        return int.TryParse(floorName.Substring(prefix.Length), out floorIndex);
     }
 
     private void Awake()
