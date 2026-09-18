@@ -1,0 +1,22 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "default_agent": "coordinator",
+  "subagent_depth": 1,
+  "watcher": {
+    "ignore": [
+      ".opencode/node_modules/**",
+      "Library/**",
+      "Temp/**",
+      "Logs/**"
+    ]
+  },
+  "tool_output": {
+    "max_lines": 300,
+    "max_bytes": 16384
+  },
+  "compaction": {
+    "auto": true,
+    "prune": true,
+    "reserved": 12000
+  }
+}
