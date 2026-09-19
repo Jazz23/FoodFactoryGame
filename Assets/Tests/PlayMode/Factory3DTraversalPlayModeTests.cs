@@ -101,6 +101,83 @@ public sealed class Factory3DTraversalPlayModeTests
     }
 
     [UnityTest]
+    public IEnumerator DefaultMovementRemainsWorldAligned()
+    {
+        traversal.Set3DOwnership(true);
+        var start = playerObject.transform.position;
+        traversal.StepForTest(Vector2.right, 0.1f);
+        var rightDisplacement = playerObject.transform.position - start;
+
+        Assert.That(rightDisplacement.x, Is.EqualTo(traversal.MoveSpeed * 0.1f).Within(0.0001f));
+        Assert.That(rightDisplacement.z, Is.EqualTo(0f).Within(0.0001f));
+
+        traversal.Teleport(new Vector3(0f, 1f, 0f), 0);
+        start = playerObject.transform.position;
+        traversal.StepForTest(Vector2.up, 0.1f);
+        var forwardDisplacement = playerObject.transform.position - start;
+
+        Assert.That(forwardDisplacement.x, Is.EqualTo(0f).Within(0.0001f));
+        Assert.That(forwardDisplacement.z, Is.EqualTo(traversal.MoveSpeed * 0.1f).Within(0.0001f));
+        yield return null;
+    }
+
+    [UnityTest]
+    public IEnumerator ScreenAlignedCardinalInputFollowsDimetricCameraGroundBasis()
+    {
+        traversal.Set3DOwnership(true);
+        traversal.SetScreenAlignedMovement(true);
+        var cameraRotation = Factory3DPresentationBridge.GetDimetricCameraRotation();
+        var expectedRight = Vector3.ProjectOnPlane(
+            cameraRotation * Vector3.right,
+            Vector3.up).normalized;
+        var start = playerObject.transform.position;
+        traversal.StepForTest(Vector2.right, 0.1f);
+        var rightDisplacement = playerObject.transform.position - start;
+
+        Assert.That(
+            Vector3.Dot(
+                new Vector3(rightDisplacement.x, 0f, rightDisplacement.z).normalized,
+                expectedRight),
+            Is.GreaterThan(0.999f));
+
+        traversal.Teleport(new Vector3(0f, 1f, 0f), 0);
+        var expectedForward = Vector3.ProjectOnPlane(
+            cameraRotation * Vector3.forward,
+            Vector3.up).normalized;
+        start = playerObject.transform.position;
+        traversal.StepForTest(Vector2.up, 0.1f);
+        var forwardDisplacement = playerObject.transform.position - start;
+
+        Assert.That(
+            Vector3.Dot(
+                new Vector3(forwardDisplacement.x, 0f, forwardDisplacement.z).normalized,
+                expectedForward),
+            Is.GreaterThan(0.999f));
+        yield return null;
+    }
+
+    [UnityTest]
+    public IEnumerator ScreenAlignedDiagonalInputPreservesCardinalMovementMagnitude()
+    {
+        traversal.Set3DOwnership(true);
+        traversal.SetScreenAlignedMovement(true);
+        var start = playerObject.transform.position;
+        traversal.StepForTest(Vector2.right, 0.1f);
+        var cardinalDisplacement = playerObject.transform.position - start;
+
+        traversal.Teleport(new Vector3(0f, 1f, 0f), 0);
+        start = playerObject.transform.position;
+        traversal.StepForTest(Vector2.one, 0.1f);
+        var diagonalDisplacement = playerObject.transform.position - start;
+
+        Assert.That(
+            new Vector2(diagonalDisplacement.x, diagonalDisplacement.z).magnitude,
+            Is.EqualTo(new Vector2(cardinalDisplacement.x, cardinalDisplacement.z).magnitude)
+                .Within(0.0001f));
+        yield return null;
+    }
+
+    [UnityTest]
     public IEnumerator DerivedCollisionPresenterStopsThePlayerAtEquipment()
     {
         var grid = gridObject.GetComponent<SceneGrid>();

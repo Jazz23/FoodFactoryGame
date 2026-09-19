@@ -40,11 +40,11 @@ public sealed class FactorySpatialAdapter
         FactoryLogicalLocation location,
         float floorElevation)
     {
-        var projectedPosition = LogicalToWorld2D(location);
+        var groundPosition = LogicalToWorld3DGround(location.FloorPosition);
         return new Vector3(
-            projectedPosition.x,
+            groundPosition.x,
             floorElevation,
-            projectedPosition.y);
+            groundPosition.y);
     }
 
     public FactoryLogicalLocation WorldToLogical2D(
@@ -63,10 +63,22 @@ public sealed class FactorySpatialAdapter
         uint buildingInstanceId,
         int floorIndex)
     {
-        return WorldToLogical2D(
-            new Vector2(worldPosition.x, worldPosition.z),
+        return new FactoryLogicalLocation(
             buildingInstanceId,
-            floorIndex);
+            floorIndex,
+            WorldToLogical3DGround(new Vector2(worldPosition.x, worldPosition.z)));
+    }
+
+    public Vector2 LogicalToWorld3DGround(Vector2 logicalPosition)
+    {
+        return grid.VisualOrigin
+            + (logicalPosition - grid.LogicalOrigin) * CellSize;
+    }
+
+    public Vector2 WorldToLogical3DGround(Vector2 worldPosition)
+    {
+        return grid.LogicalOrigin
+            + (worldPosition - grid.VisualOrigin) / CellSize;
     }
 
     public bool TryGetCellFrom2DRay(
@@ -106,7 +118,7 @@ public sealed class FactorySpatialAdapter
         }
 
         var point = ray.GetPoint(distance);
-        var logical = grid.WorldToLogical(new Vector2(point.x, point.z));
+        var logical = WorldToLogical3DGround(new Vector2(point.x, point.z));
         cell = new Vector3Int(
             Mathf.FloorToInt(logical.x),
             Mathf.FloorToInt(logical.y),

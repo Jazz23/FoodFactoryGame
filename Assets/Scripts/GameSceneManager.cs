@@ -47,6 +47,7 @@ public sealed class GameSceneManager : MonoBehaviour
     private Factory3DRouteAuthorityPresenter routeAuthorityPresenter = null!;
     private Factory3DOutsideTestCollisionPresenter outsideCollisionPresenter = null!;
     private Factory3DConstructionController constructionController = null!;
+    private Factory3DPresentationBridge presentationBridge = null!;
     private readonly List<Factory3DOutsideTestProxyBuildingSource> outsideCollisionSources = new();
     private SceneHandle registeredOutsideTestSceneHandle;
     private bool outsideTestWorldReconciled;
@@ -174,6 +175,10 @@ public sealed class GameSceneManager : MonoBehaviour
         {
             outsideCollisionPresenter.Clear();
         }
+        if (presentationBridge is not null && presentationBridge)
+        {
+            presentationBridge.ClearPresentation();
+        }
     }
 
     private void OnApplicationQuit()
@@ -190,6 +195,7 @@ public sealed class GameSceneManager : MonoBehaviour
         EnsureTruckMarkerView();
         EnsureDockExteriorView();
         Ensure3DConstructionController();
+        Ensure3DPresentationBridge();
 
         if (!networkManager.IsServerStarted)
         {
@@ -405,6 +411,18 @@ public sealed class GameSceneManager : MonoBehaviour
         }
 
         constructionController.Initialize(this);
+    }
+
+    private void Ensure3DPresentationBridge()
+    {
+        if (presentationBridge is null || !presentationBridge)
+        {
+            presentationBridge = GetComponent<Factory3DPresentationBridge>();
+            if (presentationBridge is null || !presentationBridge)
+            {
+                presentationBridge = gameObject.AddComponent<Factory3DPresentationBridge>();
+            }
+        }
     }
 
     private static void EnsureExteriorViewScene(GameObject view)

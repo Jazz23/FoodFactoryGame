@@ -293,8 +293,12 @@ public sealed class TestToolsShell : MonoBehaviour
     {
         get
         {
-            var selected = EventSystem.current?.currentSelectedGameObject;
+            var eventSystem = EventSystem.current;
+            var selected = eventSystem is not null && eventSystem
+                ? eventSystem.currentSelectedGameObject
+                : null;
             return selected is not null
+                && selected
                 && selected.TryGetComponent<InputField>(out var field)
                 && field.isFocused;
         }

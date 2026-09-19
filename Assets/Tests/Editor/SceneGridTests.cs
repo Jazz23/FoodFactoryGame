@@ -119,6 +119,55 @@ public sealed class SceneGridTests
     }
 
     [Test]
+    public void SpatialAdapterKeeps2DDimetricProjectionSeparateFrom3DGroundMapping()
+    {
+        var gridObject = new GameObject("Separate 2D and 3D Mapping Grid");
+        SceneManager.MoveGameObjectToScene(gridObject, scene);
+        var grid = gridObject.AddComponent<SceneGrid>();
+        var serializedGrid = new SerializedObject(grid);
+        serializedGrid.FindProperty("projection").enumValueIndex = (int)GridProjection.Dimetric;
+        serializedGrid.FindProperty("logicalOrigin").vector2Value = new Vector2(-2f, 3f);
+        serializedGrid.FindProperty("visualOrigin").vector2Value = new Vector2(4f, -1f);
+        serializedGrid.FindProperty("cellSize").floatValue = 1.5f;
+        serializedGrid.ApplyModifiedPropertiesWithoutUndo();
+
+        var logical = new Vector2(2.5f, -0.5f);
+        var adapter = grid.CreateSpatialAdapter();
+        var world3D = adapter.LogicalToWorld3D(
+            new FactoryLogicalLocation(1u, 0, logical),
+            0f);
+        var expected3DGround = grid.VisualOrigin
+            + (logical - grid.LogicalOrigin) * grid.CellSize;
+
+        Assert.That(grid.LogicalToWorld(logical), Is.EqualTo(new Vector2(16f, -0.25f)));
+        Assert.That(world3D.x, Is.EqualTo(expected3DGround.x).Within(0.0001f));
+        Assert.That(world3D.z, Is.EqualTo(expected3DGround.y).Within(0.0001f));
+        Assert.That(world3D.x, Is.Not.EqualTo(grid.LogicalToWorld(logical).x));
+    }
+
+    [Test]
+    public void SpatialAdapterKeeps3DLogicalAxesOrthogonal()
+    {
+        var gridObject = new GameObject("Orthogonal 3D Mapping Grid");
+        SceneManager.MoveGameObjectToScene(gridObject, scene);
+        var grid = gridObject.AddComponent<SceneGrid>();
+        var adapter = grid.CreateSpatialAdapter();
+        var origin = adapter.LogicalToWorld3D(
+            new FactoryLogicalLocation(1u, 0, Vector2.zero),
+            0f);
+        var xAxis = adapter.LogicalToWorld3D(
+            new FactoryLogicalLocation(1u, 0, Vector2.right),
+            0f) - origin;
+        var yAxis = adapter.LogicalToWorld3D(
+            new FactoryLogicalLocation(1u, 0, Vector2.up),
+            0f) - origin;
+
+        Assert.That(Vector3.Dot(xAxis, yAxis), Is.EqualTo(0f).Within(0.0001f));
+        Assert.That(xAxis.magnitude, Is.EqualTo(grid.CellSize).Within(0.0001f));
+        Assert.That(yAxis.magnitude, Is.EqualTo(grid.CellSize).Within(0.0001f));
+    }
+
+    [Test]
     public void SpatialAdapterRoundTripsA3DLocationWithoutPersistingWorldHeight()
     {
         var gridObject = new GameObject("3D Spatial Adapter Grid");

@@ -60,8 +60,9 @@ public sealed class Factory3DInteriorPresentationTests
             new Vector2(2.25f, 1.75f));
         var world = grid.CreateSpatialAdapter().LogicalToWorld3D(logical, 3f);
 
-        Assert.That(world.x, Is.EqualTo(grid.LogicalToWorld(logical.FloorPosition).x).Within(0.0001f));
-        Assert.That(world.z, Is.EqualTo(grid.LogicalToWorld(logical.FloorPosition).y).Within(0.0001f));
+        var expectedGround = grid.CreateSpatialAdapter().LogicalToWorld3DGround(logical.FloorPosition);
+        Assert.That(world.x, Is.EqualTo(expectedGround.x).Within(0.0001f));
+        Assert.That(world.z, Is.EqualTo(expectedGround.y).Within(0.0001f));
         Assert.That(world.y, Is.EqualTo(3f).Within(0.0001f));
     }
 

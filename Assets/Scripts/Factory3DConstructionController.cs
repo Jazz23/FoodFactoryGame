@@ -596,21 +596,24 @@ public sealed class Factory3DConstructionController : MonoBehaviour
                 record.AnchorCell.x + record.FootprintSize.x * 0.5f,
                 record.AnchorCell.y + record.FootprintSize.y * 0.5f)
             : SceneGrid.CellCenterLogical(exteriorCell);
-        var world = grid.LogicalToWorld(logicalPosition);
+        var previewFloorIndex = pendingRemovalPreview.TargetKind == FactoryConstructionTargetKind.Building
+            ? 0
+            : pendingRemovalPreview.FloorIndex;
+        var adapter = grid.CreateSpatialAdapter();
+        var world = adapter.LogicalToWorld3D(
+            new FactoryLogicalLocation(0u, previewFloorIndex, logicalPosition),
+            previewFloorIndex * manager.OutsideTestStoryHeight);
         var size = pendingRemovalPreview.TargetKind == FactoryConstructionTargetKind.Building
             ? new Vector3(
                 Mathf.Max(0.1f, record.FootprintSize.x * grid.CellSize * 0.9f),
                 0.15f,
                 Mathf.Max(0.1f, record.FootprintSize.y * grid.CellSize * 0.9f))
             : new Vector3(grid.CellSize * 0.7f, grid.CellSize * 0.35f, grid.CellSize * 0.7f);
-        var previewFloorIndex = pendingRemovalPreview.TargetKind == FactoryConstructionTargetKind.Building
-            ? 0
-            : pendingRemovalPreview.FloorIndex;
         previewObject.transform.SetPositionAndRotation(
             new Vector3(
                 world.x,
-                previewFloorIndex * manager.OutsideTestStoryHeight + size.y * 0.5f,
-                world.y),
+                world.y + size.y * 0.5f,
+                world.z),
             Quaternion.identity);
         previewObject.transform.localScale = size;
         if (previewMaterial is not null)
@@ -686,7 +689,10 @@ public sealed class Factory3DConstructionController : MonoBehaviour
                 preview.AnchorCell.x + preview.FootprintSize.x * 0.5f,
                 preview.AnchorCell.y + preview.FootprintSize.y * 0.5f)
             : SceneGrid.CellCenterLogical(exteriorCell);
-        var world = grid.LogicalToWorld(logicalPosition);
+        var adapter = grid.CreateSpatialAdapter();
+        var world = adapter.LogicalToWorld3D(
+            new FactoryLogicalLocation(0u, floorIndex, logicalPosition),
+            floorIndex * manager.OutsideTestStoryHeight);
         var size = preview.TargetKind == FactoryConstructionTargetKind.Building
             ? new Vector3(
                 Mathf.Max(0.1f, preview.FootprintSize.x * grid.CellSize * 0.9f),
@@ -696,8 +702,8 @@ public sealed class Factory3DConstructionController : MonoBehaviour
         previewObject.transform.SetPositionAndRotation(
             new Vector3(
                 world.x,
-                floorIndex * manager.OutsideTestStoryHeight + size.y * 0.5f,
-                world.y),
+                world.y + size.y * 0.5f,
+                world.z),
             Quaternion.identity);
         previewObject.transform.localScale = size;
         if (previewMaterial is not null)

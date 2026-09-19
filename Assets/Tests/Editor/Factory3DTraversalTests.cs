@@ -43,7 +43,10 @@ public sealed class Factory3DTraversalTests
         Assert.That(location.FloorIndex, Is.EqualTo(2));
         Assert.That(
             location.FloorPosition,
-            Is.EqualTo(grid.WorldToLogical(new Vector2(2.25f, 3.75f))));
+            Is.EqualTo(
+                grid.CreateSpatialAdapter()
+                    .WorldToLogical3D(playerObject.transform.position, 17u, 2)
+                    .FloorPosition));
         Assert.That(traversal.FloorElevation, Is.EqualTo(6f).Within(0.0001f));
     }
 

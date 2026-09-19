@@ -28,6 +28,7 @@ public sealed class Factory3DInteriorPresenter : MonoBehaviour
     public float StoryHeight => storyHeight;
     public Transform ProxyRoot => proxyRoot;
     public NAIStateManager Authority => authority;
+    public SceneGrid TargetGrid => targetGrid;
     public InsideFactoryController ActiveController => activeController;
     public Factory3DInteriorProxyBuildResult LastBuild => lastBuild;
     public Factory3DTraversalCollisionPresenter CollisionPresenter => collisionPresenter;

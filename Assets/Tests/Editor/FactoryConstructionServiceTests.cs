@@ -26,9 +26,11 @@ public sealed class FactoryConstructionServiceTests
         serializedGrid.ApplyModifiedPropertiesWithoutUndo();
 
         var logicalCenter = SceneGrid.CellCenterLogical(new Vector2Int(3, 4));
-        var projected = grid.LogicalToWorld(logicalCenter);
         var adapter = grid.CreateSpatialAdapter();
-        var ray = new Ray(new Vector3(projected.x, 10f, projected.y), Vector3.down);
+        var projected = adapter.LogicalToWorld3D(
+            new FactoryLogicalLocation(0u, 0, logicalCenter),
+            0f);
+        var ray = new Ray(new Vector3(projected.x, 10f, projected.z), Vector3.down);
 
         Assert.That(adapter.TryGetCellFrom3DRay(ray, 0f, out var cell), Is.True);
         Assert.That(new Vector2Int(cell.x, cell.y), Is.EqualTo(new Vector2Int(3, 4)));

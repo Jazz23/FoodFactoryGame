@@ -206,8 +206,16 @@ public sealed class OutsideTestFloorTransitionTests
             InputSystem.Update();
             yield return new WaitForSeconds(0.25f);
             var movedPosition = traversal.FootAnchor;
+            var cameraRotation = Factory3DPresentationBridge.GetDimetricCameraRotation();
+            var expectedScreenRight = Vector3.ProjectOnPlane(
+                cameraRotation * Vector3.right,
+                Vector3.up).normalized;
+            var displacement = movedPosition - startPosition;
+            displacement.y = 0f;
 
-            Assert.That(movedPosition.x, Is.GreaterThan(startPosition.x + 0.1f));
+            Assert.That(
+                Vector3.Dot(displacement.normalized, expectedScreenRight),
+                Is.GreaterThan(0.99f));
         }
         finally
         {

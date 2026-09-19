@@ -7,6 +7,7 @@ public sealed class TestBuildingPresentation : DepthOcclusionPresentation
 {
     private static readonly int ColorPropertyId = Shader.PropertyToID("_Color");
 
+    [SerializeField] private bool hideLegacyPresentation;
     private readonly List<Renderer> renderers = new();
     private readonly Dictionary<SpriteRenderer, Color> baseSpriteColors = new();
     private readonly Dictionary<LineRenderer, (Color start, Color end)> baseLineColors = new();
@@ -29,6 +30,12 @@ public sealed class TestBuildingPresentation : DepthOcclusionPresentation
 
         foreach (var renderer in GetComponentsInChildren<Renderer>(true))
         {
+            if (hideLegacyPresentation)
+            {
+                renderer.enabled = false;
+                continue;
+            }
+
             if (!renderer.enabled)
             {
                 continue;

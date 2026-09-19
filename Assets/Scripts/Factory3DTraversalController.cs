@@ -31,6 +31,7 @@ public sealed class Factory3DTraversalController : MonoBehaviour
     private bool uiFocusOverride;
     private bool hasUiFocusOverride;
     private bool grounded;
+    private bool screenAlignedMovement;
 
     public event Action<Vector3> InteractionRequested;
 
@@ -40,6 +41,7 @@ public sealed class Factory3DTraversalController : MonoBehaviour
         && characterController.isGrounded) || grounded;
     public bool IsUiInputBlocking => IsPointerInputBlocked();
     public float MoveSpeed => moveSpeed;
+    public bool ScreenAlignedMovementEnabled => screenAlignedMovement;
     public Vector3 FootAnchor => transform.position;
     public uint BuildingInstanceId => buildingInstanceId;
     public int FloorIndex => floorIndex;
@@ -75,6 +77,11 @@ public sealed class Factory3DTraversalController : MonoBehaviour
     public void SetMoveSpeed(float newMoveSpeed)
     {
         moveSpeed = Mathf.Max(0.01f, newMoveSpeed);
+    }
+
+    public void SetScreenAlignedMovement(bool enabled)
+    {
+        screenAlignedMovement = enabled;
     }
 
     public void SetPointerFocusOverride(bool? pointerIsOverUi)
@@ -218,7 +225,7 @@ public sealed class Factory3DTraversalController : MonoBehaviour
             return;
         }
 
-        if (transition is not null && transition.IsFactoryBuildContextActive)
+        if (transition is not null && transition.IsFactoryBuildPlacementActive)
         {
             return;
         }
@@ -246,14 +253,14 @@ public sealed class Factory3DTraversalController : MonoBehaviour
         }
 
         Physics.SyncTransforms();
-        MovePlanar(new Vector3(planarInput.x, 0f, planarInput.y) * moveSpeed * deltaTime);
+        MovePlanar(GetPlanarMovement(planarInput) * moveSpeed * deltaTime);
         Physics.SyncTransforms();
         MoveVertical(verticalVelocity * deltaTime);
     }
 
     private void MoveWithCharacterController(Vector2 planarInput, float deltaTime)
     {
-        var movement = new Vector3(planarInput.x, 0f, planarInput.y) * moveSpeed;
+        var movement = GetPlanarMovement(planarInput) * moveSpeed;
         if (characterController.isGrounded)
         {
             verticalVelocity = -groundingVelocity;
@@ -266,6 +273,26 @@ public sealed class Factory3DTraversalController : MonoBehaviour
         movement.y = verticalVelocity;
         var collisionFlags = characterController.Move(movement * deltaTime);
         grounded = (collisionFlags & CollisionFlags.Below) != 0;
+    }
+
+    private static Vector3 GetScreenAlignedPlanarMovement(Vector2 planarInput)
+    {
+        var cameraRotation = Factory3DPresentationBridge.GetDimetricCameraRotation();
+        var cameraGroundRight = Vector3.ProjectOnPlane(
+            cameraRotation * Vector3.right,
+            Vector3.up).normalized;
+        var cameraGroundForward = Vector3.ProjectOnPlane(
+            cameraRotation * Vector3.forward,
+            Vector3.up).normalized;
+        return cameraGroundRight * planarInput.x
+            + cameraGroundForward * planarInput.y;
+    }
+
+    private Vector3 GetPlanarMovement(Vector2 planarInput)
+    {
+        return screenAlignedMovement
+            ? GetScreenAlignedPlanarMovement(planarInput)
+            : new Vector3(planarInput.x, 0f, planarInput.y);
     }
 
     private void OnInteract(InputAction.CallbackContext _)
@@ -297,7 +324,7 @@ public sealed class Factory3DTraversalController : MonoBehaviour
         return inputOwnershipEnabled
             && !IsUiInputBlocking
             && (transition is null || (!transition.IsTransitioning
-                && !transition.IsFactoryBuildContextActive));
+                && !transition.IsFactoryBuildPlacementActive));
     }
 
     private bool CanAcceptInteractionInput()

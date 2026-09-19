@@ -34,6 +34,7 @@ public sealed class SceneGrid : MonoBehaviour
 
     public GridProjection Projection => projection;
     public Vector2 LogicalOrigin => logicalOrigin;
+    public Vector2 VisualOrigin => visualOrigin;
     public float CellSize => cellSize;
     public Vector2 InitialPlayerLogicalPosition => initialPlayerLogicalPosition;
     public float VerticalMovementMultiplier => verticalMovementMultiplier;

@@ -29,6 +29,7 @@ public sealed class PlayerSceneTransition : NetworkBehaviour
     public static PlayerSceneTransition LocalOwner = null!;
     public bool IsTransitioning => isTransitioning;
     public bool IsFactoryBuildContextActive => factoryBuilder is not null && factoryBuilder.IsBuildContextActive;
+    public bool IsFactoryBuildPlacementActive => factoryBuilder is not null && factoryBuilder.IsBuilding;
     public bool Is3DTraversalOwner => threeDOwnership;
     public bool IsElevatorPromptOpen => elevatorPromptOpen;
 

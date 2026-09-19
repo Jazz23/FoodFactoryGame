@@ -75,6 +75,98 @@ public sealed class Factory3DOutsideTestProxyTests
     }
 
     [Test]
+    public void ReconcileCreatesAndReusesBoundedGroundPresentationThenCleansIt()
+    {
+        SetLogicalBounds(grid, new Vector2Int(-2, -1), new Vector2Int(4, 3));
+        var shader = Shader.Find("Standard");
+        Assert.That(shader, Is.Not.Null);
+        var sourceMaterial = new Material(shader!);
+        var sourceColor = new Color(0.9f, 0.1f, 0.1f, 1f);
+        sourceMaterial.color = sourceColor;
+        try
+        {
+            var settings = new Factory3DOutsideTestProxySettings(
+                3f,
+                3f,
+                0.1f,
+                0.25f,
+                0.7f,
+                TestBuildingCreator.DefaultDoorCornerExclusionDistance,
+                sourceMaterial);
+            var assembler = new Factory3DOutsideTestProxyAssembler();
+            assembler.Reconcile(
+                proxyRoot.transform,
+                grid,
+                Array.Empty<BuildingRecord>(),
+                Array.Empty<OutsideTestFloorRecord>(),
+                settings);
+
+            var groundRoot = proxyRoot.transform.Find(Factory3DOutsideTestProxyAssembler.GroundPresentationRootName);
+            var plane = groundRoot!.Find(Factory3DOutsideTestProxyAssembler.GroundPlaneName);
+            var logicalGrid = groundRoot.Find(Factory3DOutsideTestProxyAssembler.LogicalGridName);
+            var planeMesh = plane!.GetComponent<MeshFilter>()!.sharedMesh;
+            var gridMesh = logicalGrid!.GetComponent<MeshFilter>()!.sharedMesh;
+            var groundMaterial = plane.GetComponent<MeshRenderer>()!.sharedMaterial;
+            Assert.That(groundRoot, Is.Not.Null);
+            Assert.That(planeMesh, Is.Not.Null);
+            Assert.That(gridMesh, Is.Not.Null);
+            Assert.That(gridMesh!.vertexCount, Is.EqualTo((4 + 1 + 3 + 1) * 4));
+            Assert.That(planeMesh!.bounds.min.y, Is.EqualTo(0f).Within(0.0001f));
+            Assert.That(planeMesh.bounds.max.y, Is.EqualTo(0f).Within(0.0001f));
+            Assert.That(groundMaterial, Is.Not.SameAs(sourceMaterial));
+            Assert.That(sourceMaterial.color.r, Is.EqualTo(sourceColor.r).Within(0.0001f));
+            Assert.That(sourceMaterial.color.g, Is.EqualTo(sourceColor.g).Within(0.0001f));
+            Assert.That(sourceMaterial.color.b, Is.EqualTo(sourceColor.b).Within(0.0001f));
+            Assert.That(sourceMaterial.color.a, Is.EqualTo(sourceColor.a).Within(0.0001f));
+            Assert.That(groundRoot.GetComponentsInChildren<Collider>(true), Is.Empty);
+
+            assembler.Reconcile(
+                proxyRoot.transform,
+                grid,
+                Array.Empty<BuildingRecord>(),
+                Array.Empty<OutsideTestFloorRecord>(),
+                settings);
+
+            Assert.That(
+                proxyRoot.transform.Find(Factory3DOutsideTestProxyAssembler.GroundPresentationRootName),
+                Is.SameAs(groundRoot));
+            Assert.That(
+                plane.GetComponent<MeshFilter>()!.sharedMesh,
+                Is.SameAs(planeMesh));
+            Assert.That(
+                logicalGrid.GetComponent<MeshFilter>()!.sharedMesh,
+                Is.SameAs(gridMesh));
+
+            assembler.Clear(proxyRoot.transform);
+            Assert.That(
+                proxyRoot.transform.Find(Factory3DOutsideTestProxyAssembler.GroundPresentationRootName),
+                Is.Null);
+            Assert.That(planeMesh == null, Is.True);
+            Assert.That(gridMesh == null, Is.True);
+            Assert.That(groundMaterial == null, Is.True);
+        }
+        finally
+        {
+            UnityEngine.Object.DestroyImmediate(sourceMaterial);
+        }
+    }
+
+    [Test]
+    public void ReconcileOmitsGroundPresentationWhenLogicalBoundsAreAbsent()
+    {
+        new Factory3DOutsideTestProxyAssembler().Reconcile(
+            proxyRoot.transform,
+            grid,
+            Array.Empty<BuildingRecord>(),
+            Array.Empty<OutsideTestFloorRecord>(),
+            CreateSettings(3f, 2f));
+
+        Assert.That(
+            proxyRoot.transform.Find(Factory3DOutsideTestProxyAssembler.GroundPresentationRootName),
+            Is.Null);
+    }
+
+    [Test]
     public void ReconcilePlacesEveryFloorAtDerivedStoryElevation()
     {
         var record = CreateRecord(
@@ -269,7 +361,7 @@ public sealed class Factory3DOutsideTestProxyTests
     }
 
     [Test]
-    public void ProxyViewCanIsolateAnActiveFloorAndHideItsOccludingRoof()
+    public void ProxyViewCanIsolateAnActiveFloorAndHideItsRoof()
     {
         var view = proxyRoot.AddComponent<Factory3DOutsideTestProxyView>();
         var record = new BuildingRecord(
@@ -289,12 +381,124 @@ public sealed class Factory3DOutsideTestProxyTests
         Assert.That(view.ActiveFloor, Is.EqualTo(1));
         Assert.That(proxyRoot.transform.Find("Building 28/Floor 0")!.gameObject.activeSelf, Is.False);
         Assert.That(proxyRoot.transform.Find("Building 28/Floor 1")!.gameObject.activeSelf, Is.True);
+        Assert.That(
+            FindFirstChildStartingWith(proxyRoot.transform.Find("Building 28/Floor 0")!, "Wall ").gameObject.activeSelf,
+            Is.False);
+        Assert.That(
+            FindFirstChildStartingWith(proxyRoot.transform.Find("Building 28/Floor 1")!, "Wall ").gameObject.activeSelf,
+            Is.True);
+        Assert.That(proxyRoot.transform.Find("Building 28/Floor 0/Floor Slab")!.gameObject.activeSelf, Is.False);
+        Assert.That(proxyRoot.transform.Find("Building 28/Floor 1/Floor Slab")!.gameObject.activeSelf, Is.True);
         Assert.That(proxyRoot.transform.Find("Building 28/Floor 1/Roof")!.gameObject.activeSelf, Is.False);
 
         view.ClearActiveFloor();
         Assert.That(view.ActiveFloor, Is.EqualTo(-1));
         Assert.That(proxyRoot.transform.Find("Building 28/Floor 0")!.gameObject.activeSelf, Is.True);
+        Assert.That(
+            FindFirstChildStartingWith(proxyRoot.transform.Find("Building 28/Floor 0")!, "Wall ").gameObject.activeSelf,
+            Is.True);
+        Assert.That(proxyRoot.transform.Find("Building 28/Floor 0/Floor Slab")!.gameObject.activeSelf, Is.False);
+        Assert.That(proxyRoot.transform.Find("Building 28/Floor 1/Floor Slab")!.gameObject.activeSelf, Is.False);
         Assert.That(proxyRoot.transform.Find("Building 28/Floor 1/Roof")!.gameObject.activeSelf, Is.True);
+    }
+
+    [Test]
+    public void BridgeControlledExteriorModeSuppressesRoofsWhileShowingWallsAndKeepingSlabsHidden()
+    {
+        var view = proxyRoot.AddComponent<Factory3DOutsideTestProxyView>();
+        var record = new BuildingRecord(
+            30u,
+            Vector3Int.zero,
+            new Vector2Int(5, 4),
+            2,
+            Array.Empty<BuildingRecord.DoorPlacement>());
+        view.Rebuild(
+            grid,
+            new[] { record },
+            Array.Empty<OutsideTestFloorRecord>(),
+            3f,
+            TestBuildingCreator.DefaultDoorCornerExclusionDistance);
+
+        var floor0 = proxyRoot.transform.Find("Building 30/Floor 0")!;
+        var floor1 = proxyRoot.transform.Find("Building 30/Floor 1")!;
+        var roof1 = floor1.Find("Roof")!;
+        var wall0 = FindFirstChildStartingWith(
+            floor0,
+            "Wall ");
+        var wall1 = FindFirstChildStartingWith(
+            floor1,
+            "Wall ");
+        view.SetExteriorOcclusionSurfacesVisible(false);
+
+        Assert.That(view.ExteriorOcclusionSurfacesVisible, Is.False);
+        Assert.That(floor0.gameObject.activeSelf, Is.True);
+        Assert.That(floor1.gameObject.activeSelf, Is.True);
+        Assert.That(roof1.gameObject.activeSelf, Is.False);
+        Assert.That(wall0.gameObject.activeSelf, Is.True);
+        Assert.That(wall1.gameObject.activeSelf, Is.True);
+        Assert.That(
+            floor0.Find("Floor Slab")!.gameObject.activeSelf,
+            Is.False);
+        Assert.That(
+            floor1.Find("Floor Slab")!.gameObject.activeSelf,
+            Is.False);
+
+        view.SetActiveFloor(1);
+        Assert.That(view.ActiveFloor, Is.EqualTo(1));
+        Assert.That(floor0.gameObject.activeSelf, Is.False);
+        Assert.That(floor1.gameObject.activeSelf, Is.True);
+        Assert.That(wall0.gameObject.activeSelf, Is.False);
+        Assert.That(wall1.gameObject.activeSelf, Is.True);
+        Assert.That(floor0.Find("Floor Slab")!.gameObject.activeSelf, Is.False);
+        Assert.That(floor1.Find("Floor Slab")!.gameObject.activeSelf, Is.True);
+        Assert.That(roof1.gameObject.activeSelf, Is.False);
+
+        view.ClearActiveFloor();
+        Assert.That(view.ActiveFloor, Is.EqualTo(-1));
+        Assert.That(floor0.gameObject.activeSelf, Is.True);
+        Assert.That(floor1.gameObject.activeSelf, Is.True);
+        Assert.That(wall0.gameObject.activeSelf, Is.True);
+        Assert.That(wall1.gameObject.activeSelf, Is.True);
+        Assert.That(roof1.gameObject.activeSelf, Is.False);
+        Assert.That(floor0.Find("Floor Slab")!.gameObject.activeSelf, Is.False);
+        Assert.That(floor1.Find("Floor Slab")!.gameObject.activeSelf, Is.False);
+    }
+
+    [Test]
+    public void StateAwareRebuildForwardsConfiguredMaterialToProxyGeometry()
+    {
+        var record = new BuildingRecord(
+            32u,
+            Vector3Int.zero,
+            new Vector2Int(5, 4),
+            1,
+            Array.Empty<BuildingRecord.DoorPlacement>());
+        var state = new FactoryWorldState(record.BuildingInstanceId);
+        Assert.That(state.TryRegisterBuilding(record, out var error), Is.True, error);
+        var shader = Shader.Find("Standard");
+        Assert.That(shader, Is.Not.Null);
+        var material = new Material(shader!);
+        try
+        {
+            var view = proxyRoot.AddComponent<Factory3DOutsideTestProxyView>();
+            view.Rebuild(
+                grid,
+                state,
+                3f,
+                TestBuildingCreator.DefaultDoorCornerExclusionDistance,
+                material);
+
+            var wall = FindFirstChildStartingWith(
+                proxyRoot.transform.Find("Building 32/Floor 0")!,
+                "Wall ");
+            var renderers = wall.GetComponentsInChildren<MeshRenderer>(true);
+            Assert.That(renderers, Is.Not.Empty);
+            Assert.That(renderers[0].sharedMaterial, Is.SameAs(material));
+        }
+        finally
+        {
+            UnityEngine.Object.DestroyImmediate(material);
+        }
     }
 
     [Test]
@@ -331,7 +535,7 @@ public sealed class Factory3DOutsideTestProxyTests
         var expected = adapter.LogicalToWorld3D(
             new FactoryLogicalLocation(23u, 0, new Vector2(0.5f, 0.5f)),
             0f);
-        var expectedFootprintSize = GetProjectedFootprintSize(
+        var expectedFootprintSize = Get3DFootprintSize(
             grid,
             Vector3Int.zero,
             interiorSize);
@@ -376,6 +580,31 @@ public sealed class Factory3DOutsideTestProxyTests
         assembler.Clear(proxyRoot.transform);
         Assert.That(firstMesh == null, Is.True);
         Assert.That(proxyRoot.transform.childCount, Is.EqualTo(0));
+    }
+
+    [Test]
+    public void ReconcileUsesInsetRoofFootprintWithoutChangingFloorSlabFootprint()
+    {
+        var record = new BuildingRecord(
+            26u,
+            new Vector3Int(2, 3, 0),
+            new Vector2Int(5, 4),
+            1,
+            Array.Empty<BuildingRecord.DoorPlacement>());
+        var assembler = new Factory3DOutsideTestProxyAssembler();
+        var settings = CreateSettings(3f, 2f);
+        assembler.Reconcile(
+            proxyRoot.transform,
+            grid,
+            new[] { record },
+            Array.Empty<OutsideTestFloorRecord>(),
+            settings);
+
+        var floor = proxyRoot.transform.Find("Building 26/Floor 0")!;
+        var slabMesh = floor.Find("Floor Slab")!.GetComponent<MeshFilter>()!.sharedMesh;
+        var roofMesh = floor.Find("Roof")!.GetComponent<MeshFilter>()!.sharedMesh;
+        Assert.That(roofMesh.bounds.size.x, Is.LessThan(slabMesh.bounds.size.x));
+        Assert.That(roofMesh.bounds.size.z, Is.LessThan(slabMesh.bounds.size.z));
     }
 
     [Test]
@@ -666,7 +895,7 @@ public sealed class Factory3DOutsideTestProxyTests
             var expectedEquipment = adapter.LogicalToWorld3D(
                 new FactoryLogicalLocation(62u, 0, beforeEntityPosition),
                 0f);
-            var expectedFootprintSize = GetProjectedFootprintSize(
+        var expectedFootprintSize = Get3DFootprintSize(
                 grid,
                 Vector3Int.zero,
                 interiorSize);
@@ -725,6 +954,23 @@ public sealed class Factory3DOutsideTestProxyTests
             TestBuildingCreator.DefaultDoorCornerExclusionDistance);
     }
 
+    private static void SetLogicalBounds(
+        SceneGrid sourceGrid,
+        Vector2Int minimum,
+        Vector2Int size)
+    {
+        var flags = BindingFlags.NonPublic | BindingFlags.Instance;
+        var hasBoundsField = typeof(SceneGrid).GetField("hasLogicalBounds", flags);
+        var minimumField = typeof(SceneGrid).GetField("logicalBoundsMin", flags);
+        var sizeField = typeof(SceneGrid).GetField("logicalBoundsSize", flags);
+        Assert.That(hasBoundsField, Is.Not.Null);
+        Assert.That(minimumField, Is.Not.Null);
+        Assert.That(sizeField, Is.Not.Null);
+        hasBoundsField!.SetValue(sourceGrid, true);
+        minimumField!.SetValue(sourceGrid, minimum);
+        sizeField!.SetValue(sourceGrid, size);
+    }
+
     private static Transform FindFirstChildStartingWith(Transform parent, string prefix)
     {
         for (var index = 0; index < parent.childCount; index++)
@@ -766,17 +1012,18 @@ public sealed class Factory3DOutsideTestProxyTests
         return result;
     }
 
-    private static Vector2 GetProjectedFootprintSize(
+    private static Vector2 Get3DFootprintSize(
         SceneGrid sourceGrid,
         Vector3Int anchor,
         Vector2Int size)
     {
+        var adapter = sourceGrid.CreateSpatialAdapter();
         var corners = new[]
         {
-            sourceGrid.LogicalToWorld(new Vector2(anchor.x, anchor.y)),
-            sourceGrid.LogicalToWorld(new Vector2(anchor.x + size.x, anchor.y)),
-            sourceGrid.LogicalToWorld(new Vector2(anchor.x + size.x, anchor.y + size.y)),
-            sourceGrid.LogicalToWorld(new Vector2(anchor.x, anchor.y + size.y))
+            adapter.LogicalToWorld3DGround(new Vector2(anchor.x, anchor.y)),
+            adapter.LogicalToWorld3DGround(new Vector2(anchor.x + size.x, anchor.y)),
+            adapter.LogicalToWorld3DGround(new Vector2(anchor.x + size.x, anchor.y + size.y)),
+            adapter.LogicalToWorld3DGround(new Vector2(anchor.x, anchor.y + size.y))
         };
         var minimum = corners[0];
         var maximum = corners[0];

@@ -123,8 +123,14 @@ public sealed class Factory3DOutsideTestProxyAssembler
     public const string RootName = "Factory 3D OutsideTest Proxies";
     public const string FloorSlabName = "Floor Slab";
     public const string RoofName = "Roof";
+    public const string GroundPresentationRootName = "Ground Presentation";
+    public const string GroundPlaneName = "Ground Plane";
+    public const string LogicalGridName = "Logical Grid";
 
     private const string GeneratedMeshPrefix = "Factory3DOutsideTestProxy";
+    private const string GeneratedMaterialPrefix = "Factory3DOutsideTestProxy";
+    private const float GroundElevation = 0f;
+    private const float GridLineElevation = 0.002f;
 
     private readonly List<Factory3DOutsideTestProxyBuildingSource> preparedSources = new();
     private readonly List<Factory3DOutsideTestProxyBuildingSource> candidateSources = new();
@@ -137,6 +143,13 @@ public sealed class Factory3DOutsideTestProxyAssembler
     private readonly List<TestBuildingCreator.ExteriorWallSpan> wallSpans = new();
     private readonly List<GridWall.PlaneSegment> wallSegments = new();
     private readonly List<BuildingRecord.DoorPlacement> validDoors = new();
+    private readonly List<Vector3> groundVertices = new();
+    private readonly List<int> groundTriangles = new();
+    private readonly List<Vector3> gridVertices = new();
+    private readonly List<int> gridTriangles = new();
+    private Material groundMaterial = null!;
+    private Material gridMaterial = null!;
+    private Material groundMaterialSource = null!;
 
     public Factory3DOutsideTestProxyBuildResult Reconcile(
         Transform targetRoot,
@@ -234,6 +247,7 @@ public sealed class Factory3DOutsideTestProxyAssembler
         var removedNodeCount = 0;
         if (grid is null || !grid)
         {
+            ReleaseGroundPresentationMaterials();
             removedNodeCount += RemoveChildrenNotIn(
                 targetRoot,
                 new HashSet<string> { Factory3DOutsideTestProxyView.RouteProxyRootName });
@@ -276,8 +290,20 @@ public sealed class Factory3DOutsideTestProxyAssembler
             desiredBuildingNames.Add(GetBuildingName(record.BuildingInstanceId));
         }
         desiredBuildingNames.Add(Factory3DOutsideTestProxyView.RouteProxyRootName);
+        if (grid.HasLogicalBounds)
+        {
+            desiredBuildingNames.Add(GroundPresentationRootName);
+        }
+        else
+        {
+            ReleaseGroundPresentationMaterials();
+        }
 
         removedNodeCount += RemoveChildrenNotIn(targetRoot, desiredBuildingNames);
+        if (grid.HasLogicalBounds)
+        {
+            ReconcileGroundPresentation(targetRoot, grid, spatialAdapter, effectiveSettings);
+        }
         foreach (var record in validRecords)
         {
             var buildingRoot = GetOrCreateChild(
@@ -322,9 +348,275 @@ public sealed class Factory3DOutsideTestProxyAssembler
             return;
         }
 
+        ReleaseGroundPresentationMaterials();
         RemoveChildrenNotIn(
             targetRoot,
             new HashSet<string> { Factory3DOutsideTestProxyView.RouteProxyRootName });
+    }
+
+    private void ReconcileGroundPresentation(
+        Transform targetRoot,
+        SceneGrid grid,
+        FactorySpatialAdapter spatialAdapter,
+        Factory3DOutsideTestProxySettings settings)
+    {
+        var groundRoot = GetOrCreateChild(targetRoot, GroundPresentationRootName);
+        ResetContainerTransform(groundRoot);
+        var desiredNames = new HashSet<string> { GroundPlaneName, LogicalGridName };
+        RemoveChildrenNotIn(groundRoot, desiredNames);
+
+        if (!ReferenceEquals(groundMaterialSource, settings.Material))
+        {
+            ReleaseGroundPresentationMaterials();
+            groundMaterialSource = settings.Material;
+        }
+
+        var planeMaterial = GetOrCreatePresentationMaterial(
+            ref groundMaterial,
+            settings.Material,
+            new Color(0.12f, 0.34f, 0.27f, 1f),
+            " Ground");
+        var lineMaterial = GetOrCreatePresentationMaterial(
+            ref gridMaterial,
+            settings.Material,
+            new Color(0.08f, 0.23f, 0.2f, 1f),
+            " Grid");
+
+        var plane = GetOrCreateMeshChild(groundRoot, GroundPlaneName);
+        BuildGroundPlaneGeometry(targetRoot, grid, spatialAdapter, groundVertices, groundTriangles);
+        ConfigureGeneratedMesh(plane, groundVertices, groundTriangles, " Ground");
+        GetOrAddComponent<MeshRenderer>(plane.gameObject).sharedMaterial = planeMaterial;
+
+        var logicalGrid = GetOrCreateMeshChild(groundRoot, LogicalGridName);
+        BuildLogicalGridGeometry(
+            targetRoot,
+            grid,
+            spatialAdapter,
+            gridVertices,
+            gridTriangles);
+        ConfigureGeneratedMesh(logicalGrid, gridVertices, gridTriangles, " Grid");
+        GetOrAddComponent<MeshRenderer>(logicalGrid.gameObject).sharedMaterial = lineMaterial;
+    }
+
+    private void ConfigureGeneratedMesh(
+        Transform target,
+        IReadOnlyList<Vector3> vertices,
+        IReadOnlyList<int> triangles,
+        string meshSuffix)
+    {
+        var meshFilter = GetOrAddComponent<MeshFilter>(target.gameObject);
+        var oldMesh = meshFilter.sharedMesh;
+        if (!HasGeneratedMeshGeometry(oldMesh, vertices, triangles))
+        {
+            meshFilter.sharedMesh = CreatePrismMesh(
+                $"{GeneratedMeshPrefix}{meshSuffix}",
+                vertices,
+                triangles);
+            DestroyGeneratedMesh(oldMesh);
+        }
+
+        RemoveCollider(target.gameObject);
+    }
+
+    private static Material GetOrCreatePresentationMaterial(
+        ref Material target,
+        Material source,
+        Color color,
+        string suffix)
+    {
+        if (target is null || !target)
+        {
+            var shader = source is not null && source
+                ? source.shader
+                : FindSafeUnlitShader();
+            if (shader is not null)
+            {
+                target = source is not null && source
+                    ? new Material(source)
+                    : new Material(shader);
+                target.name = $"{GeneratedMaterialPrefix}{suffix} Material";
+                target.hideFlags = HideFlags.DontSave;
+            }
+        }
+
+        if (target is not null && target)
+        {
+            SetMaterialColor(target, color);
+        }
+
+        return target;
+    }
+
+    private static Shader FindSafeUnlitShader()
+    {
+        var shader = Shader.Find("Universal Render Pipeline/Unlit");
+        if (shader is null)
+        {
+            shader = Shader.Find("Unlit/Color");
+        }
+
+        if (shader is null)
+        {
+            shader = Shader.Find("Sprites/Default");
+        }
+
+        return shader;
+    }
+
+    private static void SetMaterialColor(Material material, Color color)
+    {
+        if (material.HasProperty("_BaseColor"))
+        {
+            material.SetColor("_BaseColor", color);
+        }
+
+        if (material.HasProperty("_Color"))
+        {
+            material.SetColor("_Color", color);
+        }
+    }
+
+    private static void BuildGroundPlaneGeometry(
+        Transform targetRoot,
+        SceneGrid grid,
+        FactorySpatialAdapter spatialAdapter,
+        List<Vector3> vertices,
+        List<int> triangles)
+    {
+        vertices.Clear();
+        triangles.Clear();
+        var bounds = grid.LogicalBounds;
+        var minimum = new Vector2(bounds.xMin, bounds.yMin);
+        var maximum = new Vector2(bounds.xMax, bounds.yMax);
+        var worldCorners = new[]
+        {
+            GetLogicalWorldPoint(spatialAdapter, minimum, GroundElevation),
+            GetLogicalWorldPoint(spatialAdapter, new Vector2(maximum.x, minimum.y), GroundElevation),
+            GetLogicalWorldPoint(spatialAdapter, maximum, GroundElevation),
+            GetLogicalWorldPoint(spatialAdapter, new Vector2(minimum.x, maximum.y), GroundElevation)
+        };
+        foreach (var worldCorner in worldCorners)
+        {
+            vertices.Add(targetRoot.InverseTransformPoint(worldCorner));
+        }
+
+        var signedArea = 0f;
+        for (var index = 0; index < worldCorners.Length; index++)
+        {
+            var next = (index + 1) % worldCorners.Length;
+            signedArea += worldCorners[index].x * worldCorners[next].z
+                - worldCorners[index].z * worldCorners[next].x;
+        }
+
+        if (signedArea >= 0f)
+        {
+            AddUpwardQuad(triangles, 0, 1, 2, 3);
+        }
+        else
+        {
+            AddUpwardQuad(triangles, 0, 3, 2, 1);
+        }
+    }
+
+    private static void BuildLogicalGridGeometry(
+        Transform targetRoot,
+        SceneGrid grid,
+        FactorySpatialAdapter spatialAdapter,
+        List<Vector3> vertices,
+        List<int> triangles)
+    {
+        vertices.Clear();
+        triangles.Clear();
+        var bounds = grid.LogicalBounds;
+        var lineWidth = Mathf.Max(0.01f, Mathf.Abs(grid.CellSize) * 0.018f);
+        for (var x = bounds.xMin; x <= bounds.xMax; x++)
+        {
+            AddGridLine(
+                targetRoot,
+                spatialAdapter,
+                new Vector2(x, bounds.yMin),
+                new Vector2(x, bounds.yMax),
+                lineWidth,
+                vertices,
+                triangles);
+        }
+
+        for (var y = bounds.yMin; y <= bounds.yMax; y++)
+        {
+            AddGridLine(
+                targetRoot,
+                spatialAdapter,
+                new Vector2(bounds.xMin, y),
+                new Vector2(bounds.xMax, y),
+                lineWidth,
+                vertices,
+                triangles);
+        }
+    }
+
+    private static void AddGridLine(
+        Transform targetRoot,
+        FactorySpatialAdapter spatialAdapter,
+        Vector2 logicalStart,
+        Vector2 logicalEnd,
+        float width,
+        List<Vector3> vertices,
+        List<int> triangles)
+    {
+        var start = GetLogicalWorldPoint(spatialAdapter, logicalStart, GridLineElevation);
+        var end = GetLogicalWorldPoint(spatialAdapter, logicalEnd, GridLineElevation);
+        var direction = end - start;
+        direction.y = 0f;
+        if (direction.sqrMagnitude <= 0.000001f)
+        {
+            return;
+        }
+
+        var offset = new Vector3(-direction.z, 0f, direction.x).normalized * width * 0.5f;
+        var first = targetRoot.InverseTransformPoint(start - offset);
+        var second = targetRoot.InverseTransformPoint(end - offset);
+        var third = targetRoot.InverseTransformPoint(end + offset);
+        var fourth = targetRoot.InverseTransformPoint(start + offset);
+        var firstIndex = vertices.Count;
+        vertices.Add(first);
+        vertices.Add(second);
+        vertices.Add(third);
+        vertices.Add(fourth);
+        AddUpwardQuad(triangles, firstIndex, firstIndex + 1, firstIndex + 2, firstIndex + 3);
+    }
+
+    private static Vector3 GetLogicalWorldPoint(
+        FactorySpatialAdapter spatialAdapter,
+        Vector2 logicalPosition,
+        float elevation)
+    {
+        return spatialAdapter.LogicalToWorld3D(
+            new FactoryLogicalLocation(0u, 0, logicalPosition),
+            elevation);
+    }
+
+    private static void AddUpwardQuad(
+        ICollection<int> triangles,
+        int first,
+        int second,
+        int third,
+        int fourth)
+    {
+        triangles.Add(first);
+        triangles.Add(third);
+        triangles.Add(second);
+        triangles.Add(first);
+        triangles.Add(fourth);
+        triangles.Add(third);
+    }
+
+    private void ReleaseGroundPresentationMaterials()
+    {
+        DestroyGeneratedObject(groundMaterial);
+        DestroyGeneratedObject(gridMaterial);
+        groundMaterial = null!;
+        gridMaterial = null!;
+        groundMaterialSource = null!;
     }
 
     public static string GetBuildingName(uint buildingInstanceId)
@@ -683,7 +975,7 @@ public sealed class Factory3DOutsideTestProxyAssembler
         roof.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
         roof.localScale = Vector3.one;
         var top = elevation + settings.WallHeight;
-        var corners = GetWorldFootprintCorners(
+        var corners = GetWorldRoofFootprintCorners(
             record,
             floorIndex,
             spatialAdapter,
@@ -738,6 +1030,42 @@ public sealed class Factory3DOutsideTestProxyAssembler
                     logicalCorner),
                 elevation));
         }
+        return corners;
+    }
+
+    private static List<Vector3> GetWorldRoofFootprintCorners(
+        BuildingRecord record,
+        int floorIndex,
+        FactorySpatialAdapter spatialAdapter,
+        float elevation)
+    {
+        var secondCorner = record.AnchorCell + new Vector3Int(
+            record.FootprintSize.x - 1,
+            record.FootprintSize.y - 1);
+        var minimum = TestBuildingCreator.GetRoofLogicalMin(
+            record.AnchorCell,
+            secondCorner);
+        var maximum = TestBuildingCreator.GetRoofLogicalMax(
+            record.AnchorCell,
+            secondCorner);
+        var logicalCorners = new[]
+        {
+            new Vector2(minimum.x, minimum.y),
+            new Vector2(maximum.x, minimum.y),
+            new Vector2(maximum.x, maximum.y),
+            new Vector2(minimum.x, maximum.y)
+        };
+        var corners = new List<Vector3>(logicalCorners.Length);
+        foreach (var logicalCorner in logicalCorners)
+        {
+            corners.Add(spatialAdapter.LogicalToWorld3D(
+                new FactoryLogicalLocation(
+                    record.BuildingInstanceId,
+                    floorIndex,
+                    logicalCorner),
+                elevation));
+        }
+
         return corners;
     }
 

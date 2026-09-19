@@ -8,18 +8,22 @@ using UnityEngine.SceneManagement;
 public sealed class Factory3DOutsideTestProxyView : MonoBehaviour
 {
     public const string RouteProxyRootName = Factory3DRouteProxyAssembler.RootName;
+    private const string WallRootPrefix = "Wall ";
 
     private Factory3DOutsideTestProxyAssembler assembler = null!;
     private Material fallbackMaterial = null!;
     private int activeFloor = -1;
+    private bool exteriorOcclusionSurfacesVisible = true;
 
     public int ActiveFloor => activeFloor;
+    public bool ExteriorOcclusionSurfacesVisible => exteriorOcclusionSurfacesVisible;
 
     public Factory3DOutsideTestProxyBuildResult Rebuild(
         SceneGrid grid,
         FactoryWorldState state,
         float wallHeight,
-        float doorCornerExclusionDistance)
+        float doorCornerExclusionDistance,
+        Material material = null)
     {
         var result = state is null
             ? Rebuild(
@@ -27,12 +31,14 @@ public sealed class Factory3DOutsideTestProxyView : MonoBehaviour
                 Array.Empty<BuildingRecord>(),
                 Array.Empty<OutsideTestFloorRecord>(),
                 wallHeight,
-                doorCornerExclusionDistance)
+                doorCornerExclusionDistance,
+                material)
             : RebuildStateAware(
                 grid,
                 state,
                 wallHeight,
-                doorCornerExclusionDistance);
+                doorCornerExclusionDistance,
+                material);
         ApplyActiveFloor();
         return result;
     }
@@ -41,7 +47,8 @@ public sealed class Factory3DOutsideTestProxyView : MonoBehaviour
         SceneGrid grid,
         FactoryWorldState state,
         float wallHeight,
-        float doorCornerExclusionDistance)
+        float doorCornerExclusionDistance,
+        Material material)
     {
         if (assembler is null)
         {
@@ -54,7 +61,9 @@ public sealed class Factory3DOutsideTestProxyView : MonoBehaviour
             return default;
         }
 
-        var effectiveMaterial = GetFallbackMaterial();
+        var effectiveMaterial = material is not null
+            ? material
+            : GetFallbackMaterial();
         var settings = Factory3DOutsideTestProxySettings.ForGrid(
             wallHeight,
             grid.CellSize,
@@ -154,6 +163,12 @@ public sealed class Factory3DOutsideTestProxyView : MonoBehaviour
         ApplyActiveFloor();
     }
 
+    public void SetExteriorOcclusionSurfacesVisible(bool visible)
+    {
+        exteriorOcclusionSurfacesVisible = visible;
+        ApplyActiveFloor();
+    }
+
     public void Clear()
     {
         if (assembler is null)
@@ -163,6 +178,7 @@ public sealed class Factory3DOutsideTestProxyView : MonoBehaviour
 
         assembler.Clear(transform);
         activeFloor = -1;
+        exteriorOcclusionSurfacesVisible = true;
     }
 
     public Factory3DRouteProxyView GetOrCreateRouteProxyView()
@@ -341,10 +357,28 @@ public sealed class Factory3DOutsideTestProxyView : MonoBehaviour
 
                 var isVisible = activeFloor < 0 || parsedFloorIndex == activeFloor;
                 floor.gameObject.SetActive(isVisible);
+                for (var childIndex = 0; childIndex < floor.childCount; childIndex++)
+                {
+                    var child = floor.GetChild(childIndex);
+                    if (child.name.StartsWith(WallRootPrefix, StringComparison.Ordinal))
+                    {
+                        child.gameObject.SetActive(isVisible);
+                    }
+                }
+
+                var slab = floor.Find(Factory3DOutsideTestProxyAssembler.FloorSlabName);
+                if (slab is not null && slab)
+                {
+                    slab.gameObject.SetActive(activeFloor >= 0 && parsedFloorIndex == activeFloor);
+                }
+
                 var roof = floor.Find(Factory3DOutsideTestProxyAssembler.RoofName);
                 if (roof is not null && roof)
                 {
-                    roof.gameObject.SetActive(isVisible && activeFloor < 0);
+                    roof.gameObject.SetActive(
+                        isVisible
+                        && activeFloor < 0
+                        && exteriorOcclusionSurfacesVisible);
                 }
             }
         }
