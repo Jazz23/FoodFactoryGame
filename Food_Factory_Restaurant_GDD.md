@@ -84,8 +84,7 @@ objectives.
 
 - Procedurally generated map divided into districts/markets.
 
-- The game is fully 3D. Outdoor play uses an isometric-style camera;
-  building interiors use a more top-down camera.
+- The game is fully 3D. Outdoors use a third-person camera that orbits the player. Indoors use a top-down camera aligned so the building floor grid reads vertically/horizontally on screen.
 
 - Districts vary by population, wealth, cuisine preferences, land cost,
   traffic, and competition.
@@ -140,8 +139,9 @@ but weak dinner traffic.
 - Restaurants trade dining space against kitchen, storage,
   refrigeration, staff circulation, and utilities.
 
-- Factories trade machine footprint against buffers, worker access,
-  loading, and expansion space.
+- Factories trade machine footprint against buffers, worker access, loading, and expansion space.
+
+- Factories can add additional floors, allowing vertical expansion when land is limited.
 
 - Construction requires money only. Construction work is outsourced
   rather than performed by the player or employees.
@@ -259,12 +259,19 @@ seating if applicable, pay, and leave.
 
 - Affected by road distance and congestion.
 
+## Roads
+
+- Roads are public infrastructure and are not built or owned by the player.
+
+- Trucks use the existing road network.
+
 ## Trains
 
 - High throughput over long distances.
 
-- Require tracks, stations, trains, loading infrastructure, and
-  scheduling.
+- Rail infrastructure is player-built and player-owned.
+
+- Requires tracks, stations, trains, loading infrastructure, and scheduling.
 
 - Best for repeated bulk flows between major hubs.
 
@@ -327,7 +334,7 @@ seating if applicable, pay, and leave.
 
 - Employee wages.
 
-- Land/building purchases or rent.
+- Land/building purchases.
 
 - Machines and equipment.
 
@@ -378,8 +385,7 @@ support them.
 
 - Direct 3D character movement and interaction for local tasks.
 
-- Build/planning mode for placing layouts, furniture, machines, roads,
-  and rails; construction is completed by paying the required cost.
+- Build/planning mode for placing layouts, furniture, machines, and player-built rail; construction is completed by paying the required cost. Roads are pre-existing public infrastructure.
 
 - Management overlays for inventory, freshness, throughput, profit,
   demand, staffing, and transport.
@@ -448,18 +454,17 @@ support them.
 
 - Food condition: LOCKED - binary edible or spoiled; no graded quality score.
 
-- Property ownership and rent rules. Construction is LOCKED as
+- Property ownership: LOCKED - properties are purchased outright; no renting or leasing. Construction is LOCKED as
   outsourced for money.
 
-- How roads/rails are built and who owns them.
+- Roads/rail ownership: LOCKED - roads are public/pre-existing; rail is player-built and player-owned.
 
 - How bankruptcy, loans, and recovery work.
 
 - Whether there are scenarios/campaign goals in addition to sandbox
   play.
 
-- Exact camera transition between outdoor isometric and indoor top-down
-  views.
+- Camera model: LOCKED - outdoors use an orbiting third-person camera; indoors use a top-down camera aligned to the building grid.
 
 Decision process: handle these one at a time. For each decision, present
 three distinct options, select one, and update this document.
@@ -515,28 +520,49 @@ Status: selected - Simple workforce.
 
 - A. Aggregate demand - each restaurant gets a calculated demand score; customers are mostly visual representation.
 
-- B. Individual choice - each customer evaluates nearby restaurants using price, quality, cuisine fit, distance, and wait time. [SELECTED]
+- B. Individual choice - each customer evaluates nearby restaurants using price, cuisine fit, distance, reputation, and wait time. [SELECTED]
 
 - C. Hybrid - districts generate demand in aggregate, then spawned customers choose among nearby restaurants using a simpler score.
 
 Status: selected - Individual choice.
 
-# 24. Next Decision: Food Quality Calculation
+# 24. Decision Record: Food Condition
 
-- A. Weighted score - ingredient quality, freshness, recipe complexity, and execution combine into one simple quality score.
+- Food condition is binary: edible or spoiled. [SELECTED]
 
-- B. Weakest-link model - each production step can cap final quality, so poor ingredients or bad processing meaningfully limit the result.
-
-- C. Multiple attributes - food tracks separate qualities such as taste, freshness, and presentation; different customers value them differently.
-
-Status: undecided.
-
-# 23. Decision Record: Food Condition
-
-- Food has a binary condition: edible or spoiled. [SELECTED]
-
-- No graded freshness or quality score is used.
+- No graded freshness or food-quality score is used.
 
 - Refrigeration only affects how long an item remains edible.
 
 Status: selected - Binary edible/spoiled condition.
+
+# 25. Decision Record: Property Ownership
+
+- A. Buy only - all player-owned restaurants, factories, farms, and other properties are purchased outright. [SELECTED]
+
+- B. Rent or buy - renting lowers upfront cost while ownership reduces long-term cost.
+
+- C. Lease only - properties are leased rather than purchased.
+
+Status: selected - Buy only.
+
+# 26. Decision Record: Roads & Rail
+
+- A. Public roads, player-built rail - roads already exist; player builds and owns rail infrastructure. [SELECTED]
+
+- B. Player-built roads and rail - player constructs the full transport network.
+
+- C. Mostly public infrastructure - player buys access/stations/depots rather than constructing networks.
+
+Status: selected - Public roads, player-built rail.
+
+
+# 27. Decision Record: Vertical Factory Transport
+
+- A. Freight elevators only - vertical movement is handled through elevators.
+
+- B. Conveyor lifts only - automated conveyor systems move goods between floors.
+
+- C. Both - conveyor lifts handle automated item flow; elevators handle workers and bulk/manual transport. [SELECTED]
+
+Status: selected - Both conveyors and elevators.
