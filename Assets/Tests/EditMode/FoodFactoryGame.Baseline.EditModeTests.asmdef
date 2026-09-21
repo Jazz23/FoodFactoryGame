@@ -1,0 +1,8 @@
+{
+  "name": "FoodFactoryGame.Baseline.EditModeTests",
+  "rootNamespace": "FoodFactoryGame.Baseline.Tests",
+  "references": ["FishNet.Runtime", "Unity.InputSystem"],
+  "includePlatforms": ["Editor"],
+  "optionalUnityReferences": ["TestAssemblies"],
+  "autoReferenced": false
+}

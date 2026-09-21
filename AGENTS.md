@@ -4,7 +4,7 @@
 
 - `Food_Factory_Restaurant_GDD.md` is the authoritative gameplay design; `gdd.md` is superseded historical reference. Distinguish confirmed requirements, proposals, and open decisions. Do not silently promote proposals to requirements.
 - `dev_resources.md` records resource facts, agent defaults, and setup gaps. Do not infer working systems from old instructions, generated projects, or test artifacts.
-- Maintain accepted contracts and implementation status in `docs/architecture.md`, verified workflows in `docs/development.md`, and consequential technical decisions in `docs/decisions/` as foundation work creates them. These documents are not yet established; do not assume they exist. Update them when contracts/workflows change, labeling implemented, planned, and undecided behavior.
+- Maintain accepted contracts and implementation status in `docs/architecture.md`, verified workflows in `docs/development.md`, and consequential technical decisions in `docs/decisions/`. These currently describe the development baseline, not completed gameplay foundations. Update them when contracts/workflows change, labeling implemented, planned, and undecided behavior.
 
 ## C# and Authoring
 

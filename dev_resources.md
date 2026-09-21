@@ -23,9 +23,10 @@ Repository declarations below were inspected; successful installation and runtim
 | uGUI | `2.5.0`, declared dependency; final UI approach TBD |
 | SQLite | `com.gilzoide.sqlite-net`, Git reference `1.3.2`; intended persistence role TBD |
 | MoonSharp | Git reference `upm/beta/v3.0`; scripting/modding requirement TBD |
-| FishNet | Local `Assets/FishNet` exists and is ignored by Git; no FishNet dependency in the manifest. Version, acquisition source, and reproducible installation procedure TBD |
-| Package resolution | `Packages/packages-lock.json` is tracked; validate fresh-checkout resolution before claiming reproducibility |
-| Unity automation | Project policy uses Unity CLI MCP; current Editor connection and available project commands still need live verification |
+| FishNet | Vendored `Assets/FishNet` version `4.7.3`, including metadata, license, and third-party notices; root ignore removed. The snapshot contains 2,014 FishNet files. Original upstream commit/channel is unknown; do not claim byte identity beyond this repository snapshot |
+| FishNet configuration | `Assets/FishNet.Config.XML` is retained as project authoring/configuration and its `.meta` is present |
+| Package resolution | `Packages/packages-lock.json` is tracked; an isolated source snapshot resolved packages and passed the baseline EditMode suite |
+| Unity automation | Unity CLI MCP connected to Editor PID `5068`, Unity `6000.5.9f1`, project path `E:\Projects\Unity\FoodFactoryGame`; registered commands were discovered and exercised |
 | OpenCode | CLI is available; the three configured model IDs and their selected variants were found through `opencode models openai --verbose` |
 
 Other declared dependencies remain in `Packages/manifest.json`; declaration alone is not a decision to use a package for gameplay.
@@ -74,11 +75,11 @@ World-wide population totals are a planning assumption awaiting confirmation. Pl
 
 These items are pending, not verified workflows:
 
-- Verify current Editor compilation, console baseline, and registered automation commands. Old `factory_*` commands are not established in this version.
-- Document FishNet acquisition/version and prove dependency restoration from a clean checkout.
-- Create `docs/architecture.md` for accepted contracts and implemented/planned status, `docs/development.md` for tested setup/compile/test/build procedures, and `docs/decisions/` for consequential technical decisions.
-- Establish exact test commands, filters, isolated save locations, run IDs, and artifact paths. Existing/generated test files do not prove a current passing suite.
-- Produce and launch a real player build; a dry run does not establish build success.
+- Verify current Editor compilation, console baseline, and registered automation commands. Old `factory_*` commands are not established in this version; the generic Pipeline commands are documented in `docs/development.md`.
+- Document FishNet acquisition/version and prove dependency restoration from a clean source snapshot. The local snapshot check passed; an empty-machine/global-cache check remains pending.
+- Maintain `docs/architecture.md` for accepted contracts and implemented/planned status, `docs/development.md` for tested setup/compile/test/build procedures, and `docs/decisions/` for consequential technical decisions.
+- Establish exact test commands, filters, isolated save locations, run IDs, and artifact paths. The current baseline now has four passing EditMode checks; gameplay/stateful tests do not exist yet.
+- Produce and launch a real player build; the baseline Windows Development Player succeeded and launched. Future build regressions must retain the BuildReport and player log.
 - Add multiplayer smoke verification after the networking foundation exists.
 - Define repeatable server/client performance scenarios and record measured results on specified hardware.
 

@@ -1,6 +1,7 @@
-/Assets/FishNet
+# FishNet 4.7.3 is vendored with its original metadata and licenses.
 /TestResults
 /Assets/TestResults
+/Assets/TestResults.meta
 # Unity .gitignore Template
 # Source: https://github.com/github/gitignore/blob/main/Unity.gitignore
 # Last synced: 2026-07-02
@@ -116,3 +117,5 @@ InitTestScene*.unity*
 
 # Auto-generated cache in Assets folder
 /[Aa]ssets/[Ss]ceneDependencyCache*
+
+/[Aa]ssets/FishNet*
