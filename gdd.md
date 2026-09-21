@@ -1,3 +1,9 @@
+# Superseded Design Notes
+
+Historical reference only. [Food_Factory_Restaurant_GDD.md](Food_Factory_Restaurant_GDD.md) is the authoritative gameplay design. Do not implement these notes as current requirements: they include superseded food quality, equipment manufacturing, construction, and camera ideas.
+
+---
+
 - Manufacturing plant \= logistics (trucks/trains) to transport food to restaurants.  
   - If you transport raw ingredients instead, you can make better food in the kitchen.  
 - The kitchen requires space, so does the rest of the restaurant. More tables mean more customers, bigger kitchens mean more food or unlock bigger recipes.  

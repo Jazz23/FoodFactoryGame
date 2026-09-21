@@ -1,0 +1,85 @@
+# Development Resources
+
+Last reviewed: 2026-09-21. This file records resource facts, configuration, and open setup work; it does not certify a working build. Gameplay requirements belong in [Food_Factory_Restaurant_GDD.md](Food_Factory_Restaurant_GDD.md).
+
+## Priorities
+
+1. Minimize subscription consumption per accepted feature, including review and rework.
+2. Preserve code quality through clear contracts, capable task ownership, and relevant verification.
+3. Reduce elapsed time where it does not undermine the first two goals.
+
+## Environment and Dependencies
+
+Repository declarations below were inspected; successful installation and runtime integration require baseline verification.
+
+| Resource | Recorded state / source |
+|----------|-------------------------|
+| Workspace | `E:\Projects\Unity\FoodFactoryGame`; Git repository on Windows |
+| Unity Editor | `6000.5.9f1` (`b57deb96f08d`), declared in `ProjectSettings/ProjectVersion.txt` |
+| Render pipeline | URP `17.5.0`, declared in `Packages/manifest.json` |
+| Input System | `1.20.0`; project includes `Assets/InputSystem_Actions.inputactions` |
+| AI Navigation | `2.0.14`, declared dependency |
+| Test Framework | `1.7.0`, declared dependency |
+| uGUI | `2.5.0`, declared dependency; final UI approach TBD |
+| SQLite | `com.gilzoide.sqlite-net`, Git reference `1.3.2`; intended persistence role TBD |
+| MoonSharp | Git reference `upm/beta/v3.0`; scripting/modding requirement TBD |
+| FishNet | Local `Assets/FishNet` exists and is ignored by Git; no FishNet dependency in the manifest. Version, acquisition source, and reproducible installation procedure TBD |
+| Package resolution | `Packages/packages-lock.json` is tracked; validate fresh-checkout resolution before claiming reproducibility |
+| Unity automation | Project policy uses Unity CLI MCP; current Editor connection and available project commands still need live verification |
+| OpenCode | CLI is available; the three configured model IDs and their selected variants were found through `opencode models openai --verbose` |
+
+Other declared dependencies remain in `Packages/manifest.json`; declaration alone is not a decision to use a package for gameplay.
+
+## Hardware, Assets, and Budget - To Fill In
+
+| Item | Status |
+|------|--------|
+| Development CPU / GPU / RAM | TBD |
+| Target PC CPU / GPU / RAM | TBD; owner requested mid-range PC |
+| Target resolution / quality settings | TBD |
+| Subscriptions, quotas, reset windows, and provider routing | TBD; do not infer subscription consumption from model catalog API prices |
+| Owned art, animation, audio, UI, and tooling assets | Inventory and usage/license constraints TBD |
+| Hosting/service budget | TBD after multiplayer hosting decision |
+
+## Agent Configuration and Usage Policy
+
+These are initial settings, not a measured cost ranking. Model IDs are retained from the existing agent definitions. Restart OpenCode after changing agent configuration.
+
+| Agent | Model | Default variant | Ownership |
+|-------|-------|-----------------|-----------|
+| Coordinator | `openai/gpt-5.6-luna` | `medium` | Scope, risk-based routing, communication, acceptance |
+| Investigator | `openai/gpt-5.6-luna` | `medium` | Focused read-only discovery and diagnostic evidence |
+| Worker | `openai/gpt-5.6-luna` | `medium` | Bounded implementation using established contracts |
+| Mid-level developer | `openai/gpt-5.6-terra` | `medium` | Ordinary feature ownership from investigation through verification |
+| Senior developer | `openai/gpt-6-astra` | `high` | Foundational contracts, high-risk implementation, difficult diagnosis, independent review |
+
+- Route directly to the appropriate owner; a task does not need to visit every agent.
+- Use senior judgment before consequential cross-system implementation, rather than only after repeated failures.
+- Keep known-file lookups with the current owner. Use an investigator when focused discovery meaningfully reduces duplicated exploration.
+- Reuse a related agent session when its context remains useful; pass concise contracts and results instead of entire transcripts.
+- Default to one implementation owner. Parallelism is optional and subject to the ownership and Editor rules in `AGENTS.md`.
+- Collect a small representative sample (about ten tasks) before retuning models or reasoning effort.
+
+Configuration verification (2026-09-21): `opencode debug agent <name>` successfully resolved all five project agents with the defaults above. Resolved permissions allow coordinator questions and restrict investigator to read-only discovery/web fetching (edits, shell execution, delegation, and unlisted tools denied). This validates configuration loading, not model output quality or subscription savings.
+
+Suggested measurement record per task: task/risk, agent/model/variant, observable usage or quota change, handoff count, first-pass acceptance, rework, elapsed time, and verification artifacts. Mark unavailable usage as unknown; do not invent token costs or subscription savings.
+
+## Scale and Open Product Decisions
+
+The authoritative targets and statuses are in GDD section 28: multiplayer; approximately 20 active workers, 1,000 customers, thousands of goods, 100 vehicles, and 20 sites; 60 FPS on a mid-range PC; distant operations continue while the world runs.
+
+World-wide population totals are a planning assumption awaiting confirmation. Player count, hosting/disconnect behavior, goods representation, precise benchmark goods count, and target hardware remain open. Physical-goods batching is a proposal, not an approved requirement.
+
+## Baseline and Tooling Backlog
+
+These items are pending, not verified workflows:
+
+- Verify current Editor compilation, console baseline, and registered automation commands. Old `factory_*` commands are not established in this version.
+- Document FishNet acquisition/version and prove dependency restoration from a clean checkout.
+- Create `docs/architecture.md` for accepted contracts and implemented/planned status, `docs/development.md` for tested setup/compile/test/build procedures, and `docs/decisions/` for consequential technical decisions.
+- Establish exact test commands, filters, isolated save locations, run IDs, and artifact paths. Existing/generated test files do not prove a current passing suite.
+- Produce and launch a real player build; a dry run does not establish build success.
+- Add multiplayer smoke verification after the networking foundation exists.
+- Define repeatable server/client performance scenarios and record measured results on specified hardware.
+
+Upgrade policy: propose Editor/package changes explicitly, keep declared versions and lock files consistent, and verify compile/tests/build before adopting an upgrade. Review mutable Git references during reproducibility work; no dependencies were upgraded as part of this documentation setup.

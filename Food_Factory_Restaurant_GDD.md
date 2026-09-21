@@ -4,9 +4,11 @@
 
 *Working design - assumptions are provisional until explicitly decided*
 
+This is the authoritative gameplay design. `gdd.md` contains superseded historical notes. Confirmed requirements, proposals, and open decisions are labeled separately; a proposal is not an approved gameplay requirement.
+
 # 1. High Concept
 
-A 3D management/automation game combining food production, logistics,
+A multiplayer 3D management/automation game combining food production, logistics,
 restaurant operation, and direct character control. The player starts
 with a tiny restaurant, does much of the work personally, and grows into
 a vertically integrated food network spanning farms, food factories,
@@ -94,6 +96,8 @@ objectives.
 
 - Distance matters for delivery cost, employee travel, freshness, and
   network design.
+
+- Operations at distant sites continue while the world simulation is running, regardless of whether a client is viewing the site or has its presentation loaded. Whether the world continues after its host disconnects is undecided.
 
 ## District Demand
 
@@ -466,6 +470,14 @@ support them.
 
 - Camera model: LOCKED - outdoors use an orbiting third-person camera; indoors use a top-down camera aligned to the building grid.
 
+- Multiplayer: LOCKED - required. Maximum concurrent players and hosting/disconnect behavior remain undecided (section 28).
+
+- Distant operations: LOCKED - sites continue operating independently of client visibility (section 28).
+
+- Scale/performance targets: recorded in section 28; exact benchmark hardware and population scope remain to be confirmed.
+
+- Physical goods representation: proposed in section 28; not yet selected.
+
 Decision process: handle these one at a time. For each decision, present
 three distinct options, select one, and update this document.
 
@@ -566,3 +578,51 @@ Status: selected - Public roads, player-built rail.
 - C. Both - conveyor lifts handle automated item flow; elevators handle workers and bulk/manual transport. [SELECTED]
 
 Status: selected - Both conveyors and elevators.
+
+# 28. Multiplayer, Scale & Technical Decision Status
+
+## Confirmed Requirements
+
+Recorded from the project owner's decisions on 2026-09-21:
+
+- Multiplayer is required.
+- Distant sites continue operating while the world simulation is running. Client visibility and presentation loading must not control whether a site operates.
+- Approximate scale targets:
+
+| Population | Target |
+|------------|--------|
+| Active workers | 20 |
+| Customers | 1,000 |
+| Goods | Thousands; exact benchmark quantity TBD |
+| Vehicles | 100 |
+| Sites | 20 |
+
+- Performance target: 60 FPS on a mid-range PC (approximately 16.7 ms per rendered frame).
+
+Planning assumption, not a confirmed decision: these populations are world-wide concurrent totals, not per-site counts. The number simultaneously visible to a client is unspecified. Server simulation capacity and client rendering performance require separate measurements; 60 FPS does not prescribe a server tick rate. No benchmark has established achievement of these targets.
+
+## Proposed Physical Goods Model - Awaiting Approval
+
+Goods always have an authoritative quantity, condition, owner, and physical location. They do not always require individual GameObjects, rigidbodies, or network objects.
+
+- Storage and vehicle cargo may use inventory batches.
+- Carried goods and visible transport may use visual representations of authoritative inventory or transport state.
+- Distant goods retain their inventory, processing, transport, and spoilage state without requiring local visual objects.
+- Batch only goods whose gameplay-relevant state is compatible. Preserve different spoilage histories; stacking must not reset spoilage or erase relevant differences.
+
+This proposal preserves location-based logistics and the physical-world pillar. The precise interaction and representation rules remain undecided; do not implement it as a locked requirement without approval.
+
+## Development Constraints and Pending Technical Decisions
+
+The development instructions require server-owned gameplay state, validated client action requests, and simulation independent of client presentation. These are implementation constraints, not claims of an implemented networking system.
+
+Open decisions:
+
+- Maximum concurrent players and multiplayer ownership/cooperation rules.
+- Hosting model and whether a world continues after its host disconnects; offline progression is not implied by distant-site operation.
+- Physical goods representation: accept, revise, or replace the proposal above.
+- Confirm world-wide versus per-site population targets and expected simultaneous client visibility.
+- Specify target CPU, GPU, RAM, resolution, and quality settings for the mid-range PC benchmark.
+- Simulation scheduling, replication/interest rules, and persistence contracts need technical design and verification.
+
+A listen-server development path with a headless-compatible simulation is a proposal, not a selected hosting requirement. Record accepted technical contracts and implementation status in `docs/architecture.md` when the foundation work creates it. Resource facts and setup gaps are tracked in `dev_resources.md`.
