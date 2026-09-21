@@ -2,7 +2,7 @@
 mode: subagent
 description: Owns ordinary features end to end, including investigation, implementation, integration, and verification.
 model: openai/gpt-5.6-terra
-variant: medium
+variant: high
 permission:
   "*": allow
   doom_loop: ask

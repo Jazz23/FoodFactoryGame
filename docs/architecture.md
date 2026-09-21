@@ -14,21 +14,44 @@ Gameplay requirements and open product decisions are in [the GDD](../Food_Factor
 - `Assets/Tests/EditMode` contains four authoring/dependency checks in `FoodFactoryGame.Baseline.EditModeTests`. Tests open build scenes as isolated preview scenes and do not touch application saves.
 - No project gameplay simulation, network session flow, inventory system, persistence contract, or remote-site system is established by this baseline.
 
+## Accepted Foundational Multiplayer Design
+
+[Decision 0002](decisions/0002-authoritative-multiplayer-foundation.md) is the
+accepted technical starting design. It is a contract for feature work, not a
+claim that the runtime exists.
+
+- A server owns gameplay state and validates client requests. A listen server
+  is the initial development path, with a headless-compatible simulation that
+  is independent of the host camera, local player, and presentation scenes.
+- The server uses one explicit world simulation clock, with subsystem-specific
+  fixed-step or scheduled updates. All sites use the same model initially.
+- Replication is interest-based. Remote management requires an explicit,
+  server-validated connection subscription; presentation visibility does not
+  control simulation.
+- Persistence is made of server-owned, versioned snapshots with stable domain
+  IDs and explicit recovery of reservations and in-flight operations.
+- Goods are logical inventory/transport state with selective visual
+  representation. Exact physical batching remains an open GDD decision.
+
+The first network integration targets the vendored FishNet `4.7.3` snapshot.
+The existing demo prefab catalog remains baseline authoring only.
+
 ## Required Constraints for Future Implementation
 
-- The server owns gameplay state; clients request validated actions.
+- The server owns gameplay state; clients request validated actions through the command contract in decision 0002.
 - Site operations continue independently of client cameras, interest, or presentation scene loading while the world simulation runs.
 - Persistent identities, inventory transfers, payments, and job reservations must survive failure/cancellation without silent loss or duplication.
 - Player and employee operational rules should be shared; input and AI choose actions through those rules.
 - Visual objects must not become the sole owners of authoritative simulation state.
 
-These constraints guide future work; they are not implemented systems or finalized interfaces.
+These are accepted contracts. No runtime implementation or final public
+interface is established yet.
 
 ## Planned / Undecided
 
-- Gameplay assembly boundaries, simulation scheduling, command interfaces, replication interest, and persistence schema: technical design pending.
+- Domain assembly boundaries, simulation scheduling, command interfaces, replication interest, and persistence schema: defined in decision 0002; implementation pending.
 - Player count, hosting/disconnect behavior, physical-goods representation, and exact performance hardware: GDD decisions pending.
-- Logical inventory batches with selective visual representation and a headless-compatible listen-server development path remain proposals.
+- Offline progression, host migration, discovery/join flow, and the shipped hosting model remain undecided.
 - SQLite and MoonSharp are existing declared dependencies, with their gameplay roles undecided. Neither is selected merely by being installed.
 - Multiplayer smoke tests and representative scale benchmarks follow implementation; current tests do not establish replication correctness or the 60 FPS target.
 

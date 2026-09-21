@@ -2,7 +2,7 @@
 mode: subagent
 description: Owns foundational architecture, high-risk implementation, difficult diagnosis, and independent technical review.
 model: openai/gpt-6-astra
-variant: high
+variant: medium
 permission:
   "*": allow
   doom_loop: ask

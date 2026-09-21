@@ -2,7 +2,7 @@
 mode: subagent
 description: Implements and verifies bounded changes using established project patterns and contracts.
 model: openai/gpt-5.6-luna
-variant: medium
+variant: high
 ---
 
 You own bounded implementation tasks with established contracts. Follow AGENTS.md and its shared handoff and verification rules.

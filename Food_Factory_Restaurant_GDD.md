@@ -612,17 +612,20 @@ Goods always have an authoritative quantity, condition, owner, and physical loca
 
 This proposal preserves location-based logistics and the physical-world pillar. The precise interaction and representation rules remain undecided; do not implement it as a locked requirement without approval.
 
-## Development Constraints and Pending Technical Decisions
+## Development Constraints and Decision Status
 
-The development instructions require server-owned gameplay state, validated client action requests, and simulation independent of client presentation. These are implementation constraints, not claims of an implemented networking system.
+The development instructions require server-owned gameplay state, validated client action requests, and simulation independent of client presentation. Decision 0002 records the accepted technical starting design for those constraints; it is not a claim of an implemented networking system.
 
-Open decisions:
+Open product decisions:
 
 - Maximum concurrent players and multiplayer ownership/cooperation rules.
 - Hosting model and whether a world continues after its host disconnects; offline progression is not implied by distant-site operation.
 - Physical goods representation: accept, revise, or replace the proposal above.
 - Confirm world-wide versus per-site population targets and expected simultaneous client visibility.
 - Specify target CPU, GPU, RAM, resolution, and quality settings for the mid-range PC benchmark.
-- Simulation scheduling, replication/interest rules, and persistence contracts need technical design and verification.
 
-A listen-server development path with a headless-compatible simulation is a proposal, not a selected hosting requirement. Record accepted technical contracts and implementation status in `docs/architecture.md` when the foundation work creates it. Resource facts and setup gaps are tracked in `dev_resources.md`.
+Accepted technical design with implementation pending:
+
+- Simulation scheduling, replication/interest rules, and persistence contracts are defined in `docs/decisions/0002-authoritative-multiplayer-foundation.md` and still require runtime verification.
+
+The accepted development starting point is an authoritative server with a listen-server path and a headless-compatible simulation, as recorded in `docs/decisions/0002-authoritative-multiplayer-foundation.md`. This does not select the shipped hosting model, dedicated hosting, host migration, or post-disconnect/offline progression. Record implementation status in `docs/architecture.md`; resource facts and setup gaps are tracked in `dev_resources.md`.

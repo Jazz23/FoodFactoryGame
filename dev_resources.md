@@ -50,9 +50,9 @@ These are initial settings, not a measured cost ranking. Model IDs are retained 
 |-------|-------|-----------------|-----------|
 | Coordinator | `openai/gpt-5.6-luna` | `medium` | Scope, risk-based routing, communication, acceptance |
 | Investigator | `openai/gpt-5.6-luna` | `medium` | Focused read-only discovery and diagnostic evidence |
-| Worker | `openai/gpt-5.6-luna` | `medium` | Bounded implementation using established contracts |
-| Mid-level developer | `openai/gpt-5.6-terra` | `medium` | Ordinary feature ownership from investigation through verification |
-| Senior developer | `openai/gpt-6-astra` | `high` | Foundational contracts, high-risk implementation, difficult diagnosis, independent review |
+| Worker | `openai/gpt-5.6-luna` | `high` | Bounded implementation using established contracts |
+| Mid-level developer | `openai/gpt-5.6-terra` | `high` | Ordinary feature ownership from investigation through verification |
+| Senior developer | `openai/gpt-6-astra` | `medium` | Foundational contracts, high-risk implementation, difficult diagnosis, independent review |
 
 - Route directly to the appropriate owner; a task does not need to visit every agent.
 - Use senior judgment before consequential cross-system implementation, rather than only after repeated failures.
@@ -69,7 +69,7 @@ Suggested measurement record per task: task/risk, agent/model/variant, observabl
 
 The authoritative targets and statuses are in GDD section 28: multiplayer; approximately 20 active workers, 1,000 customers, thousands of goods, 100 vehicles, and 20 sites; 60 FPS on a mid-range PC; distant operations continue while the world runs.
 
-World-wide population totals are a planning assumption awaiting confirmation. Player count, hosting/disconnect behavior, goods representation, precise benchmark goods count, and target hardware remain open. Physical-goods batching is a proposal, not an approved requirement.
+World-wide population totals are a planning assumption awaiting confirmation. Player count, hosting/disconnect behavior, goods representation, precise benchmark goods count, and target hardware remain open. Physical-goods batching is a proposal, not an approved requirement. The accepted technical starting architecture for authority, simulation timing, visibility, and persistence is [decision 0002](docs/decisions/0002-authoritative-multiplayer-foundation.md); it is not yet implemented.
 
 ## Baseline and Tooling Backlog
 
@@ -80,7 +80,7 @@ These items are pending, not verified workflows:
 - Maintain `docs/architecture.md` for accepted contracts and implemented/planned status, `docs/development.md` for tested setup/compile/test/build procedures, and `docs/decisions/` for consequential technical decisions.
 - Establish exact test commands, filters, isolated save locations, run IDs, and artifact paths. The current baseline now has four passing EditMode checks; gameplay/stateful tests do not exist yet.
 - Produce and launch a real player build; the baseline Windows Development Player succeeded and launched. Future build regressions must retain the BuildReport and player log.
-- Add multiplayer smoke verification after the networking foundation exists.
+- Implement and verify the authoritative multiplayer foundation in decision 0002, then add the documented server/client smoke verification.
 - Define repeatable server/client performance scenarios and record measured results on specified hardware.
 
 Upgrade policy: propose Editor/package changes explicitly, keep declared versions and lock files consistent, and verify compile/tests/build before adopting an upgrade. Review mutable Git references during reproducibility work; no dependencies were upgraded as part of this documentation setup.

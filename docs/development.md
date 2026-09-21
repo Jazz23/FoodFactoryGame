@@ -53,6 +53,40 @@ Checks: FishNet runtime availability, all entries in the default network prefab 
 
 The tests use preview scenes and do not write save data or modify application databases. Future stateful tests must receive explicit isolated save paths.
 
+## Multiplayer Foundation Verification
+
+The contracts for the first multiplayer implementation are in [decision
+0002](decisions/0002-authoritative-multiplayer-foundation.md). They are
+accepted design contracts; the current baseline has no runtime multiplayer
+implementation. Do not mark the foundation complete from a successful player
+build or FishNet import check alone.
+
+When the foundation exists, verify these layers separately:
+
+- Domain/EditMode tests: server-only command validation, permission checks,
+  atomic rejection, request-ID idempotency, reservations, stable IDs, clock
+  scheduling, and save/recovery rules. Report the exact filter, run identity,
+  matched count, pass/fail/skip counts, and artifact path. Zero matches is a
+  failure.
+- Headless-compatible simulation: advance a site with no camera, local player,
+  or presentation scene; confirm that an unsubscribed site follows the same
+  model as a subscribed site.
+- Listen-server PlayMode/smoke test: run the server and local client together,
+  connect a remote client, reject an unauthorized command, and establish a
+  server-validated remote management subscription. Capture the run identity,
+  logs, and any relevant network diagnostics.
+- Persistence/recovery: use a new isolated save/database path, run migration
+  and reconciliation as a dry run first when supported, and verify stable IDs
+  plus no duplicated or silently deleted inventory/payments after failure and
+  cancellation.
+- Scale/performance: use approved hardware and population interpretation
+  before measuring the GDD targets. Keep server simulation timing separate
+  from client rendered FPS.
+
+Keep one owner for live Editor mutations, compilation, and test execution.
+These procedures are acceptance requirements for the future foundation, not
+verified workflows today.
+
 For a separate checkout with its Editor closed, the batch equivalent is:
 
 ```powershell
