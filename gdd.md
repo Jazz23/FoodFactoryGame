@@ -16,3 +16,7 @@
 - Inside a building is top down, outside is isometric.  
 - All machines are unlocked immediately  
 - Machines cost money
+
+
+
+Camera:
