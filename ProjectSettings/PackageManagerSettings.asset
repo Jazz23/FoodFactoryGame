@@ -2,7 +2,7 @@
 %TAG !u! tag:unity3d.com,2011:
 --- !u!114 &1
 MonoBehaviour:
-  m_ObjectHideFlags: 53
+  m_ObjectHideFlags: 61
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
@@ -38,7 +38,7 @@ MonoBehaviour:
     m_Modified: 0
     m_ErrorMessage: 
     m_UserModificationsEntityId:
-      m_rawData: 568105589213756512
+      m_rawData: 568105589213756492
     m_OriginalEntityId:
-      m_rawData: 568105589213756510
+      m_rawData: 568105589213756490
   m_LoadAssets: 0
