@@ -476,7 +476,7 @@ support them.
 
 - Scale/performance targets: recorded in section 28; exact benchmark hardware and population scope remain to be confirmed.
 
-- Physical goods representation: proposed in section 28; not yet selected.
+- Physical goods representation: LOCKED - location-based goods with selective visual representations (section 28).
 
 Decision process: handle these one at a time. For each decision, present
 three distinct options, select one, and update this document.
@@ -601,16 +601,17 @@ Recorded from the project owner's decisions on 2026-09-21:
 
 Planning assumption, not a confirmed decision: these populations are world-wide concurrent totals, not per-site counts. The number simultaneously visible to a client is unspecified. Server simulation capacity and client rendering performance require separate measurements; 60 FPS does not prescribe a server tick rate. No benchmark has established achievement of these targets.
 
-## Proposed Physical Goods Model - Awaiting Approval
+## Selected Physical Goods Model
 
-Goods always have an authoritative quantity, condition, owner, and physical location. They do not always require individual GameObjects, rigidbodies, or network objects.
+Selected by the project owner on 2026-09-22. "Physical" means that goods occupy a definite place in the world and must move through its logistics. It does not require a separate GameObject, rigidbody, or network object for every unit.
 
-- Storage and vehicle cargo may use inventory batches.
-- Carried goods and visible transport may use visual representations of authoritative inventory or transport state.
-- Distant goods retain their inventory, processing, transport, and spoilage state without requiring local visual objects.
-- Batch only goods whose gameplay-relevant state is compatible. Preserve different spoilage histories; stacking must not reset spoilage or erase relevant differences.
+- The server records each lot's stable identity, item type, quantity, owner, edible/spoiled condition, spoilage history, and exactly one physical location. Locations include storage, machine buffers, a character's carried inventory, vehicle cargo, transport in progress, and goods placed in the world.
+- Storage, buffers, and cargo may hold batches. Splitting a batch preserves the original goods' condition and spoilage history. Merge only goods with compatible gameplay-relevant state; stacking must never reset spoilage or erase a meaningful difference.
+- Players, employees, machines, conveyors, and vehicles move goods through validated pickup, processing, loading, transit, and drop-off actions. Location, capacity, travel time, and refrigeration continue to matter. A failed or cancelled move must leave the goods at a recorded location without loss or duplication.
+- Nearby carried goods, placed goods, and visible transport may use visual packages representing one or more authoritative units. The presentation must reflect the actual goods and support interaction with the authoritative lot or quantity; destroying or unloading a visual does not destroy the goods.
+- Distant goods retain their inventory, processing, transport, and spoilage state while the world simulation runs, even without local visual objects. Client visibility does not determine their progression.
 
-This proposal preserves location-based logistics and the physical-world pillar. The precise interaction and representation rules remain undecided; do not implement it as a locked requirement without approval.
+The exact package sizes, visual style, interaction ranges, and use of rigidbody physics for exceptional loose goods remain implementation and tuning decisions. Food condition remains binary as specified in section 6.
 
 ## Development Constraints and Decision Status
 
@@ -620,12 +621,11 @@ Open product decisions:
 
 - Maximum concurrent players and multiplayer ownership/cooperation rules.
 - Hosting model and whether a world continues after its host disconnects; offline progression is not implied by distant-site operation.
-- Physical goods representation: accept, revise, or replace the proposal above.
 - Confirm world-wide versus per-site population targets and expected simultaneous client visibility.
 - Specify target CPU, GPU, RAM, resolution, and quality settings for the mid-range PC benchmark.
 
 Accepted technical design with implementation pending:
 
-- Simulation scheduling, replication/interest rules, and persistence contracts are defined in `docs/decisions/0002-authoritative-multiplayer-foundation.md` and still require runtime verification.
+- Simulation scheduling, replication/interest rules, and persistence contracts are defined in `docs/decisions/0002-authoritative-multiplayer-foundation.md`; the selected physical goods model is detailed in `docs/decisions/0003-physical-goods-model.md`. Both still require runtime verification.
 
 The accepted development starting point is an authoritative server with a listen-server path and a headless-compatible simulation, as recorded in `docs/decisions/0002-authoritative-multiplayer-foundation.md`. This does not select the shipped hosting model, dedicated hosting, host migration, or post-disconnect/offline progression. Record implementation status in `docs/architecture.md`; resource facts and setup gaps are tracked in `dev_resources.md`.

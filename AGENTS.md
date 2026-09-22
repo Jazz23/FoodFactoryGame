@@ -39,8 +39,10 @@
 
 ## Task Ownership and Efficiency
 
-- When delegation is authorized, route by uncertainty and consequences: worker for bounded existing-pattern changes; mid-level developer for ordinary end-to-end features; senior developer directly for foundational contracts, high-risk implementation, or difficult diagnosis. Senior involvement does not require prior worker failure.
-- Keep small known-file lookups with the current owner. Use an investigator for focused discovery that avoids substantial duplicated exploration. Do not send every task through every role.
+- Codex and OpenCode have separate agent configurations and coordinator entry points. Codex uses a user-facing main agent with an optional coordinator subagent; OpenCode uses a user-facing primary coordinator and retains the `investigator` role name. Use the active runtime's configuration in `.codex/config.toml` and `.codex/agents/`, or `.opencode/agents/`; do not infer role or spawn permissions across runtimes. `dev_resources.md` records both setups.
+- When delegation is authorized, route by uncertainty and consequences using the active runtime's roles. Involve a senior developer directly for foundational contracts, high-risk implementation, or difficult diagnosis; senior involvement does not require prior worker failure.
+- After a senior decision, give implementation to the appropriate role when interfaces, invariants, failure behavior, and acceptance checks form a stable bounded contract. Keep tightly coupled or fragile core implementation with the senior owner. Avoid a handoff or extra review that adds more work than it resolves.
+- Keep small known-file lookups with the current owner. Use the active runtime's focused read-only discovery role when that avoids substantial duplicated exploration. Do not send every task through every role.
 - A handoff must state the goal, relevant decisions/contracts, owned files/systems, acceptance criteria, required verification, deferred scope, and escalation conditions. Reuse relevant context without copying whole transcripts.
 - Implementation owners inspect, implement, and verify within scope. Return changed files/behavior, verification evidence, remaining issues, and decisions requiring attention. Do not mark unverified work complete.
 - After failure, collect evidence and identify a supported cause before a targeted correction. Escalate unresolved uncertainty or recurrence of the same failure; do not repeat speculative fixes or escalate trivial understood errors.

@@ -62,8 +62,8 @@ listen-server host disconnects.
   reservations, and economic state remain server-owned records.
 - Goods are represented first as logical inventory and transport state, with
   visual objects created selectively. Exact batching, interaction, and
-  physical representation rules remain the GDD proposal and must not be
-  silently locked by an implementation.
+  physical representation rules were deferred by this record and later
+  selected in [decision 0003](0003-physical-goods-model.md).
 
 ### 3. Command and validation contract
 
@@ -198,7 +198,8 @@ This record intentionally does not decide:
   happens after the host disconnects;
 - offline progression while no authoritative server process is running;
 - discovery, join flow, connectivity service, or target platform constraints;
-- exact physical-goods batching and visual interaction rules;
+- exact physical-goods batching and visual interaction rules, subsequently
+  selected at the contract level by [decision 0003](0003-physical-goods-model.md);
 - exact subsystem frequencies, benchmark hardware, or the final scale budget;
 - the persistence backend and operational snapshot cadence.
 

@@ -30,8 +30,10 @@ claim that the runtime exists.
   control simulation.
 - Persistence is made of server-owned, versioned snapshots with stable domain
   IDs and explicit recovery of reservations and in-flight operations.
-- Goods are logical inventory/transport state with selective visual
-  representation. Exact physical batching remains an open GDD decision.
+- Goods are server-owned, location-based lots with selective visual
+  representation. Splits preserve spoilage history; only compatible lots merge.
+  [Decision 0003](decisions/0003-physical-goods-model.md) records the selected
+  model and its still-pending implementation.
 
 The first network integration targets the vendored FishNet `4.7.3` snapshot.
 The existing demo prefab catalog remains baseline authoring only.
@@ -50,7 +52,9 @@ interface is established yet.
 ## Planned / Undecided
 
 - Domain assembly boundaries, simulation scheduling, command interfaces, replication interest, and persistence schema: defined in decision 0002; implementation pending.
-- Player count, hosting/disconnect behavior, physical-goods representation, and exact performance hardware: GDD decisions pending.
+- Player count, hosting/disconnect behavior, and exact performance hardware: GDD decisions pending.
+- Physical goods model: selected in GDD section 28 and decision 0003; runtime
+  inventory, transport, spoilage, projection, and recovery remain unimplemented.
 - Offline progression, host migration, discovery/join flow, and the shipped hosting model remain undecided.
 - SQLite and MoonSharp are existing declared dependencies, with their gameplay roles undecided. Neither is selected merely by being installed.
 - Multiplayer smoke tests and representative scale benchmarks follow implementation; current tests do not establish replication correctness or the 60 FPS target.

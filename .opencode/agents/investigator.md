@@ -1,7 +1,7 @@
 ---
 mode: subagent
 description: Performs focused read-only repository discovery and returns evidence for implementation or diagnosis.
-model: openai/gpt-5.6-luna
+model: openai/gpt-6-luna
 variant: medium
 permission:
   "*": deny

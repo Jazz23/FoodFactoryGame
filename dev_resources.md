@@ -27,7 +27,7 @@ Repository declarations below were inspected; successful installation and runtim
 | FishNet configuration | `Assets/FishNet.Config.XML` is retained as project authoring/configuration and its `.meta` is present |
 | Package resolution | `Packages/packages-lock.json` is tracked; an isolated source snapshot resolved packages and passed the baseline EditMode suite |
 | Unity automation | Unity CLI MCP connected to Editor PID `5068`, Unity `6000.5.9f1`, project path `E:\Projects\Unity\FoodFactoryGame`; registered commands were discovered and exercised |
-| OpenCode | CLI is available; the three configured model IDs and their selected variants were found through `opencode models openai --verbose` |
+| OpenCode | A 2026-09-21 CLI check found the then-configured models and variants. The CLI is not on PATH in the current Codex shell (2026-09-22), so the new agent files have not been live-loaded here |
 
 Other declared dependencies remain in `Packages/manifest.json`; declaration alone is not a decision to use a package for gameplay.
 
@@ -44,26 +44,44 @@ Other declared dependencies remain in `Packages/manifest.json`; declaration alon
 
 ## Agent Configuration and Usage Policy
 
-These are initial settings, not a measured cost ranking. Model IDs are retained from the existing agent definitions. Restart OpenCode after changing agent configuration.
+Codex and OpenCode use separate agent configurations. This section records each runtime's roster; shared project rules remain in `AGENTS.md`. Do not treat a role, model, or delegation rule from one runtime as the other's default. These settings are not a measured cost ranking.
 
-| Agent | Model | Default variant | Ownership |
+### Codex
+
+Project-local `.codex/config.toml` sets the default for new trusted-project sessions; `.codex/agents/*.toml` defines project subagents. Existing sessions may retain their selected model. The main agent may delegate an explicit user-requested scope to the coordinator subagent, which can spawn Codex specialists and returns its result to the main agent.
+
+| Agent | Model | Reasoning effort | Ownership |
 |-------|-------|-----------------|-----------|
-| Coordinator | `openai/gpt-5.6-luna` | `medium` | Scope, risk-based routing, communication, acceptance |
-| Investigator | `openai/gpt-5.6-luna` | `medium` | Focused read-only discovery and diagnostic evidence |
-| Worker | `openai/gpt-5.6-luna` | `high` | Bounded implementation using established contracts |
-| Mid-level developer | `openai/gpt-5.6-terra` | `high` | Ordinary feature ownership from investigation through verification |
-| Senior developer | `openai/gpt-6-astra` | `medium` | Foundational contracts, high-risk implementation, difficult diagnosis, independent review |
+| Main Codex session | `gpt-6-luna` | `medium` | Scope, risk-based routing, communication, acceptance, and local work |
+| Coordinator subagent | `gpt-6-luna` | `high` | Orchestrate explicitly delegated work and spawn project specialists |
+| Explorer | `gpt-6-luna` | `medium` | Focused read-only discovery and diagnostic evidence |
+| Worker | `gpt-6-luna` | `high` | Ordinary feature ownership from investigation through verification |
+| Senior developer | `gpt-6-sol` | `high` | Foundational contracts, high-risk implementation, difficult diagnosis, independent review |
 
-- Route directly to the appropriate owner; a task does not need to visit every agent.
-- Use senior judgment before consequential cross-system implementation, rather than only after repeated failures.
-- Keep known-file lookups with the current owner. Use an investigator when focused discovery meaningfully reduces duplicated exploration.
+- Codex `worker` owns ordinary features end to end; there is no Codex mid-level developer. Prefer a senior decision followed by worker implementation when the contract is stable and bounded; keep design-coupled critical code with the senior owner.
+
+### OpenCode
+
+The user-facing primary `coordinator` in `.opencode/agents/coordinator.md` delegates directly to OpenCode specialists. Its read-only discovery role remains named `investigator`; its `worker` owns ordinary features end to end. There is no OpenCode mid-level developer. Unlike Codex, the coordinator is the primary agent rather than a subagent.
+
+| Agent | Model | Variant | Ownership |
+|-------|-------|---------|-----------|
+| Coordinator | `openai/gpt-6-luna` | `high` | User communication, routing, and acceptance |
+| Investigator | `openai/gpt-6-luna` | `medium` | Focused read-only discovery |
+| Worker | `openai/gpt-6-luna` | `high` | Ordinary feature ownership from investigation through verification |
+| Senior developer | `openai/gpt-6-sol` | `high` | Foundational contracts, high-risk implementation, difficult diagnosis, independent review |
+
+### Shared usage policy
+
+- Route directly to the appropriate owner; a task does not need to visit every agent. Use senior judgment before consequential cross-system implementation, rather than only after repeated failures.
+- Keep known-file lookups with the current owner. Use the runtime's investigator or explorer when focused discovery meaningfully reduces duplicated exploration.
 - Reuse a related agent session when its context remains useful; pass concise contracts and results instead of entire transcripts.
 - Default to one implementation owner. Parallelism is optional and subject to the ownership and Editor rules in `AGENTS.md`.
 - Collect a small representative sample (about ten tasks) before retuning models or reasoning effort.
 
-Configuration verification (2026-09-21): `opencode debug agent <name>` successfully resolved all five project agents with the defaults above. Resolved permissions allow coordinator questions and restrict investigator to read-only discovery/web fetching (edits, shell execution, delegation, and unlisted tools denied). This validates configuration loading, not model output quality or subscription savings.
+Configuration verification (2026-09-21): `opencode debug agent <name>` resolved the previous five-agent OpenCode setup. The four-agent setup above has only static validation until OpenCode CLI is available again. That earlier check does not validate the separate Codex configuration, model output quality, or subscription savings. Files ending in `.retired` under `.codex/` are historical references, not active configuration.
 
-Suggested measurement record per task: task/risk, agent/model/variant, observable usage or quota change, handoff count, first-pass acceptance, rework, elapsed time, and verification artifacts. Mark unavailable usage as unknown; do not invent token costs or subscription savings.
+Suggested measurement record per task: task/risk, agent/model/variant or reasoning effort, observable usage or quota change, handoff count, first-pass acceptance, rework, elapsed time, and verification artifacts. Mark unavailable usage as unknown; do not invent token costs or subscription savings.
 
 ## Scale and Open Product Decisions
 
