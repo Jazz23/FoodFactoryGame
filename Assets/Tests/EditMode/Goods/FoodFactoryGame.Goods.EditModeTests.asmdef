@@ -1,0 +1,1 @@
+{"name":"FoodFactoryGame.Goods.EditModeTests","rootNamespace":"FoodFactoryGame.Goods.Tests","references":["FoodFactoryGame.Goods"],"includePlatforms":["Editor"],"optionalUnityReferences":["TestAssemblies"],"autoReferenced":false}

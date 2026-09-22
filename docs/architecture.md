@@ -12,7 +12,7 @@ Gameplay requirements and open product decisions are in [the GDD](../Food_Factor
 - FishNet `4.7.3` is vendored under `Assets/FishNet`, including its original metadata, demo references, and license files. See [decision 0001](decisions/0001-reproducible-baseline.md).
 - `Assets/DefaultPrefabObjects.asset` currently references FishNet demo prefabs. It is not the project's final network spawn catalog.
 - `Assets/Tests/EditMode` contains four authoring/dependency checks in `FoodFactoryGame.Baseline.EditModeTests`. Tests open build scenes as isolated preview scenes and do not touch application saves.
-- No project gameplay simulation, network session flow, inventory system, persistence contract, or remote-site system is established by this baseline.
+- The starter scene still has no game-specific session/bootstrap authoring. A limited goods domain and a FishNet transport bridge exist; the bridge has been exercised only by an isolated, test-owned listen-server fixture. See below.
 
 ## Accepted Foundational Multiplayer Design
 
@@ -38,6 +38,14 @@ claim that the runtime exists.
 The first network integration targets the vendored FishNet `4.7.3` snapshot.
 The existing demo prefab catalog remains baseline authoring only.
 
+## Implemented: bounded goods slice (2026-09-22)
+
+- `FoodFactoryGame.Goods` holds server-instantiated stable-ID lots and locations, integer quantities, one location per lot, owner/site grants, binary spoilage, elapsed exposure, active reservations, terminal command outcomes, and an integer-second authoritative clock. Ambient time accumulates exposure; refrigerated time does not. Moves retain prior exposure. Equivalent lots merge only when owner, location, item, condition, and exposure/threshold match; reserved lots cannot merge.
+- `Transfer` validates a same-site route, grant, source owner, unreserved quantity or owned reservation, and destination unit capacity before locked mutation. A partial transfer splits with a new ID. Duplicate request IDs replay stored terminal outcomes; another actor cannot replay someone else's outcome. `Cancel` releases an unconsumed reservation; committed transfers are not reversible. No in-flight transport or cross-site route has been implemented.
+- `GoodsSnapshotStore` serializes schema-v1 world ID, time/revision, lots, locations, grants, reservations, and outcomes with a checksum. An explicit path is required; it writes/flushed a temporary file then atomically replaces the latest with a previous-version fallback. Recovery validates invariants; unknown newer schemas fail. Concurrent saves reject older/conflicting revisions. Every acknowledged mutation has a durable boundary: `TransferDurably`, `ReserveDurably`, `CancelDurably`, and the clock tick `TryAdvanceDurably` commit the snapshot before acknowledging and restore the pre-command state if the commit fails. Terminal outcomes are keyed per actor (player ID + request ID), so one actor cannot claim or poison another actor’s request ID. This is a goods-slice snapshot, **not** the full-world decision-0002 persistence contract; no production snapshot cadence or v1 migration is implemented.
+- `GoodsNetworkBridge` is compiled FishNet RPC transport for connection-resolved transfer intent/result and server-validated, revisioned full site baselines. It ticks the same world even with zero subscribers. Its `InitializeServer` requires a pre-existing matching committed save and an authenticated connection-to-player resolver supplied by a session owner. It also exposes reserve/cancel RPCs through the durable paths and rejects requests while clock persistence is failing. An Editor PlayMode listen-server fixture (host + separate loopback-UDP remote client, test-owned bootstrap and connection→player map) has demonstrated an authorized transfer, an unauthorized remote transfer and subscription rejection, a granted site baseline, and unsubscribed site progression persisted to the snapshot. There is still no production session owner or authenticator, player build, client UI, pickup visuals, or multi-process multiplayer evidence. Full baselines (not deltas) are used to avoid a partial replication protocol.
+- EditMode tests with *test-only* restaurant/ingredient/storage/fridge/kitchen capacities and spoilage threshold verify domain and isolated file recovery without any camera or client. The PlayMode fixture above covers the live FishNet path within one Editor process; it does not prove pickup projections, real authentication, or separate-process play. See [verification record](verification/goods-20260922.md).
+
 ## Required Constraints for Future Implementation
 
 - The server owns gameplay state; clients request validated actions through the command contract in decision 0002.
@@ -46,15 +54,13 @@ The existing demo prefab catalog remains baseline authoring only.
 - Player and employee operational rules should be shared; input and AI choose actions through those rules.
 - Visual objects must not become the sole owners of authoritative simulation state.
 
-These are accepted contracts. No runtime implementation or final public
-interface is established yet.
+These remain accepted contracts; only the bounded goods slice above has a runtime interface.
 
 ## Planned / Undecided
 
-- Domain assembly boundaries, simulation scheduling, command interfaces, replication interest, and persistence schema: defined in decision 0002; implementation pending.
+- Full-world simulation scheduling, command interfaces outside goods, replication interest/deltas, and persistence of other systems: defined in decision 0002; implementation pending.
 - Player count, hosting/disconnect behavior, and exact performance hardware: GDD decisions pending.
-- Physical goods model: selected in GDD section 28 and decision 0003; runtime
-  inventory, transport, spoilage, projection, and recovery remain unimplemented.
+- Physical goods model: selected in GDD section 28 and decision 0003; a logical lot/condition/transfer/recovery slice is implemented. Transport staging, actual placed-world positions, carrier/vehicle handling constraints, and visual projection remain pending.
 - Offline progression, host migration, discovery/join flow, and the shipped hosting model remain undecided.
 - SQLite and MoonSharp are existing declared dependencies, with their gameplay roles undecided. Neither is selected merely by being installed.
 - Multiplayer smoke tests and representative scale benchmarks follow implementation; current tests do not establish replication correctness or the 60 FPS target.

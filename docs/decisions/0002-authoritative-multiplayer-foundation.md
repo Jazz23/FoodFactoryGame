@@ -2,7 +2,7 @@
 
 Date: 2026-09-21
 
-Status: accepted as the starting technical design; runtime implementation pending.
+Status: accepted as the starting technical design; implementation partial — only the bounded goods slice (durable server-owned commands, snapshot recovery, and an in-Editor listen-server test fixture) exists. Session bootstrap, full-world scheduling, replication interest/deltas, and whole-world persistence remain pending. See [architecture status](../architecture.md).
 
 ## Context
 

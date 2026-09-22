@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "unity": {
+      "type": "stdio",
+      "command": "unity",
+      "args": [
+        "mcp",
+        "--project-path",
+        "E:\\Projects\\Unity\\FoodFactoryGame"
+      ],
+      "env": {}
+    }
+  }
+}

@@ -57,9 +57,9 @@ The tests use preview scenes and do not write save data or modify application da
 
 The contracts for the first multiplayer implementation are in [decision
 0002](decisions/0002-authoritative-multiplayer-foundation.md). They are
-accepted design contracts; the current baseline has no runtime multiplayer
-implementation. Do not mark the foundation complete from a successful player
-build or FishNet import check alone.
+accepted design contracts. A bounded goods domain and a FishNet bridge exist; the only live
+multiplayer proof is an isolated in-Editor listen-server test fixture. Do not mark the foundation complete
+from a domain test, build, or FishNet import check alone.
 
 When the foundation exists, verify these layers separately:
 
@@ -84,8 +84,12 @@ When the foundation exists, verify these layers separately:
   from client rendered FPS.
 
 Keep one owner for live Editor mutations, compilation, and test execution.
-These procedures are acceptance requirements for the future foundation, not
-verified workflows today.
+The multiplayer and scale procedures above remain acceptance requirements, not
+verified workflows today; the isolated goods-domain and goods listen-server test procedures below have been exercised.
+
+The bounded goods domain has an exercised EditMode workflow: confirm `editor_status` reports **play mode stopped**, compile and poll `recompile_status`, then run `run_tests` with `mode: editor`, `filter_type: assembly`, `filter: FoodFactoryGame.Goods.EditModeTests`; require 17 matched/17 passed. Run the unchanged baseline separately with `FoodFactoryGame.Baseline.EditModeTests` (4 matched/4 passed). Test fixtures create and delete unique isolated directories under the OS temp path. The exact run identities, counts, resolved test-runner precondition failure, and remaining unverified multiplayer checks are recorded in [the verification artifact](verification/goods-20260922.md). The Pipeline runner returns no native artifact path on synchronous completion; preserve this recorded result or use an explicitly configured CI XML run for future machine-ingested evidence.
+
+The goods listen-server PlayMode test has an exercised workflow: make sure the active scene is **not dirty** (the Test Runner otherwise blocks on its save-scene prompt and the async run never enters Play mode), then run `run_tests` with `mode: playmode`, `async_tests: true`, `filter_type: assembly`, `filter: FoodFactoryGame.Goods.PlayModeTests`; require 1 matched/1 passed. The synchronous HTTP call is dropped by the Play-mode domain reload, so read the result from `test_status` or the async response. Unity writes the NUnit XML to `%USERPROFILE%/AppData/LocalLow/DefaultCompany/FoodFactoryGame/TestResults.xml` and overwrites it on each run; copy it to `docs/verification/artifacts/` when it is evidence. The fixture prefab `Assets/Tests/PlayMode/Goods/GoodsBridgeFixture.prefab` is intentionally authored non-spawnable so FishNet’s default-prefab generator never adds it to `Assets/DefaultPrefabObjects.asset`; the test enables spawning in memory only.
 
 For a separate checkout with its Editor closed, the batch equivalent is:
 

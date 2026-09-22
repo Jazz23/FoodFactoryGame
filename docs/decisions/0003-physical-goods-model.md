@@ -2,7 +2,7 @@
 
 Date: 2026-09-22
 
-Status: accepted product and technical contract; implementation pending.
+Status: accepted product and technical contract; implementation partial — logical lots, locations, condition/exposure, reservations, transfers, and recovery exist for a test fixture; transport staging, placed-world positions, carriers/vehicles, and visual projection remain pending. See [architecture status](../architecture.md).
 
 ## Context
 
