@@ -1,5 +1,6 @@
-// Authored equipment content: grid footprint, buffer capacities and visual. Converted to a plain GoodsEquipment record when
-// the server creates a piece; the record keeps copies, so saved equipment never depends on this asset afterwards.
+// Authored equipment content: grid footprint, buffer capacities, visual and inventory icon. Converted to a plain
+// GoodsEquipment record when the server creates a piece; the record keeps copies, so saved equipment never depends on this
+// asset afterwards.
 using FoodFactoryGame.Goods;
 using UnityEngine;
 
@@ -15,6 +16,7 @@ namespace FoodFactoryGame.Session.Equipment
         [SerializeField, Min(1)] private int outputCapacity = 1;
         [SerializeField] private bool outputRefrigerated;
         [SerializeField] private GameObject visualPrefab;
+        [SerializeField] private Sprite icon;
 
         public string Kind => kind;
         public int Width => width;
@@ -23,6 +25,7 @@ namespace FoodFactoryGame.Session.Equipment
         public int OutputCapacity => outputCapacity;
         public bool OutputRefrigerated => outputRefrigerated;
         public GameObject VisualPrefab => visualPrefab;
+        public Sprite Icon => icon;
 
         public GoodsEquipment CreatePlaced(string id, string siteId, int cellX, int cellZ, int rotation) => new()
         {

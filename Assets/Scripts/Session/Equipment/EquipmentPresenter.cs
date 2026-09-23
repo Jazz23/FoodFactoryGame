@@ -64,17 +64,7 @@ namespace FoodFactoryGame.Session.Equipment
             }
             var root = new GameObject($"Equipment {equipment.Id}");
             root.transform.SetParent(transform, false);
-            var model = Instantiate(definition.VisualPrefab, root.transform, false);
-            // Centre the model's rendered bounds on the footprint and stand it on the floor, whatever the asset's pivot.
-            var renderers = model.GetComponentsInChildren<Renderer>();
-            if (renderers.Length > 0)
-            {
-                var bounds = renderers[0].bounds;
-                foreach (var item in renderers.Skip(1)) bounds.Encapsulate(item.bounds);
-                var center = root.transform.InverseTransformPoint(bounds.center);
-                var floor = root.transform.InverseTransformPoint(new Vector3(bounds.center.x, bounds.min.y, bounds.center.z)).y;
-                model.transform.localPosition -= new Vector3(center.x, floor, center.z);
-            }
+            EquipmentModel.Create(definition, root.transform);
             var visual = root.AddComponent<EquipmentVisual>();
             visual.Bind(equipment.Id, equipment.Kind);
             return visual;

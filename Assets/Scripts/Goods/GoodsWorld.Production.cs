@@ -1,6 +1,7 @@
 // Station jobs share GoodsWorld's lock and snapshot so input consumption, output creation and refunds commit atomically with goods.
 // A job keeps copies of its consumed inputs and its recipe output, so recovery and pickup never depend on registered recipe content.
-// Stations are created and removed only with placed equipment (GoodsWorld.Equipment.cs).
+// Stations are created and removed only with placed equipment (GoodsWorld.Equipment.cs). Jobs start on request, or by
+// themselves when the server turns AutomaticJobs on.
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -62,7 +63,19 @@ namespace FoodFactoryGame.Goods
 
     public sealed partial class GoodsWorld
     {
+        // StartedBy of a job an automatic station started for itself.
+        public const string AutomaticStarter = "automatic";
+
         private readonly Dictionary<string, RecipeDefinition> _recipes = new();
+        private bool _automaticJobs;
+
+        // Server configuration, like recipes: never saved, set by the server owner on every start. When on, stations start
+        // batches by themselves (StartReadyJobs); explicit StartJob requests still work when a station is idle.
+        public bool AutomaticJobs
+        {
+            get { lock (_gate) return _automaticJobs; }
+            set { lock (_gate) _automaticJobs = value; }
+        }
 
         public void RegisterRecipe(RecipeDefinition recipe)
         {
@@ -95,46 +108,11 @@ namespace FoodFactoryGame.Goods
                     return Record(requestId, playerId, false, "invalid-recipe", null);
                 if (_state.Jobs.Any(x => x.StationId == station.Id))
                     return Record(requestId, playerId, false, "station-busy", null);
-
-                // Most-exposed edible lots are consumed first; lot ID breaks ties so the choice is deterministic.
-                var plan = new List<(GoodsLot Lot, int Take)>();
-                foreach (var input in recipe.Inputs)
-                {
-                    var needed = input.Quantity;
-                    var candidates = _state.Lots
-                        .Where(x => x.LocationId == station.InputLocationId && x.ItemId == input.ItemId
-                            && x.OwnerId == station.SiteId && !x.Spoiled && Available(x) > 0)
-                        .OrderByDescending(x => x.ExposureSeconds).ThenBy(x => x.Id, StringComparer.Ordinal);
-                    foreach (var lot in candidates)
-                    {
-                        if (needed == 0) break;
-                        var take = Math.Min(needed, Available(lot));
-                        plan.Add((lot, take));
-                        needed -= take;
-                    }
-                    if (needed > 0) return Record(requestId, playerId, false, "missing-inputs", null);
-                }
+                var plan = InputPlan(station, recipe);
+                if (plan == null) return Record(requestId, playerId, false, "missing-inputs", null);
 
                 // All checks precede this single locked mutation.
-                var job = new StationJob
-                {
-                    Id = Guid.NewGuid().ToString("N"), StationId = station.Id, RecipeId = recipe.Id, StartedBy = playerId,
-                    StartedAtSeconds = _state.ClockSeconds, DurationSeconds = recipe.DurationSeconds,
-                    RemainingSeconds = recipe.DurationSeconds, State = StationJobState.Running,
-                    OutputItemId = recipe.OutputItemId, OutputQuantity = recipe.OutputQuantity,
-                    OutputSpoilAfterSeconds = recipe.OutputSpoilAfterSeconds
-                };
-                foreach (var (lot, take) in plan)
-                {
-                    job.Inputs.Add(new GoodsLot
-                    {
-                        Id = job.Id + ":in:" + job.Inputs.Count, ItemId = lot.ItemId, OwnerId = lot.OwnerId, LocationId = "",
-                        Quantity = take, ExposureSeconds = lot.ExposureSeconds, SpoilAfterSeconds = lot.SpoilAfterSeconds
-                    });
-                    lot.Quantity -= take;
-                    if (lot.Quantity == 0) _state.Lots.Remove(lot);
-                }
-                _state.Jobs.Add(job);
+                var job = AddJob(station, recipe, plan, playerId);
                 var result = Record(requestId, playerId, true, "started", null);
                 result.JobId = job.Id;
                 _state.Outcomes[_state.Outcomes.Count - 1].JobId = job.Id;
@@ -147,13 +125,81 @@ namespace FoodFactoryGame.Goods
             return Commit(playerId, requestId, savePath, () => StartJob(playerId, requestId, stationId, recipeId));
         }
 
+        // Most-exposed edible lots are consumed first; lot ID breaks ties so the choice is deterministic. Null if any input is short.
+        private List<(GoodsLot Lot, int Take)> InputPlan(GoodsStation station, RecipeDefinition recipe)
+        {
+            var plan = new List<(GoodsLot Lot, int Take)>();
+            foreach (var input in recipe.Inputs)
+            {
+                var needed = input.Quantity;
+                var candidates = _state.Lots
+                    .Where(x => x.LocationId == station.InputLocationId && x.ItemId == input.ItemId
+                        && x.OwnerId == station.SiteId && !x.Spoiled && Available(x) > 0)
+                    .OrderByDescending(x => x.ExposureSeconds).ThenBy(x => x.Id, StringComparer.Ordinal);
+                foreach (var lot in candidates)
+                {
+                    if (needed == 0) break;
+                    var take = Math.Min(needed, Available(lot));
+                    plan.Add((lot, take));
+                    needed -= take;
+                }
+                if (needed > 0) return null;
+            }
+            return plan;
+        }
+
+        private StationJob AddJob(GoodsStation station, RecipeDefinition recipe, List<(GoodsLot Lot, int Take)> plan, string startedBy)
+        {
+            var job = new StationJob
+            {
+                Id = Guid.NewGuid().ToString("N"), StationId = station.Id, RecipeId = recipe.Id, StartedBy = startedBy,
+                StartedAtSeconds = _state.ClockSeconds, DurationSeconds = recipe.DurationSeconds,
+                RemainingSeconds = recipe.DurationSeconds, State = StationJobState.Running,
+                OutputItemId = recipe.OutputItemId, OutputQuantity = recipe.OutputQuantity,
+                OutputSpoilAfterSeconds = recipe.OutputSpoilAfterSeconds
+            };
+            foreach (var (lot, take) in plan)
+            {
+                job.Inputs.Add(new GoodsLot
+                {
+                    Id = job.Id + ":in:" + job.Inputs.Count, ItemId = lot.ItemId, OwnerId = lot.OwnerId, LocationId = "",
+                    Quantity = take, ExposureSeconds = lot.ExposureSeconds, SpoilAfterSeconds = lot.SpoilAfterSeconds
+                });
+                lot.Quantity -= take;
+                if (lot.Quantity == 0) _state.Lots.Remove(lot);
+            }
+            _state.Jobs.Add(job);
+            return job;
+        }
+
+        // Automatic stations (decision 0008): an idle station starts the first recipe for its kind, by recipe ID, whose inputs
+        // are present and whose output fits the output buffer now. Runs inside the caller's locked mutation (an accepted
+        // transfer or a clock step), so the start commits atomically with it. A full output stops new starts, not a batch.
+        private void StartReadyJobs()
+        {
+            if (!_automaticJobs) return;
+            foreach (var station in _state.Stations)
+            {
+                if (_state.Jobs.Any(x => x.StationId == station.Id)) continue;
+                foreach (var recipe in _recipes.Values.Where(x => x.StationKind == station.Kind).OrderBy(x => x.Id, StringComparer.Ordinal))
+                {
+                    if (!Fits(station.OutputLocationId, recipe.OutputItemId, false, recipe.OutputQuantity)) continue;
+                    var plan = InputPlan(station, recipe);
+                    if (plan == null) continue;
+                    AddJob(station, recipe, plan, AutomaticStarter);
+                    break;
+                }
+            }
+        }
+
         private void EmitBlockedOutputs()
         {
             foreach (var job in _state.Jobs.Where(x => x.State == StationJobState.Blocked).ToList())
             {
                 var station = _state.Stations.First(x => x.Id == job.StationId);
-                if (!Fits(station.OutputLocationId, job.OutputQuantity)) continue;
-                _state.Lots.Add(OutputLot(job, station, station.OutputLocationId, 0));
+                var lot = OutputLot(job, station, station.OutputLocationId, 0);
+                if (!Fits(lot.LocationId, lot.ItemId, lot.Spoiled, lot.Quantity)) continue;
+                _state.Lots.Add(lot);
                 _state.Jobs.Remove(job);
             }
         }
@@ -169,12 +215,13 @@ namespace FoodFactoryGame.Goods
                 if (job.RemainingSeconds > 0) continue;
                 var station = _state.Stations.First(x => x.Id == job.StationId);
                 var output = _state.Locations.First(x => x.Id == station.OutputLocationId);
-                if (!Fits(output.Id, job.OutputQuantity))
+                var lot = OutputLot(job, station, output.Id, output.Refrigerated ? 0 : seconds - worked);
+                if (!Fits(output.Id, lot.ItemId, lot.Spoiled, lot.Quantity))
                 {
                     job.State = StationJobState.Blocked;
                     continue;
                 }
-                _state.Lots.Add(OutputLot(job, station, output.Id, output.Refrigerated ? 0 : seconds - worked));
+                _state.Lots.Add(lot);
                 _state.Jobs.Remove(job);
             }
         }

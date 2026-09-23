@@ -160,6 +160,55 @@ namespace FoodFactoryGame.Goods.Tests
         }
 
         [Test]
+        public void AutomaticStationStartsOnTransferAndRunsUntilInputsRunOut()
+        {
+            _world.Bootstrap(new GoodsLot { Id = "pantry-sauce", ItemId = "sauce", OwnerId = "restaurant", LocationId = "pantry", Quantity = 2, SpoilAfterSeconds = 100 });
+            _world.Advance(1);
+            Assert.That(_world.Snapshot().Jobs, Is.Empty, "Stations are manual unless the server turns automatic jobs on.");
+
+            _world.AutomaticJobs = true;
+            GoodsSnapshotStore.Save(_world, PathForSave);
+            var before = Goods(_world);
+            var sauce = new TransferIntent { RequestId = "add-sauce", LotId = "pantry-sauce", DestinationId = "oven-1:in", Quantity = 1 };
+            Assert.That(_world.TransferDurably("chef", sauce, BadPath).Reason, Is.EqualTo("persistence-unavailable"));
+            Assert.That(Goods(_world), Is.EqualTo(before), "A failed commit rolls back the transfer and the start together.");
+
+            Assert.That(_world.TransferDurably("chef", sauce, PathForSave).Accepted, Is.True);
+            var job = _world.Snapshot().Jobs.Single(x => x.StationId == "oven-1");
+            Assert.That(job.StartedBy, Is.EqualTo(GoodsWorld.AutomaticStarter));
+            Assert.That(job.RecipeId, Is.EqualTo("bake"), "The first matching recipe by ID starts.");
+            Assert.That(job.RemainingSeconds, Is.EqualTo(5));
+            Assert.That(GoodsSnapshotStore.Load(PathForSave).Snapshot().Jobs.Any(x => x.Id == job.Id), Is.True, "The start commits with the transfer.");
+            Assert.That(_world.Snapshot().Jobs.Any(x => x.StationId == "oven-cold"), Is.True, "Every ready station starts.");
+            Assert.That(Start("manual").Reason, Is.EqualTo("station-busy"));
+
+            // 5 dough + 3 sauce make exactly two pizzas; the second batch starts in the step that finishes the first.
+            _world.Advance(5);
+            Assert.That(_world.Snapshot().Jobs.Single(x => x.StationId == "oven-1").Id, Is.Not.EqualTo(job.Id));
+            _world.Advance(5);
+            _world.Advance(5);
+            var state = _world.Snapshot();
+            Assert.That(state.Lots.Where(x => x.LocationId == "oven-1:out").Sum(x => x.Quantity), Is.EqualTo(2));
+            Assert.That(state.Jobs.Any(x => x.StationId == "oven-1"), Is.False);
+            Assert.That(state.Lots.Where(x => x.LocationId == "oven-1:in").Sum(x => x.Quantity), Is.EqualTo(2), "1 dough and 1 sauce are left.");
+            Assert.That(Count(_world, "dough"), Is.EqualTo(7 - 2 * 2 - 2));
+        }
+
+        [Test]
+        public void AutomaticStationWaitsForRoomInItsOutput()
+        {
+            _world.Bootstrap(new GoodsLot { Id = "filler", ItemId = "plate", OwnerId = "restaurant", LocationId = "oven-1:out", Quantity = 4, SpoilAfterSeconds = 1000 });
+            _world.AutomaticJobs = true;
+            _world.Advance(1);
+            Assert.That(_world.Snapshot().Jobs.Any(x => x.StationId == "oven-1"), Is.False, "No batch starts while the output is full.");
+            Assert.That(_world.Snapshot().Lots.Where(x => x.LocationId == "oven-1:in" && x.ItemId == "dough").Sum(x => x.Quantity), Is.EqualTo(5));
+
+            Assert.That(_world.Transfer("chef", new TransferIntent { RequestId = "clear", LotId = "filler", DestinationId = "pantry", Quantity = 4 }).Accepted, Is.True);
+            Assert.That(_world.Snapshot().Jobs.Single(x => x.StationId == "oven-1").StartedBy, Is.EqualTo(GoodsWorld.AutomaticStarter),
+                "Freeing the output starts the station in the same command.");
+        }
+
+        [Test]
         public void ReservedQuantityIsNotConsumed()
         {
             Assert.That(_world.Reserve("sous", "hold", "dough-a", 2), Is.True);

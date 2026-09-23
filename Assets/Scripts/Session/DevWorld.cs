@@ -13,12 +13,14 @@ namespace FoodFactoryGame.Session
         public const string SiteId = "dev-site";
         public const string StorageId = "dev-site-storage";
         public const string OvenId = "dev-oven-1";
-        // PROTOTYPE values: a 20x20 one-metre grid, the seeded oven's anchor cell, and each player's inventory size.
+        // PROTOTYPE values: a 20x20 one-metre grid, the seeded oven's anchor cell, and the slot counts of each player's
+        // inventory and the dev storage (decision 0009: capacity counts slots; a slot holds one stack up to the item's max).
         public const int GridWidth = 20;
         public const int GridDepth = 20;
         public const int OvenCellX = 12;
         public const int OvenCellZ = 13;
-        public const int InventoryCapacity = 10;
+        public const int InventoryCapacity = 30;
+        public const int StorageCapacity = 30;
         // PROTOTYPE ingredients until something produces dough: stock in the dev storage and a few for each new player.
         public const string DoughItemId = "dough";
         public const int StorageDough = 20;
@@ -36,7 +38,7 @@ namespace FoodFactoryGame.Session
         {
             if (File.Exists(worldPath) || File.Exists(worldPath + ".previous")) return GoodsSnapshotStore.Load(worldPath);
             var world = new GoodsWorld(WorldId);
-            world.Bootstrap(new GoodsLocation { Id = StorageId, SiteId = SiteId, Kind = "storage", Capacity = 100 });
+            world.Bootstrap(new GoodsLocation { Id = StorageId, SiteId = SiteId, Kind = "storage", Capacity = StorageCapacity });
             world.Bootstrap(new GoodsLot
             {
                 Id = "dev-storage-dough", ItemId = DoughItemId, OwnerId = SiteId, LocationId = StorageId,

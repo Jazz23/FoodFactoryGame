@@ -85,6 +85,8 @@ namespace FoodFactoryGame.Goods
     public sealed partial class GoodsWorld
     {
         private readonly object _gate = new();
+        // Item content, like recipes: registered by the server at start and never saved. Unregistered items stack to 1.
+        private readonly Dictionary<string, int> _maxStacks = new();
         private GoodsSnapshot _state;
 
         // Bootstrap is server-only: callers supply durable IDs; never expose this method to an RPC.
@@ -126,7 +128,7 @@ namespace FoodFactoryGame.Goods
                 if (lot == null || string.IsNullOrWhiteSpace(lot.Id) || string.IsNullOrWhiteSpace(lot.ItemId)
                     || string.IsNullOrWhiteSpace(lot.OwnerId) || lot.Quantity < 1 || lot.SpoilAfterSeconds < 1
                     || lot.ExposureSeconds < 0 || lot.Spoiled != (lot.ExposureSeconds >= lot.SpoilAfterSeconds)
-                    || _state.Lots.Any(x => x.Id == lot.Id) || !Fits(lot.LocationId, lot.Quantity))
+                    || _state.Lots.Any(x => x.Id == lot.Id) || !Fits(lot.LocationId, lot.ItemId, lot.Spoiled, lot.Quantity))
                     throw new ArgumentException("Invalid lot or location capacity.");
                 _state.Lots.Add(JsonUtility.FromJson<GoodsLot>(JsonUtility.ToJson(lot)));
                 _state.Revision++;
@@ -149,9 +151,9 @@ namespace FoodFactoryGame.Goods
 
         // Server-only admission path: an existing grant (and inventory, if requested) succeeds without a write; anything
         // missing is created in one commit before success. Returns false with the prior state restored if the snapshot
-        // cannot commit. inventoryCapacity > 0 ensures the player's inventory location on the site. Starter goods
-        // (item, quantity and spoil threshold only) are added, owned by the site, only when that inventory is created,
-        // so reconnecting never grants them again.
+        // cannot commit. inventoryCapacity > 0 ensures the player's inventory location on the site with at least that many
+        // slots (an older, smaller inventory is enlarged, never shrunk). Starter goods (item, quantity and spoil threshold
+        // only) are added, owned by the site, only when that inventory is created, so reconnecting never grants them again.
         public bool TryGrantDurably(string playerId, string siteId, string savePath, int inventoryCapacity = 0,
             IReadOnlyList<GoodsLot> starterGoods = null)
         {
@@ -162,14 +164,21 @@ namespace FoodFactoryGame.Goods
                     throw new ArgumentException("Invalid grant.");
                 starterGoods ??= Array.Empty<GoodsLot>();
                 if (starterGoods.Any(x => x == null || string.IsNullOrWhiteSpace(x.ItemId) || x.Quantity < 1 || x.SpoilAfterSeconds < 1)
-                    || starterGoods.Sum(x => (long)x.Quantity) > Math.Max(0, inventoryCapacity))
+                    || GoodsSlots.SlotsUsed(starterGoods, MaxStackLocked) > Math.Max(0, inventoryCapacity))
                     throw new ArgumentException("Invalid starter goods or they exceed the inventory capacity.");
                 var inventoryId = InventoryLocationId(playerId);
-                var needsInventory = inventoryCapacity > 0 && _state.Locations.All(x => x.Id != inventoryId);
+                var inventory = _state.Locations.FirstOrDefault(x => x.Id == inventoryId);
+                var needsInventory = inventoryCapacity > 0 && inventory == null;
+                var needsSlots = inventory != null && inventory.Capacity < inventoryCapacity;
                 if (needsInventory && _state.Lots.Any(x => x.Id.StartsWith($"starter:{playerId}:", StringComparison.Ordinal)))
                     throw new InvalidOperationException($"Starter goods for {playerId} exist without an inventory.");
-                if (CanView(playerId, siteId) && !needsInventory) return true;
+                if (CanView(playerId, siteId) && !needsInventory && !needsSlots) return true;
                 var before = Snapshot();
+                if (needsSlots)
+                {
+                    inventory.Capacity = inventoryCapacity;
+                    _state.Revision++;
+                }
                 if (needsInventory)
                 {
                     Bootstrap(new GoodsLocation { Id = inventoryId, SiteId = siteId, Kind = "carried", Capacity = inventoryCapacity });
@@ -239,6 +248,7 @@ namespace FoodFactoryGame.Goods
                     lot.Spoiled = lot.ExposureSeconds >= lot.SpoilAfterSeconds;
                 }
                 ProgressJobs(seconds);
+                StartReadyJobs();
                 _state.Revision++;
             }
         }
@@ -300,7 +310,7 @@ namespace FoodFactoryGame.Goods
                         : reservation.LotId != lot.Id || reservation.PlayerId != playerId || reservation.Quantity != intent.Quantity
                           || intent.Quantity > Available(lot) + reservation.Quantity))
                     return Record(intent.RequestId, playerId, false, "quantity-or-reservation", null);
-                if (!Fits(destination.Id, intent.Quantity))
+                if (!Fits(destination.Id, lot.ItemId, lot.Spoiled, intent.Quantity))
                     return Record(intent.RequestId, playerId, false, "capacity", null);
 
                 // All checks precede the single locked mutation. A partial move is a split with a new durable ID.
@@ -319,6 +329,7 @@ namespace FoodFactoryGame.Goods
                     });
                 }
                 if (reservation != null) reservation.Active = false;
+                StartReadyJobs();
                 return Record(intent.RequestId, playerId, true, "transferred", movedId);
             }
         }
@@ -448,10 +459,36 @@ namespace FoodFactoryGame.Goods
             var location = _state.Locations.First(x => x.Id == locationId);
             return _state.Grants.Any(x => x.PlayerId == player && x.SiteId == location.SiteId);
         }
-        private bool Fits(string id, int quantity)
+
+        // Server content: the largest quantity of an item one slot holds. Register every item before serving requests;
+        // an item never registered stacks to 1, so its capacity counts units.
+        public void RegisterItem(string itemId, int maxStack)
+        {
+            lock (_gate)
+            {
+                if (string.IsNullOrWhiteSpace(itemId) || maxStack < 1 || _maxStacks.ContainsKey(itemId))
+                    throw new ArgumentException("Invalid or duplicate item.");
+                _maxStacks.Add(itemId, maxStack);
+            }
+        }
+
+        public int MaxStack(string itemId)
+        {
+            lock (_gate) return MaxStackLocked(itemId);
+        }
+
+        private int MaxStackLocked(string itemId) => itemId != null && _maxStacks.TryGetValue(itemId, out var size) ? size : 1;
+
+        // Capacity is checked only when goods enter a location. Spoiling (a new stack) or a smaller max stack in content can
+        // leave a location over its slots; that blocks further entries and never removes goods.
+        private bool Fits(string id, string itemId, bool spoiled, int quantity) => quantity > 0
+            && GoodsSlots.FreeUnits(_state.Locations.FirstOrDefault(x => x.Id == id), _state.Lots, itemId, spoiled, MaxStackLocked) >= quantity;
+
+        private bool FitsAll(string id, IEnumerable<GoodsLot> incoming)
         {
             var location = _state.Locations.FirstOrDefault(x => x.Id == id);
-            return location != null && quantity > 0 && (long)_state.Lots.Where(x => x.LocationId == id).Sum(x => (long)x.Quantity) + quantity <= location.Capacity;
+            return location != null
+                && GoodsSlots.SlotsUsed(_state.Lots.Where(x => x.LocationId == id).Concat(incoming), MaxStackLocked) <= location.Capacity;
         }
 
         public static void Validate(GoodsSnapshot state)
@@ -469,7 +506,6 @@ namespace FoodFactoryGame.Goods
                     || x.Spoiled != (x.ExposureSeconds >= x.SpoilAfterSeconds)
                     || !state.Locations.Any(y => y.Id == x.LocationId))
                 || state.Lots.GroupBy(x => x.Id).Any(x => x.Count() != 1)
-                || state.Locations.Any(x => state.Lots.Where(y => y.LocationId == x.Id).Sum(y => (long)y.Quantity) > x.Capacity)
                 || state.Reservations.Any(x => x == null || string.IsNullOrWhiteSpace(x.Id) || x.Quantity < 1
                     || (x.Active && !state.Lots.Any(y => y.Id == x.LotId)))
                 || state.Reservations.GroupBy(x => x.Id).Any(x => x.Count() != 1)

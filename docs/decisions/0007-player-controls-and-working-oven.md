@@ -2,7 +2,8 @@
 
 Date: 2026-09-22
 
-Status: accepted by the project owner; implemented on the dev site. See
+Status: accepted by the project owner; implemented on the dev site. Point 4 (one batch per click) and the list-style
+screens are superseded by [0008](0008-slot-grid-ui-and-automatic-machines.md). See
 [architecture status](../architecture.md#implemented-factorio-style-controls-and-a-working-oven-2026-09-22).
 
 ## Context

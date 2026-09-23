@@ -510,6 +510,7 @@ MonoBehaviour:
   lookAction: {fileID: -5630151704836100654, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   zoomAction: {fileID: 500627165542639897, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   focusHeight: 1
+  shoulderOffset: 1
   orbitDegreesPerUnit: 0.2
   zoomStep: 1
   minPitch: 10

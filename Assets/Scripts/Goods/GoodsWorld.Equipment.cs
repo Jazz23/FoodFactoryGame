@@ -80,6 +80,41 @@ namespace FoodFactoryGame.Goods
             }
         }
 
+        // Server-only start step (decision 0009): pieces of a kind take the content's current buffer slot counts, placed
+        // buffers included, and the change commits before any request is served. Lower counts may leave a buffer over
+        // its slots; that only blocks entries and never removes goods. Returns whether anything changed; a failed save
+        // restores the prior state and rethrows.
+        public bool ApplyEquipmentCapacitiesDurably(string kind, int inputCapacity, int outputCapacity, string savePath)
+        {
+            if (string.IsNullOrWhiteSpace(kind) || inputCapacity < 1 || outputCapacity < 1)
+                throw new ArgumentException("Invalid equipment capacities.");
+            lock (_gate)
+            {
+                var stale = _state.Equipment
+                    .Where(x => x.Kind == kind && (x.InputCapacity != inputCapacity || x.OutputCapacity != outputCapacity)).ToList();
+                if (stale.Count == 0) return false;
+                var before = Snapshot();
+                foreach (var equipment in stale)
+                {
+                    equipment.InputCapacity = inputCapacity;
+                    equipment.OutputCapacity = outputCapacity;
+                    foreach (var location in _state.Locations.Where(x => x.Id == equipment.InputLocationId)) location.Capacity = inputCapacity;
+                    foreach (var location in _state.Locations.Where(x => x.Id == equipment.OutputLocationId)) location.Capacity = outputCapacity;
+                }
+                _state.Revision++;
+                try
+                {
+                    GoodsSnapshotStore.Save(this, savePath);
+                    return true;
+                }
+                catch
+                {
+                    _state = before;
+                    throw;
+                }
+            }
+        }
+
         // Volatile primitive for tests. Live request handlers must call PickUpDurably.
         // A running job refunds its inputs, a blocked job hands over its output, and both buffers are swept into the
         // player's inventory location. Everything must fit together or the pickup is refused and nothing changes.
@@ -107,8 +142,7 @@ namespace FoodFactoryGame.Goods
                 var returned = job == null ? new List<GoodsLot>()
                     : job.State == StationJobState.Blocked ? new List<GoodsLot> { OutputLot(job, station, inventory.Id, 0) }
                     : job.Inputs.Select(x => JsonUtility.FromJson<GoodsLot>(JsonUtility.ToJson(x))).ToList();
-                var total = buffered.Sum(x => (long)x.Quantity) + returned.Sum(x => (long)x.Quantity);
-                if (total > 0 && (total > int.MaxValue || !Fits(inventory.Id, (int)total)))
+                if (!FitsAll(inventory.Id, buffered.Concat(returned)))
                     return Record(requestId, playerId, false, "capacity", null);
 
                 // All checks precede this single locked mutation. Swept lots keep their IDs and exposure.

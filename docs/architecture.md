@@ -103,6 +103,28 @@ Decisions are in [decision 0007](decisions/0007-player-controls-and-working-oven
 
 Prototype, labelled in code or content: the dev recipe, dough stock and spoil times, hotbar slots in content order, the 1 m shoulder offset, and storage as the inventory screen's second panel. Open: any granted player can transfer out of another player's inventory location (a pre-existing transfer rule); no gamepad hotbar or screen navigation; reach is wherever the crosshair meets the floor.
 
+## Implemented: slot-grid UI and automatic machines (2026-09-23)
+
+Decisions are in [decision 0008](decisions/0008-slot-grid-ui-and-automatic-machines.md); it supersedes 0007's one-batch-per-click rule and list-style screens. No schema change.
+
+- Server rule: `GoodsWorld.AutomaticJobs` (configuration, not saved; `SessionRoot.StartServer` turns it on). `StartReadyJobs` runs inside every accepted `Transfer` and every `Advance`: an idle station starts the lowest-ID recipe for its kind whose inputs are present and whose output fits now (`StartedBy = "automatic"`). `StartJob` and `RequestStartJob` remain for explicit starts.
+- HUD (`PlayerHud`): inventory, storage, and machine input/output are slot grids of stacks (item × spoiled; held machines × kind) with icons and counts. The machine screen is input slot → progress bar → output slot plus a status line. Slot positions are client-only (`_arrangement`); a drop claims its slot until the server answers.
+- Cursor (`EquipmentInteraction`): `CursorGoods` names a stack in a container; `DropGoods` sends ordinary transfers. `PickUpMachine` puts a held kind on the cursor from the grid. The cursor icon follows `Player/Point`.
+- Ghost: `EquipmentModel.CreateGhost` copies the kind's visual prefab without behaviours, colliders or lights, with `EquipmentGhost.mat` (transparent URP Lit), tinted by the placement preview over the flat footprint. `EquipmentModel.Create` is the shared centring used by `EquipmentPresenter`.
+- Content: `ItemDefinition` (`Assets/Content/Items/Dough.asset`, `Bread.asset`), `EquipmentDefinition.icon`, DEVELOPMENT icons in `Assets/Art/Icons` (drawn by `AgentScripts/DrawItemIcons.ps1`).
+
+Prototype: icon art. Open: per-machine recipe choice, restricting inputs to ingredients, stack splitting. (Grid size, stack limits and quick transfer are now covered by decision 0009, below.)
+
+## Implemented: slot capacity, max stacks and quick transfer (2026-09-23)
+
+Decisions are in [decision 0009](decisions/0009-slot-capacity-and-quick-transfer.md). No schema change; `GoodsLocation.Capacity` now counts slots.
+
+- Domain (`GoodsSlots`, `GoodsWorld`): each (item, spoiled) stack in a location takes `ceil(quantity / max stack)` slots. `GoodsWorld.RegisterItem(itemId, maxStack)` is content (not saved; unregistered items stack to 1, which keeps unit semantics for them). `Transfer`, lot bootstrap, starter goods, automatic starts, job output and equipment pickup check slots. `Validate` no longer checks capacity: over-fullness from spoilage or a smaller content max stack is legal state that blocks entries and never removes goods. `TryGrantDurably` enlarges an existing smaller inventory to the configured slot count (never shrinks it).
+- Session: `SessionRoot.items` holds the `ItemDefinition`s (moved from `PlayerHud`); the server registers each `MaxStack` on start, and clients use `SessionRoot.MaxStack` for previews. Dev content: dough and bread stack to 20, inventories and new dev storage have 30 slots, the oven has 1 input and 1 output slot.
+- HUD/controls: a grid has one slot per unit of capacity; a stack is split into slots of at most its max stack, and picking a slot carries just that slot's quantity (`CursorStack.Quantity`). `Player/QuickTransfer` (Shift) + click calls `PlayerHud.QuickTransferSlot` → `EquipmentInteraction.TransferStack`, which moves the slot's stack to the other open container (inventory ↔ storage; inventory → machine input; input/output → inventory), capped at the destination's free room for that stack. A slot click counts only if its press began after the press that opened the screen was released (`EquipmentInteraction.ScreenClicksArmed`, sampled by a trickle-down `PointerDownEvent` on the screen).
+
+Existing saves keep their recorded capacities, now read as slots, except machine buffers: on every server start `GoodsWorld.ApplyEquipmentCapacitiesDurably` sets each saved machine to its `EquipmentDefinition` slot counts (committed before serving; over-full buffers keep their goods). An already-created dev storage keeps 100 slots. Slot presses are read from `PointerDownEvent`/`PointerUpEvent` on each slot because `Button.clicked` ignores modified (shift) clicks. Open: whether held machines should take inventory slots on the server (the HUD shows them in overflow slots).
+
 ## Required Constraints for Future Implementation
 
 - The server owns gameplay state; clients request validated actions through the command contract in decision 0002.

@@ -30,6 +30,8 @@ namespace FoodFactoryGame.Session
         [SerializeField] private EquipmentDefinition[] equipmentDefinitions = Array.Empty<EquipmentDefinition>();
         // Recipe content: the server registers every entry with the world; clients read it for the machine screen.
         [SerializeField] private RecipeAsset[] recipes = Array.Empty<RecipeAsset>();
+        // Item content: names and icons for the HUD, and each item's max stack, which the server registers with the world.
+        [SerializeField] private ItemDefinition[] items = Array.Empty<ItemDefinition>();
         [SerializeField] private bool readCommandLine = true;
 
         private SessionOptions _options;
@@ -51,6 +53,9 @@ namespace FoodFactoryGame.Session
         public ClientSiteSubscription ClientSubscription => _site;
         public IReadOnlyList<EquipmentDefinition> EquipmentDefinitions => equipmentDefinitions;
         public IReadOnlyList<RecipeAsset> Recipes => recipes;
+        public IReadOnlyList<ItemDefinition> Items => items;
+        // Client previews count slots with the same content the server registers; an item without a definition stacks to 1.
+        public int MaxStack(string itemId) => items.FirstOrDefault(x => x != null && x.Id == itemId)?.MaxStack ?? 1;
         public bool IsRunning => Mode != SessionMode.None;
         // The transport finishes stopping on a later iteration. Starting before then lets the old server's late Stopped event
         // release the new world, so Begin waits for both local connections to be fully stopped.
@@ -142,8 +147,15 @@ namespace FoodFactoryGame.Session
             Directory.CreateDirectory(_options.SaveDirectory);
             // The world is committed before FishNet listens, so the bridge never serves an uncommitted state.
             ServerWorld = DevWorld.LoadOrCreate(_options.WorldPath, equipmentDefinitions.FirstOrDefault(x => x != null && x.Kind == "oven"));
+            // Machine buffer slot counts follow content, so a saved machine created with older counts is brought up to date.
+            foreach (var definition in equipmentDefinitions.Where(x => x != null))
+                ServerWorld.ApplyEquipmentCapacitiesDurably(definition.Kind, definition.InputCapacity, definition.OutputCapacity, _options.WorldPath);
             // Recipes are content, not saved state, so they are registered on every start, including a recovered save.
             foreach (var recipe in recipes) ServerWorld.RegisterRecipe(recipe.ToDefinition());
+            // Max stacks are content too: capacity counts slots, so they are registered before any request is served.
+            foreach (var item in items) ServerWorld.RegisterItem(item.Id, item.MaxStack);
+            // Machines run by themselves, Factorio-style (decision 0008); like recipes, this is configuration, not saved.
+            ServerWorld.AutomaticJobs = true;
             _registry = new PlayerRegistry(_options.RegistryPath);
             authenticator.ConfigureServer(new SessionAdmission(_registry, ServerWorld, DevWorld.SiteId, _options.WorldPath,
                 DevWorld.InventoryCapacity, DevWorld.StarterGoods));

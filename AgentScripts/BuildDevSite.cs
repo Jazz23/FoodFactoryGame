@@ -1,5 +1,6 @@
 // Editor authoring script (run via Unity MCP run_script): creates the dev session prefabs, prefab catalog, equipment content,
-// recipe content, UI panel settings and the DevSite scene, then makes DevSite the only build scene. Safe to re-run: assets keep GUIDs.
+// recipe and item content, icon imports, ghost materials, UI panel settings and the DevSite scene, then makes DevSite the
+// only build scene. Safe to re-run: assets keep GUIDs.
 // The scene holds no equipment instances; placed equipment is shown from replicated state by EquipmentPresenter.
 using System.IO;
 using System.Linq;
@@ -33,20 +34,25 @@ public static class BuildDevSite
     private const string OvenDefinitionPath = "Assets/Content/Equipment/Oven.asset";
     private const string GhostMaterialPath = "Assets/Materials/PlacementGhost.mat";
     private const string BreadRecipePath = "Assets/Content/Recipes/Bread.asset";
+    private const string GhostModelMaterialPath = "Assets/Materials/EquipmentGhost.mat";
+    private const string IconFolder = "Assets/Art/Icons";
+    private const string ItemFolder = "Assets/Content/Items";
 
     public static string Run()
     {
-        foreach (var folder in new[] { "Assets/UI", "Assets/Prefabs/Network", "Assets/Prefabs/Player", "Assets/Network", "Assets/Content/Equipment", "Assets/Content/Recipes", "Assets/Materials" })
+        foreach (var folder in new[] { "Assets/UI", "Assets/Prefabs/Network", "Assets/Prefabs/Player", "Assets/Network", "Assets/Content/Equipment", "Assets/Content/Recipes", "Assets/Content/Items", "Assets/Materials" })
             Directory.CreateDirectory(folder);
         AssetDatabase.Refresh();
         var panelSettings = BuildPanelSettings();
         var bridge = BuildBridge();
         var player = BuildPlayer();
         var catalog = BuildCatalog(bridge, player);
-        var oven = BuildOvenDefinition();
+        var oven = BuildOvenDefinition(ImportIcon("Oven"));
         var bread = BuildBreadRecipe();
+        var items = new[] { BuildItem(DevWorld.DoughItemId, "Dough"), BuildItem("bread", "Bread") };
         var ghostMaterial = BuildGhostMaterial();
-        BuildScene(catalog, bridge, player, panelSettings, oven, bread, ghostMaterial);
+        var ghostModelMaterial = BuildGhostModelMaterial();
+        BuildScene(catalog, bridge, player, panelSettings, oven, bread, items, ghostMaterial, ghostModelMaterial);
         EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
         AssetDatabase.SaveAssets();
         return "DevSite authored";
@@ -73,7 +79,7 @@ public static class BuildDevSite
 
     // DEVELOPMENT content: the oven measures about 2.6 x 2.2 m, so it takes a 3x3-cell footprint with clearance.
     // Buffer capacities are placeholders until recipe content exists.
-    private static EquipmentDefinition BuildOvenDefinition()
+    private static EquipmentDefinition BuildOvenDefinition(Sprite icon)
     {
         var definition = AssetDatabase.LoadAssetAtPath<EquipmentDefinition>(OvenDefinitionPath);
         if (definition == null)
@@ -88,10 +94,12 @@ public static class BuildDevSite
             serialized.FindProperty("kind").stringValue = "oven";
             serialized.FindProperty("width").intValue = 3;
             serialized.FindProperty("depth").intValue = 3;
-            serialized.FindProperty("inputCapacity").intValue = 10;
-            serialized.FindProperty("outputCapacity").intValue = 4;
+            // Capacity counts slots (decision 0009): one input stack and one output stack, like a Factorio furnace.
+            serialized.FindProperty("inputCapacity").intValue = 1;
+            serialized.FindProperty("outputCapacity").intValue = 1;
             serialized.FindProperty("outputRefrigerated").boolValue = false;
             serialized.FindProperty("visualPrefab").objectReferenceValue = prefab;
+            serialized.FindProperty("icon").objectReferenceValue = icon;
             serialized.ApplyModifiedPropertiesWithoutUndo();
         }
         EditorUtility.SetDirty(definition);
@@ -124,6 +132,69 @@ public static class BuildDevSite
         }
         EditorUtility.SetDirty(recipe);
         return recipe;
+    }
+
+    // DEVELOPMENT icons drawn by AgentScripts/DrawItemIcons.ps1, imported as UI sprites.
+    private static Sprite ImportIcon(string name)
+    {
+        var path = $"{IconFolder}/{name}.png";
+        if (!(AssetImporter.GetAtPath(path) is TextureImporter importer)) throw new System.InvalidOperationException($"Missing {path}; run DrawItemIcons.ps1.");
+        importer.textureType = TextureImporterType.Sprite;
+        importer.spriteImportMode = SpriteImportMode.Single;
+        importer.alphaIsTransparency = true;
+        importer.mipmapEnabled = false;
+        importer.textureCompression = TextureImporterCompression.Uncompressed;
+        importer.SaveAndReimport();
+        return AssetDatabase.LoadAssetAtPath<Sprite>(path);
+    }
+
+    private static ItemDefinition BuildItem(string id, string displayName)
+    {
+        var path = $"{ItemFolder}/{displayName}.asset";
+        var item = AssetDatabase.LoadAssetAtPath<ItemDefinition>(path);
+        if (item == null)
+        {
+            item = ScriptableObject.CreateInstance<ItemDefinition>();
+            AssetDatabase.CreateAsset(item, path);
+        }
+        using (var serialized = new SerializedObject(item))
+        {
+            serialized.FindProperty("id").stringValue = id;
+            serialized.FindProperty("displayName").stringValue = displayName;
+            serialized.FindProperty("icon").objectReferenceValue = ImportIcon(displayName);
+            // PROTOTYPE stack size for the dev items.
+            serialized.FindProperty("maxStack").intValue = 20;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+        EditorUtility.SetDirty(item);
+        return item;
+    }
+
+    // URP Lit, transparent (alpha blended, no depth write), so the machine ghost is see-through but still shaded.
+    private static Material BuildGhostModelMaterial()
+    {
+        var material = AssetDatabase.LoadAssetAtPath<Material>(GhostModelMaterialPath);
+        if (material == null)
+        {
+            material = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+            AssetDatabase.CreateAsset(material, GhostModelMaterialPath);
+        }
+        material.SetColor("_BaseColor", new Color(1f, 1f, 1f, 0.45f));
+        material.SetFloat("_Surface", 1f);
+        material.SetFloat("_Blend", 0f);
+        material.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+        material.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+        material.SetFloat("_SrcBlendAlpha", (float)UnityEngine.Rendering.BlendMode.One);
+        material.SetFloat("_DstBlendAlpha", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+        material.SetFloat("_ZWrite", 0f);
+        material.SetFloat("_Smoothness", 0.2f);
+        material.SetOverrideTag("RenderType", "Transparent");
+        material.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+        material.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+        material.SetShaderPassEnabled("ShadowCaster", false);
+        material.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+        EditorUtility.SetDirty(material);
+        return material;
     }
 
     private static Material BuildGhostMaterial()
@@ -240,7 +311,7 @@ public static class BuildDevSite
     }
 
     private static void BuildScene(SinglePrefabObjects catalog, NetworkObject bridge, NetworkObject player, PanelSettings panelSettings,
-        EquipmentDefinition oven, RecipeAsset bread, Material ghostMaterial)
+        EquipmentDefinition oven, RecipeAsset bread, ItemDefinition[] items, Material ghostMaterial, Material ghostModelMaterial)
     {
         var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
@@ -310,6 +381,10 @@ public static class BuildDevSite
             var recipes = serialized.FindProperty("recipes");
             recipes.arraySize = 1;
             recipes.GetArrayElementAtIndex(0).objectReferenceValue = bread;
+            var itemsProperty = serialized.FindProperty("items");
+            itemsProperty.arraySize = items.Length;
+            for (var index = 0; index < items.Length; index++)
+                itemsProperty.GetArrayElementAtIndex(index).objectReferenceValue = items[index];
             serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 
@@ -336,6 +411,7 @@ public static class BuildDevSite
         {
             serialized.FindProperty("session").objectReferenceValue = session;
             serialized.FindProperty("ghost").objectReferenceValue = ghostRenderer;
+            serialized.FindProperty("ghostModelMaterial").objectReferenceValue = ghostModelMaterial;
             serialized.FindProperty("placeAction").objectReferenceValue = Action("Place");
             serialized.FindProperty("removeAction").objectReferenceValue = Action("Remove");
             serialized.FindProperty("rotateAction").objectReferenceValue = Action("Rotate");
@@ -344,6 +420,7 @@ public static class BuildDevSite
             serialized.FindProperty("clearCursorAction").objectReferenceValue = Action("ClearCursor");
             serialized.FindProperty("closeScreenAction").objectReferenceValue = Action("CloseScreen");
             serialized.FindProperty("hotbarAction").objectReferenceValue = Action("Hotbar");
+            serialized.FindProperty("quickTransferAction").objectReferenceValue = Action("QuickTransfer");
             serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 

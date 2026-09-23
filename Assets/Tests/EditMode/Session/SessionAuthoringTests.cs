@@ -63,7 +63,10 @@ namespace FoodFactoryGame.Session.Tests
                 Assert.That(server.GetAuthenticator(), Is.InstanceOf<DevAuthenticator>());
                 var roots = objects.SelectMany(x => x.GetComponents<SessionRoot>()).ToArray();
                 Assert.That(roots.Length, Is.EqualTo(1));
-                AssertAssigned(roots[0], "networkManager", "authenticator", "bridgePrefab", "playerPrefab", "spawnPoints", "equipmentDefinitions", "recipes");
+                AssertAssigned(roots[0], "networkManager", "authenticator", "bridgePrefab", "playerPrefab", "spawnPoints", "equipmentDefinitions", "recipes", "items");
+                Assert.That(roots[0].Items.Select(x => x.Id), Is.EquivalentTo(new[] { DevWorld.DoughItemId, "bread" }));
+                Assert.That(roots[0].Items.All(x => x.Icon != null), Is.True, "Every dev item has an inventory icon.");
+                Assert.That(roots[0].Items.All(x => x.MaxStack == 20), Is.True, "Dev dough and bread stack to 20.");
                 using (var serialized = new SerializedObject(roots[0]))
                 {
                     Assert.That(serialized.FindProperty("authenticator").objectReferenceValue, Is.SameAs(server.GetAuthenticator()));
@@ -84,11 +87,16 @@ namespace FoodFactoryGame.Session.Tests
                 AssertAssigned(presenters[0], "session");
                 var interactions = objects.SelectMany(x => x.GetComponents<EquipmentInteraction>()).ToArray();
                 Assert.That(interactions.Length, Is.EqualTo(1));
-                AssertAssigned(interactions[0], "session", "ghost", "placeAction", "removeAction", "rotateAction", "pointAction",
-                    "inventoryAction", "clearCursorAction", "closeScreenAction", "hotbarAction");
+                AssertAssigned(interactions[0], "session", "ghost", "ghostModelMaterial", "placeAction", "removeAction", "rotateAction", "pointAction",
+                    "inventoryAction", "clearCursorAction", "closeScreenAction", "hotbarAction", "quickTransferAction");
                 var huds = objects.SelectMany(x => x.GetComponents<PlayerHud>()).ToArray();
                 Assert.That(huds.Length, Is.EqualTo(1));
                 AssertAssigned(huds[0], "document", "interaction");
+                using (var serialized = new SerializedObject(interactions[0]))
+                {
+                    var ghostModel = (Material)serialized.FindProperty("ghostModelMaterial").objectReferenceValue;
+                    Assert.That(ghostModel.renderQueue, Is.GreaterThanOrEqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent), "The machine ghost is see-through.");
+                }
                 Assert.That(huds[0].GetComponent<UnityEngine.UIElements.UIDocument>().panelSettings, Is.Not.Null);
                 var ghost = interactions[0].GetComponentInChildren<Renderer>(true);
                 Assert.That(ghost.gameObject.activeSelf, Is.False);
@@ -200,6 +208,7 @@ namespace FoodFactoryGame.Session.Tests
             Assert.That(player.FindAction("Inventory").bindings.Any(x => x.path == "<Keyboard>/e"), Is.True);
             Assert.That(player.FindAction("ClearCursor").bindings.Any(x => x.path == "<Keyboard>/q"), Is.True);
             Assert.That(player.FindAction("CloseScreen").bindings.Any(x => x.path == "<Keyboard>/escape"), Is.True);
+            Assert.That(player.FindAction("QuickTransfer").bindings.Any(x => x.path == "<Keyboard>/shift"), Is.True, "Shift+click quick-transfers a stack.");
             foreach (var name in new[] { "Place", "Remove", "Inventory", "ClearCursor", "CloseScreen" })
                 Assert.That(player.FindAction(name).interactions, Is.Empty, $"{name} is a press, not a hold.");
             // Each hotbar key reads as its slot number through a scale processor.

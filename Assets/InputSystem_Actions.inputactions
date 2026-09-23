@@ -166,6 +166,15 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
+                },
+                {
+                    "name": "QuickTransfer",
+                    "type": "Button",
+                    "id": "e3a9d7b1-2f64-4c85-a0d9-1b6e8c3f5a72",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
                 }
             ],
             "bindings": [
@@ -804,6 +813,17 @@
                     "processors": "Scale(factor=9)",
                     "groups": ";Keyboard&Mouse",
                     "action": "Hotbar",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "5b0f3c2e-8d41-4a67-9e2b-7c1d6f4a9e30",
+                    "path": "<Keyboard>/shift",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Keyboard&Mouse",
+                    "action": "QuickTransfer",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }
