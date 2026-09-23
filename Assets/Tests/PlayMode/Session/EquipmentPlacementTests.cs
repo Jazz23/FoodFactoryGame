@@ -17,6 +17,7 @@ using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
+using UnityEngine.UIElements;
 
 namespace FoodFactoryGame.Session.PlayModeTests
 {
@@ -198,6 +199,72 @@ namespace FoodFactoryGame.Session.PlayModeTests
             _remoteSite.Bridge.RequestPlace("remote-place", DevWorld.OvenId, 6, 6, 0);
             yield return Await("remote-place");
             Assert.That(_results["remote-place"].Accepted, Is.True, _results["remote-place"].Reason);
+        }
+
+        // The host goes through the real HUD and interaction layer; the remote uses the bridge directly for rejections.
+        [UnityTest]
+        public IEnumerator HostBakesBreadThroughTheOvenScreenAndRemoteSeesItRun()
+        {
+            yield return StartHost();
+            var hostId = _root.Authenticator.LocalPlayerId;
+            CreateRemote();
+            yield return ConnectRemote();
+            var remoteId = _remoteAuth.LocalPlayerId;
+            var interaction = UnityEngine.Object.FindAnyObjectByType<EquipmentInteraction>();
+            var hud = UnityEngine.Object.FindAnyObjectByType<PlayerHud>();
+            var input = DevWorld.OvenId + ":in";
+            var output = DevWorld.OvenId + ":out";
+            int Count(GoodsSnapshot site, string location, string item) =>
+                site.Lots.Where(x => x.LocationId == location && x.ItemId == item).Sum(x => x.Quantity);
+
+            // Dev seed: storage dough and starter dough for each new player.
+            var server = _root.ServerWorld.Snapshot();
+            Assert.That(Count(server, DevWorld.StorageId, "dough"), Is.EqualTo(DevWorld.StorageDough));
+            Assert.That(Count(server, GoodsWorld.InventoryLocationId(hostId), "dough"), Is.EqualTo(DevWorld.StarterDough));
+            Assert.That(Count(server, GoodsWorld.InventoryLocationId(remoteId), "dough"), Is.EqualTo(DevWorld.StarterDough));
+
+            var remote = _remoteSite.Bridge;
+            remote.RequestStartJob("remote-empty", DevWorld.OvenId, "oven-bread");
+            yield return Await("remote-empty");
+            Assert.That(_results["remote-empty"].Reason, Is.EqualTo("missing-inputs"));
+            remote.RequestStartJob("remote-bogus", DevWorld.OvenId, "no-such-recipe");
+            yield return Await("remote-bogus");
+            Assert.That(_results["remote-bogus"].Reason, Is.EqualTo("invalid-recipe"));
+
+            // The oven screen opens from the crosshair click path's entry point and lists the recipe and a Start button.
+            yield return Until(() => { interaction.OpenMachine(DevWorld.OvenId); return interaction.Screen == InteractionScreen.Machine; }, "oven screen");
+            yield return null;
+            Assert.That(hud.ScreenRoot.Q<Button>("hud-recipe-oven-bread"), Is.Not.Null);
+            Assert.That(hud.ScreenRoot.Q<Button>("hud-start"), Is.Not.Null);
+            Assert.That(hud.ScreenRoot.Q<Button>("hud-inventory-dough"), Is.Not.Null);
+
+            // Clicking the inventory stack moves all of it into the oven input.
+            interaction.MoveGoods(_root.ClientSite.Lots.Where(x => x.LocationId == interaction.InventoryId).ToList(), input);
+            yield return Until(() => Count(_root.ClientSite, input, "dough") == DevWorld.StarterDough && !interaction.HasPendingRequests, "dough in the oven");
+            yield return null;
+            Assert.That(hud.ScreenRoot.Q<Button>("hud-machine-input-dough"), Is.Not.Null);
+
+            interaction.StartJob(DevWorld.OvenId, "oven-bread");
+            yield return Until(() => { _remoteSite.Tick(); return _remoteSite.Latest.Jobs.Any(x => x.StationId == DevWorld.OvenId && x.StartedBy == hostId); },
+                "remote sees the running batch");
+            Assert.That(interaction.LastRejection, Is.Null);
+            yield return Until(() => _presenter.Visuals[DevWorld.OvenId].Running, "oven visual running");
+            Assert.That(Count(_root.ServerWorld.Snapshot(), input, "dough"), Is.EqualTo(DevWorld.StarterDough - 1), "One dough per batch.");
+
+            // One batch per click: a second start while it runs is refused.
+            remote.RequestStartJob("remote-busy", DevWorld.OvenId, "oven-bread");
+            yield return Await("remote-busy");
+            Assert.That(_results["remote-busy"].Reason, Is.EqualTo("station-busy"));
+
+            yield return Until(() => Count(_root.ClientSite, output, "bread") == 1, "bread in the output", 20f);
+            yield return Until(() => !_presenter.Visuals[DevWorld.OvenId].Running, "oven visual idle");
+            Assert.That(_root.ClientSite.Jobs, Is.Empty, "The oven does not start another batch by itself.");
+
+            // Clicking the output moves the bread into the inventory.
+            interaction.MoveGoods(_root.ClientSite.Lots.Where(x => x.LocationId == output).ToList(), interaction.InventoryId);
+            yield return Until(() => Count(_root.ClientSite, interaction.InventoryId, "bread") == 1 && !interaction.HasPendingRequests, "bread in the inventory");
+            Assert.That(Count(GoodsSnapshotStore.Load(_root.Options.WorldPath).Snapshot(), GoodsWorld.InventoryLocationId(hostId), "bread"), Is.EqualTo(1));
+            interaction.CloseScreen();
         }
 
         [UnityTest]

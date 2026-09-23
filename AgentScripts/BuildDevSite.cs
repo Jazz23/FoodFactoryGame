@@ -1,5 +1,5 @@
 // Editor authoring script (run via Unity MCP run_script): creates the dev session prefabs, prefab catalog, equipment content,
-// UI panel settings and the DevSite scene, then makes DevSite the only build scene. Safe to re-run: assets keep GUIDs.
+// recipe content, UI panel settings and the DevSite scene, then makes DevSite the only build scene. Safe to re-run: assets keep GUIDs.
 // The scene holds no equipment instances; placed equipment is shown from replicated state by EquipmentPresenter.
 using System.IO;
 using System.Linq;
@@ -32,10 +32,11 @@ public static class BuildDevSite
     private const string OvenPrefabPath = "Assets/Prefabs/Equipment/Oven.prefab";
     private const string OvenDefinitionPath = "Assets/Content/Equipment/Oven.asset";
     private const string GhostMaterialPath = "Assets/Materials/PlacementGhost.mat";
+    private const string BreadRecipePath = "Assets/Content/Recipes/Bread.asset";
 
     public static string Run()
     {
-        foreach (var folder in new[] { "Assets/UI", "Assets/Prefabs/Network", "Assets/Prefabs/Player", "Assets/Network", "Assets/Content/Equipment", "Assets/Materials" })
+        foreach (var folder in new[] { "Assets/UI", "Assets/Prefabs/Network", "Assets/Prefabs/Player", "Assets/Network", "Assets/Content/Equipment", "Assets/Content/Recipes", "Assets/Materials" })
             Directory.CreateDirectory(folder);
         AssetDatabase.Refresh();
         var panelSettings = BuildPanelSettings();
@@ -43,8 +44,9 @@ public static class BuildDevSite
         var player = BuildPlayer();
         var catalog = BuildCatalog(bridge, player);
         var oven = BuildOvenDefinition();
+        var bread = BuildBreadRecipe();
         var ghostMaterial = BuildGhostMaterial();
-        BuildScene(catalog, bridge, player, panelSettings, oven, ghostMaterial);
+        BuildScene(catalog, bridge, player, panelSettings, oven, bread, ghostMaterial);
         EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
         AssetDatabase.SaveAssets();
         return "DevSite authored";
@@ -94,6 +96,34 @@ public static class BuildDevSite
         }
         EditorUtility.SetDirty(definition);
         return definition;
+    }
+
+    // DEVELOPMENT content: the owner's first oven recipe, one dough to one bread in 10 s. Bread spoils after an hour ambient.
+    private static RecipeAsset BuildBreadRecipe()
+    {
+        var recipe = AssetDatabase.LoadAssetAtPath<RecipeAsset>(BreadRecipePath);
+        if (recipe == null)
+        {
+            recipe = ScriptableObject.CreateInstance<RecipeAsset>();
+            AssetDatabase.CreateAsset(recipe, BreadRecipePath);
+        }
+        using (var serialized = new SerializedObject(recipe))
+        {
+            serialized.FindProperty("id").stringValue = "oven-bread";
+            serialized.FindProperty("displayName").stringValue = "Bread";
+            serialized.FindProperty("stationKind").stringValue = "oven";
+            serialized.FindProperty("durationSeconds").intValue = 10;
+            var inputs = serialized.FindProperty("inputs");
+            inputs.arraySize = 1;
+            inputs.GetArrayElementAtIndex(0).FindPropertyRelative("itemId").stringValue = DevWorld.DoughItemId;
+            inputs.GetArrayElementAtIndex(0).FindPropertyRelative("quantity").intValue = 1;
+            serialized.FindProperty("outputItemId").stringValue = "bread";
+            serialized.FindProperty("outputQuantity").intValue = 1;
+            serialized.FindProperty("outputSpoilAfterSeconds").intValue = 3600;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+        EditorUtility.SetDirty(recipe);
+        return recipe;
     }
 
     private static Material BuildGhostMaterial()
@@ -172,7 +202,6 @@ public static class BuildDevSite
                 serialized.FindProperty("target").objectReferenceValue = root.transform;
                 serialized.FindProperty("cameraTransform").objectReferenceValue = cameraObject.transform;
                 serialized.FindProperty("lookAction").objectReferenceValue = Action("Look");
-                serialized.FindProperty("orbitAction").objectReferenceValue = Action("Orbit");
                 serialized.FindProperty("zoomAction").objectReferenceValue = Action("Zoom");
                 serialized.ApplyModifiedPropertiesWithoutUndo();
             }
@@ -211,7 +240,7 @@ public static class BuildDevSite
     }
 
     private static void BuildScene(SinglePrefabObjects catalog, NetworkObject bridge, NetworkObject player, PanelSettings panelSettings,
-        EquipmentDefinition oven, Material ghostMaterial)
+        EquipmentDefinition oven, RecipeAsset bread, Material ghostMaterial)
     {
         var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
@@ -278,6 +307,9 @@ public static class BuildDevSite
             var definitions = serialized.FindProperty("equipmentDefinitions");
             definitions.arraySize = 1;
             definitions.GetArrayElementAtIndex(0).objectReferenceValue = oven;
+            var recipes = serialized.FindProperty("recipes");
+            recipes.arraySize = 1;
+            recipes.GetArrayElementAtIndex(0).objectReferenceValue = bread;
             serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 
@@ -304,10 +336,14 @@ public static class BuildDevSite
         {
             serialized.FindProperty("session").objectReferenceValue = session;
             serialized.FindProperty("ghost").objectReferenceValue = ghostRenderer;
-            serialized.FindProperty("interactAction").objectReferenceValue = Action("Interact");
             serialized.FindProperty("placeAction").objectReferenceValue = Action("Place");
+            serialized.FindProperty("removeAction").objectReferenceValue = Action("Remove");
             serialized.FindProperty("rotateAction").objectReferenceValue = Action("Rotate");
             serialized.FindProperty("pointAction").objectReferenceValue = Action("Point");
+            serialized.FindProperty("inventoryAction").objectReferenceValue = Action("Inventory");
+            serialized.FindProperty("clearCursorAction").objectReferenceValue = Action("ClearCursor");
+            serialized.FindProperty("closeScreenAction").objectReferenceValue = Action("CloseScreen");
+            serialized.FindProperty("hotbarAction").objectReferenceValue = Action("Hotbar");
             serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 
@@ -325,6 +361,23 @@ public static class BuildDevSite
             serialized.FindProperty("document").objectReferenceValue = document;
             serialized.FindProperty("session").objectReferenceValue = session;
             serialized.FindProperty("equipment").objectReferenceValue = interaction;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        // The HUD has its own document on the same panel, drawn above the session readout.
+        var hudObject = new GameObject("PlayerHud");
+        var hudDocument = hudObject.AddComponent<UIDocument>();
+        using (var serialized = new SerializedObject(hudDocument))
+        {
+            serialized.FindProperty("m_PanelSettings").objectReferenceValue = panelSettings;
+            serialized.FindProperty("m_SortingOrder").floatValue = 1f;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+        var hud = hudObject.AddComponent<PlayerHud>();
+        using (var serialized = new SerializedObject(hud))
+        {
+            serialized.FindProperty("document").objectReferenceValue = hudDocument;
+            serialized.FindProperty("interaction").objectReferenceValue = interaction;
             serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 

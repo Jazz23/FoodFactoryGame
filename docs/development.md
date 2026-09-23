@@ -93,7 +93,9 @@ The goods listen-server PlayMode test has an exercised workflow: make sure the a
 
 ## Session Bootstrap (host, join, multi-process)
 
-Decisions: [0005](decisions/0005-session-bootstrap-and-player-identity.md). `Assets/Scenes/DevSite.unity` is the only build scene. It is authored by `AgentScripts/BuildDevSite.cs`, which is idempotent and keeps asset GUIDs; re-run it with MCP `run_script` (`file: AgentScripts/BuildDevSite.cs`, `entry: BuildDevSite.Run`) rather than editing the scene or prefab YAML. Running it also makes FishNet's generator append the spawnable prefabs to `DefaultPrefabObjects.asset`; that is expected.
+Decisions: [0005](decisions/0005-session-bootstrap-and-player-identity.md). `Assets/Scenes/DevSite.unity` is the only build scene. It is authored by `AgentScripts/BuildDevSite.cs`, which is idempotent and keeps asset GUIDs; re-run it with MCP `run_script` (`file: AgentScripts/BuildDevSite.cs`, `entry: BuildDevSite.Run`) rather than editing the scene or prefab YAML. Running it also makes FishNet's generator append the spawnable prefabs to `DefaultPrefabObjects.asset`; that is expected. It re-saves `Player.prefab` and `GoodsNetworkBridge.prefab` with FishNet's cached `NetworkObject` fields unset, and the generator then logs `… have the same assetPath hash of 0`. Run the MCP `eval` `EditorApplication.ExecuteMenuItem("Tools/Fish-Networking/Utility/Refresh Default Prefabs")` afterwards to restore the hashes, and revert the reordering it makes in `DefaultPrefabObjects.asset`. The other cached fields (`PrefabId`, `NetworkBehaviours`, …) flip between raw and filled as FishNet processes the prefabs; the session PlayMode tests pass with either.
+
+MCP `capture_game_view` resolves `save_path` under `Assets/` and refuses `..`. Save captures to `Temp/<run>/…` (that is, `Assets/Temp/<run>`), then move them to `docs/verification/` and delete the folder, so no capture is imported as an asset.
 
 Where state lives (real play, not tests):
 
@@ -109,8 +111,9 @@ Starting a session:
 
 - From the menu: enter a name, then **Host**, or **Join** with an address (default `127.0.0.1`). Tugboat's port is 7770 (UDP). The status line shows rejection reasons.
 - From the command line (skips the menu): `-host`, `-server` (no local player, for `-batchmode -nographics`), or `-connect <address>`, plus optional `-name <display>`, `-save <dir>`, `-identity <file>`.
-- Controls: WASD/left stick moves relative to the camera; hold right mouse (or left shoulder) and move the mouse/right stick to orbit; scroll to zoom. Equipment: press E with the cursor on a machine to pick it up into your inventory; while holding one, a green/red footprint follows the cursor, R (right shoulder) rotates it, and left click (right trigger) places it. The readout shows the hint and the server's last rejection reason.
-- The dev seed (a 20×20 grid and one oven) is applied only when a world is created. A save made before equipment placement has neither, so delete it to get the oven. Existing players receive their inventory on their next join.
+- Controls ([decision 0007](decisions/0007-player-controls-and-working-oven.md)): WASD/left stick moves relative to the camera; the mouse/right stick always orbits (the pointer is locked to a centre crosshair); scroll zooms. E opens/closes the inventory (your machines and goods beside the dev storage). 1–9 put a held machine kind on the cursor (green/red footprint, R rotates, Q clears); left click places it, or with an empty cursor opens the machine under the crosshair; right click picks the machine up. On a screen, click a stack to move it; on the oven screen pick the recipe and press **Start batch** (one batch per press). Esc closes a screen, or releases the pointer until the next click. The readout shows the hint and the server's last rejection reason.
+- Don't edit scripts while the Editor is in play mode during a live check: Unity's recompile-and-continue reloads the domain, which drops the FishNet session (the subscription loses its bridge) and turns null strings into empty ones. Stop play mode first.
+- The dev seed (a 20×20 grid, one oven and 20 dough in storage) is applied only when a world is created, and players get 5 starter dough only when their inventory is created. A save made before these steps lacks them, so delete it to get them.
 
 Two-process check on one machine (use an existing artifact directory for logs and isolated saves):
 

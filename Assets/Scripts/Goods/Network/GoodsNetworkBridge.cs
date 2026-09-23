@@ -93,6 +93,21 @@ namespace FoodFactoryGame.Goods.Network
             if (IsClientStarted) ServerPlace(requestId, equipmentId, cellX, cellZ, rotation);
         }
 
+        // One batch per request: the server checks the station, recipe, busy state and inputs (StartJobDurably).
+        public void RequestStartJob(string requestId, string stationId, string recipeId)
+        {
+            if (IsClientStarted) ServerStartJob(requestId, stationId, recipeId);
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        private void ServerStartJob(string requestId, string stationId, string recipeId, NetworkConnection sender = null)
+        {
+            if (!TryIdentify(sender, requestId, out var player)) return;
+            var result = _world.StartJobDurably(player, requestId, stationId, recipeId, _savePath);
+            Reply(sender, result);
+            if (result.Accepted) Broadcast();
+        }
+
         [ServerRpc(RequireOwnership = false)]
         private void ServerPickUp(string requestId, string equipmentId, NetworkConnection sender = null)
         {

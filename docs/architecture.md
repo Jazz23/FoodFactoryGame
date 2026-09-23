@@ -48,7 +48,7 @@ The existing demo prefab catalog remains baseline authoring only.
 
 ## Implemented: station jobs (domain) (2026-09-22)
 
-Rules are in [decision 0004](decisions/0004-station-job-rules.md). This is domain code only. There is **no** job network command, `OvenToggle` display, or recipe authoring yet. Placed stations now come from equipment (below).
+Rules are in [decision 0004](decisions/0004-station-job-rules.md). This step was domain code only. The job network command, recipe content and the oven's running display came with the working oven (below). Placed stations now come from equipment (below).
 
 - `GoodsWorld` is `partial`. Station and job code lives in `GoodsWorld.Production.cs` and shares the goods lock and snapshot, so input consumption, output creation and pickup refunds commit atomically with the goods.
 - `RecipeDefinition` is content registered by the server with `RegisterRecipe`. It is not saved. `GoodsStation` (site, kind, input and output location) is created with the server-only `Bootstrap(GoodsStation)`.
@@ -67,7 +67,7 @@ Decisions are in [decision 0005](decisions/0005-session-bootstrap-and-player-ide
 - `DevAuthenticator` (FishNet `Authenticator`): clients send `{DisplayName, Secret}`; the server answers `{Accepted, Reason, PlayerId}` before passing or failing the connection. Rejection reasons: `invalid-name`, `invalid-secret`, `persistence-unavailable`, `already-connected`, `server-full` (cap 8), `server-not-ready`. `already-connected` is checked with a read-only lookup before any write. A rejected client disconnects itself after reading the reason; the server kicks it only after a 2 s grace, because FishNet's forced close raced the reply over real UDP. The connection→player map is server memory only and is cleared on disconnect.
 - `ClientIdentity` keeps the client secret at `persistentDataPath/Identity/client.secret` (`-identity <file>` override).
 - FishNet sends start scenes only after authentication, so `SessionRoot` spawns one `Player` per connection on `OnClientLoadedStartScenes`, owned by that connection and with a server-set display name. FishNet despawns it on disconnect; the world keeps running.
-- `Player.prefab`: `NetworkObject`, client-authoritative `NetworkTransform`, `CharacterController`, `PlayerAvatar` (camera-yaw-relative `Player/Move`), a capsule placeholder tinted per display name, and a disabled `CameraRig` (`OrbitCameraRig`, camera, audio listener) that only the owning client enables. It orbits with `Player/Look` while `Player/Orbit` (right mouse / left shoulder) is held; `Player/Zoom` (scroll) steps distance. Pitch is limited to 10–80° and distance to 3–20 m.
+- `Player.prefab`: `NetworkObject`, client-authoritative `NetworkTransform`, `CharacterController`, `PlayerAvatar` (camera-yaw-relative `Player/Move`), a capsule placeholder tinted per display name, and a disabled `CameraRig` (`OrbitCameraRig`, camera, audio listener) that only the owning client enables. It orbits with `Player/Look` (always on since 0007; formerly while `Player/Orbit` was held); `Player/Zoom` (scroll) steps distance. Pitch is limited to 10–80° and distance to 3–20 m.
 - `ClientSiteSubscription` subscribes an authenticated client to `dev-site` once the bridge is visible. `SessionPanel` (UI Toolkit, built in code, `Assets/UI/SessionPanelSettings.asset`) shows the name/address/Host/Join menu with status and rejection reasons, then a readout of mode, player ID, the replicated site clock and revision, and (on a server) the server clock, revision and player count.
 
 Prototype, labelled in code: the authenticator (no encryption or accounts), owner movement authority (presentation only; no gameplay rule trusts position), the all-players `dev-site` grant, the 8-player cap, and the dev seed.
@@ -83,13 +83,25 @@ Decisions are in [decision 0006](decisions/0006-equipment-placement-and-inventor
 - `TryGrantDurably(..., inventoryCapacity)` creates the player's inventory together with the grant; `SessionAdmission` passes the dev capacity (10).
 - `View` adds the site's equipment (placed and held) and layout. `Validate` enforces the rules listed in 0006.
 - Network: `GoodsNetworkBridge.RequestPickUp` / `RequestPlace` ServerRPCs resolve the player from the connection and rebroadcast a full baseline to every subscriber after an accepted command. `ClientSiteSubscription` exposes its `Bridge` and forwards results (`ResultReceived`).
-- Presentation (`Assets/Scripts/Session/Equipment`, in `DevSite`): `EquipmentPresenter` builds one local, non-networked visual per placed piece from its `EquipmentDefinition` prefab. The visual is centred on the footprint and stood on the floor using its rendered bounds, keyed by equipment ID. It is removed while the piece is held and never owns state. `EquipmentInteraction` (local player only) raycasts `Player/Point` through the owned avatar's camera: `Player/Interact` (E, a press) picks up; while holding, a ghost footprint follows the cursor, green or red from the same `SiteGrid` rule, `Player/Rotate` (R / right shoulder) turns it, and `Player/Place` (left mouse / right trigger) sends the request. Nothing moves until the next baseline. The `SessionPanel` readout shows the hint and the last rejection reason. The grid is centred on the scene origin (`SiteGridSpace`).
+- Presentation (`Assets/Scripts/Session/Equipment`, in `DevSite`): `EquipmentPresenter` builds one local, non-networked visual per placed piece from its `EquipmentDefinition` prefab. The visual is centred on the footprint and stood on the floor using its rendered bounds, keyed by equipment ID. It is removed while the piece is held and never owns state. `EquipmentInteraction` (local player only) raycasts through the owned avatar's camera. As first built, `Player/Interact` (E) picked up; since 0007 the controls are those below. While a machine is on the cursor, a ghost footprint follows the aim point, green or red from the same `SiteGrid` rule, `Player/Rotate` (R / right shoulder) turns it, and `Player/Place` (left mouse / right trigger) sends the request. Nothing moves until the next baseline. The `SessionPanel` readout shows the hint and the last rejection reason. The grid is centred on the scene origin (`SiteGridSpace`).
 - Content: `Assets/Content/Equipment/Oven.asset` (kind `oven`, 3×3, input 10, output 4, `Oven.prefab`). `SessionRoot.equipmentDefinitions` lists it; the dev seed places `dev-oven-1` at (12, 13) on a 20×20 grid in a **new** world only.
 - `SessionRoot.Begin` now refuses while the transport is still stopping (`CanBegin`). Previously a same-frame Stop→Start let the old server's late `Stopped` event release the new world, so the bridge never initialized.
 
 Prototype, labelled in code or content: free placement, no range or line-of-sight check, dev grid size and footprint, dev inventory capacity, and grid-to-scene mapping centred on the origin. Scene landmarks and walls are not placement blockers.
 
-Not yet: buying/selling equipment, starting jobs over the network, the oven's running display (`OvenToggle` stays off), other machines and belts, moving equipment between sites, and a hotbar or selection for players holding several pieces (placement uses the first held piece).
+Not yet: buying/selling equipment, other machines and belts, and moving equipment between sites. Starting jobs, the running display and the hotbar came with the working oven (below).
+
+## Implemented: Factorio-style controls and a working oven (2026-09-22)
+
+Decisions are in [decision 0007](decisions/0007-player-controls-and-working-oven.md). No new server rule and no schema change.
+
+- Controls (`EquipmentInteraction`, `OrbitCameraRig`): the pointer is locked to a centre crosshair while no screen is open, so `Player/Look` always orbits; the rig pivots 1 m beside the avatar. `Player/Inventory` (E) toggles the inventory screen, `Player/Hotbar` (1–9, one action whose bindings scale to the slot number) puts a held machine kind on the cursor, `Player/ClearCursor` (Q) empties it, `Player/Place` (left mouse) places the cursor item or opens the machine under the crosshair, `Player/Remove` (right mouse) picks the machine up, `Player/Rotate` (R) turns the ghost, `Player/CloseScreen` (Esc) closes a screen or releases the pointer. Aim rays skip player avatars. `Player/Orbit` is gone.
+- HUD (`PlayerHud`, UI Toolkit built in code, its own `UIDocument` on the session panel settings): crosshair, 9-slot hotbar (kind and held count), the inventory screen (your machines and goods by item/spoiled beside `dev-site-storage`) and the machine screen (recipe picker, Start, progress, input, output). Every click is a request: stack moves use `GoodsNetworkBridge.RequestTransfer` (whole lots up to the destination's previewed free capacity), Start uses the new `RequestStartJob` → `StartJobDurably`, one batch per click.
+- Content: `RecipeAsset` (`Assets/Content/Recipes/Bread.asset`: `oven-bread`, 1 dough → 1 bread, 10 s, bread spoils after 3600 s). `SessionRoot.recipes` lists it; `StartServer` registers every recipe with the world, including a recovered save.
+- Dev ingredients: a new dev world's storage gets 20 dough; `TryGrantDurably(..., starterGoods)` adds 5 dough (`starter:<playerId>:0`) to a player's inventory only in the commit that creates it. Dough spoils after 7200 s. Existing saves and existing inventories get neither.
+- Display: `EquipmentPresenter` sets `EquipmentVisual.Running` from the baseline (a running, not blocked, job on the station), which drives every `IEquipmentRunningDisplay` in the model; `OvenToggle` implements it (glow, light, fans).
+
+Prototype, labelled in code or content: the dev recipe, dough stock and spoil times, hotbar slots in content order, the 1 m shoulder offset, and storage as the inventory screen's second panel. Open: any granted player can transfer out of another player's inventory location (a pre-existing transfer rule); no gamepad hotbar or screen navigation; reach is wherever the crosshair meets the floor.
 
 ## Required Constraints for Future Implementation
 
@@ -99,7 +111,7 @@ Not yet: buying/selling equipment, starting jobs over the network, the oven's ru
 - Player and employee operational rules should be shared; input and AI choose actions through those rules.
 - Visual objects must not become the sole owners of authoritative simulation state.
 
-These remain accepted contracts; only the bounded goods slice, its station-job domain and equipment placement above have a runtime interface.
+These remain accepted contracts; only the bounded goods slice, its station jobs, equipment placement and the working oven above have a runtime interface.
 
 ## Planned / Undecided
 

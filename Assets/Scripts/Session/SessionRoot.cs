@@ -28,6 +28,8 @@ namespace FoodFactoryGame.Session
         [SerializeField] private Transform[] spawnPoints = Array.Empty<Transform>();
         // Content for every equipment kind the site can show; the dev seed places the "oven" kind.
         [SerializeField] private EquipmentDefinition[] equipmentDefinitions = Array.Empty<EquipmentDefinition>();
+        // Recipe content: the server registers every entry with the world; clients read it for the machine screen.
+        [SerializeField] private RecipeAsset[] recipes = Array.Empty<RecipeAsset>();
         [SerializeField] private bool readCommandLine = true;
 
         private SessionOptions _options;
@@ -48,6 +50,7 @@ namespace FoodFactoryGame.Session
         public GoodsSnapshot ClientSite => _site?.Latest;
         public ClientSiteSubscription ClientSubscription => _site;
         public IReadOnlyList<EquipmentDefinition> EquipmentDefinitions => equipmentDefinitions;
+        public IReadOnlyList<RecipeAsset> Recipes => recipes;
         public bool IsRunning => Mode != SessionMode.None;
         // The transport finishes stopping on a later iteration. Starting before then lets the old server's late Stopped event
         // release the new world, so Begin waits for both local connections to be fully stopped.
@@ -139,8 +142,11 @@ namespace FoodFactoryGame.Session
             Directory.CreateDirectory(_options.SaveDirectory);
             // The world is committed before FishNet listens, so the bridge never serves an uncommitted state.
             ServerWorld = DevWorld.LoadOrCreate(_options.WorldPath, equipmentDefinitions.FirstOrDefault(x => x != null && x.Kind == "oven"));
+            // Recipes are content, not saved state, so they are registered on every start, including a recovered save.
+            foreach (var recipe in recipes) ServerWorld.RegisterRecipe(recipe.ToDefinition());
             _registry = new PlayerRegistry(_options.RegistryPath);
-            authenticator.ConfigureServer(new SessionAdmission(_registry, ServerWorld, DevWorld.SiteId, _options.WorldPath, DevWorld.InventoryCapacity));
+            authenticator.ConfigureServer(new SessionAdmission(_registry, ServerWorld, DevWorld.SiteId, _options.WorldPath,
+                DevWorld.InventoryCapacity, DevWorld.StarterGoods));
             SetStatus("Starting server...");
             if (!networkManager.ServerManager.StartConnection()) throw new InvalidOperationException("Transport refused to start the server.");
         }

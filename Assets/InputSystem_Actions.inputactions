@@ -87,15 +87,6 @@
                     "initialStateCheck": false
                 },
                 {
-                    "name": "Orbit",
-                    "type": "Button",
-                    "id": "e140f42d-12cc-452c-9e5b-596917492400",
-                    "expectedControlType": "Button",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": false
-                },
-                {
                     "name": "Zoom",
                     "type": "Value",
                     "id": "26f37be8-c9e4-475f-ba1f-e2967aa562d0",
@@ -130,6 +121,51 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": true
+                },
+                {
+                    "name": "Inventory",
+                    "type": "Button",
+                    "id": "f108a195-55ed-4ec9-8b10-dbe131a554e5",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "Remove",
+                    "type": "Button",
+                    "id": "aecf22ec-9b07-45dc-8c17-6692fd496eb4",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "ClearCursor",
+                    "type": "Button",
+                    "id": "11bada40-728e-4ac7-a66f-5f0710e275a4",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "CloseScreen",
+                    "type": "Button",
+                    "id": "8aa3628a-d4b4-4bd2-84da-5c205085bebc",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "Hotbar",
+                    "type": "PassThrough",
+                    "id": "a2c742ba-8242-4f7c-98d2-65248af8ece7",
+                    "expectedControlType": "Axis",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -575,34 +611,199 @@
                 },
                 {
                     "name": "",
-                    "id": "b8137f38-3195-4b95-b306-da7e78fa4852",
-                    "path": "<Mouse>/rightButton",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": ";Keyboard&Mouse",
-                    "action": "Orbit",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
-                    "id": "ad533974-e47f-40a1-8f40-d00132080257",
-                    "path": "<Gamepad>/leftShoulder",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": ";Gamepad",
-                    "action": "Orbit",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
                     "id": "a42f4cfa-f37a-4a34-862f-2637057cc9a5",
                     "path": "<Mouse>/scroll",
                     "interactions": "",
                     "processors": "",
                     "groups": ";Keyboard&Mouse",
                     "action": "Zoom",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "87377e3b-4fe9-438d-9707-24b84a8cbb48",
+                    "path": "<Keyboard>/e",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Keyboard&Mouse",
+                    "action": "Inventory",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "ec0fa0d7-6a0b-4baa-b4de-e8ac84727d2c",
+                    "path": "<Gamepad>/select",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Gamepad",
+                    "action": "Inventory",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "1cfac890-ca84-450e-8f7d-e2bb057a4802",
+                    "path": "<Mouse>/rightButton",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Keyboard&Mouse",
+                    "action": "Remove",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "023c674f-0b46-4321-b79b-74f49e6f0263",
+                    "path": "<Gamepad>/leftShoulder",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Gamepad",
+                    "action": "Remove",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "a8c93f31-5776-497c-8e1f-4313af36222f",
+                    "path": "<Keyboard>/q",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Keyboard&Mouse",
+                    "action": "ClearCursor",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "e4c1bf50-b84d-4626-bc52-455ce08f944e",
+                    "path": "<Gamepad>/buttonEast",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Gamepad",
+                    "action": "ClearCursor",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "9b522543-63d4-4c71-96b2-091255d8e9ba",
+                    "path": "<Keyboard>/escape",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Keyboard&Mouse",
+                    "action": "CloseScreen",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "6ebb73b2-cc3e-4278-9979-76a2165804a9",
+                    "path": "<Gamepad>/start",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Gamepad",
+                    "action": "CloseScreen",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "0b08f76b-c682-4ba0-a5ab-08c46d274734",
+                    "path": "<Keyboard>/1",
+                    "interactions": "",
+                    "processors": "Scale(factor=1)",
+                    "groups": ";Keyboard&Mouse",
+                    "action": "Hotbar",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "71406041-6b50-46eb-8d15-0984b098f4d1",
+                    "path": "<Keyboard>/2",
+                    "interactions": "",
+                    "processors": "Scale(factor=2)",
+                    "groups": ";Keyboard&Mouse",
+                    "action": "Hotbar",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "7c4dc8a5-2df5-4d9a-9623-4e64f6023aaa",
+                    "path": "<Keyboard>/3",
+                    "interactions": "",
+                    "processors": "Scale(factor=3)",
+                    "groups": ";Keyboard&Mouse",
+                    "action": "Hotbar",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "49644490-029e-4064-bc1c-bfde1edfdab8",
+                    "path": "<Keyboard>/4",
+                    "interactions": "",
+                    "processors": "Scale(factor=4)",
+                    "groups": ";Keyboard&Mouse",
+                    "action": "Hotbar",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "6eeba4ca-6cc0-4202-b7b5-d50aa46c9747",
+                    "path": "<Keyboard>/5",
+                    "interactions": "",
+                    "processors": "Scale(factor=5)",
+                    "groups": ";Keyboard&Mouse",
+                    "action": "Hotbar",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "78014832-89e1-409a-bfdf-350cfdd9df6f",
+                    "path": "<Keyboard>/6",
+                    "interactions": "",
+                    "processors": "Scale(factor=6)",
+                    "groups": ";Keyboard&Mouse",
+                    "action": "Hotbar",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "73b086b6-f35a-4704-abbd-80236b3660d2",
+                    "path": "<Keyboard>/7",
+                    "interactions": "",
+                    "processors": "Scale(factor=7)",
+                    "groups": ";Keyboard&Mouse",
+                    "action": "Hotbar",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "dca73bec-0574-4075-8690-3e45c8c3fac5",
+                    "path": "<Keyboard>/8",
+                    "interactions": "",
+                    "processors": "Scale(factor=8)",
+                    "groups": ";Keyboard&Mouse",
+                    "action": "Hotbar",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "9dca619e-52a2-4e5e-ba30-ec843fd737b2",
+                    "path": "<Keyboard>/9",
+                    "interactions": "",
+                    "processors": "Scale(factor=9)",
+                    "groups": ";Keyboard&Mouse",
+                    "action": "Hotbar",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

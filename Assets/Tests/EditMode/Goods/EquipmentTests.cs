@@ -180,6 +180,30 @@ namespace FoodFactoryGame.Goods.Tests
         }
 
         [Test]
+        public void StarterGoodsArriveOnlyWithANewInventory()
+        {
+            // TEST-ONLY starter goods: 4 flour that spoil after 100 s.
+            var starter = new[] { new GoodsLot { ItemId = "flour", Quantity = 4, SpoilAfterSeconds = 100 } };
+            GoodsSnapshotStore.Save(_world, PathForSave);
+            Assert.That(_world.TryGrantDurably("cook", "restaurant", PathForSave, 7, starter), Is.True);
+            var lot = _world.Snapshot().Lots.Single(x => x.LocationId == "carried:cook");
+            Assert.That((lot.Id, lot.ItemId, lot.OwnerId, lot.Quantity, lot.SpoilAfterSeconds),
+                Is.EqualTo(("starter:cook:0", "flour", "restaurant", 4, 100L)));
+            Assert.That(GoodsSnapshotStore.Load(PathForSave).Snapshot().Lots.Any(x => x.Id == "starter:cook:0"), Is.True);
+
+            // Rejoining never grants them again, even after they were used up.
+            Assert.That(_world.Transfer("cook", new TransferIntent { RequestId = "stow", LotId = lot.Id, DestinationId = "pantry", Quantity = 4 }).Accepted, Is.True);
+            Assert.That(_world.TryGrantDurably("cook", "restaurant", PathForSave, 7, starter), Is.True);
+            Assert.That(_world.Snapshot().Lots.Any(x => x.LocationId == "carried:cook"), Is.False);
+
+            // A failed commit leaves neither the inventory nor its goods; oversized starters are refused before any change.
+            var before = JsonUtility.ToJson(_world.Snapshot());
+            Assert.That(_world.TryGrantDurably("waiter", "restaurant", BadPath, 7, starter), Is.False);
+            Assert.Throws<ArgumentException>(() => _world.TryGrantDurably("porter", "restaurant", PathForSave, 3, starter));
+            Assert.That(JsonUtility.ToJson(_world.Snapshot()), Is.EqualTo(before));
+        }
+
+        [Test]
         public void SchemaV2SaveLoadsAsV3WithoutEquipment()
         {
             var legacy = new GoodsWorld("legacy-world");

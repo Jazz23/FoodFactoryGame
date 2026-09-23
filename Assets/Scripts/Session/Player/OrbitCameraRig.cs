@@ -1,4 +1,6 @@
-// Owner-only third-person camera: orbits while the Orbit action is held so the cursor stays free, and zooms in steps.
+// Owner-only third-person camera: Look always orbits (the gameplay cursor is locked to a centre crosshair) unless the
+// local UI suspends it through OrbitEnabled while a screen is open; zooms in steps. The pivot sits beside the avatar
+// (over the shoulder), so the crosshair aims past the avatar at the floor ahead instead of through it.
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -10,9 +12,9 @@ namespace FoodFactoryGame.Session.Player
         [SerializeField] private Transform target;
         [SerializeField] private Transform cameraTransform;
         [SerializeField] private InputActionReference lookAction;
-        [SerializeField] private InputActionReference orbitAction;
         [SerializeField] private InputActionReference zoomAction;
         [SerializeField] private float focusHeight = 1f;
+        [SerializeField] private float shoulderOffset = 1f;
         [SerializeField] private float orbitDegreesPerUnit = 0.2f;
         [SerializeField] private float zoomStep = 1f;
         [SerializeField] private float minPitch = 10f;
@@ -26,24 +28,24 @@ namespace FoodFactoryGame.Session.Player
         public float Yaw => yaw;
         public float Pitch => pitch;
         public float Distance => distance;
+        // Presentation state owned by the local interaction layer; false while an inventory or machine screen is open.
+        public bool OrbitEnabled { get; set; } = true;
 
         private void OnEnable()
         {
             lookAction.action.Enable();
-            orbitAction.action.Enable();
             zoomAction.action.Enable();
         }
 
         private void OnDisable()
         {
             lookAction.action.Disable();
-            orbitAction.action.Disable();
             zoomAction.action.Disable();
         }
 
         private void LateUpdate()
         {
-            if (orbitAction.action.IsPressed())
+            if (OrbitEnabled)
             {
                 var delta = lookAction.action.ReadValue<Vector2>();
                 yaw = Mathf.Repeat(yaw + delta.x * orbitDegreesPerUnit, 360f);
@@ -55,7 +57,8 @@ namespace FoodFactoryGame.Session.Player
             pitch = Mathf.Clamp(pitch, minPitch, maxPitch);
             distance = Mathf.Clamp(distance, minDistance, maxDistance);
             // The rig ignores the avatar's facing; only position follows the target.
-            transform.SetPositionAndRotation(target.position + Vector3.up * focusHeight, Quaternion.Euler(pitch, yaw, 0f));
+            transform.SetPositionAndRotation(target.position + Vector3.up * focusHeight + Quaternion.Euler(0f, yaw, 0f) * Vector3.right * shoulderOffset,
+                Quaternion.Euler(pitch, yaw, 0f));
             cameraTransform.SetLocalPositionAndRotation(new Vector3(0f, 0f, -distance), Quaternion.identity);
         }
     }

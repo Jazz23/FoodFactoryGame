@@ -24,6 +24,7 @@ namespace FoodFactoryGame.Session.Tests
         private const string FixturePath = "Assets/Tests/PlayMode/Goods/GoodsBridgeFixture.prefab";
         private const string OvenPrefabPath = "Assets/Prefabs/Equipment/Oven.prefab";
         private const string OvenDefinitionPath = "Assets/Content/Equipment/Oven.asset";
+        private const string BreadRecipePath = "Assets/Content/Recipes/Bread.asset";
 
         private static void AssertAssigned(Object component, params string[] fields)
         {
@@ -62,7 +63,7 @@ namespace FoodFactoryGame.Session.Tests
                 Assert.That(server.GetAuthenticator(), Is.InstanceOf<DevAuthenticator>());
                 var roots = objects.SelectMany(x => x.GetComponents<SessionRoot>()).ToArray();
                 Assert.That(roots.Length, Is.EqualTo(1));
-                AssertAssigned(roots[0], "networkManager", "authenticator", "bridgePrefab", "playerPrefab", "spawnPoints", "equipmentDefinitions");
+                AssertAssigned(roots[0], "networkManager", "authenticator", "bridgePrefab", "playerPrefab", "spawnPoints", "equipmentDefinitions", "recipes");
                 using (var serialized = new SerializedObject(roots[0]))
                 {
                     Assert.That(serialized.FindProperty("authenticator").objectReferenceValue, Is.SameAs(server.GetAuthenticator()));
@@ -70,6 +71,8 @@ namespace FoodFactoryGame.Session.Tests
                     Assert.That(AssetDatabase.GetAssetPath(serialized.FindProperty("bridgePrefab").objectReferenceValue), Is.EqualTo(BridgePath));
                     Assert.That(AssetDatabase.GetAssetPath(serialized.FindProperty("equipmentDefinitions").GetArrayElementAtIndex(0).objectReferenceValue),
                         Is.EqualTo(OvenDefinitionPath));
+                    Assert.That(AssetDatabase.GetAssetPath(serialized.FindProperty("recipes").GetArrayElementAtIndex(0).objectReferenceValue),
+                        Is.EqualTo(BreadRecipePath));
                 }
                 var panels = objects.SelectMany(x => x.GetComponents<SessionPanel>()).ToArray();
                 Assert.That(panels.Length, Is.EqualTo(1));
@@ -81,7 +84,12 @@ namespace FoodFactoryGame.Session.Tests
                 AssertAssigned(presenters[0], "session");
                 var interactions = objects.SelectMany(x => x.GetComponents<EquipmentInteraction>()).ToArray();
                 Assert.That(interactions.Length, Is.EqualTo(1));
-                AssertAssigned(interactions[0], "session", "ghost", "interactAction", "placeAction", "rotateAction", "pointAction");
+                AssertAssigned(interactions[0], "session", "ghost", "placeAction", "removeAction", "rotateAction", "pointAction",
+                    "inventoryAction", "clearCursorAction", "closeScreenAction", "hotbarAction");
+                var huds = objects.SelectMany(x => x.GetComponents<PlayerHud>()).ToArray();
+                Assert.That(huds.Length, Is.EqualTo(1));
+                AssertAssigned(huds[0], "document", "interaction");
+                Assert.That(huds[0].GetComponent<UnityEngine.UIElements.UIDocument>().panelSettings, Is.Not.Null);
                 var ghost = interactions[0].GetComponentInChildren<Renderer>(true);
                 Assert.That(ghost.gameObject.activeSelf, Is.False);
                 Assert.That(ghost.GetComponent<Collider>(), Is.Null, "The ghost must not intercept pickup raycasts.");
@@ -129,6 +137,20 @@ namespace FoodFactoryGame.Session.Tests
         }
 
         [Test]
+        public void BreadRecipeTurnsDoughIntoBreadInTheOven()
+        {
+            var recipe = AssetDatabase.LoadAssetAtPath<RecipeAsset>(BreadRecipePath);
+            Assert.That(recipe, Is.Not.Null);
+            var definition = recipe.ToDefinition();
+            Assert.That((definition.StationKind, definition.DurationSeconds, definition.OutputItemId, definition.OutputQuantity),
+                Is.EqualTo(("oven", 10L, "bread", 1)));
+            Assert.That(definition.Inputs.Select(x => (x.ItemId, x.Quantity)), Is.EqualTo(new[] { (DevWorld.DoughItemId, 1) }));
+            Assert.That(definition.OutputSpoilAfterSeconds, Is.GreaterThan(0));
+            // The server must accept it as content; this throws on an invalid recipe.
+            Assert.DoesNotThrow(() => new FoodFactoryGame.Goods.GoodsWorld("authoring-check").RegisterRecipe(definition));
+        }
+
+        [Test]
         public void PlayerPrefabHasNetworkedBodyAndDisabledOwnerRig()
         {
             var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PlayerPath);
@@ -144,7 +166,7 @@ namespace FoodFactoryGame.Session.Tests
             var rig = prefab.GetComponentInChildren<OrbitCameraRig>(true);
             Assert.That(rig, Is.Not.Null);
             Assert.That(rig.gameObject.activeSelf, Is.False, "Only the owning client enables the rig.");
-            AssertAssigned(rig, "target", "cameraTransform", "lookAction", "orbitAction", "zoomAction");
+            AssertAssigned(rig, "target", "cameraTransform", "lookAction", "zoomAction");
             Assert.That(rig.GetComponentsInChildren<Camera>(true).Length, Is.EqualTo(1));
             Assert.That(prefab.GetComponentsInChildren<Camera>(true).Single().transform.IsChildOf(rig.transform), Is.True);
             Assert.That(prefab.GetComponentsInChildren<AudioListener>(true).All(x => x.transform.IsChildOf(rig.transform)), Is.True);
@@ -168,14 +190,22 @@ namespace FoodFactoryGame.Session.Tests
         {
             var input = AssetDatabase.LoadAssetAtPath<InputActionAsset>("Assets/InputSystem_Actions.inputactions");
             var player = input.FindActionMap("Player", true);
-            foreach (var name in new[] { "Move", "Look", "Orbit", "Zoom", "Interact", "Place", "Rotate", "Point" })
+            foreach (var name in new[] { "Move", "Look", "Zoom", "Place", "Remove", "Rotate", "Point", "Inventory", "ClearCursor", "CloseScreen", "Hotbar" })
                 Assert.That(player.FindAction(name, true).bindings.Count, Is.GreaterThan(0), name);
-            Assert.That(player.FindAction("Orbit").bindings.Any(x => x.path == "<Mouse>/rightButton"), Is.True);
+            Assert.That(player.FindAction("Orbit"), Is.Null, "Orbiting is always on; no button holds it.");
             Assert.That(player.FindAction("Zoom").bindings.Any(x => x.path == "<Mouse>/scroll"), Is.True);
             Assert.That(player.FindAction("Place").bindings.Any(x => x.path == "<Mouse>/leftButton"), Is.True);
+            Assert.That(player.FindAction("Remove").bindings.Any(x => x.path == "<Mouse>/rightButton"), Is.True);
             Assert.That(player.FindAction("Rotate").bindings.Any(x => x.path == "<Keyboard>/r"), Is.True);
-            Assert.That(player.FindAction("Interact").bindings.Any(x => x.path == "<Keyboard>/e"), Is.True);
-            Assert.That(player.FindAction("Interact").interactions, Is.Empty, "Pickup is a press, not the starter asset's hold.");
+            Assert.That(player.FindAction("Inventory").bindings.Any(x => x.path == "<Keyboard>/e"), Is.True);
+            Assert.That(player.FindAction("ClearCursor").bindings.Any(x => x.path == "<Keyboard>/q"), Is.True);
+            Assert.That(player.FindAction("CloseScreen").bindings.Any(x => x.path == "<Keyboard>/escape"), Is.True);
+            foreach (var name in new[] { "Place", "Remove", "Inventory", "ClearCursor", "CloseScreen" })
+                Assert.That(player.FindAction(name).interactions, Is.Empty, $"{name} is a press, not a hold.");
+            // Each hotbar key reads as its slot number through a scale processor.
+            var hotbar = player.FindAction("Hotbar");
+            for (var slot = 1; slot <= 9; slot++)
+                Assert.That(hotbar.bindings.Any(x => x.path == $"<Keyboard>/{slot}" && x.processors == $"Scale(factor={slot})"), Is.True, $"slot {slot}");
         }
     }
 }

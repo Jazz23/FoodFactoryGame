@@ -248,24 +248,22 @@ MonoBehaviour:
   _spectatorInterpolation: 2
   _enableTeleport: 0
   _teleportThreshold: 1
-  <PrefabId>k__BackingField: 0
+  <PrefabId>k__BackingField: 65535
   <SpawnableCollectionId>k__BackingField: 0
   <AssetPathHash>k__BackingField: 5306845881338098766
   SceneId: 0
   SerializedTransformProperties:
     Position: {x: 0, y: 0, z: 0}
-    Rotation: {x: 0, y: 0, z: 0, w: 1}
-    Scale: {x: 1, y: 1, z: 1}
-    IsValid: 1
+    Rotation: {x: 0, y: 0, z: 0, w: 0}
+    Scale: {x: 0, y: 0, z: 0}
+    IsValid: 0
   <IsNested>k__BackingField: 0
   WasActiveDuringEdit: 0
   WasActiveDuringEdit_Set1: 1
   <ComponentIndex>k__BackingField: 0
   <PredictedSpawn>k__BackingField: {fileID: 0}
   <PredictedOwner>k__BackingField: {fileID: 0}
-  NetworkBehaviours:
-  - {fileID: 5012388688286268589}
-  - {fileID: 5380995037869238230}
+  NetworkBehaviours: []
   InitializedParentNetworkBehaviour: {fileID: 0}
   InitializedNestedNetworkObjects: []
   RuntimeParentNetworkBehaviour: {fileID: 0}
@@ -276,7 +274,7 @@ MonoBehaviour:
   _initializeOrder: 0
   _preventDespawnOnDisconnect: 0
   _defaultDespawnType: 0
-  _initializedTimestamp: -8584114685599607210
+  _initializedTimestamp: 0
 --- !u!114 &5012388688286268589
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -289,9 +287,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a2836e36774ca1c4bbbee976e17b649c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: FishNet.Runtime::FishNet.Component.Transforming.NetworkTransform
-  _componentIndexCache: 0
+  _componentIndexCache: 255
   _addedNetworkObject: {fileID: 4443926686840925403}
-  _networkObjectCache: {fileID: 4443926686840925403}
+  _networkObjectCache: {fileID: 0}
   _componentConfiguration: 0
   _synchronizeParent: 0
   _packing:
@@ -360,9 +358,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d2cad1e1d3931744f9e28204a7fa239e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: FoodFactoryGame.Session::FoodFactoryGame.Session.Player.PlayerAvatar
-  _componentIndexCache: 1
+  _componentIndexCache: 255
   _addedNetworkObject: {fileID: 4443926686840925403}
-  _networkObjectCache: {fileID: 4443926686840925403}
+  _networkObjectCache: {fileID: 0}
   controller: {fileID: 7767222319062982877}
   cameraRig: {fileID: 4468185691923731147}
   body: {fileID: 1607015911366375415}
@@ -510,7 +508,6 @@ MonoBehaviour:
   target: {fileID: 5249658081252032230}
   cameraTransform: {fileID: 8026403742980381184}
   lookAction: {fileID: -5630151704836100654, guid: 052faaac586de48259a63d0c4782560b, type: 3}
-  orbitAction: {fileID: 7625583603926720725, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   zoomAction: {fileID: 500627165542639897, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   focusHeight: 1
   orbitDegreesPerUnit: 0.2

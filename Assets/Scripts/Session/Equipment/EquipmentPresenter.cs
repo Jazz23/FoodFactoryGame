@@ -1,5 +1,6 @@
 // Shows placed equipment from the latest replicated site baseline: one local visual per placed piece, keyed by equipment ID.
 // Visuals never own state; held equipment has no visual, and a missing baseline clears the scene rather than guessing.
+// A visual shows "running" exactly while the baseline has a running (not blocked) job on its station.
 using System.Collections.Generic;
 using System.Linq;
 using FoodFactoryGame.Goods;
@@ -39,6 +40,7 @@ namespace FoodFactoryGame.Session.Equipment
                     _visuals.Add(equipment.Id, visual);
                 }
                 visual.transform.SetPositionAndRotation(SiteGridSpace.Center(layout, equipment), SiteGridSpace.Rotation(equipment.Rotation));
+                visual.SetRunning(site.Jobs.Any(x => x.StationId == equipment.Id && x.State == StationJobState.Running));
             }
         }
 

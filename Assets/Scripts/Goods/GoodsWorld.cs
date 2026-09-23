@@ -149,20 +149,38 @@ namespace FoodFactoryGame.Goods
 
         // Server-only admission path: an existing grant (and inventory, if requested) succeeds without a write; anything
         // missing is created in one commit before success. Returns false with the prior state restored if the snapshot
-        // cannot commit. inventoryCapacity > 0 ensures the player's inventory location on the site.
-        public bool TryGrantDurably(string playerId, string siteId, string savePath, int inventoryCapacity = 0)
+        // cannot commit. inventoryCapacity > 0 ensures the player's inventory location on the site. Starter goods
+        // (item, quantity and spoil threshold only) are added, owned by the site, only when that inventory is created,
+        // so reconnecting never grants them again.
+        public bool TryGrantDurably(string playerId, string siteId, string savePath, int inventoryCapacity = 0,
+            IReadOnlyList<GoodsLot> starterGoods = null)
         {
             lock (_gate)
             {
                 // Invalid grants throw here, before any mutation, rather than masquerading as I/O failure.
                 if (string.IsNullOrWhiteSpace(playerId) || !_state.Locations.Any(x => x.SiteId == siteId))
                     throw new ArgumentException("Invalid grant.");
+                starterGoods ??= Array.Empty<GoodsLot>();
+                if (starterGoods.Any(x => x == null || string.IsNullOrWhiteSpace(x.ItemId) || x.Quantity < 1 || x.SpoilAfterSeconds < 1)
+                    || starterGoods.Sum(x => (long)x.Quantity) > Math.Max(0, inventoryCapacity))
+                    throw new ArgumentException("Invalid starter goods or they exceed the inventory capacity.");
                 var inventoryId = InventoryLocationId(playerId);
                 var needsInventory = inventoryCapacity > 0 && _state.Locations.All(x => x.Id != inventoryId);
+                if (needsInventory && _state.Lots.Any(x => x.Id.StartsWith($"starter:{playerId}:", StringComparison.Ordinal)))
+                    throw new InvalidOperationException($"Starter goods for {playerId} exist without an inventory.");
                 if (CanView(playerId, siteId) && !needsInventory) return true;
                 var before = Snapshot();
                 if (needsInventory)
+                {
                     Bootstrap(new GoodsLocation { Id = inventoryId, SiteId = siteId, Kind = "carried", Capacity = inventoryCapacity });
+                    for (var index = 0; index < starterGoods.Count; index++)
+                        Bootstrap(new GoodsLot
+                        {
+                            Id = $"starter:{playerId}:{index}", ItemId = starterGoods[index].ItemId, OwnerId = siteId,
+                            LocationId = inventoryId, Quantity = starterGoods[index].Quantity,
+                            SpoilAfterSeconds = starterGoods[index].SpoilAfterSeconds
+                        });
+                }
                 Grant(playerId, siteId);
                 try
                 {
