@@ -145,6 +145,30 @@ namespace FoodFactoryGame.Goods
             }
         }
 
+        // Server-only admission path: an existing grant succeeds without a write; a new grant is committed
+        // before success. Returns false with the pre-grant state restored if the snapshot cannot commit.
+        public bool TryGrantDurably(string playerId, string siteId, string savePath)
+        {
+            lock (_gate)
+            {
+                if (CanView(playerId, siteId)) return true;
+                var before = Snapshot();
+                // Invalid grants throw here, outside the persistence handler, rather than masquerading as I/O failure.
+                Grant(playerId, siteId);
+                try
+                {
+                    GoodsSnapshotStore.Save(this, savePath);
+                    return true;
+                }
+                catch (Exception error)
+                {
+                    _state = before;
+                    if (!PersistenceError(error)) throw;
+                    return false;
+                }
+            }
+        }
+
         public bool CanView(string playerId, string siteId)
         {
             lock (_gate) return _state.Grants.Any(x => x.PlayerId == playerId && x.SiteId == siteId);

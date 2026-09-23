@@ -49,7 +49,7 @@ Assembly: `FoodFactoryGame.Baseline.EditModeTests`.
 
 The runner may return a completed result immediately despite `async_tests=true`. Otherwise poll `test_status`. Archive the result before starting another run; this command reports the most recent run. Require exactly four tests for the current baseline, all passed, none skipped. Zero matched tests is failure.
 
-Checks: FishNet runtime availability, all entries in the default network prefab collection resolving, starter Player/UI input actions importing, and enabled starter scenes loading without missing scripts and with a camera. These are setup checks, not gameplay or multiplayer acceptance.
+Checks: FishNet runtime availability, all entries in the default network prefab collection resolving, starter Player/UI input actions importing, and enabled build scenes loading without missing scripts and with a camera source (a scene camera, or a `SessionRoot` whose player prefab has one; `DevSite` intentionally has no scene camera). These are setup checks, not gameplay or multiplayer acceptance.
 
 The tests use preview scenes and do not write save data or modify application databases. Future stateful tests must receive explicit isolated save paths.
 
@@ -90,6 +90,37 @@ verified workflows today; the isolated goods-domain and goods listen-server test
 The bounded goods domain has an exercised EditMode workflow: confirm `editor_status` reports **play mode stopped**, compile and poll `recompile_status`, then run `run_tests` with `mode: editor`, `filter_type: assembly`, `filter: FoodFactoryGame.Goods.EditModeTests`; require 17 matched/17 passed. Run the unchanged baseline separately with `FoodFactoryGame.Baseline.EditModeTests` (4 matched/4 passed). Test fixtures create and delete unique isolated directories under the OS temp path. The exact run identities, counts, resolved test-runner precondition failure, and remaining unverified multiplayer checks are recorded in [the verification artifact](verification/goods-20260922.md). The Pipeline runner returns no native artifact path on synchronous completion; preserve this recorded result or use an explicitly configured CI XML run for future machine-ingested evidence.
 
 The goods listen-server PlayMode test has an exercised workflow: make sure the active scene is **not dirty** (the Test Runner otherwise blocks on its save-scene prompt and the async run never enters Play mode), then run `run_tests` with `mode: playmode`, `async_tests: true`, `filter_type: assembly`, `filter: FoodFactoryGame.Goods.PlayModeTests`; require 1 matched/1 passed. The synchronous HTTP call is dropped by the Play-mode domain reload, so read the result from `test_status` or the async response. Unity writes the NUnit XML to `%USERPROFILE%/AppData/LocalLow/DefaultCompany/FoodFactoryGame/TestResults.xml` and overwrites it on each run; copy it to `docs/verification/artifacts/` when it is evidence. The fixture prefab `Assets/Tests/PlayMode/Goods/GoodsBridgeFixture.prefab` is intentionally authored non-spawnable so FishNet’s default-prefab generator never adds it to `Assets/DefaultPrefabObjects.asset`; the test enables spawning in memory only.
+
+## Session Bootstrap (host, join, multi-process)
+
+Decisions: [0005](decisions/0005-session-bootstrap-and-player-identity.md). `Assets/Scenes/DevSite.unity` is the only build scene. It is authored by `AgentScripts/BuildDevSite.cs`, which is idempotent and keeps asset GUIDs; re-run it with MCP `run_script` (`file: AgentScripts/BuildDevSite.cs`, `entry: BuildDevSite.Run`) rather than editing the scene or prefab YAML. Running it also makes FishNet's generator append the spawnable prefabs to `DefaultPrefabObjects.asset`; that is expected.
+
+Where state lives (real play, not tests):
+
+| What | Default | Override |
+| --- | --- | --- |
+| World snapshot | `%USERPROFILE%\AppData\LocalLow\DefaultCompany\FoodFactoryGame\Saves\dev-world\world.snapshot` (+ `.previous`) | `-save <directory>` |
+| Player registry (SQLite) | same directory, `players.db` | `-save <directory>` |
+| Client secret | `...\FoodFactoryGame\Identity\client.secret` | `-identity <file>` |
+
+Deleting the save directory resets the dev world and all identities. Deleting a client secret makes that client a new player. Two processes on one machine must use different `-identity` files, or the second is rejected with `already-connected`.
+
+Starting a session:
+
+- From the menu: enter a name, then **Host**, or **Join** with an address (default `127.0.0.1`). Tugboat's port is 7770 (UDP). The status line shows rejection reasons.
+- From the command line (skips the menu): `-host`, `-server` (no local player, for `-batchmode -nographics`), or `-connect <address>`, plus optional `-name <display>`, `-save <dir>`, `-identity <file>`.
+- Controls: WASD/left stick moves relative to the camera; hold right mouse (or left shoulder) and move the mouse/right stick to orbit; scroll to zoom.
+
+Two-process check on one machine (use an existing artifact directory for logs and isolated saves):
+
+```powershell
+Start-Process -FilePath ".\build\Session\FoodFactoryGame.exe" -ArgumentList '-screen-fullscreen 0 -screen-width 1280 -screen-height 720 -host -name Host -save "<artifacts>\host-save" -identity "<artifacts>\host.secret" -logFile "<artifacts>\host.log"'
+Start-Process -FilePath ".\build\Session\FoodFactoryGame.exe" -ArgumentList '-screen-fullscreen 0 -screen-width 1280 -screen-height 720 -connect 127.0.0.1 -name Guest -identity "<artifacts>\guest.secret" -logFile "<artifacts>\guest.log"'
+```
+
+Evidence: both logs contain `[Session] Joined as player-...` with different IDs, the host log contains `[Session] Hosting`, and captures of both windows show two avatars and matching site revisions in the readout.
+
+Session tests: `FoodFactoryGame.Session.EditModeTests` (assembly, editor) and `FoodFactoryGame.Session.PlayModeTests` (assembly, playmode, async; make sure the open scene is not dirty). The PlayMode tests load the real `DevSite`, call `SessionRoot.Configure` with a temporary save directory and identity files and a free UDP port, and add a second client-only NetworkManager for the remote client. They expect one `SpawnablePrefabs is null on session-test-remote` error from FishNet's editor `Reset` (declared with `LogAssert.Expect`), and emit "2 audio listeners" warnings because both local clients own a camera in one process. Current counts and run identities are in [the session verification record](verification/session-20260922.md).
 
 For a separate checkout with its Editor closed, the batch equivalent is:
 

@@ -7,12 +7,12 @@ Gameplay requirements and open product decisions are in [the GDD](../Food_Factor
 ## Implemented Baseline
 
 - Unity `6000.5.9f1`, URP `17.5.0`, and Input System `1.20.0`.
-- `Assets/Scenes/SampleScene.unity` is the enabled starter build scene. It is not a restaurant prototype.
+- `Assets/Scenes/DevSite.unity` is the only enabled build scene (session bootstrap, below). `Assets/Scenes/SampleScene.unity` and its oven prototype remain in the project but are no longer built.
 - `Assets/InputSystem_Actions.inputactions` is imported starter input authoring, not completed gameplay controls.
 - FishNet `4.7.3` is vendored under `Assets/FishNet`, including its original metadata, demo references, and license files. See [decision 0001](decisions/0001-reproducible-baseline.md).
-- `Assets/DefaultPrefabObjects.asset` currently references FishNet demo prefabs. It is not the project's final network spawn catalog.
+- `Assets/DefaultPrefabObjects.asset` references FishNet demo prefabs and is auto-maintained by FishNet's prefab generator, which also appends the project's spawnable prefabs. No game NetworkManager uses it; `DevSite` uses the project-owned `Assets/Network/GamePrefabs.asset`.
 - `Assets/Tests/EditMode` contains four authoring/dependency checks in `FoodFactoryGame.Baseline.EditModeTests`. Tests open build scenes as isolated preview scenes and do not touch application saves.
-- The starter scene still has no game-specific session/bootstrap authoring. A limited goods domain and a FishNet transport bridge exist; the bridge has been exercised only by an isolated, test-owned listen-server fixture. See below.
+- A limited goods domain, a FishNet transport bridge, and a prototype session bootstrap (direct-IP host/join, SQLite player identity, networked avatar) exist. See below.
 
 ## Accepted Foundational Multiplayer Design
 
@@ -58,6 +58,22 @@ Rules are in [decision 0004](decisions/0004-station-job-rules.md). This is domai
 - Snapshot schema v2 adds `Stations` and `Jobs`. `GoodsSnapshotStore` upgrades v1 in memory and rejects anything newer than v2. `Validate` adds rules for station identity and same-site locations, and for job/station references: at most one job per station, remaining time within range, blocked means zero remaining, and no output or input ID colliding with a live lot. `View` includes the site's stations and their jobs.
 - The recipes, capacities and durations in `StationJobTests` are test-only. See [verification record](verification/station-jobs-20260922.md).
 
+## Implemented: session bootstrap and networked player (2026-09-22)
+
+Decisions are in [decision 0005](decisions/0005-session-bootstrap-and-player-identity.md). Assembly `FoodFactoryGame.Session` (`Assets/Scripts/Session`).
+
+- `SessionRoot` (in `DevSite`) is the server composition root, with Host, Client and Server-only modes. Server start creates the save directory, loads `world.snapshot` or creates and commits the **development seed** (`DevWorld`: world `dev-world`, site `dev-site`, one storage location; placeholder content), opens the SQLite `players.db`, configures the authenticator, and only then starts FishNet. Once listening, it spawns `GoodsNetworkBridge` and calls `InitializeServer` with `DevAuthenticator.PlayerIdOf` as the only connection→player resolver. The bridge ticks the world whenever the server runs, including with no clients (`-server`).
+- `PlayerRegistry` (SQLite, server-only) maps SHA-256(client secret) to a stable `player-<guid>` ID; raw secrets are never stored. `SessionAdmission` resolves or creates the identity first, then commits the `dev-site` grant with `GoodsWorld.TryGrantDurably`; either failure rejects the join. Registry schema is `user_version` 1; newer is refused. The goods snapshot stays at v2.
+- `DevAuthenticator` (FishNet `Authenticator`): clients send `{DisplayName, Secret}`; the server answers `{Accepted, Reason, PlayerId}` before passing or failing the connection. Rejection reasons: `invalid-name`, `invalid-secret`, `persistence-unavailable`, `already-connected`, `server-full` (cap 8), `server-not-ready`. `already-connected` is checked with a read-only lookup before any write. A rejected client disconnects itself after reading the reason; the server kicks it only after a 2 s grace, because FishNet's forced close raced the reply over real UDP. The connection→player map is server memory only and is cleared on disconnect.
+- `ClientIdentity` keeps the client secret at `persistentDataPath/Identity/client.secret` (`-identity <file>` override).
+- FishNet sends start scenes only after authentication, so `SessionRoot` spawns one `Player` per connection on `OnClientLoadedStartScenes`, owned by that connection and with a server-set display name. FishNet despawns it on disconnect; the world keeps running.
+- `Player.prefab`: `NetworkObject`, client-authoritative `NetworkTransform`, `CharacterController`, `PlayerAvatar` (camera-yaw-relative `Player/Move`), a capsule placeholder tinted per display name, and a disabled `CameraRig` (`OrbitCameraRig`, camera, audio listener) that only the owning client enables. It orbits with `Player/Look` while `Player/Orbit` (right mouse / left shoulder) is held; `Player/Zoom` (scroll) steps distance. Pitch is limited to 10–80° and distance to 3–20 m.
+- `ClientSiteSubscription` subscribes an authenticated client to `dev-site` once the bridge is visible. `SessionPanel` (UI Toolkit, built in code, `Assets/UI/SessionPanelSettings.asset`) shows the name/address/Host/Join menu with status and rejection reasons, then a readout of mode, player ID, the replicated site clock and revision, and (on a server) the server clock, revision and player count.
+
+Prototype, labelled in code: the authenticator (no encryption or accounts), owner movement authority (presentation only; no gameplay rule trusts position), the all-players `dev-site` grant, the 8-player cap, and the dev seed.
+
+Still open: hosting model, host leaving/migration and disconnect grace, and player count (GDD); interaction range; the indoor camera; character art.
+
 ## Required Constraints for Future Implementation
 
 - The server owns gameplay state; clients request validated actions through the command contract in decision 0002.
@@ -73,8 +89,8 @@ These remain accepted contracts; only the bounded goods slice and its station-jo
 - Full-world simulation scheduling, command interfaces outside goods, replication interest/deltas, and persistence of other systems: defined in decision 0002; implementation pending.
 - Player count, hosting/disconnect behavior, and exact performance hardware: GDD decisions pending.
 - Physical goods model: selected in GDD section 28 and decision 0003; a logical lot/condition/transfer/recovery slice is implemented. Transport staging, actual placed-world positions, carrier/vehicle handling constraints, and visual projection remain pending.
-- Offline progression, host migration, discovery/join flow, and the shipped hosting model remain undecided.
-- SQLite and MoonSharp are existing declared dependencies, with their gameplay roles undecided. Neither is selected merely by being installed.
+- Offline progression, host migration, discovery/lobbies/relay, and the shipped hosting model remain undecided. A direct-IP development host/join flow exists (decision 0005).
+- SQLite stores the prototype player identity registry (decision 0005); its role for other persistence is undecided. MoonSharp remains a declared dependency with no selected role.
 - Multiplayer smoke tests and representative scale benchmarks follow implementation; current tests do not establish replication correctness or the 60 FPS target.
 
 ## Baseline Test Evolution

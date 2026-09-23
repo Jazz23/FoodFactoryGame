@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="2" result="Passed" total="2" passed="2" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-09-23 03:54:18Z" end-time="2026-09-23 03:54:21Z" duration="3.6933674">
+  <test-suite type="TestSuite" id="1105" name="FoodFactoryGame" fullname="FoodFactoryGame" runstate="Runnable" testcasecount="3" result="Passed" start-time="2026-09-23 03:54:18Z" end-time="2026-09-23 03:54:21Z" duration="3.693367" total="2" passed="2" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="PlayMode" />
+    </properties>
+    <test-suite type="Assembly" id="1097" name="FoodFactoryGame.Session.PlayModeTests.dll" fullname="E:/Projects/Unity/FoodFactoryGame/Library/ScriptAssemblies/FoodFactoryGame.Session.PlayModeTests.dll" runstate="Runnable" testcasecount="2" result="Passed" start-time="2026-09-23 03:54:18Z" end-time="2026-09-23 03:54:21Z" duration="3.690998" total="2" passed="2" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="39356" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="PlayMode" />
+        <property name="EditorOnly" value="False" />
+      </properties>
+      <test-suite type="TestSuite" id="1098" name="FoodFactoryGame" fullname="FoodFactoryGame" runstate="Runnable" testcasecount="2" result="Passed" start-time="2026-09-23 03:54:18Z" end-time="2026-09-23 03:54:21Z" duration="3.689093" total="2" passed="2" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-suite type="TestSuite" id="1099" name="Session" fullname="FoodFactoryGame.Session" runstate="Runnable" testcasecount="2" result="Passed" start-time="2026-09-23 03:54:18Z" end-time="2026-09-23 03:54:21Z" duration="3.687220" total="2" passed="2" failed="0" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <test-suite type="TestSuite" id="1100" name="PlayModeTests" fullname="FoodFactoryGame.Session.PlayModeTests" runstate="Runnable" testcasecount="2" result="Passed" start-time="2026-09-23 03:54:18Z" end-time="2026-09-23 03:54:21Z" duration="3.685513" total="2" passed="2" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-suite type="TestFixture" id="1094" name="SessionBootstrapTests" fullname="FoodFactoryGame.Session.PlayModeTests.SessionBootstrapTests" classname="FoodFactoryGame.Session.PlayModeTests.SessionBootstrapTests" runstate="Runnable" testcasecount="2" result="Passed" start-time="2026-09-23 03:54:18Z" end-time="2026-09-23 03:54:21Z" duration="3.683771" total="2" passed="2" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-case id="1095" name="HostAndRemoteJoinWithStableIdsOwnedAvatarsAndSiteState" fullname="FoodFactoryGame.Session.PlayModeTests.SessionBootstrapTests.HostAndRemoteJoinWithStableIdsOwnedAvatarsAndSiteState" methodname="HostAndRemoteJoinWithStableIdsOwnedAvatarsAndSiteState" classname="FoodFactoryGame.Session.PlayModeTests.SessionBootstrapTests" runstate="Runnable" seed="569810237" result="Passed" start-time="2026-09-23 03:54:18Z" end-time="2026-09-23 03:54:19Z" duration="1.269671" asserts="0">
+                <properties>
+                  <property name="_JOINTYPE" value="UnityCombinatorial" />
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <output><![CDATA[[Session] Starting server...
+Local server is starting for Tugboat. Listening on port 59878.
+Local server is started for Tugboat.
+[Session] Hosting
+[Session] Connecting to 127.0.0.1...
+Local client is starting for Tugboat. Server IP is 127.0.0.1, port is 59878.
+Remote connection started for Id 0.
+Local client is started for Tugboat.
+[Session] Joined as player-4531440a39a840ebafa7be406605e40b
+SpawnablePrefabs is null on session-test-remote. Select the NetworkManager in scene DevSite and choose a prefabs file. Choosing DefaultPrefabObjects will automatically populate prefabs for you.
+Local client is starting for Tugboat. Server IP is 127.0.0.1, port is 59878.
+Remote connection started for Id 1.
+Local client is started for Tugboat.
+There are 2 audio listeners in the scene. Please ensure there is always exactly one audio listener in the scene.
+There are 2 audio listeners in the scene. Please ensure there is always exactly one audio listener in the scene.
+There are 2 audio listeners in the scene. Please ensure there is always exactly one audio listener in the scene.
+There are 2 audio listeners in the scene. Please ensure there is always exactly one audio listener in the scene.
+There are 2 audio listeners in the scene. Please ensure there is always exactly one audio listener in the scene.
+There are 2 audio listeners in the scene. Please ensure there is always exactly one audio listener in the scene.
+There are 2 audio listeners in the scene. Please ensure there is always exactly one audio listener in the scene.
+There are 2 audio listeners in the scene. Please ensure there is always exactly one audio listener in the scene.
+There are 2 audio listeners in the scene. Please ensure there is always exactly one audio listener in the scene.
+There are 2 audio listeners in the scene. Please ensure there is always exactly one audio listener in the scene.
+There are 2 audio listeners in the scene. Please ensure there is always exactly one audio listener in the scene.
+There are 2 audio listeners in the scene. Please ensure there is always exactly one audio listener in the scene.
+There are 2 audio listeners in the scene. Please ensure there is always exactly one audio listener in the scene.
+There are 2 audio listeners in the scene. Please ensure there is always exactly one audio listener in the scene.
+There are 2 audio listeners in the scene. Please ensure there is always exactly one audio listener in the scene.
+There are 2 audio listeners in the scene. Please ensure there is always exactly one audio listener in the scene.
+There are 2 audio listeners in the scene. Please ensure there is always exactly one audio listener in the scene.
+There are 2 audio listeners in the scene. Please ensure there is always exactly one audio listener in the scene.
+There are 2 audio listeners in the scene. Please ensure there is always exactly one audio listener in the scene.
+There are 2 audio listeners in the scene. Please ensure there is always exactly one audio listener in the scene.
+There are 2 audio listeners in the scene. Please ensure there is always exactly one audio listener in the scene.
+Local client is stopping for Tugboat.
+Remote connection stopped for Id 1.
+Local client is stopped for Tugboat.
+Local client is starting for Tugboat. Server IP is 127.0.0.1, port is 59878.
+Remote connection started for Id 2.
+Local client is started for Tugboat.
+Local client is stopping for Tugboat.
+Remote connection stopped for Id 2.
+Local client is stopped for Tugboat.
+Local client is starting for Tugboat. Server IP is 127.0.0.1, port is 59878.
+Remote connection started for Id 3.
+Local client is started for Tugboat.
+[Session] Rejected connection 3: already-connected
+Local client is stopping for Tugboat.
+Remote connection stopped for Id 3.
+Local client is stopped for Tugboat.
+Local client is stopping for Tugboat.
+]]></output>
+              </test-case>
+              <test-case id="1096" name="ServerOnlyStartAdvancesWorldWithoutAnyClient" fullname="FoodFactoryGame.Session.PlayModeTests.SessionBootstrapTests.ServerOnlyStartAdvancesWorldWithoutAnyClient" methodname="ServerOnlyStartAdvancesWorldWithoutAnyClient" classname="FoodFactoryGame.Session.PlayModeTests.SessionBootstrapTests" runstate="Runnable" seed="2006134132" result="Passed" start-time="2026-09-23 03:54:19Z" end-time="2026-09-23 03:54:21Z" duration="2.411154" asserts="0">
+                <properties>
+                  <property name="_JOINTYPE" value="UnityCombinatorial" />
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <output><![CDATA[[Session] Starting server...
+Local server is starting for Tugboat. Listening on port 59883.
+Local server is started for Tugboat.
+[Session] Server running
+Saving results to: C:/Users/Deven/AppData/LocalLow/DefaultCompany/FoodFactoryGame\TestResults.xml
+]]></output>
+              </test-case>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>
