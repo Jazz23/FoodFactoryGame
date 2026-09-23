@@ -284,7 +284,7 @@ namespace FoodFactoryGame.Goods.Tests
             Assert.That(GoodsSnapshotStore.Load(PathForSave).Snapshot().ClockSeconds, Is.Zero,
                 "The valid backup must survive a save after recovery.");
             var newer = _world.Snapshot();
-            newer.SchemaVersion = 2;
+            newer.SchemaVersion = GoodsSnapshot.CurrentSchema + 1;
             Assert.Throws<InvalidOperationException>(() => GoodsWorld.Restore(newer));
         }
 

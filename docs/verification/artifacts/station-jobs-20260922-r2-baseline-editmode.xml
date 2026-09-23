@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="4" result="Passed" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-09-23 03:22:28Z" end-time="2026-09-23 03:22:28Z" duration="0.0225452">
+  <test-suite type="TestSuite" id="1074" name="FoodFactoryGame" fullname="FoodFactoryGame" runstate="Runnable" testcasecount="36" result="Passed" start-time="2026-09-23 03:22:28Z" end-time="2026-09-23 03:22:28Z" duration="0.022545" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="EditMode" />
+    </properties>
+    <test-suite type="Assembly" id="1006" name="FoodFactoryGame.Baseline.EditModeTests.dll" fullname="E:/Projects/Unity/FoodFactoryGame/Library/ScriptAssemblies/FoodFactoryGame.Baseline.EditModeTests.dll" runstate="Runnable" testcasecount="4" result="Passed" start-time="2026-09-23 03:22:28Z" end-time="2026-09-23 03:22:28Z" duration="0.018418" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="39356" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="EditMode" />
+        <property name="EditorOnly" value="True" />
+      </properties>
+      <test-suite type="TestSuite" id="1007" name="FoodFactoryGame" fullname="FoodFactoryGame" runstate="Runnable" testcasecount="4" result="Passed" start-time="2026-09-23 03:22:28Z" end-time="2026-09-23 03:22:28Z" duration="0.018229" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-suite type="TestSuite" id="1008" name="Baseline" fullname="FoodFactoryGame.Baseline" runstate="Runnable" testcasecount="4" result="Passed" start-time="2026-09-23 03:22:28Z" end-time="2026-09-23 03:22:28Z" duration="0.018065" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <test-suite type="TestSuite" id="1009" name="Tests" fullname="FoodFactoryGame.Baseline.Tests" runstate="Runnable" testcasecount="4" result="Passed" start-time="2026-09-23 03:22:28Z" end-time="2026-09-23 03:22:28Z" duration="0.017883" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-suite type="TestFixture" id="1001" name="ProjectBaselineTests" fullname="FoodFactoryGame.Baseline.Tests.ProjectBaselineTests" classname="FoodFactoryGame.Baseline.Tests.ProjectBaselineTests" runstate="Runnable" testcasecount="4" result="Passed" start-time="2026-09-23 03:22:28Z" end-time="2026-09-23 03:22:28Z" duration="0.017658" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-case id="1003" name="DefaultNetworkPrefabReferencesResolve" fullname="FoodFactoryGame.Baseline.Tests.ProjectBaselineTests.DefaultNetworkPrefabReferencesResolve" methodname="DefaultNetworkPrefabReferencesResolve" classname="FoodFactoryGame.Baseline.Tests.ProjectBaselineTests" runstate="Runnable" seed="549763559" result="Passed" start-time="2026-09-23 03:22:28Z" end-time="2026-09-23 03:22:28Z" duration="0.000199" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1005" name="EnabledBuildScenesLoadWithoutMissingScriptsAndHaveCamera" fullname="FoodFactoryGame.Baseline.Tests.ProjectBaselineTests.EnabledBuildScenesLoadWithoutMissingScriptsAndHaveCamera" methodname="EnabledBuildScenesLoadWithoutMissingScriptsAndHaveCamera" classname="FoodFactoryGame.Baseline.Tests.ProjectBaselineTests" runstate="Runnable" seed="438497820" result="Passed" start-time="2026-09-23 03:22:28Z" end-time="2026-09-23 03:22:28Z" duration="0.015910" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1002" name="FishNetRuntimeIsAvailable" fullname="FoodFactoryGame.Baseline.Tests.ProjectBaselineTests.FishNetRuntimeIsAvailable" methodname="FishNetRuntimeIsAvailable" classname="FoodFactoryGame.Baseline.Tests.ProjectBaselineTests" runstate="Runnable" seed="641586979" result="Passed" start-time="2026-09-23 03:22:28Z" end-time="2026-09-23 03:22:28Z" duration="0.000063" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1004" name="StarterInputActionsImportWithPlayerAndUiMaps" fullname="FoodFactoryGame.Baseline.Tests.ProjectBaselineTests.StarterInputActionsImportWithPlayerAndUiMaps" methodname="StarterInputActionsImportWithPlayerAndUiMaps" classname="FoodFactoryGame.Baseline.Tests.ProjectBaselineTests" runstate="Runnable" seed="193557325" result="Passed" start-time="2026-09-23 03:22:28Z" end-time="2026-09-23 03:22:28Z" duration="0.000785" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <output><![CDATA[Saving results to: C:/Users/Deven/AppData/LocalLow/DefaultCompany/FoodFactoryGame\TestResults.xml
+Saving results to: C:/Users/Deven/AppData/LocalLow/DefaultCompany/FoodFactoryGame\TestResults.xml
+Saving results to: C:/Users/Deven/AppData/LocalLow/DefaultCompany/FoodFactoryGame\TestResults.xml
+Saving results to: C:/Users/Deven/AppData/LocalLow/DefaultCompany/FoodFactoryGame\TestResults.xml
+]]></output>
+              </test-case>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

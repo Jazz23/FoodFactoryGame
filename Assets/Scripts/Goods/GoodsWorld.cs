@@ -45,6 +45,7 @@ namespace FoodFactoryGame.Goods
         public string Reason;
         public string MovedLotId;
         public string ReservationId;
+        public string JobId;
         public long Revision;
     }
 
@@ -65,7 +66,8 @@ namespace FoodFactoryGame.Goods
 
     [Serializable] public sealed class GoodsSnapshot
     {
-        public int SchemaVersion = 1;
+        public const int CurrentSchema = 2;
+        public int SchemaVersion = CurrentSchema;
         public string WorldId;
         public long ClockSeconds;
         public long Revision;
@@ -74,9 +76,11 @@ namespace FoodFactoryGame.Goods
         public List<GoodsReservation> Reservations = new();
         public List<GoodsOutcome> Outcomes = new();
         public List<GoodsGrant> Grants = new();
+        public List<GoodsStation> Stations = new();
+        public List<StationJob> Jobs = new();
     }
 
-    public sealed class GoodsWorld
+    public sealed partial class GoodsWorld
     {
         private readonly object _gate = new();
         private GoodsSnapshot _state;
@@ -155,6 +159,9 @@ namespace FoodFactoryGame.Goods
                 view.Locations = view.Locations.Where(x => x.SiteId == siteId).ToList();
                 var ids = new HashSet<string>(view.Locations.Select(x => x.Id));
                 view.Lots = view.Lots.Where(x => ids.Contains(x.LocationId)).ToList();
+                view.Stations = view.Stations.Where(x => x.SiteId == siteId).ToList();
+                var stationIds = new HashSet<string>(view.Stations.Select(x => x.Id));
+                view.Jobs = view.Jobs.Where(x => stationIds.Contains(x.StationId)).ToList();
                 view.Reservations.Clear();
                 view.Outcomes.Clear();
                 view.Grants.Clear();
@@ -168,14 +175,18 @@ namespace FoodFactoryGame.Goods
             if (seconds < 0) throw new ArgumentOutOfRangeException(nameof(seconds));
             lock (_gate)
             {
+                if (seconds == 0) return;
                 checked { _state.ClockSeconds += seconds; }
+                // Blocked outputs emit before exposure so they age with this step, like any lot already present.
+                EmitBlockedOutputs();
                 foreach (var lot in _state.Lots)
                 {
                     if (lot.Spoiled || _state.Locations.First(x => x.Id == lot.LocationId).Refrigerated) continue;
                     lot.ExposureSeconds += Math.Min(seconds, lot.SpoilAfterSeconds - lot.ExposureSeconds);
                     lot.Spoiled = lot.ExposureSeconds >= lot.SpoilAfterSeconds;
                 }
-                if (seconds > 0) _state.Revision++;
+                ProgressJobs(seconds);
+                _state.Revision++;
             }
         }
 
@@ -392,9 +403,10 @@ namespace FoodFactoryGame.Goods
 
         public static void Validate(GoodsSnapshot state)
         {
-            if (state == null || state.SchemaVersion != 1 || string.IsNullOrWhiteSpace(state.WorldId)
+            if (state == null || state.SchemaVersion != GoodsSnapshot.CurrentSchema || string.IsNullOrWhiteSpace(state.WorldId)
                 || state.ClockSeconds < 0 || state.Revision < 0 || state.Locations == null || state.Lots == null
-                || state.Grants == null || state.Reservations == null || state.Outcomes == null)
+                || state.Grants == null || state.Reservations == null || state.Outcomes == null
+                || state.Stations == null || state.Jobs == null)
                 throw new InvalidOperationException("Unsupported or invalid goods snapshot schema.");
             if (state.Locations.Any(x => x == null || string.IsNullOrWhiteSpace(x.Id) || string.IsNullOrWhiteSpace(x.SiteId) || x.Capacity < 1)
                 || state.Locations.GroupBy(x => x.Id).Any(x => x.Count() != 1)
@@ -414,6 +426,7 @@ namespace FoodFactoryGame.Goods
                 || state.Grants.Any(x => x == null || string.IsNullOrWhiteSpace(x.PlayerId)
                     || !state.Locations.Any(y => y.SiteId == x.SiteId)))
                 throw new InvalidOperationException("Goods snapshot violates identity, capacity, or reservation invariants.");
+            ValidateProduction(state);
         }
     }
 }
