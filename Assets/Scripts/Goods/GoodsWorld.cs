@@ -66,7 +66,7 @@ namespace FoodFactoryGame.Goods
 
     [Serializable] public sealed class GoodsSnapshot
     {
-        public const int CurrentSchema = 2;
+        public const int CurrentSchema = 3;
         public int SchemaVersion = CurrentSchema;
         public string WorldId;
         public long ClockSeconds;
@@ -78,6 +78,8 @@ namespace FoodFactoryGame.Goods
         public List<GoodsGrant> Grants = new();
         public List<GoodsStation> Stations = new();
         public List<StationJob> Jobs = new();
+        public List<GoodsEquipment> Equipment = new();
+        public List<SiteLayout> SiteLayouts = new();
     }
 
     public sealed partial class GoodsWorld
@@ -145,15 +147,22 @@ namespace FoodFactoryGame.Goods
             }
         }
 
-        // Server-only admission path: an existing grant succeeds without a write; a new grant is committed
-        // before success. Returns false with the pre-grant state restored if the snapshot cannot commit.
-        public bool TryGrantDurably(string playerId, string siteId, string savePath)
+        // Server-only admission path: an existing grant (and inventory, if requested) succeeds without a write; anything
+        // missing is created in one commit before success. Returns false with the prior state restored if the snapshot
+        // cannot commit. inventoryCapacity > 0 ensures the player's inventory location on the site.
+        public bool TryGrantDurably(string playerId, string siteId, string savePath, int inventoryCapacity = 0)
         {
             lock (_gate)
             {
-                if (CanView(playerId, siteId)) return true;
+                // Invalid grants throw here, before any mutation, rather than masquerading as I/O failure.
+                if (string.IsNullOrWhiteSpace(playerId) || !_state.Locations.Any(x => x.SiteId == siteId))
+                    throw new ArgumentException("Invalid grant.");
+                var inventoryId = InventoryLocationId(playerId);
+                var needsInventory = inventoryCapacity > 0 && _state.Locations.All(x => x.Id != inventoryId);
+                if (CanView(playerId, siteId) && !needsInventory) return true;
                 var before = Snapshot();
-                // Invalid grants throw here, outside the persistence handler, rather than masquerading as I/O failure.
+                if (needsInventory)
+                    Bootstrap(new GoodsLocation { Id = inventoryId, SiteId = siteId, Kind = "carried", Capacity = inventoryCapacity });
                 Grant(playerId, siteId);
                 try
                 {
@@ -186,6 +195,8 @@ namespace FoodFactoryGame.Goods
                 view.Stations = view.Stations.Where(x => x.SiteId == siteId).ToList();
                 var stationIds = new HashSet<string>(view.Stations.Select(x => x.Id));
                 view.Jobs = view.Jobs.Where(x => stationIds.Contains(x.StationId)).ToList();
+                view.Equipment = view.Equipment.Where(x => x.SiteId == siteId).ToList();
+                view.SiteLayouts = view.SiteLayouts.Where(x => x.SiteId == siteId).ToList();
                 view.Reservations.Clear();
                 view.Outcomes.Clear();
                 view.Grants.Clear();
@@ -430,7 +441,7 @@ namespace FoodFactoryGame.Goods
             if (state == null || state.SchemaVersion != GoodsSnapshot.CurrentSchema || string.IsNullOrWhiteSpace(state.WorldId)
                 || state.ClockSeconds < 0 || state.Revision < 0 || state.Locations == null || state.Lots == null
                 || state.Grants == null || state.Reservations == null || state.Outcomes == null
-                || state.Stations == null || state.Jobs == null)
+                || state.Stations == null || state.Jobs == null || state.Equipment == null || state.SiteLayouts == null)
                 throw new InvalidOperationException("Unsupported or invalid goods snapshot schema.");
             if (state.Locations.Any(x => x == null || string.IsNullOrWhiteSpace(x.Id) || string.IsNullOrWhiteSpace(x.SiteId) || x.Capacity < 1)
                 || state.Locations.GroupBy(x => x.Id).Any(x => x.Count() != 1)
@@ -451,6 +462,7 @@ namespace FoodFactoryGame.Goods
                     || !state.Locations.Any(y => y.SiteId == x.SiteId)))
                 throw new InvalidOperationException("Goods snapshot violates identity, capacity, or reservation invariants.");
             ValidateProduction(state);
+            ValidateEquipment(state);
         }
     }
 }

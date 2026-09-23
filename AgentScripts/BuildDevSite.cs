@@ -1,5 +1,6 @@
-// Editor authoring script (run via Unity MCP run_script): creates the dev session prefabs, prefab catalog,
+// Editor authoring script (run via Unity MCP run_script): creates the dev session prefabs, prefab catalog, equipment content,
 // UI panel settings and the DevSite scene, then makes DevSite the only build scene. Safe to re-run: assets keep GUIDs.
+// The scene holds no equipment instances; placed equipment is shown from replicated state by EquipmentPresenter.
 using System.IO;
 using System.Linq;
 using FishNet.Component.Transforming;
@@ -11,6 +12,7 @@ using FishNet.Object;
 using FishNet.Transporting.Tugboat;
 using FoodFactoryGame.Goods.Network;
 using FoodFactoryGame.Session;
+using FoodFactoryGame.Session.Equipment;
 using FoodFactoryGame.Session.Player;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -27,17 +29,22 @@ public static class BuildDevSite
     private const string PlayerPath = "Assets/Prefabs/Player/Player.prefab";
     private const string CatalogPath = "Assets/Network/GamePrefabs.asset";
     private const string ScenePath = "Assets/Scenes/DevSite.unity";
+    private const string OvenPrefabPath = "Assets/Prefabs/Equipment/Oven.prefab";
+    private const string OvenDefinitionPath = "Assets/Content/Equipment/Oven.asset";
+    private const string GhostMaterialPath = "Assets/Materials/PlacementGhost.mat";
 
     public static string Run()
     {
-        foreach (var folder in new[] { "Assets/UI", "Assets/Prefabs/Network", "Assets/Prefabs/Player", "Assets/Network" })
+        foreach (var folder in new[] { "Assets/UI", "Assets/Prefabs/Network", "Assets/Prefabs/Player", "Assets/Network", "Assets/Content/Equipment", "Assets/Materials" })
             Directory.CreateDirectory(folder);
         AssetDatabase.Refresh();
         var panelSettings = BuildPanelSettings();
         var bridge = BuildBridge();
         var player = BuildPlayer();
         var catalog = BuildCatalog(bridge, player);
-        BuildScene(catalog, bridge, player, panelSettings);
+        var oven = BuildOvenDefinition();
+        var ghostMaterial = BuildGhostMaterial();
+        BuildScene(catalog, bridge, player, panelSettings, oven, ghostMaterial);
         EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
         AssetDatabase.SaveAssets();
         return "DevSite authored";
@@ -60,6 +67,46 @@ public static class BuildDevSite
         settings.scaleMode = PanelScaleMode.ConstantPixelSize;
         EditorUtility.SetDirty(settings);
         return settings;
+    }
+
+    // DEVELOPMENT content: the oven measures about 2.6 x 2.2 m, so it takes a 3x3-cell footprint with clearance.
+    // Buffer capacities are placeholders until recipe content exists.
+    private static EquipmentDefinition BuildOvenDefinition()
+    {
+        var definition = AssetDatabase.LoadAssetAtPath<EquipmentDefinition>(OvenDefinitionPath);
+        if (definition == null)
+        {
+            definition = ScriptableObject.CreateInstance<EquipmentDefinition>();
+            AssetDatabase.CreateAsset(definition, OvenDefinitionPath);
+        }
+        var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(OvenPrefabPath);
+        if (prefab == null) throw new System.InvalidOperationException($"Missing {OvenPrefabPath}.");
+        using (var serialized = new SerializedObject(definition))
+        {
+            serialized.FindProperty("kind").stringValue = "oven";
+            serialized.FindProperty("width").intValue = 3;
+            serialized.FindProperty("depth").intValue = 3;
+            serialized.FindProperty("inputCapacity").intValue = 10;
+            serialized.FindProperty("outputCapacity").intValue = 4;
+            serialized.FindProperty("outputRefrigerated").boolValue = false;
+            serialized.FindProperty("visualPrefab").objectReferenceValue = prefab;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+        EditorUtility.SetDirty(definition);
+        return definition;
+    }
+
+    private static Material BuildGhostMaterial()
+    {
+        var material = AssetDatabase.LoadAssetAtPath<Material>(GhostMaterialPath);
+        if (material == null)
+        {
+            material = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
+            AssetDatabase.CreateAsset(material, GhostMaterialPath);
+        }
+        material.SetColor("_BaseColor", Color.white);
+        EditorUtility.SetDirty(material);
+        return material;
     }
 
     private static NetworkObject BuildBridge()
@@ -163,7 +210,8 @@ public static class BuildDevSite
         return catalog;
     }
 
-    private static void BuildScene(SinglePrefabObjects catalog, NetworkObject bridge, NetworkObject player, PanelSettings panelSettings)
+    private static void BuildScene(SinglePrefabObjects catalog, NetworkObject bridge, NetworkObject player, PanelSettings panelSettings,
+        EquipmentDefinition oven, Material ghostMaterial)
     {
         var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
@@ -227,6 +275,39 @@ public static class BuildDevSite
             spawnProperty.arraySize = spawns.Length;
             for (var index = 0; index < spawns.Length; index++)
                 spawnProperty.GetArrayElementAtIndex(index).objectReferenceValue = spawns[index];
+            var definitions = serialized.FindProperty("equipmentDefinitions");
+            definitions.arraySize = 1;
+            definitions.GetArrayElementAtIndex(0).objectReferenceValue = oven;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        var presenterObject = new GameObject("EquipmentPresenter");
+        var presenter = presenterObject.AddComponent<EquipmentPresenter>();
+        using (var serialized = new SerializedObject(presenter))
+        {
+            serialized.FindProperty("session").objectReferenceValue = session;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        var interactionObject = new GameObject("EquipmentInteraction");
+        var interaction = interactionObject.AddComponent<EquipmentInteraction>();
+        var ghost = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        ghost.name = "PlacementGhost";
+        // The ghost must never intercept the pickup raycast or block movement.
+        Object.DestroyImmediate(ghost.GetComponent<BoxCollider>());
+        ghost.transform.SetParent(interactionObject.transform, false);
+        var ghostRenderer = ghost.GetComponent<MeshRenderer>();
+        ghostRenderer.sharedMaterial = ghostMaterial;
+        ghostRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        ghost.SetActive(false);
+        using (var serialized = new SerializedObject(interaction))
+        {
+            serialized.FindProperty("session").objectReferenceValue = session;
+            serialized.FindProperty("ghost").objectReferenceValue = ghostRenderer;
+            serialized.FindProperty("interactAction").objectReferenceValue = Action("Interact");
+            serialized.FindProperty("placeAction").objectReferenceValue = Action("Place");
+            serialized.FindProperty("rotateAction").objectReferenceValue = Action("Rotate");
+            serialized.FindProperty("pointAction").objectReferenceValue = Action("Point");
             serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 
@@ -243,6 +324,7 @@ public static class BuildDevSite
         {
             serialized.FindProperty("document").objectReferenceValue = document;
             serialized.FindProperty("session").objectReferenceValue = session;
+            serialized.FindProperty("equipment").objectReferenceValue = interaction;
             serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 

@@ -1,10 +1,11 @@
-// Checks the DevSite, player prefab, prefab catalog and input authoring contract without entering Play mode.
+// Checks the DevSite, player prefab, prefab catalog, equipment content and input authoring contract without entering Play mode.
 using System.Linq;
 using FishNet.Component.Transforming;
 using FishNet.Managing;
 using FishNet.Managing.Object;
 using FishNet.Object;
 using FoodFactoryGame.Goods.Network;
+using FoodFactoryGame.Session.Equipment;
 using FoodFactoryGame.Session.Player;
 using NUnit.Framework;
 using UnityEditor;
@@ -21,6 +22,8 @@ namespace FoodFactoryGame.Session.Tests
         private const string BridgePath = "Assets/Prefabs/Network/GoodsNetworkBridge.prefab";
         private const string CatalogPath = "Assets/Network/GamePrefabs.asset";
         private const string FixturePath = "Assets/Tests/PlayMode/Goods/GoodsBridgeFixture.prefab";
+        private const string OvenPrefabPath = "Assets/Prefabs/Equipment/Oven.prefab";
+        private const string OvenDefinitionPath = "Assets/Content/Equipment/Oven.asset";
 
         private static void AssertAssigned(Object component, params string[] fields)
         {
@@ -59,16 +62,32 @@ namespace FoodFactoryGame.Session.Tests
                 Assert.That(server.GetAuthenticator(), Is.InstanceOf<DevAuthenticator>());
                 var roots = objects.SelectMany(x => x.GetComponents<SessionRoot>()).ToArray();
                 Assert.That(roots.Length, Is.EqualTo(1));
-                AssertAssigned(roots[0], "networkManager", "authenticator", "bridgePrefab", "playerPrefab", "spawnPoints");
+                AssertAssigned(roots[0], "networkManager", "authenticator", "bridgePrefab", "playerPrefab", "spawnPoints", "equipmentDefinitions");
                 using (var serialized = new SerializedObject(roots[0]))
                 {
                     Assert.That(serialized.FindProperty("authenticator").objectReferenceValue, Is.SameAs(server.GetAuthenticator()));
                     Assert.That(AssetDatabase.GetAssetPath(serialized.FindProperty("playerPrefab").objectReferenceValue), Is.EqualTo(PlayerPath));
                     Assert.That(AssetDatabase.GetAssetPath(serialized.FindProperty("bridgePrefab").objectReferenceValue), Is.EqualTo(BridgePath));
+                    Assert.That(AssetDatabase.GetAssetPath(serialized.FindProperty("equipmentDefinitions").GetArrayElementAtIndex(0).objectReferenceValue),
+                        Is.EqualTo(OvenDefinitionPath));
                 }
                 var panels = objects.SelectMany(x => x.GetComponents<SessionPanel>()).ToArray();
                 Assert.That(panels.Length, Is.EqualTo(1));
-                AssertAssigned(panels[0], "document", "session");
+                AssertAssigned(panels[0], "document", "session", "equipment");
+
+                // Equipment is shown from replicated state; the scene itself holds no equipment instance.
+                var presenters = objects.SelectMany(x => x.GetComponents<EquipmentPresenter>()).ToArray();
+                Assert.That(presenters.Length, Is.EqualTo(1));
+                AssertAssigned(presenters[0], "session");
+                var interactions = objects.SelectMany(x => x.GetComponents<EquipmentInteraction>()).ToArray();
+                Assert.That(interactions.Length, Is.EqualTo(1));
+                AssertAssigned(interactions[0], "session", "ghost", "interactAction", "placeAction", "rotateAction", "pointAction");
+                var ghost = interactions[0].GetComponentInChildren<Renderer>(true);
+                Assert.That(ghost.gameObject.activeSelf, Is.False);
+                Assert.That(ghost.GetComponent<Collider>(), Is.Null, "The ghost must not intercept pickup raycasts.");
+                var oven = AssetDatabase.LoadAssetAtPath<GameObject>(OvenPrefabPath);
+                Assert.That(objects.Any(x => PrefabUtility.GetCorrespondingObjectFromSource(x) == oven), Is.False);
+                Assert.That(objects.Any(x => x.GetComponent<EquipmentVisual>() != null), Is.False);
                 var document = panels[0].GetComponent<UnityEngine.UIElements.UIDocument>();
                 Assert.That(document, Is.Not.Null);
                 Assert.That(document.panelSettings, Is.Not.Null, "Without PanelSettings the menu and readout never render.");
@@ -80,6 +99,33 @@ namespace FoodFactoryGame.Session.Tests
             {
                 EditorSceneManager.ClosePreviewScene(scene);
             }
+        }
+
+        [Test]
+        public void OvenDefinitionHasFootprintCapacitiesAndServerFreeVisual()
+        {
+            var definition = AssetDatabase.LoadAssetAtPath<EquipmentDefinition>(OvenDefinitionPath);
+            Assert.That(definition, Is.Not.Null);
+            Assert.That(definition.Kind, Is.EqualTo("oven"));
+            Assert.That((definition.Width, definition.Depth), Is.EqualTo((3, 3)));
+            Assert.That(definition.InputCapacity, Is.GreaterThan(0));
+            Assert.That(definition.OutputCapacity, Is.GreaterThan(0));
+            Assert.That(AssetDatabase.GetAssetPath(definition.VisualPrefab), Is.EqualTo(OvenPrefabPath));
+            var components = definition.VisualPrefab.GetComponentsInChildren<Component>(true);
+            Assert.That(components.Any(x => x is NetworkObject), Is.False, "Equipment visuals are local, not network objects.");
+            Assert.That(components.Any(x => x != null && x.GetType().Name == "OvenClickInput"), Is.False, "A local toggle contradicts server authority.");
+            Assert.That(definition.VisualPrefab.GetComponentsInChildren<Collider>(true), Is.Not.Empty, "Pickup raycasts need a collider.");
+            // The measured model must fit its footprint.
+            var instance = (GameObject)PrefabUtility.InstantiatePrefab(definition.VisualPrefab);
+            try
+            {
+                var renderers = instance.GetComponentsInChildren<Renderer>();
+                var bounds = renderers[0].bounds;
+                foreach (var item in renderers.Skip(1)) bounds.Encapsulate(item.bounds);
+                Assert.That(bounds.size.x, Is.LessThanOrEqualTo(definition.Width * FoodFactoryGame.Goods.SiteGrid.CellSize));
+                Assert.That(bounds.size.z, Is.LessThanOrEqualTo(definition.Depth * FoodFactoryGame.Goods.SiteGrid.CellSize));
+            }
+            finally { Object.DestroyImmediate(instance); }
         }
 
         [Test]
@@ -118,14 +164,18 @@ namespace FoodFactoryGame.Session.Tests
         }
 
         [Test]
-        public void PlayerMapHasMoveLookOrbitAndZoom()
+        public void PlayerMapHasMovementCameraAndEquipmentActions()
         {
             var input = AssetDatabase.LoadAssetAtPath<InputActionAsset>("Assets/InputSystem_Actions.inputactions");
             var player = input.FindActionMap("Player", true);
-            foreach (var name in new[] { "Move", "Look", "Orbit", "Zoom" })
+            foreach (var name in new[] { "Move", "Look", "Orbit", "Zoom", "Interact", "Place", "Rotate", "Point" })
                 Assert.That(player.FindAction(name, true).bindings.Count, Is.GreaterThan(0), name);
             Assert.That(player.FindAction("Orbit").bindings.Any(x => x.path == "<Mouse>/rightButton"), Is.True);
             Assert.That(player.FindAction("Zoom").bindings.Any(x => x.path == "<Mouse>/scroll"), Is.True);
+            Assert.That(player.FindAction("Place").bindings.Any(x => x.path == "<Mouse>/leftButton"), Is.True);
+            Assert.That(player.FindAction("Rotate").bindings.Any(x => x.path == "<Keyboard>/r"), Is.True);
+            Assert.That(player.FindAction("Interact").bindings.Any(x => x.path == "<Keyboard>/e"), Is.True);
+            Assert.That(player.FindAction("Interact").interactions, Is.Empty, "Pickup is a press, not the starter asset's hold.");
         }
     }
 }

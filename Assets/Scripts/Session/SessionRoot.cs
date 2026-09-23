@@ -2,6 +2,8 @@
 // and spawns one avatar per authenticated connection. The world runs whenever the server runs, observed or not.
 using System;
 using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
 using System.IO;
 using FishNet.Connection;
 using FishNet.Managing;
@@ -9,6 +11,7 @@ using FishNet.Object;
 using FishNet.Transporting;
 using FoodFactoryGame.Goods;
 using FoodFactoryGame.Goods.Network;
+using FoodFactoryGame.Session.Equipment;
 using FoodFactoryGame.Session.Player;
 using SQLite;
 using UnityEngine;
@@ -23,6 +26,8 @@ namespace FoodFactoryGame.Session
         [SerializeField] private NetworkObject bridgePrefab;
         [SerializeField] private NetworkObject playerPrefab;
         [SerializeField] private Transform[] spawnPoints = Array.Empty<Transform>();
+        // Content for every equipment kind the site can show; the dev seed places the "oven" kind.
+        [SerializeField] private EquipmentDefinition[] equipmentDefinitions = Array.Empty<EquipmentDefinition>();
         [SerializeField] private bool readCommandLine = true;
 
         private SessionOptions _options;
@@ -41,7 +46,13 @@ namespace FoodFactoryGame.Session
         public GoodsNetworkBridge ServerBridge { get; private set; }
         public PlayerRegistry ServerRegistry => _registry;
         public GoodsSnapshot ClientSite => _site?.Latest;
+        public ClientSiteSubscription ClientSubscription => _site;
+        public IReadOnlyList<EquipmentDefinition> EquipmentDefinitions => equipmentDefinitions;
         public bool IsRunning => Mode != SessionMode.None;
+        // The transport finishes stopping on a later iteration. Starting before then lets the old server's late Stopped event
+        // release the new world, so Begin waits for both local connections to be fully stopped.
+        public bool CanBegin => !IsRunning && networkManager.TransportManager.Transport.GetConnectionState(true) == LocalConnectionState.Stopped
+            && networkManager.TransportManager.Transport.GetConnectionState(false) == LocalConnectionState.Stopped;
 
         private void Awake()
         {
@@ -81,7 +92,7 @@ namespace FoodFactoryGame.Session
 
         public bool Begin(SessionMode mode, string displayName = null, string address = null)
         {
-            if (IsRunning || mode == SessionMode.None) return false;
+            if (!CanBegin || mode == SessionMode.None) return false;
             if (!string.IsNullOrWhiteSpace(displayName)) _options.DisplayName = displayName.Trim();
             if (!string.IsNullOrWhiteSpace(address)) _options.Address = address.Trim();
             Mode = mode;
@@ -127,9 +138,9 @@ namespace FoodFactoryGame.Session
         {
             Directory.CreateDirectory(_options.SaveDirectory);
             // The world is committed before FishNet listens, so the bridge never serves an uncommitted state.
-            ServerWorld = DevWorld.LoadOrCreate(_options.WorldPath);
+            ServerWorld = DevWorld.LoadOrCreate(_options.WorldPath, equipmentDefinitions.FirstOrDefault(x => x != null && x.Kind == "oven"));
             _registry = new PlayerRegistry(_options.RegistryPath);
-            authenticator.ConfigureServer(new SessionAdmission(_registry, ServerWorld, DevWorld.SiteId, _options.WorldPath));
+            authenticator.ConfigureServer(new SessionAdmission(_registry, ServerWorld, DevWorld.SiteId, _options.WorldPath, DevWorld.InventoryCapacity));
             SetStatus("Starting server...");
             if (!networkManager.ServerManager.StartConnection()) throw new InvalidOperationException("Transport refused to start the server.");
         }

@@ -1,5 +1,6 @@
-// Development host/join panel and in-session readout (player ID, server clock, site revision) built in UI Toolkit.
+// Development host/join panel and in-session readout (player ID, server clock, site revision, equipment hint) built in UI Toolkit.
 // Presentation only: it reads session state and calls SessionRoot; it never decides admission or simulation.
+using FoodFactoryGame.Session.Equipment;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -10,6 +11,7 @@ namespace FoodFactoryGame.Session
     {
         [SerializeField] private UIDocument document;
         [SerializeField] private SessionRoot session;
+        [SerializeField] private EquipmentInteraction equipment;
 
         private VisualElement _menu;
         private TextField _name;
@@ -59,7 +61,8 @@ namespace FoodFactoryGame.Session
                 + $"Player: {session.Authenticator.LocalPlayerId ?? "(none)"}\n"
                 + (site == null ? "Site: waiting for dev-site baseline\n"
                     : $"Site {DevWorld.SiteId}: clock {site.ClockSeconds}s, revision {site.Revision}\n")
-                + (server == null ? "" : $"Server: clock {server.ClockSeconds}s, revision {server.Revision}, players {session.Authenticator.AuthenticatedCount}");
+                + (server == null ? "" : $"Server: clock {server.ClockSeconds}s, revision {server.Revision}, players {session.Authenticator.AuthenticatedCount}\n")
+                + equipment.Status;
         }
 
         private static void Style(VisualElement element, int padding)

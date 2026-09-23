@@ -60,8 +60,7 @@ namespace FoodFactoryGame.Goods.Network
             }
             _clockRemainder -= seconds;
             _persistenceFailed = false;
-            foreach (var pair in new List<KeyValuePair<NetworkConnection, string>>(_subscriptions))
-                SendSite(pair.Key, pair.Value);
+            Broadcast();
         }
 
         public void RequestTransfer(string requestId, string lotId, string destinationId, int quantity, string reservationId = "")
@@ -82,6 +81,34 @@ namespace FoodFactoryGame.Goods.Network
         public void RequestCancellation(string requestId, string reservationId)
         {
             if (IsClientStarted) ServerCancel(requestId, reservationId);
+        }
+
+        public void RequestPickUp(string requestId, string equipmentId)
+        {
+            if (IsClientStarted) ServerPickUp(requestId, equipmentId);
+        }
+
+        public void RequestPlace(string requestId, string equipmentId, int cellX, int cellZ, int rotation)
+        {
+            if (IsClientStarted) ServerPlace(requestId, equipmentId, cellX, cellZ, rotation);
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        private void ServerPickUp(string requestId, string equipmentId, NetworkConnection sender = null)
+        {
+            if (!TryIdentify(sender, requestId, out var player)) return;
+            var result = _world.PickUpDurably(player, requestId, equipmentId, _savePath);
+            Reply(sender, result);
+            if (result.Accepted) Broadcast();
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        private void ServerPlace(string requestId, string equipmentId, int cellX, int cellZ, int rotation, NetworkConnection sender = null)
+        {
+            if (!TryIdentify(sender, requestId, out var player)) return;
+            var result = _world.PlaceDurably(player, requestId, equipmentId, cellX, cellZ, rotation, _savePath);
+            Reply(sender, result);
+            if (result.Accepted) Broadcast();
         }
 
         [ServerRpc(RequireOwnership = false)]
@@ -108,8 +135,12 @@ namespace FoodFactoryGame.Goods.Network
                 Quantity = quantity, ReservationId = reservationId
             }, _savePath);
             Reply(sender, result);
-            if (!result.Accepted) return;
-            // A subscriber gets a complete revisioned baseline, never unauthorized state or inferred deltas.
+            if (result.Accepted) Broadcast();
+        }
+
+        // A subscriber gets a complete revisioned baseline, never unauthorized state or inferred deltas.
+        private void Broadcast()
+        {
             foreach (var pair in new List<KeyValuePair<NetworkConnection, string>>(_subscriptions))
                 SendSite(pair.Key, pair.Value);
         }

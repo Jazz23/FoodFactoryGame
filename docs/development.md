@@ -109,7 +109,8 @@ Starting a session:
 
 - From the menu: enter a name, then **Host**, or **Join** with an address (default `127.0.0.1`). Tugboat's port is 7770 (UDP). The status line shows rejection reasons.
 - From the command line (skips the menu): `-host`, `-server` (no local player, for `-batchmode -nographics`), or `-connect <address>`, plus optional `-name <display>`, `-save <dir>`, `-identity <file>`.
-- Controls: WASD/left stick moves relative to the camera; hold right mouse (or left shoulder) and move the mouse/right stick to orbit; scroll to zoom.
+- Controls: WASD/left stick moves relative to the camera; hold right mouse (or left shoulder) and move the mouse/right stick to orbit; scroll to zoom. Equipment: press E with the cursor on a machine to pick it up into your inventory; while holding one, a green/red footprint follows the cursor, R (right shoulder) rotates it, and left click (right trigger) places it. The readout shows the hint and the server's last rejection reason.
+- The dev seed (a 20×20 grid and one oven) is applied only when a world is created. A save made before equipment placement has neither, so delete it to get the oven. Existing players receive their inventory on their next join.
 
 Two-process check on one machine (use an existing artifact directory for logs and isolated saves):
 
@@ -119,6 +120,8 @@ Start-Process -FilePath ".\build\Session\FoodFactoryGame.exe" -ArgumentList '-sc
 ```
 
 Evidence: both logs contain `[Session] Joined as player-...` with different IDs, the host log contains `[Session] Hosting`, and captures of both windows show two avatars and matching site revisions in the readout.
+
+Driving a player build from a script (used for the placement captures): the players read keys by scan code, so synthetic key events need a real scan code (`MapVirtualKey`); zero-scan-code events are ignored. Don't move player windows with `MoveWindow` before sending mouse input, because the player then reports a pointer position offset from the real cursor. Leave windows where Unity opens them and capture each one with `PrintWindow`, so overlapping windows don't matter. Run the helper DPI-aware, and check that it really took focus before sending input.
 
 Session tests: `FoodFactoryGame.Session.EditModeTests` (assembly, editor) and `FoodFactoryGame.Session.PlayModeTests` (assembly, playmode, async; make sure the open scene is not dirty). The PlayMode tests load the real `DevSite`, call `SessionRoot.Configure` with a temporary save directory and identity files and a free UDP port, and add a second client-only NetworkManager for the remote client. They expect one `SpawnablePrefabs is null on session-test-remote` error from FishNet's editor `Reset` (declared with `LogAssert.Expect`), and emit "2 audio listeners" warnings because both local clients own a camera in one process. Current counts and run identities are in [the session verification record](verification/session-20260922.md).
 

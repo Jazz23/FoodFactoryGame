@@ -1,5 +1,6 @@
 // Station jobs share GoodsWorld's lock and snapshot so input consumption, output creation and refunds commit atomically with goods.
 // A job keeps copies of its consumed inputs and its recipe output, so recovery and pickup never depend on registered recipe content.
+// Stations are created and removed only with placed equipment (GoodsWorld.Equipment.cs).
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -78,21 +79,6 @@ namespace FoodFactoryGame.Goods
             }
         }
 
-        // Server-only, like location bootstrap. Step 2 creates stations from placements.
-        public void Bootstrap(GoodsStation station)
-        {
-            lock (_gate)
-            {
-                if (station == null || string.IsNullOrWhiteSpace(station.Id) || string.IsNullOrWhiteSpace(station.SiteId)
-                    || string.IsNullOrWhiteSpace(station.Kind) || _state.Stations.Any(x => x.Id == station.Id)
-                    || !_state.Locations.Any(x => x.Id == station.InputLocationId && x.SiteId == station.SiteId)
-                    || !_state.Locations.Any(x => x.Id == station.OutputLocationId && x.SiteId == station.SiteId))
-                    throw new ArgumentException("Invalid or duplicate station.");
-                _state.Stations.Add(JsonUtility.FromJson<GoodsStation>(JsonUtility.ToJson(station)));
-                _state.Revision++;
-            }
-        }
-
         // Volatile primitive for tests. Live request handlers must call StartJobDurably.
         public GoodsOutcome StartJob(string playerId, string requestId, string stationId, string recipeId)
         {
@@ -159,50 +145,6 @@ namespace FoodFactoryGame.Goods
         public GoodsOutcome StartJobDurably(string playerId, string requestId, string stationId, string recipeId, string savePath)
         {
             return Commit(playerId, requestId, savePath, () => StartJob(playerId, requestId, stationId, recipeId));
-        }
-
-        // Volatile primitive for tests. Live pickup must call RemoveStationDurably.
-        // A running job refunds its unprocessed inputs, and a blocked job hands over its finished output, to the player's
-        // carried location. If that location cannot hold them the pickup is refused and nothing changes.
-        public GoodsOutcome RemoveStation(string playerId, string requestId, string stationId, string carriedLocationId)
-        {
-            lock (_gate)
-            {
-                if (string.IsNullOrWhiteSpace(playerId) || string.IsNullOrWhiteSpace(requestId))
-                    return new GoodsOutcome { Accepted = false, Reason = "invalid-identity" };
-                var replay = Replay(playerId, requestId);
-                if (replay != null) return replay;
-                var station = _state.Stations.FirstOrDefault(x => x.Id == stationId);
-                if (station == null || !_state.Grants.Any(x => x.PlayerId == playerId && x.SiteId == station.SiteId))
-                    return Record(requestId, playerId, false, "forbidden", null);
-                var carried = _state.Locations.FirstOrDefault(x => x.Id == carriedLocationId);
-                if (carried == null || carried.SiteId != station.SiteId
-                    || carried.Id == station.InputLocationId || carried.Id == station.OutputLocationId)
-                    return Record(requestId, playerId, false, "invalid-route", null);
-                var job = _state.Jobs.FirstOrDefault(x => x.StationId == station.Id);
-                var returned = job == null ? new List<GoodsLot>()
-                    : job.State == StationJobState.Blocked ? new List<GoodsLot> { OutputLot(job, station, carried.Id, 0) }
-                    : job.Inputs.Select(x => JsonUtility.FromJson<GoodsLot>(JsonUtility.ToJson(x))).ToList();
-                if (returned.Count > 0 && !Fits(carried.Id, returned.Sum(x => x.Quantity)))
-                    return Record(requestId, playerId, false, "capacity", null);
-
-                foreach (var lot in returned)
-                {
-                    lot.LocationId = carried.Id;
-                    _state.Lots.Add(lot);
-                }
-                if (job != null) _state.Jobs.Remove(job);
-                _state.Stations.Remove(station);
-                var result = Record(requestId, playerId, true, "station-removed", null);
-                result.JobId = job?.Id;
-                _state.Outcomes[_state.Outcomes.Count - 1].JobId = job?.Id;
-                return result;
-            }
-        }
-
-        public GoodsOutcome RemoveStationDurably(string playerId, string requestId, string stationId, string carriedLocationId, string savePath)
-        {
-            return Commit(playerId, requestId, savePath, () => RemoveStation(playerId, requestId, stationId, carriedLocationId));
         }
 
         private void EmitBlockedOutputs()

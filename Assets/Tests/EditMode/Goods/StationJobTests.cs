@@ -1,4 +1,4 @@
-// Verifies server-authoritative station jobs: atomic input consumption, clock-driven output, pickup refunds, durability and schema v2.
+// Verifies server-authoritative station jobs: atomic input consumption, clock-driven output, pickup refunds and buffer sweeps, durability and schema upgrades.
 using System;
 using System.IO;
 using System.Linq;
@@ -34,26 +34,23 @@ namespace FoodFactoryGame.Goods.Tests
         [TearDown]
         public void TearDown() => Directory.Delete(_saveDirectory, true);
 
-        // TEST-ONLY values: one restaurant with an oven (input 10, output 4), a refrigerated-output oven, a pantry,
-        // a player carried location of 5, and a 5-second recipe turning 2 dough + 1 sauce into 1 pizza.
+        // TEST-ONLY values: one 10x10 restaurant with a 1x1 oven (input 10, output 4), a refrigerated-output oven, a pantry,
+        // a chef inventory location of 10, and a 5-second recipe turning 2 dough + 1 sauce into 1 pizza.
         // Not gameplay content or configuration.
         private static GoodsWorld CreateWorld()
         {
             var world = new GoodsWorld("test-world");
             world.Bootstrap(new GoodsLocation { Id = "pantry", SiteId = "restaurant", Kind = "storage", Capacity = 50 });
-            world.Bootstrap(new GoodsLocation { Id = "oven-in", SiteId = "restaurant", Kind = "machine-buffer", Capacity = 10 });
-            world.Bootstrap(new GoodsLocation { Id = "oven-out", SiteId = "restaurant", Kind = "machine-buffer", Capacity = 4 });
-            world.Bootstrap(new GoodsLocation { Id = "cold-in", SiteId = "restaurant", Kind = "machine-buffer", Capacity = 10 });
-            world.Bootstrap(new GoodsLocation { Id = "cold-out", SiteId = "restaurant", Kind = "machine-buffer", Capacity = 4, Refrigerated = true });
-            world.Bootstrap(new GoodsLocation { Id = "hands", SiteId = "restaurant", Kind = "carried", Capacity = 5 });
+            world.Bootstrap(new GoodsLocation { Id = "carried:chef", SiteId = "restaurant", Kind = "carried", Capacity = 10 });
             world.Bootstrap(new GoodsLocation { Id = "elsewhere", SiteId = "warehouse", Kind = "storage", Capacity = 5 });
-            world.Bootstrap(new GoodsStation { Id = "oven-1", SiteId = "restaurant", Kind = "oven", InputLocationId = "oven-in", OutputLocationId = "oven-out" });
-            world.Bootstrap(new GoodsStation { Id = "oven-cold", SiteId = "restaurant", Kind = "oven", InputLocationId = "cold-in", OutputLocationId = "cold-out" });
-            world.Bootstrap(new GoodsLot { Id = "dough-a", ItemId = "dough", OwnerId = "restaurant", LocationId = "oven-in", Quantity = 3, SpoilAfterSeconds = 100 });
-            world.Bootstrap(new GoodsLot { Id = "dough-b", ItemId = "dough", OwnerId = "restaurant", LocationId = "oven-in", Quantity = 2, ExposureSeconds = 4, SpoilAfterSeconds = 100 });
-            world.Bootstrap(new GoodsLot { Id = "sauce", ItemId = "sauce", OwnerId = "restaurant", LocationId = "oven-in", Quantity = 2, SpoilAfterSeconds = 100 });
-            world.Bootstrap(new GoodsLot { Id = "cold-dough", ItemId = "dough", OwnerId = "restaurant", LocationId = "cold-in", Quantity = 2, SpoilAfterSeconds = 100 });
-            world.Bootstrap(new GoodsLot { Id = "cold-sauce", ItemId = "sauce", OwnerId = "restaurant", LocationId = "cold-in", Quantity = 1, SpoilAfterSeconds = 100 });
+            world.Bootstrap(new SiteLayout { SiteId = "restaurant", Width = 10, Depth = 10 });
+            world.Bootstrap(new GoodsEquipment { Id = "oven-1", Kind = "oven", SiteId = "restaurant", Width = 1, Depth = 1, InputCapacity = 10, OutputCapacity = 4 });
+            world.Bootstrap(new GoodsEquipment { Id = "oven-cold", Kind = "oven", SiteId = "restaurant", CellX = 2, Width = 1, Depth = 1, InputCapacity = 10, OutputCapacity = 4, OutputRefrigerated = true });
+            world.Bootstrap(new GoodsLot { Id = "dough-a", ItemId = "dough", OwnerId = "restaurant", LocationId = "oven-1:in", Quantity = 3, SpoilAfterSeconds = 100 });
+            world.Bootstrap(new GoodsLot { Id = "dough-b", ItemId = "dough", OwnerId = "restaurant", LocationId = "oven-1:in", Quantity = 2, ExposureSeconds = 4, SpoilAfterSeconds = 100 });
+            world.Bootstrap(new GoodsLot { Id = "sauce", ItemId = "sauce", OwnerId = "restaurant", LocationId = "oven-1:in", Quantity = 2, SpoilAfterSeconds = 100 });
+            world.Bootstrap(new GoodsLot { Id = "cold-dough", ItemId = "dough", OwnerId = "restaurant", LocationId = "oven-cold:in", Quantity = 2, SpoilAfterSeconds = 100 });
+            world.Bootstrap(new GoodsLot { Id = "cold-sauce", ItemId = "sauce", OwnerId = "restaurant", LocationId = "oven-cold:in", Quantity = 1, SpoilAfterSeconds = 100 });
             world.Grant("chef", "restaurant");
             world.Grant("sous", "restaurant");
             RegisterRecipes(world);
@@ -95,7 +92,7 @@ namespace FoodFactoryGame.Goods.Tests
         private static string Goods(GoodsWorld world)
         {
             var state = world.Snapshot();
-            return JsonUtility.ToJson(new GoodsSnapshot { WorldId = "x", Lots = state.Lots, Reservations = state.Reservations, Stations = state.Stations, Jobs = state.Jobs });
+            return JsonUtility.ToJson(new GoodsSnapshot { WorldId = "x", Lots = state.Lots, Reservations = state.Reservations, Stations = state.Stations, Jobs = state.Jobs, Locations = state.Locations, Equipment = state.Equipment });
         }
 
         private static int Count(GoodsWorld world, string item) =>
@@ -127,7 +124,7 @@ namespace FoodFactoryGame.Goods.Tests
             var pizza = state.Lots.Single(x => x.ItemId == "pizza");
             Assert.That(pizza.Id, Is.EqualTo(started.JobId + ":out"));
             Assert.That(pizza.OwnerId, Is.EqualTo("restaurant"));
-            Assert.That(pizza.LocationId, Is.EqualTo("oven-out"));
+            Assert.That(pizza.LocationId, Is.EqualTo("oven-1:out"));
             Assert.That(pizza.Quantity, Is.EqualTo(1));
             Assert.That(pizza.ExposureSeconds, Is.Zero);
             Assert.That(pizza.SpoilAfterSeconds, Is.EqualTo(20));
@@ -139,7 +136,7 @@ namespace FoodFactoryGame.Goods.Tests
         [Test]
         public void RejectionsLeaveGoodsUntouched()
         {
-            _world.Bootstrap(new GoodsLot { Id = "old-cheese", ItemId = "cheese", OwnerId = "restaurant", LocationId = "oven-in", Quantity = 1, ExposureSeconds = 5, SpoilAfterSeconds = 5, Spoiled = true });
+            _world.Bootstrap(new GoodsLot { Id = "old-cheese", ItemId = "cheese", OwnerId = "restaurant", LocationId = "oven-1:in", Quantity = 1, ExposureSeconds = 5, SpoilAfterSeconds = 5, Spoiled = true });
             var before = Goods(_world);
             Assert.That(Start("intruder", player: "intruder").Reason, Is.EqualTo("forbidden"));
             Assert.That(Start("no-station", station: "nowhere").Reason, Is.EqualTo("forbidden"));
@@ -199,15 +196,15 @@ namespace FoodFactoryGame.Goods.Tests
             string Shape(GoodsWorld world) => string.Join("|", world.Snapshot().Lots.OrderBy(x => x.ItemId).ThenBy(x => x.LocationId)
                 .Select(x => $"{x.ItemId}@{x.LocationId}:{x.Quantity}:{x.ExposureSeconds}:{x.Spoiled}"));
             Assert.That(Shape(_world), Is.EqualTo(Shape(stepped)));
-            Assert.That(_world.Snapshot().Lots.Single(x => x.LocationId == "oven-out").ExposureSeconds, Is.EqualTo(7));
-            Assert.That(_world.Snapshot().Lots.Single(x => x.LocationId == "cold-out").ExposureSeconds, Is.Zero);
+            Assert.That(_world.Snapshot().Lots.Single(x => x.LocationId == "oven-1:out").ExposureSeconds, Is.EqualTo(7));
+            Assert.That(_world.Snapshot().Lots.Single(x => x.LocationId == "oven-cold:out").ExposureSeconds, Is.Zero);
             Assert.That(_world.Snapshot().ClockSeconds, Is.EqualTo(stepped.Snapshot().ClockSeconds));
         }
 
         [Test]
         public void FullOutputBlocksJobUntilRoomWithoutLoss()
         {
-            _world.Bootstrap(new GoodsLot { Id = "filler", ItemId = "plate", OwnerId = "restaurant", LocationId = "oven-out", Quantity = 4, SpoilAfterSeconds = 1000 });
+            _world.Bootstrap(new GoodsLot { Id = "filler", ItemId = "plate", OwnerId = "restaurant", LocationId = "oven-1:out", Quantity = 4, SpoilAfterSeconds = 1000 });
             var started = Start("bake");
             _world.Advance(10);
             var job = _world.Snapshot().Jobs.Single();
@@ -284,38 +281,43 @@ namespace FoodFactoryGame.Goods.Tests
         }
 
         [Test]
-        public void PickupRefundsUnprocessedInputsToCarriedLocation()
+        public void PickupRefundsInputsAndSweepsBuffersIntoInventory()
         {
             var started = Start("bake");
             _world.Advance(3);
-            var removed = _world.RemoveStation("chef", "pickup", "oven-1", "hands");
-            Assert.That(removed.Accepted, Is.True);
-            Assert.That(removed.JobId, Is.EqualTo(started.JobId));
+            var picked = _world.PickUp("chef", "pickup", "oven-1");
+            Assert.That(picked.Accepted, Is.True);
+            Assert.That(picked.Reason, Is.EqualTo("picked-up"));
+            Assert.That(picked.JobId, Is.EqualTo(started.JobId));
             var state = _world.Snapshot();
             Assert.That(state.Stations.Any(x => x.Id == "oven-1"), Is.False);
+            Assert.That(state.Locations.Any(x => x.Id == "oven-1:in" || x.Id == "oven-1:out"), Is.False);
             Assert.That(state.Jobs, Is.Empty);
-            var carried = state.Lots.Where(x => x.LocationId == "hands").ToList();
-            Assert.That(carried.Where(x => x.ItemId == "dough").Sum(x => x.Quantity), Is.EqualTo(2));
-            Assert.That(carried.Where(x => x.ItemId == "sauce").Sum(x => x.Quantity), Is.EqualTo(1));
-            Assert.That(carried.Single(x => x.ItemId == "dough").ExposureSeconds, Is.EqualTo(4), "Inputs do not age while processing.");
+            var carried = state.Lots.Where(x => x.LocationId == "carried:chef").ToList();
+            // 2 refunded dough + 3 buffered dough-a; 1 refunded sauce + 1 buffered sauce.
+            Assert.That(carried.Where(x => x.ItemId == "dough").Sum(x => x.Quantity), Is.EqualTo(5));
+            Assert.That(carried.Where(x => x.ItemId == "sauce").Sum(x => x.Quantity), Is.EqualTo(2));
+            Assert.That(carried.Single(x => x.Id == started.JobId + ":in:0").ExposureSeconds, Is.EqualTo(4), "Inputs do not age while processing.");
+            Assert.That(carried.Any(x => x.Id == "dough-a") && carried.Any(x => x.Id == "sauce"), Is.True, "Swept lots keep their IDs.");
             Assert.That(carried.All(x => x.OwnerId == "restaurant"), Is.True);
             Assert.That(Count(_world, "dough"), Is.EqualTo(7));
             Assert.That(Count(_world, "sauce"), Is.EqualTo(3));
             Assert.That(state.Lots.Any(x => x.ItemId == "pizza"), Is.False);
-            Assert.That(_world.RemoveStation("chef", "pickup", "oven-1", "hands").Accepted, Is.True, "Replay returns the stored outcome.");
-            Assert.That(_world.Snapshot().Lots.Count(x => x.LocationId == "hands"), Is.EqualTo(2));
+            Assert.That(_world.PickUp("chef", "pickup", "oven-1").Accepted, Is.True, "Replay returns the stored outcome.");
+            Assert.That(_world.Snapshot().Lots.Count(x => x.LocationId == "carried:chef"), Is.EqualTo(4));
         }
 
         [Test]
         public void PickupOfBlockedJobHandsOverFinishedOutput()
         {
-            _world.Bootstrap(new GoodsLot { Id = "filler", ItemId = "plate", OwnerId = "restaurant", LocationId = "oven-out", Quantity = 4, SpoilAfterSeconds = 1000 });
+            _world.Bootstrap(new GoodsLot { Id = "filler", ItemId = "plate", OwnerId = "restaurant", LocationId = "oven-1:out", Quantity = 4, SpoilAfterSeconds = 1000 });
             var started = Start("bake");
             _world.Advance(10);
-            Assert.That(_world.RemoveStation("chef", "pickup", "oven-1", "hands").Accepted, Is.True);
+            Assert.That(_world.PickUp("chef", "pickup", "oven-1").Accepted, Is.True);
             var pizza = _world.Snapshot().Lots.Single(x => x.ItemId == "pizza");
             Assert.That(pizza.Id, Is.EqualTo(started.JobId + ":out"));
-            Assert.That(pizza.LocationId, Is.EqualTo("hands"));
+            Assert.That(pizza.LocationId, Is.EqualTo("carried:chef"));
+            Assert.That(_world.Snapshot().Lots.Single(x => x.Id == "filler").LocationId, Is.EqualTo("carried:chef"));
             Assert.That(Count(_world, "dough"), Is.EqualTo(5));
         }
 
@@ -323,13 +325,20 @@ namespace FoodFactoryGame.Goods.Tests
         public void PickupRejectionsLeaveJobRunning()
         {
             Start("bake");
-            _world.Bootstrap(new GoodsLot { Id = "held", ItemId = "plate", OwnerId = "restaurant", LocationId = "hands", Quantity = 3, SpoilAfterSeconds = 1000 });
+            _world.Bootstrap(new GoodsLot { Id = "held", ItemId = "plate", OwnerId = "restaurant", LocationId = "carried:chef", Quantity = 4, SpoilAfterSeconds = 1000 });
             var before = Goods(_world);
-            Assert.That(_world.RemoveStation("chef", "full", "oven-1", "hands").Reason, Is.EqualTo("capacity"));
-            Assert.That(_world.RemoveStation("intruder", "steal", "oven-1", "hands").Reason, Is.EqualTo("forbidden"));
-            Assert.That(_world.RemoveStation("chef", "remote", "oven-1", "elsewhere").Reason, Is.EqualTo("invalid-route"));
-            Assert.That(_world.RemoveStation("chef", "buffer", "oven-1", "oven-out").Reason, Is.EqualTo("invalid-route"));
+            Assert.That(_world.PickUp("chef", "full", "oven-1").Reason, Is.EqualTo("capacity"));
+            Assert.That(_world.PickUp("intruder", "steal", "oven-1").Reason, Is.EqualTo("forbidden"));
+            Assert.That(_world.PickUp("sous", "no-bag", "oven-1").Reason, Is.EqualTo("no-inventory"));
+            Assert.That(_world.PickUp("chef", "missing", "nowhere").Reason, Is.EqualTo("forbidden"));
             Assert.That(Goods(_world), Is.EqualTo(before));
+
+            // With room in the inventory, a reservation on a buffered lot still blocks the sweep.
+            Assert.That(_world.Transfer("chef", new TransferIntent { RequestId = "drop", LotId = "held", DestinationId = "pantry", Quantity = 4 }).Accepted, Is.True);
+            Assert.That(_world.Reserve("sous", "hold", "dough-a", 1), Is.True);
+            var reserved = Goods(_world);
+            Assert.That(_world.PickUp("chef", "reserved", "oven-1").Reason, Is.EqualTo("reserved"));
+            Assert.That(Goods(_world), Is.EqualTo(reserved));
         }
 
         [Test]
@@ -338,37 +347,41 @@ namespace FoodFactoryGame.Goods.Tests
             GoodsSnapshotStore.Save(_world, PathForSave);
             var started = _world.StartJobDurably("chef", "bake", "oven-1", "bake", PathForSave);
             var before = Goods(_world);
-            Assert.That(_world.RemoveStationDurably("chef", "pickup", "oven-1", "hands", BadPath).Reason, Is.EqualTo("persistence-unavailable"));
+            Assert.That(_world.PickUpDurably("chef", "pickup", "oven-1", BadPath).Reason, Is.EqualTo("persistence-unavailable"));
             Assert.That(Goods(_world), Is.EqualTo(before));
-            Assert.That(_world.RemoveStationDurably("chef", "pickup", "oven-1", "hands", PathForSave).JobId, Is.EqualTo(started.JobId));
+            Assert.That(_world.PickUpDurably("chef", "pickup", "oven-1", PathForSave).JobId, Is.EqualTo(started.JobId));
             _world = GoodsSnapshotStore.Load(PathForSave);
-            Assert.That(_world.RemoveStationDurably("chef", "pickup", "oven-1", "hands", PathForSave).Accepted, Is.True);
-            Assert.That(_world.Snapshot().Lots.Where(x => x.LocationId == "hands").Sum(x => x.Quantity), Is.EqualTo(3));
+            Assert.That(_world.PickUpDurably("chef", "pickup", "oven-1", PathForSave).Accepted, Is.True);
+            Assert.That(_world.Snapshot().Lots.Where(x => x.LocationId == "carried:chef").Sum(x => x.Quantity), Is.EqualTo(7));
+            Assert.That(_world.Snapshot().Equipment.Single(x => x.Id == "oven-1").HolderId, Is.EqualTo("chef"));
             Assert.That(Count(_world, "dough"), Is.EqualTo(7));
         }
 
         [Test]
-        public void SchemaV1SaveLoadsAsV2AndIsRewrittenAsV2()
+        public void SchemaV1SaveLoadsAsCurrentAndIsRewrittenAsCurrent()
         {
             var legacy = new GoodsWorld("legacy-world");
             legacy.Bootstrap(new GoodsLocation { Id = "storage", SiteId = "restaurant", Kind = "storage", Capacity = 20 });
             legacy.Bootstrap(new GoodsLot { Id = "lot-1", ItemId = "ingredient", OwnerId = "restaurant", LocationId = "storage", Quantity = 10, SpoilAfterSeconds = 10 });
-            var v2 = JsonUtility.ToJson(legacy.Snapshot());
-            var v1 = v2.Replace("\"SchemaVersion\":2", "\"SchemaVersion\":1").Replace(",\"Stations\":[],\"Jobs\":[]", "");
+            var current = JsonUtility.ToJson(legacy.Snapshot());
+            var v1 = current.Replace("\"SchemaVersion\":3", "\"SchemaVersion\":1")
+                .Replace(",\"Stations\":[],\"Jobs\":[],\"Equipment\":[],\"SiteLayouts\":[]", "");
             Assert.That(v1, Does.Not.Contain("Stations"));
+            Assert.That(v1, Does.Not.Contain("Equipment"));
             Assert.That(v1, Does.Contain("\"SchemaVersion\":1"));
             File.WriteAllText(PathForSave, JsonUtility.ToJson(new TestEnvelope { Payload = v1, Sha256 = Digest(v1) }), new UTF8Encoding(false));
 
             var loaded = GoodsSnapshotStore.Load(PathForSave);
             var state = loaded.Snapshot();
-            Assert.That(state.SchemaVersion, Is.EqualTo(2));
+            Assert.That(state.SchemaVersion, Is.EqualTo(3));
             Assert.That(state.Stations, Is.Empty);
             Assert.That(state.Jobs, Is.Empty);
+            Assert.That(state.Equipment, Is.Empty);
             Assert.That(state.Lots.Single().Quantity, Is.EqualTo(10));
 
             Assert.That(loaded.TryAdvanceDurably(1, PathForSave), Is.True);
             var written = JsonUtility.FromJson<TestEnvelope>(File.ReadAllText(PathForSave)).Payload;
-            Assert.That(written, Does.Contain("\"SchemaVersion\":2"));
+            Assert.That(written, Does.Contain("\"SchemaVersion\":3"));
             Assert.That(written, Does.Contain("\"Stations\":[]"));
             Assert.That(GoodsSnapshotStore.Load(PathForSave).Snapshot().ClockSeconds, Is.EqualTo(1));
         }

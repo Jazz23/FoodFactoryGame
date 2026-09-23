@@ -1,4 +1,6 @@
-// Client side: once authenticated and the bridge is visible, subscribes once to a site and keeps its latest baseline.
+// Client side: once authenticated and the bridge is visible, subscribes once to a site, keeps its latest baseline,
+// and forwards this client's command results so presentation can send requests through the same bridge.
+using System;
 using System.Linq;
 using FishNet.Managing;
 using FoodFactoryGame.Goods;
@@ -19,6 +21,9 @@ namespace FoodFactoryGame.Session
         }
 
         public GoodsSnapshot Latest { get; private set; }
+        // Null until subscribed; requests sent through it are resolved to this connection's player by the server.
+        public GoodsNetworkBridge Bridge => _bridge;
+        public event Action<GoodsOutcome> ResultReceived;
         public string LastRejection { get; private set; }
 
         // Call every frame; cheap once subscribed. Resets when the client connection or bridge goes away.
@@ -55,6 +60,7 @@ namespace FoodFactoryGame.Session
         private void OnResult(GoodsOutcome outcome)
         {
             if (!outcome.Accepted && outcome.Reason == "subscription-forbidden") LastRejection = outcome.Reason;
+            ResultReceived?.Invoke(outcome);
         }
     }
 }

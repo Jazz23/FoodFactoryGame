@@ -50,10 +50,11 @@ work in progress when the machine is picked up.
 - **Recipe authoring format** (ScriptableObject, JSON or otherwise): decided in
   step 2. The domain only sees `RecipeDefinition`, which is content and is not
   saved; running jobs keep their own copy of the output and duration.
-- **The station's own buffers on pickup.** The domain currently leaves the input
-  and output locations and any lots in them untouched when a station is removed.
-  Whether placement pickup also moves or refuses buffered goods, and how the
-  player's carried location is created, is decided with placement in step 2.
+- ~~The station's own buffers on pickup, and how the player's carried location
+  is created.~~ Closed by [decision 0006](0006-equipment-placement-and-inventory.md):
+  buffers are swept into the player's inventory `carried:<playerId>`
+  (all-or-nothing), which admission creates. Item 2 above now happens inside
+  equipment pickup (`PickUpDurably`), which replaced `RemoveStationDurably`.
 - Employees starting jobs, belts feeding input locations, and a start/pickup
   network command.
 
