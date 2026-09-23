@@ -83,7 +83,14 @@ namespace FoodFactoryGame.Goods
                 throw new InvalidOperationException("Goods snapshot checksum mismatch.");
             var state = JsonUtility.FromJson<GoodsSnapshot>(envelope.Payload);
             // An unknown new schema is never interpreted as an older backup.
-            if (state != null && state.SchemaVersion > 1) throw new NotSupportedException("Newer goods snapshot schema.");
+            if (state != null && state.SchemaVersion > GoodsSnapshot.CurrentSchema) throw new NotSupportedException("Newer goods snapshot schema.");
+            // v1 had no stations or jobs; it is upgraded in memory and written as v2 by the next commit.
+            if (state != null && state.SchemaVersion == 1)
+            {
+                state.Stations = new();
+                state.Jobs = new();
+                state.SchemaVersion = 2;
+            }
             GoodsWorld.Validate(state);
             return state;
         }
