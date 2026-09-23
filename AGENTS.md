@@ -23,9 +23,6 @@
 
 ## Unity Operations and Verification
 
-- Do not use the `unity-mcp-efficient` skill or its facade workflow in this project.
-- Use Unity CLI MCP (`unity mcp --project-path E:\Projects\Unity\FoodFactoryGame`) for live Editor operations. Do not manually edit scene or prefab YAML when MCP can make the change safely.
-- Discover currently registered commands and arguments before using them. Prefer verified project-specific commands over equivalent generic sequences; do not assume the old `factory_*` tooling exists.
 - Run save migration/reconciliation as a dry run first when supported, with an explicit isolated save/database path unless the user requests modification of application data.
 - After C# changes, wait for compilation, check for new console errors, and run relevant tests.
 - Stateful tests must use isolated save paths and must not modify the application database.
