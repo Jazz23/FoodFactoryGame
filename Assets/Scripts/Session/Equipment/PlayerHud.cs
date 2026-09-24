@@ -6,7 +6,9 @@
 // there, and shift+click sends it straight to the other open container, both with ordinary server-checked transfers.
 // On a screen a hotbar key over a stack, or clicking a hotbar slot with a stack on the cursor, assigns that stack's machine
 // or item to the hotbar slot (the cursor stack goes back where it was); an empty cursor takes up the slot's machine or item.
-// The site company's cash is shown top right, read from the latest baseline.
+// The site company's cash is shown top right, read from the latest baseline. Edible goods slots show the ambient time left
+// before their first lot spoils, frozen (blue) while refrigerated because refrigeration pauses spoilage (decision 0018), and
+// the hover line gives the full time; a machine with no recipes (the fridge) opens as plain storage.
 // Presentation only: slot positions are this client's arrangement of the replicated stacks, never saved or sent, and
 // progress is interpolated for at most one clock step past the latest baseline.
 using System;
@@ -40,6 +42,9 @@ namespace FoodFactoryGame.Session.Equipment
         private static readonly Color Heading = new(1f, 0.9f, 0.74f, 1f);
         private static readonly Color Spoiled = new(0.95f, 0.35f, 0.3f, 1f);
         private static readonly Color Muted = new(0.7f, 0.7f, 0.75f, 1f);
+        private static readonly Color Chilled = new(0.55f, 0.85f, 1f, 1f);
+        // A running (not refrigerated) spoil timer turns this colour in the last tenth of the item's shelf life.
+        private static readonly Color SpoilingSoon = new(1f, 0.6f, 0.35f, 1f);
 
         [SerializeField] private UIDocument document;
         [SerializeField] private EquipmentInteraction interaction;
@@ -73,6 +78,10 @@ namespace FoodFactoryGame.Session.Equipment
         private VisualElement _progressFill;
         private Label _progressLabel;
         private Label _hoverLabel;
+        // Spoil timers on goods slots (location, item), and the goods slot under the pointer, refreshed every frame from the
+        // latest baseline without rebuilding the screen.
+        private readonly List<(Label Label, string LocationId, string ItemId)> _timers = new();
+        private (string LocationId, SlotContent Content)? _hovered;
         private string _signature;
         private GoodsSnapshot _site;
         private float _siteSeenAt;
@@ -171,6 +180,7 @@ namespace FoodFactoryGame.Session.Equipment
             }
             UpdateCursor(screenOpen);
             UpdateProgress(site);
+            UpdateSpoilage(site);
         }
 
         // Handles a click on a grid slot: pick up, put down, rearrange or drop onto another container. Public so tests can
@@ -446,11 +456,18 @@ namespace FoodFactoryGame.Session.Equipment
             _progressFill = null;
             _progressLabel = null;
             _hoverLabel = null;
+            _timers.Clear();
+            _hovered = null;
             var inventoryId = interaction.InventoryId;
             if (interaction.Screen == InteractionScreen.None || inventoryId == null) return;
             var inventory = Window("hud-inventory", $"Inventory  {Units(site, inventoryId)}");
             inventory.Add(GridView(InventoryGrid));
+            // One line at the grid's width: a longer hover line must never resize the centred screen under the pointer.
             _hoverLabel = Caption(" ", 12, Muted, 6);
+            _hoverLabel.style.width = Math.Min(_grids.TryGetValue(InventoryGrid, out var slots) ? slots.Count : 0, GridColumns) * (SlotSize + 2);
+            _hoverLabel.style.whiteSpace = WhiteSpace.NoWrap;
+            _hoverLabel.style.overflow = Overflow.Hidden;
+            _hoverLabel.style.textOverflow = TextOverflow.Ellipsis;
             inventory.Add(_hoverLabel);
             _screen.Add(inventory);
             if (interaction.Screen == InteractionScreen.Inventory)
@@ -498,8 +515,10 @@ namespace FoodFactoryGame.Session.Equipment
         public void ClickOffer(string offerId) => interaction.Buy(offerId);
 
         // Input slot -> progress arrow -> output slot, like a Factorio furnace; the machine runs by itself (decision 0008).
+        // A machine with no recipes is storage (the fridge, decision 0018): just its input grid.
         private VisualElement MachineWindow(GoodsSnapshot site, GoodsEquipment equipment)
         {
+            if (!interaction.Session.Recipes.Any(x => x != null && x.StationKind == equipment.Kind)) return StorageMachineWindow(site, equipment);
             var window = Window("hud-machine", Title(equipment.Kind));
             window.style.minWidth = 300;
             var body = new VisualElement();
@@ -540,6 +559,25 @@ namespace FoodFactoryGame.Session.Equipment
             return window;
         }
 
+        private VisualElement StorageMachineWindow(GoodsSnapshot site, GoodsEquipment equipment)
+        {
+            var window = Window("hud-machine", Title(equipment.Kind));
+            var body = new VisualElement();
+            body.style.alignItems = Align.Center;
+            body.style.backgroundColor = Inset;
+            Pad(body, 12);
+            var refrigerated = site.Locations.FirstOrDefault(x => x.Id == equipment.InputLocationId)?.Refrigerated ?? false;
+            body.Add(Labelled(GridView(InputGrid), $"{(refrigerated ? "Refrigerated" : "Storage")} {Units(site, equipment.InputLocationId)}"));
+            window.Add(body);
+            if (refrigerated)
+            {
+                var note = Caption("Goods in here do not spoil.", 12, Chilled, 6);
+                note.name = "hud-refrigerated-note";
+                window.Add(note);
+            }
+            return window;
+        }
+
         private VisualElement GridView(string grid)
         {
             var view = new VisualElement { name = $"hud-{grid}-grid" };
@@ -574,13 +612,27 @@ namespace FoodFactoryGame.Session.Equipment
                     if (content.Spoiled) icon.style.unityBackgroundImageTintColor = new Color(0.6f, 0.75f, 0.35f, content.Carried ? 0.3f : 1f);
                     slot.Add(icon);
                     slot.Add(Count(content.Count));
-                    var hover = $"{name} ×{content.Count}{(content.Spoiled ? " (spoiled)" : "")}";
-                    slot.RegisterCallback<PointerEnterEvent>(_ => { if (_hoverLabel != null) _hoverLabel.text = hover; });
+                    var location = LocationOf(grid);
+                    // Edible goods show when they spoil; UpdateSpoilage fills the text in (empty for goods that do not spoil).
+                    if (content.MachineKind == null && !content.Spoiled)
+                    {
+                        var timer = Caption("", 10, Muted);
+                        timer.name = "hud-spoil-timer";
+                        timer.style.position = Position.Absolute;
+                        timer.style.left = 3;
+                        timer.style.top = 1;
+                        timer.style.unityFontStyleAndWeight = FontStyle.Bold;
+                        timer.style.textShadow = new TextShadow { offset = new Vector2(1f, 1f), color = Color.black };
+                        slot.Add(timer);
+                        _timers.Add((timer, location, content.ItemId));
+                    }
+                    slot.RegisterCallback<PointerEnterEvent>(_ => _hovered = (location, content));
                 }
                 slot.RegisterCallback<PointerEnterEvent>(_ => SetBorder(slot, Highlight, 1));
                 slot.RegisterCallback<PointerLeaveEvent>(_ =>
                 {
                     SlotEdges(slot);
+                    _hovered = null;
                     if (_hoverLabel != null) _hoverLabel.text = " ";
                 });
                 view.Add(slot);
@@ -664,6 +716,59 @@ namespace FoodFactoryGame.Session.Equipment
                 _progressLabel.text = $"{what}: {job.DurationSeconds - job.RemainingSeconds}/{job.DurationSeconds} s";
             }
             _progressFill.style.width = new Length(fraction * 100f, LengthUnit.Percent);
+        }
+
+        // Spoil timers and the hover line follow each baseline (the server ages goods every clock step); display only.
+        private void UpdateSpoilage(GoodsSnapshot site)
+        {
+            foreach (var (label, locationId, itemId) in _timers)
+            {
+                var time = SpoilTime(site, locationId, itemId);
+                label.text = time is { } known ? FormatDuration(known.Seconds, true) : "";
+                if (time is { } shown) label.style.color = shown.Soon ? SpoilingSoon : shown.Refrigerated ? Chilled : Color.white;
+            }
+            if (_hoverLabel == null || _hovered is not { } hovered) return;
+            var content = hovered.Content;
+            var name = content.MachineKind != null ? Title(content.MachineKind) : ItemName(content.ItemId);
+            var text = $"{name} ×{content.Count}";
+            if (content.Spoiled) text += " (spoiled)";
+            else if (content.MachineKind == null && SpoilTime(site, hovered.LocationId, content.ItemId) is { } spoil)
+                text += spoil.Refrigerated
+                    ? $"  ·  refrigerated: not spoiling ({FormatDuration(spoil.Seconds, false)} left out of the cold)"
+                    : $"  ·  spoils in {FormatDuration(spoil.Seconds, false)}";
+            _hoverLabel.text = text;
+        }
+
+        // Ambient time left for the first edible lot of an item in a location to spoil; null if none of them spoils. A refrigerated
+        // location pauses spoilage (decision 0018), so there the time is frozen until the goods leave the cold.
+        private static (long Seconds, bool Refrigerated, bool Soon)? SpoilTime(GoodsSnapshot site, string locationId, string itemId)
+        {
+            var refrigerated = site.Locations.FirstOrDefault(x => x.Id == locationId)?.Refrigerated ?? false;
+            GoodsLot first = null;
+            var seconds = long.MaxValue;
+            foreach (var lot in site.Lots)
+            {
+                if (lot.LocationId != locationId || lot.ItemId != itemId || lot.Spoiled || lot.SpoilAfterSeconds >= GoodsWorld.NonPerishableSeconds)
+                    continue;
+                var left = Math.Max(0, lot.SpoilAfterSeconds - lot.ExposureSeconds);
+                if (left >= seconds) continue;
+                seconds = left;
+                first = lot;
+            }
+            if (first == null) return null;
+            return (seconds, refrigerated, !refrigerated && seconds * 10 <= first.SpoilAfterSeconds);
+        }
+
+        // Whole seconds as a duration: compact for a slot corner ("45s", "12m", "3h", "2d"), otherwise "1h 05m", "12m 05s", "45s".
+        public static string FormatDuration(long seconds, bool compact)
+        {
+            seconds = Math.Max(0, seconds);
+            if (compact)
+                return seconds < 60 ? $"{seconds}s" : seconds < 3600 ? $"{seconds / 60}m" : seconds < 86400 ? $"{seconds / 3600}h" : $"{seconds / 86400}d";
+            if (seconds < 60) return $"{seconds}s";
+            if (seconds < 3600) return $"{seconds / 60}m {seconds % 60:00}s";
+            if (seconds < 86400) return $"{seconds / 3600}h {seconds / 60 % 60:00}m";
+            return $"{seconds / 86400}d {seconds / 3600 % 24}h";
         }
 
         // Slots used out of the location's capacity.

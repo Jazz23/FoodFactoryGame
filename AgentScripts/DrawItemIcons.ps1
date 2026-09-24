@@ -168,4 +168,33 @@ $g.DrawLine($mark, 32, 32, 32, 48)
 $g.DrawArc($mark, 26, 32, 12, 8, 90, 180)
 $g.DrawArc($mark, 26, 40, 12, 8, 270, 180)
 Save-Icon $bitmap $g 'Counter'
+
+# --- Fridge: a tall white two-door fridge with steel handles and an ice-blue snowflake badge (decision 0018) ---
+$bitmap, $g = New-Icon
+Shadow $g 24 110 80 14
+$dark = New-Object System.Drawing.Pen (Color '#1f2a2e'), 4
+$dark.LineJoin = [System.Drawing.Drawing2D.LineJoin]::Round
+$body = New-Object System.Drawing.RectangleF 30, 8, 68, 106
+$fill = New-Object System.Drawing.Drawing2D.LinearGradientBrush $body, (Color '#ffffff'), (Color '#c7d6de'), 0
+$g.FillRectangle($fill, $body)
+$g.DrawRectangle($dark, 30, 8, 68, 106)
+$g.DrawLine($dark, 30, 44, 98, 44)
+$steel = New-Object System.Drawing.SolidBrush (Color '#7d8b92')
+$g.FillRectangle($steel, 86, 18, 6, 18)
+$g.FillRectangle($steel, 86, 54, 6, 30)
+$feet = New-Object System.Drawing.SolidBrush (Color '#1f2a2e')
+$g.FillRectangle($feet, 36, 114, 8, 4)
+$g.FillRectangle($feet, 84, 114, 8, 4)
+$ice = New-Object System.Drawing.SolidBrush (Color '#5bc0eb')
+$g.FillEllipse($ice, 38, 62, 36, 36)
+$g.DrawEllipse($dark, 38, 62, 36, 36)
+$flake = New-Object System.Drawing.Pen (Color '#ffffff'), 3
+$flake.StartCap = $flake.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+foreach ($angle in 0, 60, 120) {
+    $rad = $angle * [Math]::PI / 180
+    $dx = [Math]::Cos($rad) * 12
+    $dy = [Math]::Sin($rad) * 12
+    $g.DrawLine($flake, 56 - $dx, 80 - $dy, 56 + $dx, 80 + $dy)
+}
+Save-Icon $bitmap $g 'Fridge'
 "Icons written to $out"

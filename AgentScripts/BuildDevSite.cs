@@ -49,11 +49,14 @@ public static class BuildDevSite
     private const string CounterDefinitionPath = "Assets/Content/Equipment/Counter.asset";
     private const string CounterMaterialFolder = "Assets/Materials/Counter";
     private const string SellBreadRecipePath = "Assets/Content/Recipes/SellBread.asset";
+    private const string FridgePrefabPath = "Assets/Prefabs/Equipment/Fridge.prefab";
+    private const string FridgeDefinitionPath = "Assets/Content/Equipment/Fridge.asset";
+    private const string FridgeMaterialFolder = "Assets/Materials/Fridge";
     private const string OfferFolder = "Assets/Content/Offers";
 
     public static string Run()
     {
-        foreach (var folder in new[] { "Assets/UI", "Assets/Prefabs/Network", "Assets/Prefabs/Player", "Assets/Network", "Assets/Content/Equipment", "Assets/Content/Recipes", "Assets/Content/Items", "Assets/Materials", BeltMaterialFolder, BeltPrefabFolder, CounterMaterialFolder, "Assets/Prefabs/Equipment", OfferFolder })
+        foreach (var folder in new[] { "Assets/UI", "Assets/Prefabs/Network", "Assets/Prefabs/Player", "Assets/Network", "Assets/Content/Equipment", "Assets/Content/Recipes", "Assets/Content/Items", "Assets/Materials", BeltMaterialFolder, BeltPrefabFolder, CounterMaterialFolder, FridgeMaterialFolder, "Assets/Prefabs/Equipment", OfferFolder })
             Directory.CreateDirectory(folder);
         AssetDatabase.Refresh();
         var panelSettings = BuildPanelSettings();
@@ -64,13 +67,18 @@ public static class BuildDevSite
         var bread = BuildBreadRecipe();
         var counter = BuildEquipmentDefinition(CounterDefinitionPath, DevWorld.CounterKind, 2, 1, 2, 1, BuildCounterPrefab(), ImportIcon("Counter"));
         var sellBread = BuildSellBreadRecipe();
+        // PROTOTYPE fridge (decision 0018): 1x1 m, 8 refrigerated storage slots where goods do not spoil, no recipes; the output
+        // slot is unused (equipment always has both buffers).
+        var fridge = BuildEquipmentDefinition(FridgeDefinitionPath, "fridge", 1, 1, 8, 1, BuildFridgePrefab(), ImportIcon("Fridge"), true);
         // PROTOTYPE supplier prices (decision 0014): dough at 50 cents a unit leaves $2.00 margin on a $2.50 bread. An oven
         // (decision 0017) costs $150.00, 75 breads of margin, so the $500.00 start can afford one while keeping ingredient money.
+        // A fridge costs $80.00.
         var offers = new[]
         {
             BuildOffer("Dough5", "supplier-dough-5", DevWorld.DoughItemId, 5, 250, DevWorld.DoughSpoilAfterSeconds),
             BuildOffer("Belt10", "supplier-belt-10", GoodsWorld.BeltItemId, 10, 500, GoodsWorld.NonPerishableSeconds),
-            BuildOffer("Oven1", "supplier-oven", "", 1, 15000, 1, oven)
+            BuildOffer("Oven1", "supplier-oven", "", 1, 15000, 1, oven),
+            BuildOffer("Fridge1", "supplier-fridge", "", 1, 8000, 1, fridge)
         };
         // PROTOTYPE stack sizes: dough and bread 20, belts 100 (Factorio's belt stack).
         var items = new[] { BuildItem(DevWorld.DoughItemId, "Dough", 20), BuildItem("bread", "Bread", 20), BuildItem(GoodsWorld.BeltItemId, "Belt", 100) };
@@ -79,7 +87,7 @@ public static class BuildDevSite
         var tread = BuildBeltMaterials();
         var beltPrefabs = new[] { BuildBeltPrefab("Conveyor_Straight_1m", "BeltStraight"), BuildBeltPrefab("Conveyor_Corner_Left_90", "BeltCornerLeft"), BuildBeltPrefab("Conveyor_Corner_Right_90", "BeltCornerRight") };
         var itemSprite = BuildItemSpriteMaterial();
-        BuildScene(catalog, bridge, player, panelSettings, new[] { oven, counter }, new[] { bread, sellBread }, offers, items, ghostMaterial,
+        BuildScene(catalog, bridge, player, panelSettings, new[] { oven, counter, fridge }, new[] { bread, sellBread }, offers, items, ghostMaterial,
             ghostModelMaterial, beltPrefabs, tread, itemSprite);
         EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
         AssetDatabase.SaveAssets();
@@ -116,7 +124,7 @@ public static class BuildDevSite
     }
 
     private static EquipmentDefinition BuildEquipmentDefinition(string path, string kind, int width, int depth, int inputCapacity,
-        int outputCapacity, GameObject prefab, Sprite icon)
+        int outputCapacity, GameObject prefab, Sprite icon, bool inputRefrigerated = false)
     {
         var definition = AssetDatabase.LoadAssetAtPath<EquipmentDefinition>(path);
         if (definition == null)
@@ -131,6 +139,7 @@ public static class BuildDevSite
             serialized.FindProperty("depth").intValue = depth;
             serialized.FindProperty("inputCapacity").intValue = inputCapacity;
             serialized.FindProperty("outputCapacity").intValue = outputCapacity;
+            serialized.FindProperty("inputRefrigerated").boolValue = inputRefrigerated;
             serialized.FindProperty("outputRefrigerated").boolValue = false;
             serialized.FindProperty("visualPrefab").objectReferenceValue = prefab;
             serialized.FindProperty("icon").objectReferenceValue = icon;
@@ -160,6 +169,32 @@ public static class BuildDevSite
             box.center = new Vector3(0f, 0.6f, 0f);
             box.size = new Vector3(2f, 1.2f, 0.9f);
             return PrefabUtility.SaveAsPrefabAsset(root, CounterPrefabPath);
+        }
+        finally { Object.DestroyImmediate(root); }
+    }
+
+    // DEVELOPMENT placeholder art for the decision-0018 fridge: a 0.9 x 0.8 x 1.9 m white two-door fridge with steel handles,
+    // dark feet and an ice-blue badge, built from primitives. One box collider on the root lets aim rays name it.
+    private static GameObject BuildFridgePrefab()
+    {
+        var shell = LitMaterial(FridgeMaterialFolder, "FridgeShell", new Color(0.93f, 0.95f, 0.96f), 0.1f, 0.7f);
+        var steel = LitMaterial(FridgeMaterialFolder, "FridgeSteel", new Color(0.55f, 0.6f, 0.63f), 0.9f, 0.6f);
+        var trim = LitMaterial(FridgeMaterialFolder, "FridgeTrim", new Color(0.12f, 0.16f, 0.18f), 0f, 0.3f);
+        var badge = LitMaterial(FridgeMaterialFolder, "FridgeBadge", new Color(0.36f, 0.75f, 0.92f), 0f, 0.8f);
+        var root = new GameObject("Fridge");
+        try
+        {
+            Block(root, "Body", shell, new Vector3(0f, 0.97f, 0f), new Vector3(0.9f, 1.86f, 0.8f));
+            // The door seam and handles face -Z, the front of an unrotated piece.
+            Block(root, "Seam", trim, new Vector3(0f, 1.3f, -0.402f), new Vector3(0.9f, 0.02f, 0.01f));
+            Block(root, "FreezerHandle", steel, new Vector3(0.33f, 1.55f, -0.43f), new Vector3(0.04f, 0.3f, 0.05f));
+            Block(root, "FridgeHandle", steel, new Vector3(0.33f, 0.95f, -0.43f), new Vector3(0.04f, 0.5f, 0.05f));
+            Block(root, "Badge", badge, new Vector3(-0.15f, 0.8f, -0.405f), new Vector3(0.22f, 0.22f, 0.01f));
+            Block(root, "Feet", trim, new Vector3(0f, 0.02f, 0f), new Vector3(0.8f, 0.04f, 0.7f));
+            var box = root.AddComponent<BoxCollider>();
+            box.center = new Vector3(0f, 0.95f, 0f);
+            box.size = new Vector3(0.9f, 1.9f, 0.8f);
+            return PrefabUtility.SaveAsPrefabAsset(root, FridgePrefabPath);
         }
         finally { Object.DestroyImmediate(root); }
     }

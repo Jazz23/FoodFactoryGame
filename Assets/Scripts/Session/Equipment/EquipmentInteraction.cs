@@ -94,6 +94,7 @@ namespace FoodFactoryGame.Session.Equipment
         private GameObject _ghostModel;
         private string _ghostKind;
         private bool _openMachineSells;
+        private bool _openMachineStores;
         private Renderer[] _ghostRenderers = Array.Empty<Renderer>();
 
         public InteractionScreen Screen { get; private set; }
@@ -238,6 +239,8 @@ namespace FoodFactoryGame.Session.Equipment
                     // A sale station (decision 0013) has no results to take: it sells its input for the company.
                     InteractionScreen.Machine when _openMachineSells =>
                         "Counter: put edible goods in the input; customers buy them one at a time for the company (shift+click moves a stack); E or Esc closes" + suffix,
+                    InteractionScreen.Machine when _openMachineStores =>
+                        "Storage: click or shift+click to move goods in and out; hover a stack to see when it spoils; E or Esc closes" + suffix,
                     InteractionScreen.Machine => "Machine: put ingredients in the input, take results from the output (shift+click moves a stack); E or Esc closes" + suffix,
                     _ => _released ? "Cursor released: click to resume" + suffix
                         : "E: inventory (pick belts or goods to carry them out), 1-9: hotbar, left click: open machine, right click: pick up, R: turn belt, F: take an item off a belt" + suffix
@@ -406,6 +409,8 @@ namespace FoodFactoryGame.Session.Equipment
             // Decided once per opening rather than every frame: a sale station (decision 0013) gets the counter hint.
             var kind = session.ClientSite.Equipment.First(x => x.Id == equipmentId).Kind;
             _openMachineSells = session.Recipes.Any(x => x != null && x.IsSale && x.StationKind == kind);
+            // A machine with no recipes is storage (the fridge, decision 0018) and gets the storage hint.
+            _openMachineStores = !session.Recipes.Any(x => x != null && x.StationKind == kind);
             _awaitingRelease = true;
         }
 

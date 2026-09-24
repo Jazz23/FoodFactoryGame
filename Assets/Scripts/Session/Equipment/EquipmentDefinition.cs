@@ -14,6 +14,7 @@ namespace FoodFactoryGame.Session.Equipment
         [SerializeField, Min(1)] private int depth = 1;
         [SerializeField, Min(1)] private int inputCapacity = 1;
         [SerializeField, Min(1)] private int outputCapacity = 1;
+        [SerializeField] private bool inputRefrigerated;
         [SerializeField] private bool outputRefrigerated;
         [SerializeField] private GameObject visualPrefab;
         [SerializeField] private Sprite icon;
@@ -23,6 +24,7 @@ namespace FoodFactoryGame.Session.Equipment
         public int Depth => depth;
         public int InputCapacity => inputCapacity;
         public int OutputCapacity => outputCapacity;
+        public bool InputRefrigerated => inputRefrigerated;
         public bool OutputRefrigerated => outputRefrigerated;
         public GameObject VisualPrefab => visualPrefab;
         public Sprite Icon => icon;
@@ -31,14 +33,16 @@ namespace FoodFactoryGame.Session.Equipment
         {
             Id = id, Kind = kind, SiteId = siteId, State = EquipmentState.Placed, HolderId = "",
             CellX = cellX, CellZ = cellZ, Rotation = rotation, Width = width, Depth = depth,
-            InputCapacity = inputCapacity, OutputCapacity = outputCapacity, OutputRefrigerated = outputRefrigerated
+            InputCapacity = inputCapacity, OutputCapacity = outputCapacity, InputRefrigerated = inputRefrigerated,
+            OutputRefrigerated = outputRefrigerated
         };
 
         // Kind, footprint and capacities only: the server gives a bought piece its ID, site and holder (decision 0017).
         public GoodsEquipment CreateTemplate() => new()
         {
             Kind = kind, State = EquipmentState.Held, Width = width, Depth = depth,
-            InputCapacity = inputCapacity, OutputCapacity = outputCapacity, OutputRefrigerated = outputRefrigerated
+            InputCapacity = inputCapacity, OutputCapacity = outputCapacity, InputRefrigerated = inputRefrigerated,
+            OutputRefrigerated = outputRefrigerated
         };
     }
 }

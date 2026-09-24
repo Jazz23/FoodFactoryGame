@@ -10,14 +10,14 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9c77d3e4774f0c945971924e55f4e458, type: 3}
-  m_Name: Oven
+  m_Name: Fridge
   m_EditorClassIdentifier: FoodFactoryGame.Session::FoodFactoryGame.Session.Equipment.EquipmentDefinition
-  kind: oven
-  width: 3
-  depth: 3
-  inputCapacity: 1
+  kind: fridge
+  width: 1
+  depth: 1
+  inputCapacity: 8
   outputCapacity: 1
-  inputRefrigerated: 0
+  inputRefrigerated: 1
   outputRefrigerated: 0
-  visualPrefab: {fileID: 9172084074788297214, guid: 1a1623ca522b94147bdca459133ed70b, type: 3}
-  icon: {fileID: 21300000, guid: 62c5e36e24901824e9b2b36347485e10, type: 3}
+  visualPrefab: {fileID: 1367471517515606816, guid: f5f25fee0a732a247a937d5d60587e1b, type: 3}
+  icon: {fileID: 21300000, guid: bf2efe3c9ba037f4d945c714b1f5c33f, type: 3}

@@ -31,6 +31,9 @@ namespace FoodFactoryGame.Goods
         public int Depth;
         public int InputCapacity;
         public int OutputCapacity;
+        // Goods in a refrigerated buffer do not spoil (their exposure is paused). A fridge is a machine with no recipes and a
+        // refrigerated input buffer (decision 0018).
+        public bool InputRefrigerated;
         public bool OutputRefrigerated;
 
         public string InputLocationId => Id + ":in";
@@ -207,7 +210,8 @@ namespace FoodFactoryGame.Goods
         {
             _state.Locations.Add(new GoodsLocation
             {
-                Id = equipment.InputLocationId, SiteId = equipment.SiteId, Kind = "machine-buffer", Capacity = equipment.InputCapacity
+                Id = equipment.InputLocationId, SiteId = equipment.SiteId, Kind = "machine-buffer", Capacity = equipment.InputCapacity,
+                Refrigerated = equipment.InputRefrigerated
             });
             _state.Locations.Add(new GoodsLocation
             {
@@ -243,6 +247,7 @@ namespace FoodFactoryGame.Goods
                         && station != null && station.SiteId == equipment.SiteId && station.Kind == equipment.Kind
                         && station.InputLocationId == equipment.InputLocationId && station.OutputLocationId == equipment.OutputLocationId
                         && input != null && input.SiteId == equipment.SiteId && input.Capacity == equipment.InputCapacity
+                        && input.Refrigerated == equipment.InputRefrigerated
                         && output != null && output.SiteId == equipment.SiteId && output.Capacity == equipment.OutputCapacity
                         && output.Refrigerated == equipment.OutputRefrigerated;
                 if (!valid) throw new InvalidOperationException($"Equipment {equipment.Id} is inconsistent with its placement.");
