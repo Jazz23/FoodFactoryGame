@@ -4,6 +4,8 @@
 // unit of its location's capacity (decision 0009); each (item, spoiled) stack fills as many slots as its max stack needs.
 // Clicking a slot picks its stack up onto the cursor (the icon follows the pointer); clicking another container drops it
 // there, and shift+click sends it straight to the other open container, both with ordinary server-checked transfers.
+// On a screen a hotbar key over a stack, or clicking a hotbar slot with a stack on the cursor, assigns that stack's machine
+// or item to the hotbar slot (the cursor stack goes back where it was); an empty cursor takes up the slot's machine or item.
 // Presentation only: slot positions are this client's arrangement of the replicated stacks, never saved or sent, and
 // progress is interpolated for at most one clock step past the latest baseline.
 using System;
@@ -115,6 +117,7 @@ namespace FoodFactoryGame.Session.Equipment
             layer.Add(_screen);
             layer.Add(_cursor);
             root.Add(layer);
+            interaction.HoveredEntry = HoveredEntry;
         }
 
         private void Update()
@@ -208,6 +211,35 @@ namespace FoodFactoryGame.Session.Equipment
             };
             if (content == null || content.MachineKind != null || content.Carried || target == null) return;
             interaction.TransferStack(LocationOf(grid), content.ItemId, content.Spoiled, content.Count, LocationOf(target));
+        }
+
+        // Click on a hotbar slot while a screen is open: the cursor's machine or item is assigned to it and the cursor emptied
+        // (nothing moves; a goods stack stays in its container), or an empty cursor takes up the slot's machine or item.
+        public void ClickHotbarSlot(int index)
+        {
+            if (interaction.Screen == InteractionScreen.None) return;
+            var entry = interaction.CursorKind != null ? HotbarEntry.Machine(interaction.CursorKind)
+                : interaction.CursorGoods != null ? HotbarEntry.Goods(interaction.CursorGoods.ItemId)
+                : null;
+            if (entry == null)
+            {
+                interaction.SelectSlot(index);
+                return;
+            }
+            interaction.AssignHotbar(index, entry);
+            interaction.ClearCursor();
+        }
+
+        // Machine or item of the grid stack under the pointer on an open screen; null over an empty slot or anything else.
+        public HotbarEntry HoveredEntry()
+        {
+            if (interaction.Screen == InteractionScreen.None || _screen?.panel == null) return null;
+            var pointer = interaction.PointerPosition;
+            var position = RuntimePanelUtils.ScreenToPanel(_screen.panel, new Vector2(pointer.x, UnityEngine.Screen.height - pointer.y));
+            for (var element = _screen.panel.Pick(position); element != null; element = element.parent)
+                if (element.userData is SlotContent content)
+                    return content.MachineKind != null ? HotbarEntry.Machine(content.MachineKind) : HotbarEntry.Goods(content.ItemId);
+            return null;
         }
 
         // First slot index holding a stack in a grid: goods by stack ("item" or "item:spoiled") or slot ("item#part"),
@@ -326,7 +358,10 @@ namespace FoodFactoryGame.Session.Equipment
             var text = new StringBuilder();
             text.Append(interaction.Screen).Append('|').Append(interaction.OpenMachineId).Append('|').Append(interaction.SelectedSlot)
                 .Append('|').Append(interaction.CursorKind).Append('|').Append(interaction.CursorGoods?.ItemId);
-            foreach (var kind in interaction.HotbarKinds) text.Append('|').Append(kind).Append(interaction.HeldCount(kind));
+            foreach (var entry in interaction.Hotbar)
+                text.Append('|').Append(entry?.MachineKind).Append('/').Append(entry?.ItemId).Append(interaction.HotbarCount(entry));
+            // The cursor stack stays on the pointer outside screens, so its count is shown there too.
+            if (interaction.CursorGoods != null) text.Append('|').Append(interaction.CursorLots(_site).Sum(x => x.Quantity));
             if (interaction.Screen == InteractionScreen.None) return text.ToString();
             foreach (var grid in _grids.OrderBy(x => x.Key, StringComparer.Ordinal))
             {
@@ -340,19 +375,44 @@ namespace FoodFactoryGame.Session.Equipment
         private void BuildHotbar()
         {
             _hotbar.Clear();
-            var kinds = interaction.HotbarKinds;
+            var entries = interaction.Hotbar;
             for (var index = 0; index < EquipmentInteraction.HotbarSize; index++)
             {
-                var slot = SlotFrame($"hud-slot-{index + 1}", index == interaction.SelectedSlot);
-                slot.pickingMode = PickingMode.Ignore;
+                var slotIndex = index;
+                var selected = index == interaction.SelectedSlot;
+                var slot = SlotFrame($"hud-slot-{index + 1}", selected);
+                // Hotbar slots take clicks only on a screen (assigning the cursor stack); in the world they are display only.
+                slot.RegisterCallback<PointerDownEvent>(evt =>
+                {
+                    if (evt.button == 0)
+                        _pressedSlot = interaction.Screen != InteractionScreen.None && interaction.ScreenClicksArmed ? slot.name : null;
+                }, TrickleDown.TrickleDown);
+                slot.RegisterCallback<PointerUpEvent>(evt =>
+                {
+                    if (evt.button != 0 || _pressedSlot != slot.name) return;
+                    _pressedSlot = null;
+                    ClickHotbarSlot(slotIndex);
+                }, TrickleDown.TrickleDown);
+                slot.RegisterCallback<PointerEnterEvent>(_ =>
+                {
+                    if (interaction.Screen != InteractionScreen.None) SetBorder(slot, Highlight, selected ? 2 : 1);
+                });
+                slot.RegisterCallback<PointerLeaveEvent>(_ =>
+                {
+                    if (selected) SetBorder(slot, Highlight, 2);
+                    else SlotEdges(slot);
+                });
                 var number = Caption($"{index + 1}", 10, Muted);
                 number.style.position = Position.Absolute;
                 number.style.left = 3;
                 number.style.top = 1;
-                if (index < kinds.Count)
+                var entry = entries[index];
+                if (entry != null)
                 {
-                    var count = interaction.HeldCount(kinds[index]);
-                    slot.Add(Icon(MachineIcon(kinds[index]), Title(kinds[index]), count > 0 ? 1f : 0.35f));
+                    var count = interaction.HotbarCount(entry);
+                    var sprite = entry.MachineKind != null ? MachineIcon(entry.MachineKind) : ItemIcon(entry.ItemId);
+                    var name = entry.MachineKind != null ? Title(entry.MachineKind) : ItemName(entry.ItemId);
+                    slot.Add(Icon(sprite, name, count > 0 ? 1f : 0.35f));
                     if (count > 0) slot.Add(Count(count));
                 }
                 slot.Add(number);
@@ -428,6 +488,8 @@ namespace FoodFactoryGame.Session.Equipment
                 var slotIndex = index;
                 var content = slots[index];
                 var slot = SlotFrame($"hud-{grid}-slot-{index}", false);
+                // Read by HoveredEntry to find the stack under the pointer when a hotbar key is pressed.
+                slot.userData = content;
                 // Presses are read here rather than through Button.clicked, whose activator ignores any press with a
                 // modifier held and so would never report a shift+click. Trickle-down runs before the button's own handler.
                 slot.RegisterCallback<PointerDownEvent>(evt =>
@@ -474,7 +536,9 @@ namespace FoodFactoryGame.Session.Equipment
             var goods = interaction.CursorGoods;
             if (goods != null)
             {
-                var count = Math.Min(goods.Quantity, interaction.CursorLots(_site).Sum(x => x.Quantity));
+                // On a screen a stack carries one slot's worth; in the world it stands for everything of that item in the inventory.
+                var total = interaction.CursorLots(_site).Sum(x => x.Quantity);
+                var count = interaction.Screen == InteractionScreen.None ? total : Math.Min(goods.Quantity, total);
                 _cursor.Add(Icon(ItemIcon(goods.ItemId), ItemName(goods.ItemId), 1f));
                 _cursor.Add(Count(count));
             }
@@ -485,13 +549,16 @@ namespace FoodFactoryGame.Session.Equipment
             }
         }
 
-        // The cursor stack follows the pointer while a screen is open; in the world the machine ghost shows instead.
+        // The cursor stack follows the pointer while a screen is open. In the world a goods stack stays on the cursor beside the
+        // crosshair (belts to build, goods to put on belts); a machine shows its ghost instead.
         private void UpdateCursor(bool screenOpen)
         {
-            var carrying = screenOpen && (interaction.CursorGoods != null || interaction.CursorKind != null);
+            var carrying = interaction.CursorGoods != null || (screenOpen && interaction.CursorKind != null);
             _cursor.style.display = carrying ? DisplayStyle.Flex : DisplayStyle.None;
             if (!carrying || _cursor.panel == null) return;
-            var pointer = interaction.PointerPosition;
+            var pointer = interaction.PointerLocked
+                ? new Vector2(UnityEngine.Screen.width * 0.5f + IconSize * 0.6f, UnityEngine.Screen.height * 0.5f - IconSize * 0.6f)
+                : interaction.PointerPosition;
             var position = RuntimePanelUtils.ScreenToPanel(_cursor.panel, new Vector2(pointer.x, UnityEngine.Screen.height - pointer.y));
             _cursor.style.left = position.x - IconSize * 0.3f;
             _cursor.style.top = position.y - IconSize * 0.3f;

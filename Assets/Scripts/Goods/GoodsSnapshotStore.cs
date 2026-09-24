@@ -98,6 +98,12 @@ namespace FoodFactoryGame.Goods
                 state.SiteLayouts ??= new();
                 state.SchemaVersion = 3;
             }
+            // v3 had no belts; no lot rode one, so every BeltPosition reads 0.
+            if (state != null && state.SchemaVersion == 3)
+            {
+                state.Belts ??= new();
+                state.SchemaVersion = 4;
+            }
             GoodsWorld.Validate(state);
             return state;
         }

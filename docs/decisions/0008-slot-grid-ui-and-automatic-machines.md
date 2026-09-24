@@ -3,7 +3,9 @@
 Date: 2026-09-23
 
 Status: point 2 (unit capacity, no stack limit) superseded by
-[decision 0009](0009-slot-capacity-and-quick-transfer.md). Originally
+[decision 0009](0009-slot-capacity-and-quick-transfer.md). Point 3's "closing the screen
+empties the cursor" no longer applies to a stack from the player's inventory, which
+stays on the cursor ([decision 0010](0010-conveyor-belts.md), point 9). Originally
 requested by the project owner ("make the UIs look more like
 Factorio for now"); implemented on the dev site. Supersedes decision 0007
 point 4 (one batch per click) and the list-style screens of point 3. See

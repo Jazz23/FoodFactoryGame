@@ -1,6 +1,9 @@
-// Local player's Factorio-style controls. The gameplay cursor is locked to a centre crosshair so Look always orbits;
-// opening a screen (E inventory, or clicking a machine) frees the pointer and suspends orbiting. Hotbar keys (or picking a
-// machine out of the inventory grid) put a held machine kind on the cursor, which shows a see-through ghost of the machine
+// Local player's Factorio-style controls. The gameplay cursor is locked to a centre crosshair so Look always orbits (the
+// top-down camera view instead leaves the pointer free and aims where it points);
+// opening a screen (E inventory, or clicking a machine) frees the pointer and suspends orbiting. Hotbar slots point to a
+// machine kind or an item, assigned on a screen (a hotbar key over a stack, or dropping the cursor on a hotbar slot); this
+// client's arrangement only, never saved or sent. Hotbar keys (or picking a machine out of the inventory grid) put a held
+// machine kind or the inventory's stack of an item on the cursor; a machine shows a see-through ghost of the machine
 // on its footprint; left click places it (or opens the machine under the crosshair when the cursor is empty) and right click
 // picks the machine under the crosshair back into the inventory. On a screen the cursor can instead carry a goods stack
 // (CursorGoods), which is only a pointer to lots still in their container until it is dropped on another one. Capacity
@@ -35,8 +38,19 @@ namespace FoodFactoryGame.Session.Equipment
         public string Slot;
     }
 
+    // One hotbar slot's target: a held machine kind or an item (the inventory's unspoiled stack of it).
+    public sealed class HotbarEntry
+    {
+        public string MachineKind;
+        public string ItemId;
+
+        public static HotbarEntry Machine(string kind) => new() { MachineKind = kind };
+        public static HotbarEntry Goods(string itemId) => new() { ItemId = itemId };
+        public bool Matches(HotbarEntry other) => other != null && other.MachineKind == MachineKind && other.ItemId == ItemId;
+    }
+
     [DisallowMultipleComponent]
-    public sealed class EquipmentInteraction : MonoBehaviour
+    public sealed partial class EquipmentInteraction : MonoBehaviour
     {
         public const int HotbarSize = 9;
         private static readonly int BaseColor = Shader.PropertyToID("_BaseColor");
@@ -62,6 +76,8 @@ namespace FoodFactoryGame.Session.Equipment
         [SerializeField] private float maximumRayDistance = 100f;
 
         private readonly HashSet<string> _pending = new();
+        private readonly HotbarEntry[] _hotbar = new HotbarEntry[HotbarSize];
+        private bool _hotbarSeeded;
         private ClientSiteSubscription _subscription;
         private MaterialPropertyBlock _block;
         private Camera _camera;
@@ -89,7 +105,8 @@ namespace FoodFactoryGame.Session.Equipment
         public string OpenMachineId { get; private set; }
         // Machine kind on the cursor; null when the cursor is empty.
         public string CursorKind { get; private set; }
-        public int SelectedSlot { get; private set; } = -1;
+        // Hotbar slot whose machine or item is on the cursor; -1 when none is.
+        public int SelectedSlot => HotbarIndex(CursorEntry);
         public bool PointerLocked => _appliedLock == true;
         public bool HasPendingRequests => _pending.Count > 0;
         public bool QuickTransferHeld => quickTransferAction.action.IsPressed();
@@ -104,13 +121,35 @@ namespace FoodFactoryGame.Session.Equipment
         public string LocalPlayerId => session.Authenticator.LocalPlayerId;
         public string InventoryId => LocalPlayerId == null ? null : GoodsWorld.InventoryLocationId(LocalPlayerId);
 
-        // Hotbar slots point to machine kinds, in the order of the session's equipment content.
-        public IReadOnlyList<string> HotbarKinds => session.EquipmentDefinitions.Where(x => x != null).Take(HotbarSize).Select(x => x.Kind).ToList();
+        // Hotbar slots (null when empty). Machine kinds fill them in the order of the session's equipment content once that is
+        // loaded, and the player reassigns them from there.
+        public IReadOnlyList<HotbarEntry> Hotbar
+        {
+            get
+            {
+                if (!_hotbarSeeded && session.EquipmentDefinitions.Any(x => x != null))
+                {
+                    _hotbarSeeded = true;
+                    var kinds = session.EquipmentDefinitions.Where(x => x != null).Take(HotbarSize).Select(x => x.Kind).ToList();
+                    for (var index = 0; index < kinds.Count; index++) _hotbar[index] = HotbarEntry.Machine(kinds[index]);
+                }
+                return _hotbar;
+            }
+        }
+
+        // Set by the HUD: the machine or item of the stack under the pointer on an open screen (null when none), so a hotbar
+        // key there assigns it to that slot instead of selecting the slot.
+        public Func<HotbarEntry> HoveredEntry { get; set; }
+
+        // The cursor's machine kind, or an unspoiled goods stack carried from the inventory.
+        private HotbarEntry CursorEntry => CursorKind != null ? HotbarEntry.Machine(CursorKind)
+            : CursorGoods != null && !CursorGoods.Spoiled && CursorGoods.LocationId == InventoryId ? HotbarEntry.Goods(CursorGoods.ItemId)
+            : null;
 
         private IEnumerable<InputActionReference> Actions => new[]
         {
             placeAction, removeAction, rotateAction, pointAction, inventoryAction, clearCursorAction, closeScreenAction, hotbarAction,
-            quickTransferAction
+            quickTransferAction, placeItemAction, takeItemAction
         };
 
         private void OnEnable()
@@ -123,6 +162,8 @@ namespace FoodFactoryGame.Session.Equipment
             clearCursorAction.action.performed += OnClearCursor;
             closeScreenAction.action.performed += OnCloseScreen;
             hotbarAction.action.performed += OnHotbar;
+            placeItemAction.action.performed += OnPlaceItem;
+            takeItemAction.action.performed += OnTakeItem;
             foreach (var action in Actions) action.action.Enable();
             ghost.gameObject.SetActive(false);
         }
@@ -136,10 +177,16 @@ namespace FoodFactoryGame.Session.Equipment
             clearCursorAction.action.performed -= OnClearCursor;
             closeScreenAction.action.performed -= OnCloseScreen;
             hotbarAction.action.performed -= OnHotbar;
+            placeItemAction.action.performed -= OnPlaceItem;
+            takeItemAction.action.performed -= OnTakeItem;
             foreach (var action in Actions) action.action.Disable();
             Subscribe(null);
             ApplyPointerLock(false);
             ShowGhostModel(null);
+            DestroyBeltGhosts();
+            _pendingBelts.Clear();
+            _removingBelts.Clear();
+            _dragging = false;
         }
 
         private void Update()
@@ -164,24 +211,32 @@ namespace FoodFactoryGame.Session.Equipment
                 .Where(x => x.State == EquipmentState.Held && x.HolderId == me && x.Kind == CursorKind)
                 .OrderBy(x => x.Id, StringComparer.Ordinal).FirstOrDefault();
             if (CursorKind != null && _held == null && site != null && !HasPendingRequests) ClearCursor();
-            // A carried stack empties once its lots are gone from the container (moved, consumed or the machine picked up).
-            if (CursorGoods != null && (Screen == InteractionScreen.None || site == null || !CursorLots(site).Any())) CursorGoods = null;
+            // A carried stack empties once its lots are gone from the container (moved, consumed, put on belts or the machine
+            // picked up). Outside a screen only an inventory stack stays on the cursor (CloseScreen).
+            if (CursorGoods != null && (site == null || !CursorLots(site).Any())) CursorGoods = null;
 
-            ApplyPointerLock(_camera != null && Screen == InteractionScreen.None && !_released);
+            // The top-down view does not orbit, so it aims with a free pointer instead of the centre crosshair.
+            ApplyPointerLock(_camera != null && Screen == InteractionScreen.None && !_released && !_rig.TopDown);
             if (_rig != null) _rig.OrbitEnabled = PointerLocked;
 
             var layout = site?.SiteLayouts.FirstOrDefault(x => x.SiteId == DevWorld.SiteId);
             var suffix = HasPendingRequests ? " (waiting for server)" : !string.IsNullOrEmpty(LastRejection) ? $" (rejected: {LastRejection})" : "";
+            if (UpdateBelts(site, layout, suffix))
+            {
+                ghost.gameObject.SetActive(false);
+                if (_ghostModel != null) _ghostModel.SetActive(false);
+                return;
+            }
             if (_held == null || layout == null || _camera == null || Screen != InteractionScreen.None || !TryFloorPoint(out var point))
             {
                 ghost.gameObject.SetActive(false);
                 if (_ghostModel != null) _ghostModel.SetActive(false);
                 Status = site == null ? "" : Screen switch
                 {
-                    InteractionScreen.Inventory => "Inventory: click a slot to pick up or put down, shift+click to move a stack across; E or Esc closes" + suffix,
+                    InteractionScreen.Inventory => "Inventory: click a slot to pick up or put down, shift+click to move a stack across, 1-9 over a stack or dropping it on the hotbar assigns it there; E or Esc closes" + suffix,
                     InteractionScreen.Machine => "Machine: put ingredients in the input, take results from the output (shift+click moves a stack); E or Esc closes" + suffix,
                     _ => _released ? "Cursor released: click to resume" + suffix
-                        : "E: inventory, 1-9: hotbar, left click: open machine, right click: pick up" + suffix
+                        : "E: inventory (pick belts or goods to carry them out), 1-9: hotbar, left click: open machine, right click: pick up, R: turn belt, F: take an item off a belt" + suffix
                 };
                 return;
             }
@@ -259,10 +314,8 @@ namespace FoodFactoryGame.Session.Equipment
         // Puts a held machine kind on the cursor, as the hotbar does; used when a machine is picked out of the inventory grid.
         public void PickUpMachine(string kind)
         {
-            var index = HotbarKinds.ToList().IndexOf(kind);
-            if (index < 0 || HeldCount(kind) == 0) return;
+            if (HeldCount(kind) == 0) return;
             CursorGoods = null;
-            SelectedSlot = index;
             CursorKind = kind;
             LastRejection = null;
         }
@@ -274,28 +327,59 @@ namespace FoodFactoryGame.Session.Equipment
             return site == null ? 0 : site.Equipment.Count(x => x.State == EquipmentState.Held && x.HolderId == me && x.Kind == kind);
         }
 
-        // Selecting a slot you hold at least one of puts that kind on the cursor; selecting the active slot again clears it.
+        // Units a hotbar entry stands for: held machines of the kind, or the inventory's unspoiled units of the item.
+        public int HotbarCount(HotbarEntry entry)
+        {
+            if (entry == null) return 0;
+            if (entry.MachineKind != null) return HeldCount(entry.MachineKind);
+            var site = session.ClientSite;
+            return site == null || InventoryId == null ? 0
+                : site.Lots.Where(x => x.LocationId == InventoryId && x.ItemId == entry.ItemId && !x.Spoiled).Sum(x => x.Quantity);
+        }
+
+        // Selecting a slot whose machine or item you have puts it on the cursor (an item as one slot's worth of the inventory's
+        // stack); selecting the active slot again, or an empty slot, clears it.
         public void SelectSlot(int index)
         {
-            var kinds = HotbarKinds;
-            if (index < 0 || index >= kinds.Count || index == SelectedSlot && CursorKind != null)
+            var entry = index >= 0 && index < HotbarSize ? Hotbar[index] : null;
+            if (entry == null || index == SelectedSlot)
             {
                 ClearCursor();
                 return;
             }
-            if (HeldCount(kinds[index]) == 0)
+            var count = HotbarCount(entry);
+            if (count == 0)
             {
-                LastRejection = $"no {kinds[index]} in inventory";
+                LastRejection = $"no {entry.MachineKind ?? entry.ItemId} in inventory";
                 return;
             }
-            PickUpMachine(kinds[index]);
+            if (entry.MachineKind != null) PickUpMachine(entry.MachineKind);
+            else PickUpGoods(InventoryId, entry.ItemId, false, Math.Min(session.MaxStack(entry.ItemId), count), entry.ItemId + "#0");
+        }
+
+        // Points a hotbar slot at a machine kind or item, taking it off any other slot it was on.
+        public void AssignHotbar(int index, HotbarEntry entry)
+        {
+            if (index < 0 || index >= HotbarSize || entry == null) return;
+            var slots = Hotbar;
+            for (var other = 0; other < HotbarSize; other++)
+                if (entry.Matches(slots[other])) _hotbar[other] = null;
+            _hotbar[index] = entry;
+        }
+
+        public int HotbarIndex(HotbarEntry entry)
+        {
+            if (entry == null) return -1;
+            var slots = Hotbar;
+            for (var index = 0; index < HotbarSize; index++)
+                if (entry.Matches(slots[index])) return index;
+            return -1;
         }
 
         public void ClearCursor()
         {
             CursorKind = null;
             CursorGoods = null;
-            SelectedSlot = -1;
             _held = null;
         }
 
@@ -318,12 +402,13 @@ namespace FoodFactoryGame.Session.Equipment
             _awaitingRelease = true;
         }
 
-        // Closing a screen empties a carried goods stack (its lots never left their container); a machine stays on the cursor.
+        // Closing a screen keeps a stack carried from the inventory on the cursor (for belts and placing goods on belts) and
+        // empties one carried from any other container; its lots never left their container. A machine stays on the cursor.
         public void CloseScreen()
         {
             Screen = InteractionScreen.None;
             OpenMachineId = null;
-            CursorGoods = null;
+            if (CursorGoods != null && CursorGoods.LocationId != InventoryId) CursorGoods = null;
         }
 
         // Moves units of one stack (lots of one item and spoiled state), most exposed first, until quantity or the room the
@@ -361,7 +446,7 @@ namespace FoodFactoryGame.Session.Equipment
                 return;
             }
             var bridge = _subscription?.Bridge;
-            if (bridge == null) return;
+            if (bridge == null || StartBeltDrag()) return;
             if (_held == null)
             {
                 var visual = EquipmentUnderCrosshair();
@@ -378,6 +463,8 @@ namespace FoodFactoryGame.Session.Equipment
             var bridge = _subscription?.Bridge;
             if (Screen != InteractionScreen.None || _released || bridge == null || _camera == null) return;
             var visual = EquipmentUnderCrosshair();
+            // Belts under the crosshair are taken up while Remove is held (UpdateBelts).
+            if (visual == null && _aimBelt != null) return;
             if (visual == null)
             {
                 LastRejection = "nothing-under-cursor";
@@ -387,7 +474,10 @@ namespace FoodFactoryGame.Session.Equipment
             bridge.RequestPickUp(Track(), visual.EquipmentId);
         }
 
-        private void OnRotate(InputAction.CallbackContext _) => _rotation = (_rotation + 1) % 4;
+        private void OnRotate(InputAction.CallbackContext _)
+        {
+            if (!RotateBelts()) _rotation = (_rotation + 1) % 4;
+        }
 
         private void OnInventory(InputAction.CallbackContext _) => ToggleInventory();
 
@@ -401,10 +491,16 @@ namespace FoodFactoryGame.Session.Equipment
         }
 
         // Each Hotbar binding scales its key press to the slot number (1-9); a release reads 0.
-        private void OnHotbar(InputAction.CallbackContext context)
+        private void OnHotbar(InputAction.CallbackContext context) => PressHotbar(Mathf.RoundToInt(context.ReadValue<float>()));
+
+        // A hotbar key (1-9): over a stack on an open screen it assigns that stack's machine or item to the slot; otherwise it
+        // selects the slot.
+        public void PressHotbar(int number)
         {
-            var slot = Mathf.RoundToInt(context.ReadValue<float>());
-            if (slot >= 1 && slot <= HotbarSize) SelectSlot(slot - 1);
+            if (number < 1 || number > HotbarSize) return;
+            var hovered = Screen != InteractionScreen.None ? HoveredEntry?.Invoke() : null;
+            if (hovered != null) AssignHotbar(number - 1, hovered);
+            else SelectSlot(number - 1);
         }
 
         private string Track()
@@ -417,6 +513,7 @@ namespace FoodFactoryGame.Session.Equipment
         private void OnResult(GoodsOutcome outcome)
         {
             if (!_pending.Remove(outcome.RequestId)) return;
+            OnBeltResult(outcome);
             if (outcome.Accepted && _pending.Count == 0) LastRejection = null;
             if (!outcome.Accepted) LastRejection = string.IsNullOrEmpty(outcome.Reason) ? "rejected" : outcome.Reason;
             Debug.Log($"[Equipment] {(outcome.Accepted ? "Accepted" : "Rejected")}: {outcome.Reason} (revision {outcome.Revision}).");
@@ -429,6 +526,8 @@ namespace FoodFactoryGame.Session.Equipment
             _subscription = subscription;
             if (_subscription != null) _subscription.ResultReceived += OnResult;
             _pending.Clear();
+            _pendingBelts.Clear();
+            _removingBelts.Clear();
         }
 
         private void ApplyPointerLock(bool locked)

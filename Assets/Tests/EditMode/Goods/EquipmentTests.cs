@@ -1,4 +1,4 @@
-// Verifies equipment placement: stable identity across pickup/place, grid rules, inventory holding, durability and schema v3.
+// Verifies equipment placement: stable identity across pickup/place, grid rules, inventory holding, durability and the v2 schema upgrade.
 using System;
 using System.IO;
 using System.Linq;
@@ -204,21 +204,21 @@ namespace FoodFactoryGame.Goods.Tests
         }
 
         [Test]
-        public void SchemaV2SaveLoadsAsV3WithoutEquipment()
+        public void SchemaV2SaveLoadsAsCurrentWithoutEquipment()
         {
             var legacy = new GoodsWorld("legacy-world");
             legacy.Bootstrap(new GoodsLocation { Id = "storage", SiteId = "restaurant", Kind = "storage", Capacity = 20 });
             var current = JsonUtility.ToJson(legacy.Snapshot());
-            var v2 = current.Replace("\"SchemaVersion\":3", "\"SchemaVersion\":2").Replace(",\"Equipment\":[],\"SiteLayouts\":[]", "");
+            var v2 = current.Replace("\"SchemaVersion\":4", "\"SchemaVersion\":2").Replace(",\"Equipment\":[],\"SiteLayouts\":[],\"Belts\":[]", "");
             Assert.That(v2, Does.Not.Contain("Equipment"));
             File.WriteAllText(PathForSave, JsonUtility.ToJson(new TestEnvelope { Payload = v2, Sha256 = Digest(v2) }), new UTF8Encoding(false));
 
             var loaded = GoodsSnapshotStore.Load(PathForSave);
-            Assert.That(loaded.Snapshot().SchemaVersion, Is.EqualTo(3));
+            Assert.That(loaded.Snapshot().SchemaVersion, Is.EqualTo(GoodsSnapshot.CurrentSchema));
             Assert.That(loaded.Snapshot().Equipment, Is.Empty);
             Assert.That(loaded.Snapshot().SiteLayouts, Is.Empty);
             Assert.That(loaded.TryAdvanceDurably(1, PathForSave), Is.True);
-            Assert.That(JsonUtility.FromJson<TestEnvelope>(File.ReadAllText(PathForSave)).Payload, Does.Contain("\"SchemaVersion\":3"));
+            Assert.That(JsonUtility.FromJson<TestEnvelope>(File.ReadAllText(PathForSave)).Payload, Does.Contain("\"SchemaVersion\":4"));
         }
 
         [Test]

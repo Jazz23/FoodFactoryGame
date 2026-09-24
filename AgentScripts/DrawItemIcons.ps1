@@ -115,4 +115,26 @@ $g.FillRectangle($handle, 94, 44, 6, 32)
 $lamp = New-Object System.Drawing.SolidBrush (Color '#ffcc33')
 $g.FillEllipse($lamp, 94, 84, 7, 7)
 Save-Icon $bitmap $g 'Oven'
+
+# --- Belt: a straight conveyor seen from above, dark tread between amber rails, chevrons pointing along travel ---
+$bitmap, $g = New-Icon
+Shadow $g 20 108 88 14
+$frame = New-Object System.Drawing.SolidBrush (Color '#3b3f44')
+$g.FillRectangle($frame, 26, 10, 76, 104)
+$treadRect = New-Object System.Drawing.RectangleF 36, 10, 56, 104
+$tread = New-Object System.Drawing.Drawing2D.LinearGradientBrush $treadRect, (Color '#2a2b2e'), (Color '#4a4c50'), 0
+$g.FillRectangle($tread, $treadRect)
+$amber = New-Object System.Drawing.SolidBrush (Color '#f0a818')
+$g.FillRectangle($amber, 26, 10, 10, 104)
+$g.FillRectangle($amber, 92, 10, 10, 104)
+$chevron = New-Object System.Drawing.Pen (Color '#f6d25a'), 7
+$chevron.StartCap = $chevron.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+$chevron.LineJoin = [System.Drawing.Drawing2D.LineJoin]::Round
+foreach ($y in 34, 64, 94) {
+    $g.DrawLines($chevron, [System.Drawing.PointF[]]@(
+        (New-Object System.Drawing.PointF 48, $y), (New-Object System.Drawing.PointF 64, ($y - 14)),
+        (New-Object System.Drawing.PointF 80, $y)))
+}
+$g.DrawRectangle($dark, 26, 10, 76, 104)
+Save-Icon $bitmap $g 'Belt'
 "Icons written to $out"

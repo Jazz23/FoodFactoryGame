@@ -408,6 +408,92 @@ namespace FoodFactoryGame.Session.PlayModeTests
             }
         }
 
+        // With a virtual mouse over an inventory stack and a virtual keyboard, a hotbar key assigns the stack's item to that
+        // slot; dropping a cursor stack on a hotbar button moves the assignment there; the key then selects it in the world.
+        [UnityTest]
+        public IEnumerator HotbarKeysOverAStackAndDropsOnTheHotbarAssignSlots()
+        {
+            yield return StartHost();
+            var interaction = UnityEngine.Object.FindAnyObjectByType<EquipmentInteraction>();
+            var hud = UnityEngine.Object.FindAnyObjectByType<PlayerHud>();
+            void Click(Button button)
+            {
+                var center = button.worldBound.center;
+                foreach (var type in new[] { EventType.MouseDown, EventType.MouseUp })
+                {
+                    var systemEvent = new Event { type = type, button = 0, clickCount = 1, mousePosition = center };
+                    using EventBase pointer = type == EventType.MouseDown ? PointerDownEvent.GetPooled(systemEvent) : PointerUpEvent.GetPooled(systemEvent);
+                    button.SendEvent(pointer);
+                }
+            }
+
+            var settings = InputSystem.settings;
+            var behavior = settings.editorInputBehaviorInPlayMode;
+            settings.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
+            var background = settings.backgroundBehavior;
+            settings.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus;
+            var keyboard = InputSystem.AddDevice<Keyboard>();
+            var mouse = InputSystem.AddDevice<Mouse>();
+            IEnumerator Press(Key key)
+            {
+                InputSystem.QueueStateEvent(keyboard, new KeyboardState(key));
+                yield return null;
+                InputSystem.QueueStateEvent(keyboard, new KeyboardState());
+                yield return null;
+            }
+            try
+            {
+                yield return Until(() =>
+                {
+                    if (interaction.Screen == InteractionScreen.None) interaction.ToggleInventory();
+                    return hud.SlotOf(PlayerHud.InventoryGrid, "dough") >= 0 && interaction.ScreenClicksArmed;
+                }, "inventory screen with dough");
+                Assert.That(interaction.Hotbar[0]?.MachineKind, Is.EqualTo("oven"), "Machine kinds fill the hotbar first.");
+
+                // Panel coordinates back to screen pixels (origin bottom left) for the mouse.
+                var dough = hud.ScreenRoot.Q<Button>($"hud-{PlayerHud.InventoryGrid}-slot-{hud.SlotOf(PlayerHud.InventoryGrid, "dough")}");
+                var origin = RuntimePanelUtils.ScreenToPanel(dough.panel, Vector2.zero);
+                var unit = RuntimePanelUtils.ScreenToPanel(dough.panel, Vector2.one) - origin;
+                var center = dough.worldBound.center;
+                var topDown = new Vector2((center.x - origin.x) / unit.x, (center.y - origin.y) / unit.y);
+                InputSystem.QueueStateEvent(mouse, new MouseState { position = new Vector2(topDown.x, UnityEngine.Screen.height - topDown.y) });
+                yield return null;
+                Assert.That(hud.HoveredEntry()?.ItemId, Is.EqualTo("dough"), "The pointer is over the dough stack.");
+                yield return Press(Key.Digit3);
+                Assert.That(interaction.Hotbar[2]?.ItemId, Is.EqualTo("dough"), "3 over the dough assigns it to slot 3.");
+                Assert.That(interaction.Hotbar[0]?.MachineKind, Is.EqualTo("oven"));
+                Assert.That(interaction.CursorGoods, Is.Null, "Assigning leaves the stack where it is.");
+                yield return null;
+                Assert.That(hud.ScreenRoot.panel.visualTree.Q<Button>("hud-slot-3").Q("hud-count"), Is.Not.Null, "Slot 3 shows the dough count.");
+
+                // Pick the dough up and drop it on hotbar slot 5: the assignment moves there and the stack goes back.
+                Click(hud.ScreenRoot.Q<Button>($"hud-{PlayerHud.InventoryGrid}-slot-{hud.SlotOf(PlayerHud.InventoryGrid, "dough")}"));
+                Assert.That(interaction.CursorGoods?.ItemId, Is.EqualTo("dough"));
+                Click(hud.ScreenRoot.panel.visualTree.Q<Button>("hud-slot-5"));
+                Assert.That(interaction.Hotbar[4]?.ItemId, Is.EqualTo("dough"), "Dropping the stack on slot 5 assigns it there.");
+                Assert.That(interaction.Hotbar[2], Is.Null, "An item sits on one hotbar slot at a time.");
+                Assert.That(interaction.CursorGoods, Is.Null);
+
+                // In the world, 5 takes the inventory's dough stack onto the cursor.
+                interaction.CloseScreen();
+                yield return null;
+                yield return Press(Key.Digit5);
+                Assert.That((interaction.CursorGoods?.ItemId, interaction.CursorGoods?.LocationId, interaction.CursorGoods?.Quantity),
+                    Is.EqualTo(("dough", interaction.InventoryId, (int?)DevWorld.StarterDough)));
+                Assert.That(interaction.SelectedSlot, Is.EqualTo(4));
+                yield return Press(Key.Digit5);
+                Assert.That(interaction.CursorGoods, Is.Null, "Selecting the active slot again clears the cursor.");
+            }
+            finally
+            {
+                InputSystem.RemoveDevice(keyboard);
+                InputSystem.RemoveDevice(mouse);
+                settings.editorInputBehaviorInPlayMode = behavior;
+                settings.backgroundBehavior = background;
+                interaction.CloseScreen();
+            }
+        }
+
         [UnityTest]
         public IEnumerator ThePressThatOpensAScreenNeverClicksASlot()
         {

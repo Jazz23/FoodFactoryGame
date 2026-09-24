@@ -146,14 +146,14 @@ namespace FoodFactoryGame.Session
         {
             Directory.CreateDirectory(_options.SaveDirectory);
             // The world is committed before FishNet listens, so the bridge never serves an uncommitted state.
-            ServerWorld = DevWorld.LoadOrCreate(_options.WorldPath, equipmentDefinitions.FirstOrDefault(x => x != null && x.Kind == "oven"));
+            // Max stacks are content: capacity counts slots, so they are registered (inside LoadOrCreate, before the seed)
+            // ahead of any request.
+            ServerWorld = DevWorld.LoadOrCreate(_options.WorldPath, equipmentDefinitions.FirstOrDefault(x => x != null && x.Kind == "oven"), items);
             // Machine buffer slot counts follow content, so a saved machine created with older counts is brought up to date.
             foreach (var definition in equipmentDefinitions.Where(x => x != null))
                 ServerWorld.ApplyEquipmentCapacitiesDurably(definition.Kind, definition.InputCapacity, definition.OutputCapacity, _options.WorldPath);
             // Recipes are content, not saved state, so they are registered on every start, including a recovered save.
             foreach (var recipe in recipes) ServerWorld.RegisterRecipe(recipe.ToDefinition());
-            // Max stacks are content too: capacity counts slots, so they are registered before any request is served.
-            foreach (var item in items) ServerWorld.RegisterItem(item.Id, item.MaxStack);
             // Machines run by themselves, Factorio-style (decision 0008); like recipes, this is configuration, not saved.
             ServerWorld.AutomaticJobs = true;
             _registry = new PlayerRegistry(_options.RegistryPath);

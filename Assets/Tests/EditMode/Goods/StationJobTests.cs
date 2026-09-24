@@ -413,8 +413,8 @@ namespace FoodFactoryGame.Goods.Tests
             legacy.Bootstrap(new GoodsLocation { Id = "storage", SiteId = "restaurant", Kind = "storage", Capacity = 20 });
             legacy.Bootstrap(new GoodsLot { Id = "lot-1", ItemId = "ingredient", OwnerId = "restaurant", LocationId = "storage", Quantity = 10, SpoilAfterSeconds = 10 });
             var current = JsonUtility.ToJson(legacy.Snapshot());
-            var v1 = current.Replace("\"SchemaVersion\":3", "\"SchemaVersion\":1")
-                .Replace(",\"Stations\":[],\"Jobs\":[],\"Equipment\":[],\"SiteLayouts\":[]", "");
+            var v1 = current.Replace("\"SchemaVersion\":4", "\"SchemaVersion\":1").Replace(",\"BeltPosition\":0", "")
+                .Replace(",\"Stations\":[],\"Jobs\":[],\"Equipment\":[],\"SiteLayouts\":[],\"Belts\":[]", "");
             Assert.That(v1, Does.Not.Contain("Stations"));
             Assert.That(v1, Does.Not.Contain("Equipment"));
             Assert.That(v1, Does.Contain("\"SchemaVersion\":1"));
@@ -422,7 +422,7 @@ namespace FoodFactoryGame.Goods.Tests
 
             var loaded = GoodsSnapshotStore.Load(PathForSave);
             var state = loaded.Snapshot();
-            Assert.That(state.SchemaVersion, Is.EqualTo(3));
+            Assert.That(state.SchemaVersion, Is.EqualTo(GoodsSnapshot.CurrentSchema));
             Assert.That(state.Stations, Is.Empty);
             Assert.That(state.Jobs, Is.Empty);
             Assert.That(state.Equipment, Is.Empty);
@@ -430,7 +430,7 @@ namespace FoodFactoryGame.Goods.Tests
 
             Assert.That(loaded.TryAdvanceDurably(1, PathForSave), Is.True);
             var written = JsonUtility.FromJson<TestEnvelope>(File.ReadAllText(PathForSave)).Payload;
-            Assert.That(written, Does.Contain("\"SchemaVersion\":3"));
+            Assert.That(written, Does.Contain("\"SchemaVersion\":4"));
             Assert.That(written, Does.Contain("\"Stations\":[]"));
             Assert.That(GoodsSnapshotStore.Load(PathForSave).Snapshot().ClockSeconds, Is.EqualTo(1));
         }

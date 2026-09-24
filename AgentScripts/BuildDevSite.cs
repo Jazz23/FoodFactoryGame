@@ -2,6 +2,8 @@
 // recipe and item content, icon imports, ghost materials, UI panel settings and the DevSite scene, then makes DevSite the
 // only build scene. Safe to re-run: assets keep GUIDs.
 // The scene holds no equipment instances; placed equipment is shown from replicated state by EquipmentPresenter.
+// Belts: the three belt models (ArtSource/Belt, copied to Assets/Art/Models/Belt) get project URP materials and are wrapped
+// in tile-centred prefabs that travel +Z; BeltPresenter draws placed belts and riding goods from replicated state.
 using System.IO;
 using System.Linq;
 using FishNet.Component.Transforming;
@@ -11,8 +13,10 @@ using FishNet.Managing.Server;
 using FishNet.Managing.Transporting;
 using FishNet.Object;
 using FishNet.Transporting.Tugboat;
+using FoodFactoryGame.Goods;
 using FoodFactoryGame.Goods.Network;
 using FoodFactoryGame.Session;
+using FoodFactoryGame.Session.Belts;
 using FoodFactoryGame.Session.Equipment;
 using FoodFactoryGame.Session.Player;
 using UnityEditor;
@@ -37,10 +41,14 @@ public static class BuildDevSite
     private const string GhostModelMaterialPath = "Assets/Materials/EquipmentGhost.mat";
     private const string IconFolder = "Assets/Art/Icons";
     private const string ItemFolder = "Assets/Content/Items";
+    private const string BeltModelFolder = "Assets/Art/Models/Belt";
+    private const string BeltMaterialFolder = "Assets/Materials/Belt";
+    private const string BeltPrefabFolder = "Assets/Prefabs/Belts";
+    private const string BeltItemSpritePath = "Assets/Materials/BeltItemSprite.mat";
 
     public static string Run()
     {
-        foreach (var folder in new[] { "Assets/UI", "Assets/Prefabs/Network", "Assets/Prefabs/Player", "Assets/Network", "Assets/Content/Equipment", "Assets/Content/Recipes", "Assets/Content/Items", "Assets/Materials" })
+        foreach (var folder in new[] { "Assets/UI", "Assets/Prefabs/Network", "Assets/Prefabs/Player", "Assets/Network", "Assets/Content/Equipment", "Assets/Content/Recipes", "Assets/Content/Items", "Assets/Materials", BeltMaterialFolder, BeltPrefabFolder })
             Directory.CreateDirectory(folder);
         AssetDatabase.Refresh();
         var panelSettings = BuildPanelSettings();
@@ -49,10 +57,14 @@ public static class BuildDevSite
         var catalog = BuildCatalog(bridge, player);
         var oven = BuildOvenDefinition(ImportIcon("Oven"));
         var bread = BuildBreadRecipe();
-        var items = new[] { BuildItem(DevWorld.DoughItemId, "Dough"), BuildItem("bread", "Bread") };
+        // PROTOTYPE stack sizes: dough and bread 20, belts 100 (Factorio's belt stack).
+        var items = new[] { BuildItem(DevWorld.DoughItemId, "Dough", 20), BuildItem("bread", "Bread", 20), BuildItem(GoodsWorld.BeltItemId, "Belt", 100) };
         var ghostMaterial = BuildGhostMaterial();
         var ghostModelMaterial = BuildGhostModelMaterial();
-        BuildScene(catalog, bridge, player, panelSettings, oven, bread, items, ghostMaterial, ghostModelMaterial);
+        var tread = BuildBeltMaterials();
+        var beltPrefabs = new[] { BuildBeltPrefab("Conveyor_Straight_1m", "BeltStraight"), BuildBeltPrefab("Conveyor_Corner_Left_90", "BeltCornerLeft"), BuildBeltPrefab("Conveyor_Corner_Right_90", "BeltCornerRight") };
+        var itemSprite = BuildItemSpriteMaterial();
+        BuildScene(catalog, bridge, player, panelSettings, oven, bread, items, ghostMaterial, ghostModelMaterial, beltPrefabs, tread, itemSprite);
         EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
         AssetDatabase.SaveAssets();
         return "DevSite authored";
@@ -148,7 +160,7 @@ public static class BuildDevSite
         return AssetDatabase.LoadAssetAtPath<Sprite>(path);
     }
 
-    private static ItemDefinition BuildItem(string id, string displayName)
+    private static ItemDefinition BuildItem(string id, string displayName, int maxStack)
     {
         var path = $"{ItemFolder}/{displayName}.asset";
         var item = AssetDatabase.LoadAssetAtPath<ItemDefinition>(path);
@@ -162,12 +174,105 @@ public static class BuildDevSite
             serialized.FindProperty("id").stringValue = id;
             serialized.FindProperty("displayName").stringValue = displayName;
             serialized.FindProperty("icon").objectReferenceValue = ImportIcon(displayName);
-            // PROTOTYPE stack size for the dev items.
-            serialized.FindProperty("maxStack").intValue = 20;
+            serialized.FindProperty("maxStack").intValue = maxStack;
             serialized.ApplyModifiedPropertiesWithoutUndo();
         }
         EditorUtility.SetDirty(item);
         return item;
+    }
+
+    // URP Lit materials for the belt models, remapped onto every belt FBX by name; returns the tread (belt surface) material,
+    // whose base map is the repeating arrow texture. BeltPresenter scrolls a runtime copy of it.
+    private static Material BuildBeltMaterials()
+    {
+        var texturePath = $"{BeltModelFolder}/Conveyor_Tread_BaseColor.png";
+        if (!(AssetImporter.GetAtPath(texturePath) is TextureImporter textureImporter)) throw new System.InvalidOperationException($"Missing {texturePath}.");
+        textureImporter.wrapMode = TextureWrapMode.Repeat;
+        textureImporter.anisoLevel = 4;
+        textureImporter.SaveAndReimport();
+        var tread = BeltMaterial("BeltTread", Color.white, 0.15f, 0.32f);
+        tread.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>(texturePath));
+        tread.SetTextureScale("_BaseMap", Vector2.one);
+        EditorUtility.SetDirty(tread);
+        // Source material names in the FBX files -> project materials (README_Corners.md lists the slots).
+        var materials = new (string Match, Material Material)[]
+        {
+            ("tread", tread),
+            ("Rubber", BeltMaterial("BeltRubber", new Color(0.07f, 0.07f, 0.075f), 0f, 0.2f)),
+            ("hardware", BeltMaterial("BeltHardware", new Color(0.62f, 0.64f, 0.66f), 0.9f, 0.55f)),
+            ("frame", BeltMaterial("BeltFrame", new Color(0.17f, 0.18f, 0.2f), 0.4f, 0.45f)),
+            ("amber", BeltMaterial("BeltRail", new Color(0.95f, 0.62f, 0.08f), 0f, 0.5f))
+        };
+        foreach (var model in new[] { "Conveyor_Straight_1m", "Conveyor_Corner_Left_90", "Conveyor_Corner_Right_90" })
+        {
+            var path = $"{BeltModelFolder}/{model}.fbx";
+            if (!(AssetImporter.GetAtPath(path) is ModelImporter importer)) throw new System.InvalidOperationException($"Missing {path}.");
+            importer.materialImportMode = ModelImporterMaterialImportMode.ImportStandard;
+            var names = AssetDatabase.LoadAllAssetsAtPath(path).OfType<Material>().Select(x => x.name)
+                .Concat(importer.GetExternalObjectMap().Keys.Where(x => x.type == typeof(Material)).Select(x => x.name)).Distinct().ToList();
+            foreach (var name in names)
+            {
+                var target = materials.FirstOrDefault(x => name.IndexOf(x.Match, System.StringComparison.OrdinalIgnoreCase) >= 0).Material;
+                if (target == null) throw new System.InvalidOperationException($"No belt material for '{name}' in {path}.");
+                importer.AddRemap(new AssetImporter.SourceAssetIdentifier(typeof(Material), name), target);
+            }
+            importer.SaveAndReimport();
+        }
+        return tread;
+    }
+
+    private static Material BeltMaterial(string name, Color color, float metallic, float smoothness)
+    {
+        var path = $"{BeltMaterialFolder}/{name}.mat";
+        var material = AssetDatabase.LoadAssetAtPath<Material>(path);
+        if (material == null)
+        {
+            material = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+            AssetDatabase.CreateAsset(material, path);
+        }
+        material.SetColor("_BaseColor", color);
+        material.SetFloat("_Metallic", metallic);
+        material.SetFloat("_Smoothness", smoothness);
+        EditorUtility.SetDirty(material);
+        return material;
+    }
+
+    // A tile-centred belt prefab that travels +Z. The FBX modules travel -Z from an inlet at their origin (Blender +Y), so
+    // the model is turned half a turn and moved back half a tile. A trigger box covering the tile lets aim rays name the
+    // belt (BeltVisual is added by BeltPresenter) without blocking player movement.
+    private static GameObject BuildBeltPrefab(string model, string name)
+    {
+        var source = AssetDatabase.LoadAssetAtPath<GameObject>($"{BeltModelFolder}/{model}.fbx");
+        if (source == null) throw new System.InvalidOperationException($"Missing {model}.fbx.");
+        var root = new GameObject(name);
+        try
+        {
+            var instance = (GameObject)PrefabUtility.InstantiatePrefab(source, root.transform);
+            instance.transform.localRotation = Quaternion.Euler(0f, 180f, 0f) * instance.transform.localRotation;
+            instance.transform.localPosition = new Vector3(0f, 0f, -0.5f);
+            foreach (var collider in instance.GetComponentsInChildren<Collider>(true)) Object.DestroyImmediate(collider);
+            var box = root.AddComponent<BoxCollider>();
+            box.isTrigger = true;
+            box.center = new Vector3(0f, 0.45f, 0f);
+            box.size = new Vector3(1f, 0.9f, 1f);
+            return PrefabUtility.SaveAsPrefabAsset(root, $"{BeltPrefabFolder}/{name}.prefab");
+        }
+        finally { Object.DestroyImmediate(root); }
+    }
+
+    // Goods riding belts are camera-facing icon sprites; unlit so they read the same as the HUD icons.
+    private static Material BuildItemSpriteMaterial()
+    {
+        var material = AssetDatabase.LoadAssetAtPath<Material>(BeltItemSpritePath);
+        if (material == null)
+        {
+            var shader = Shader.Find("Universal Render Pipeline/2D/Sprite-Unlit-Default");
+            if (shader == null) throw new System.InvalidOperationException("Missing the URP unlit sprite shader.");
+            material = new Material(shader);
+            AssetDatabase.CreateAsset(material, BeltItemSpritePath);
+        }
+        EditorUtility.SetDirty(material);
+        return material;
     }
 
     // URP Lit, transparent (alpha blended, no depth write), so the machine ghost is see-through but still shaded.
@@ -274,6 +379,7 @@ public static class BuildDevSite
                 serialized.FindProperty("cameraTransform").objectReferenceValue = cameraObject.transform;
                 serialized.FindProperty("lookAction").objectReferenceValue = Action("Look");
                 serialized.FindProperty("zoomAction").objectReferenceValue = Action("Zoom");
+                serialized.FindProperty("switchViewAction").objectReferenceValue = Action("SwitchCamera");
                 serialized.ApplyModifiedPropertiesWithoutUndo();
             }
             using (var serialized = new SerializedObject(avatar))
@@ -311,7 +417,8 @@ public static class BuildDevSite
     }
 
     private static void BuildScene(SinglePrefabObjects catalog, NetworkObject bridge, NetworkObject player, PanelSettings panelSettings,
-        EquipmentDefinition oven, RecipeAsset bread, ItemDefinition[] items, Material ghostMaterial, Material ghostModelMaterial)
+        EquipmentDefinition oven, RecipeAsset bread, ItemDefinition[] items, Material ghostMaterial, Material ghostModelMaterial,
+        GameObject[] beltPrefabs, Material tread, Material itemSprite)
     {
         var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
@@ -396,6 +503,19 @@ public static class BuildDevSite
             serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 
+        var beltObject = new GameObject("BeltPresenter");
+        var belts = beltObject.AddComponent<BeltPresenter>();
+        using (var serialized = new SerializedObject(belts))
+        {
+            serialized.FindProperty("session").objectReferenceValue = session;
+            serialized.FindProperty("straightPrefab").objectReferenceValue = beltPrefabs[0];
+            serialized.FindProperty("leftCornerPrefab").objectReferenceValue = beltPrefabs[1];
+            serialized.FindProperty("rightCornerPrefab").objectReferenceValue = beltPrefabs[2];
+            serialized.FindProperty("treadMaterial").objectReferenceValue = tread;
+            serialized.FindProperty("itemMaterial").objectReferenceValue = itemSprite;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+
         var interactionObject = new GameObject("EquipmentInteraction");
         var interaction = interactionObject.AddComponent<EquipmentInteraction>();
         var ghost = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -421,6 +541,9 @@ public static class BuildDevSite
             serialized.FindProperty("closeScreenAction").objectReferenceValue = Action("CloseScreen");
             serialized.FindProperty("hotbarAction").objectReferenceValue = Action("Hotbar");
             serialized.FindProperty("quickTransferAction").objectReferenceValue = Action("QuickTransfer");
+            serialized.FindProperty("placeItemAction").objectReferenceValue = Action("PlaceItem");
+            serialized.FindProperty("takeItemAction").objectReferenceValue = Action("TakeItem");
+            serialized.FindProperty("belts").objectReferenceValue = belts;
             serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 

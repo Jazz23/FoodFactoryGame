@@ -99,6 +99,65 @@ namespace FoodFactoryGame.Goods.Network
             if (IsClientStarted) ServerStartJob(requestId, stationId, recipeId);
         }
 
+        // Places a belt from the player's inventory on an empty cell, or turns the belt already there (PlaceBeltDurably).
+        public void RequestPlaceBelt(string requestId, string siteId, int cellX, int cellZ, int direction)
+        {
+            if (IsClientStarted) ServerPlaceBelt(requestId, siteId, cellX, cellZ, direction);
+        }
+
+        public void RequestRemoveBelt(string requestId, string beltId)
+        {
+            if (IsClientStarted) ServerRemoveBelt(requestId, beltId);
+        }
+
+        // Puts one unit of a lot on a belt (PlaceOnBeltDurably).
+        public void RequestPlaceOnBelt(string requestId, string lotId, string beltId)
+        {
+            if (IsClientStarted) ServerPlaceOnBelt(requestId, lotId, beltId);
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        private void ServerPlaceBelt(string requestId, string siteId, int cellX, int cellZ, int direction, NetworkConnection sender = null)
+        {
+            if (!TryIdentify(sender, requestId, out var player)) return;
+            var result = _world.PlaceBeltDurably(player, requestId, siteId, cellX, cellZ, direction, _savePath);
+            Reply(sender, result);
+            if (result.Accepted) Broadcast();
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        private void ServerRemoveBelt(string requestId, string beltId, NetworkConnection sender = null)
+        {
+            if (!TryIdentify(sender, requestId, out var player)) return;
+            var result = _world.RemoveBeltDurably(player, requestId, beltId, _savePath);
+            Reply(sender, result);
+            if (result.Accepted) Broadcast();
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        private void ServerPlaceOnBelt(string requestId, string lotId, string beltId, NetworkConnection sender = null)
+        {
+            if (!TryIdentify(sender, requestId, out var player)) return;
+            var result = _world.PlaceOnBeltDurably(player, requestId, lotId, beltId, _savePath);
+            Reply(sender, result);
+            if (result.Accepted) Broadcast();
+        }
+
+        // Takes one riding item off a belt into the requester's inventory (TakeFromBeltDurably).
+        public void RequestTakeFromBelt(string requestId, string lotId)
+        {
+            if (IsClientStarted) ServerTakeFromBelt(requestId, lotId);
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        private void ServerTakeFromBelt(string requestId, string lotId, NetworkConnection sender = null)
+        {
+            if (!TryIdentify(sender, requestId, out var player)) return;
+            var result = _world.TakeFromBeltDurably(player, requestId, lotId, _savePath);
+            Reply(sender, result);
+            if (result.Accepted) Broadcast();
+        }
+
         [ServerRpc(RequireOwnership = false)]
         private void ServerStartJob(string requestId, string stationId, string recipeId, NetworkConnection sender = null)
         {

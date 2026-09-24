@@ -4,7 +4,9 @@ using FishNet.Component.Transforming;
 using FishNet.Managing;
 using FishNet.Managing.Object;
 using FishNet.Object;
+using FoodFactoryGame.Goods;
 using FoodFactoryGame.Goods.Network;
+using FoodFactoryGame.Session.Belts;
 using FoodFactoryGame.Session.Equipment;
 using FoodFactoryGame.Session.Player;
 using NUnit.Framework;
@@ -64,9 +66,10 @@ namespace FoodFactoryGame.Session.Tests
                 var roots = objects.SelectMany(x => x.GetComponents<SessionRoot>()).ToArray();
                 Assert.That(roots.Length, Is.EqualTo(1));
                 AssertAssigned(roots[0], "networkManager", "authenticator", "bridgePrefab", "playerPrefab", "spawnPoints", "equipmentDefinitions", "recipes", "items");
-                Assert.That(roots[0].Items.Select(x => x.Id), Is.EquivalentTo(new[] { DevWorld.DoughItemId, "bread" }));
+                Assert.That(roots[0].Items.Select(x => x.Id), Is.EquivalentTo(new[] { DevWorld.DoughItemId, "bread", GoodsWorld.BeltItemId }));
                 Assert.That(roots[0].Items.All(x => x.Icon != null), Is.True, "Every dev item has an inventory icon.");
-                Assert.That(roots[0].Items.All(x => x.MaxStack == 20), Is.True, "Dev dough and bread stack to 20.");
+                Assert.That(roots[0].Items.Select(x => (x.Id, x.MaxStack)),
+                    Is.EquivalentTo(new[] { (DevWorld.DoughItemId, 20), ("bread", 20), (GoodsWorld.BeltItemId, 100) }), "Dev dough and bread stack to 20, belts to 100.");
                 using (var serialized = new SerializedObject(roots[0]))
                 {
                     Assert.That(serialized.FindProperty("authenticator").objectReferenceValue, Is.SameAs(server.GetAuthenticator()));
@@ -88,7 +91,11 @@ namespace FoodFactoryGame.Session.Tests
                 var interactions = objects.SelectMany(x => x.GetComponents<EquipmentInteraction>()).ToArray();
                 Assert.That(interactions.Length, Is.EqualTo(1));
                 AssertAssigned(interactions[0], "session", "ghost", "ghostModelMaterial", "placeAction", "removeAction", "rotateAction", "pointAction",
-                    "inventoryAction", "clearCursorAction", "closeScreenAction", "hotbarAction", "quickTransferAction");
+                    "inventoryAction", "clearCursorAction", "closeScreenAction", "hotbarAction", "quickTransferAction", "placeItemAction", "takeItemAction", "belts");
+                var beltPresenters = objects.SelectMany(x => x.GetComponents<BeltPresenter>()).ToArray();
+                Assert.That(beltPresenters.Length, Is.EqualTo(1));
+                AssertAssigned(beltPresenters[0], "session", "straightPrefab", "leftCornerPrefab", "rightCornerPrefab", "treadMaterial", "itemMaterial");
+                Assert.That(objects.Any(x => x.GetComponent<BeltVisual>() != null), Is.False, "Belts are shown from replicated state only.");
                 var huds = objects.SelectMany(x => x.GetComponents<PlayerHud>()).ToArray();
                 Assert.That(huds.Length, Is.EqualTo(1));
                 AssertAssigned(huds[0], "document", "interaction");
@@ -144,6 +151,31 @@ namespace FoodFactoryGame.Session.Tests
             finally { Object.DestroyImmediate(instance); }
         }
 
+        // Each belt prefab is centred on its tile and travels +Z: the belt surface covers the 1 m tile at 0.8 m, and a trigger
+        // lets aim rays name the belt without blocking movement.
+        [TestCase("Assets/Prefabs/Belts/BeltStraight.prefab")]
+        [TestCase("Assets/Prefabs/Belts/BeltCornerLeft.prefab")]
+        [TestCase("Assets/Prefabs/Belts/BeltCornerRight.prefab")]
+        public void BeltPrefabsAreTileCentredWithTriggerAndScrollingTread(string path)
+        {
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            Assert.That(prefab, Is.Not.Null, path);
+            var box = prefab.GetComponent<BoxCollider>();
+            Assert.That(box != null && box.isTrigger, Is.True, "A trigger covers the tile.");
+            Assert.That(prefab.GetComponentsInChildren<Collider>(true).Length, Is.EqualTo(1));
+            var instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+            try
+            {
+                var surface = instance.GetComponentsInChildren<Renderer>().Single(x => x.sharedMaterials.Any(m => m != null && m.name == "BeltTread"));
+                Assert.That(Vector3.Distance(surface.bounds.min, new Vector3(-0.5f, BeltPath.SurfaceHeight, -0.5f)), Is.LessThan(0.01f), "surface min");
+                Assert.That(Vector3.Distance(surface.bounds.max, new Vector3(0.5f, BeltPath.SurfaceHeight, 0.5f)), Is.LessThan(0.01f), "surface max");
+                Assert.That(((Material)surface.sharedMaterials.First(m => m.name == "BeltTread")).GetTexture("_BaseMap"), Is.Not.Null);
+                Assert.That(instance.GetComponentsInChildren<Renderer>().SelectMany(x => x.sharedMaterials)
+                    .All(x => x != null && AssetDatabase.GetAssetPath(x).StartsWith("Assets/Materials/Belt/")), Is.True, "Every slot uses a project belt material.");
+            }
+            finally { Object.DestroyImmediate(instance); }
+        }
+
         [Test]
         public void BreadRecipeTurnsDoughIntoBreadInTheOven()
         {
@@ -174,7 +206,7 @@ namespace FoodFactoryGame.Session.Tests
             var rig = prefab.GetComponentInChildren<OrbitCameraRig>(true);
             Assert.That(rig, Is.Not.Null);
             Assert.That(rig.gameObject.activeSelf, Is.False, "Only the owning client enables the rig.");
-            AssertAssigned(rig, "target", "cameraTransform", "lookAction", "zoomAction");
+            AssertAssigned(rig, "target", "cameraTransform", "lookAction", "zoomAction", "switchViewAction");
             Assert.That(rig.GetComponentsInChildren<Camera>(true).Length, Is.EqualTo(1));
             Assert.That(prefab.GetComponentsInChildren<Camera>(true).Single().transform.IsChildOf(rig.transform), Is.True);
             Assert.That(prefab.GetComponentsInChildren<AudioListener>(true).All(x => x.transform.IsChildOf(rig.transform)), Is.True);
@@ -209,7 +241,9 @@ namespace FoodFactoryGame.Session.Tests
             Assert.That(player.FindAction("ClearCursor").bindings.Any(x => x.path == "<Keyboard>/q"), Is.True);
             Assert.That(player.FindAction("CloseScreen").bindings.Any(x => x.path == "<Keyboard>/escape"), Is.True);
             Assert.That(player.FindAction("QuickTransfer").bindings.Any(x => x.path == "<Keyboard>/shift"), Is.True, "Shift+click quick-transfers a stack.");
-            foreach (var name in new[] { "Place", "Remove", "Inventory", "ClearCursor", "CloseScreen" })
+            Assert.That(player.FindAction("PlaceItem").bindings.Any(x => x.path == "<Keyboard>/z"), Is.True, "Z puts one item on a belt.");
+            Assert.That(player.FindAction("TakeItem").bindings.Any(x => x.path == "<Keyboard>/f"), Is.True, "F takes an item off a belt.");
+            foreach (var name in new[] { "Place", "Remove", "Inventory", "ClearCursor", "CloseScreen", "PlaceItem", "TakeItem" })
                 Assert.That(player.FindAction(name).interactions, Is.Empty, $"{name} is a press, not a hold.");
             // Each hotbar key reads as its slot number through a scale processor.
             var hotbar = player.FindAction("Hotbar");

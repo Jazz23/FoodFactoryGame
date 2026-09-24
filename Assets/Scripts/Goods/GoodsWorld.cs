@@ -26,6 +26,8 @@ namespace FoodFactoryGame.Goods
         public long ExposureSeconds;
         public long SpoilAfterSeconds;
         public bool Spoiled;
+        // Path position (BeltRules units) while the lot rides a belt; 0 anywhere else.
+        public int BeltPosition;
     }
 
     [Serializable] public sealed class GoodsReservation
@@ -66,7 +68,7 @@ namespace FoodFactoryGame.Goods
 
     [Serializable] public sealed class GoodsSnapshot
     {
-        public const int CurrentSchema = 3;
+        public const int CurrentSchema = 4;
         public int SchemaVersion = CurrentSchema;
         public string WorldId;
         public long ClockSeconds;
@@ -80,6 +82,7 @@ namespace FoodFactoryGame.Goods
         public List<StationJob> Jobs = new();
         public List<GoodsEquipment> Equipment = new();
         public List<SiteLayout> SiteLayouts = new();
+        public List<GoodsBelt> Belts = new();
     }
 
     public sealed partial class GoodsWorld
@@ -224,6 +227,7 @@ namespace FoodFactoryGame.Goods
                 view.Jobs = view.Jobs.Where(x => stationIds.Contains(x.StationId)).ToList();
                 view.Equipment = view.Equipment.Where(x => x.SiteId == siteId).ToList();
                 view.SiteLayouts = view.SiteLayouts.Where(x => x.SiteId == siteId).ToList();
+                view.Belts = view.Belts.Where(x => x.SiteId == siteId).ToList();
                 view.Reservations.Clear();
                 view.Outcomes.Clear();
                 view.Grants.Clear();
@@ -249,6 +253,7 @@ namespace FoodFactoryGame.Goods
                 }
                 ProgressJobs(seconds);
                 StartReadyJobs();
+                MoveBeltItems(seconds);
                 _state.Revision++;
             }
         }
@@ -300,7 +305,9 @@ namespace FoodFactoryGame.Goods
                 var source = _state.Locations.First(x => x.Id == lot.LocationId);
                 if (!Allowed(playerId, source.Id) || lot.OwnerId != source.SiteId)
                     return Record(intent.RequestId, playerId, false, "forbidden", null);
-                if (destination == null || lot.LocationId == destination.Id)
+                // Goods ride belts only through PlaceOnBelt and leave them only through TakeFromBelt or with the belt (RemoveBelt).
+                if (destination == null || lot.LocationId == destination.Id || source.Kind == BeltLocationKind
+                    || destination.Kind == BeltLocationKind)
                     return Record(intent.RequestId, playerId, false, "invalid-route", null);
                 if (source.SiteId != destination.SiteId || !Allowed(playerId, destination.Id))
                     return Record(intent.RequestId, playerId, false, "forbidden", null);
@@ -430,7 +437,8 @@ namespace FoodFactoryGame.Goods
                 if (first == null || second == null || first == second || first.ItemId != second.ItemId
                     || first.OwnerId != second.OwnerId || first.LocationId != second.LocationId
                     || first.ExposureSeconds != second.ExposureSeconds || first.SpoilAfterSeconds != second.SpoilAfterSeconds
-                    || first.Spoiled != second.Spoiled || _state.Reservations.Any(x => x.Active && (x.LotId == firstId || x.LotId == secondId))) return false;
+                    || first.Spoiled != second.Spoiled || IsBeltLocation(first.LocationId)
+                    || _state.Reservations.Any(x => x.Active && (x.LotId == firstId || x.LotId == secondId))) return false;
                 checked { first.Quantity += second.Quantity; }
                 _state.Lots.Remove(second);
                 _state.Revision++;
@@ -496,7 +504,7 @@ namespace FoodFactoryGame.Goods
             if (state == null || state.SchemaVersion != GoodsSnapshot.CurrentSchema || string.IsNullOrWhiteSpace(state.WorldId)
                 || state.ClockSeconds < 0 || state.Revision < 0 || state.Locations == null || state.Lots == null
                 || state.Grants == null || state.Reservations == null || state.Outcomes == null
-                || state.Stations == null || state.Jobs == null || state.Equipment == null || state.SiteLayouts == null)
+                || state.Stations == null || state.Jobs == null || state.Equipment == null || state.SiteLayouts == null || state.Belts == null)
                 throw new InvalidOperationException("Unsupported or invalid goods snapshot schema.");
             if (state.Locations.Any(x => x == null || string.IsNullOrWhiteSpace(x.Id) || string.IsNullOrWhiteSpace(x.SiteId) || x.Capacity < 1)
                 || state.Locations.GroupBy(x => x.Id).Any(x => x.Count() != 1)
@@ -517,6 +525,7 @@ namespace FoodFactoryGame.Goods
                 throw new InvalidOperationException("Goods snapshot violates identity, capacity, or reservation invariants.");
             ValidateProduction(state);
             ValidateEquipment(state);
+            ValidateBelts(state);
         }
     }
 }

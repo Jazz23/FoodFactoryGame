@@ -4,8 +4,10 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using FoodFactoryGame.Goods;
+using FoodFactoryGame.Session.Equipment;
 using NUnit.Framework;
 using SQLite;
+using UnityEditor;
 using UnityEngine;
 
 namespace FoodFactoryGame.Session.Tests
@@ -36,9 +38,13 @@ namespace FoodFactoryGame.Session.Tests
             if (Directory.Exists(_directory)) Directory.Delete(_directory, true);
         }
 
+        // The dev seed counts its goods in slots, so it needs the real item content (max stacks) just as the server has.
+        private static ItemDefinition[] ContentItems() => AssetDatabase.FindAssets("t:ItemDefinition", new[] { "Assets/Content/Items" })
+            .Select(x => AssetDatabase.LoadAssetAtPath<ItemDefinition>(AssetDatabase.GUIDToAssetPath(x))).ToArray();
+
         private SessionAdmission Open(out GoodsWorld world)
         {
-            world = DevWorld.LoadOrCreate(WorldPath);
+            world = DevWorld.LoadOrCreate(WorldPath, items: ContentItems());
             _registry = new PlayerRegistry(RegistryPath);
             return new SessionAdmission(_registry, world, DevWorld.SiteId, WorldPath);
         }
@@ -126,7 +132,7 @@ namespace FoodFactoryGame.Session.Tests
         [Test]
         public void FailedGrantCommitRejectsAndRetryReusesIdentity()
         {
-            var world = DevWorld.LoadOrCreate(WorldPath);
+            var world = DevWorld.LoadOrCreate(WorldPath, items: ContentItems());
             _registry = new PlayerRegistry(RegistryPath);
             var missingDirectory = Path.Combine(_directory, "missing", SessionOptions.WorldFileName);
             var failing = new SessionAdmission(_registry, world, DevWorld.SiteId, missingDirectory);
@@ -187,7 +193,7 @@ namespace FoodFactoryGame.Session.Tests
         [Test]
         public void DurableGrantRejectsUnknownSiteWithoutWriting()
         {
-            var world = DevWorld.LoadOrCreate(WorldPath);
+            var world = DevWorld.LoadOrCreate(WorldPath, items: ContentItems());
             var revision = world.Snapshot().Revision;
             Assert.Throws<ArgumentException>(() => world.TryGrantDurably("player-x", "unknown-site", WorldPath));
             Assert.That(world.Snapshot().Revision, Is.EqualTo(revision));
