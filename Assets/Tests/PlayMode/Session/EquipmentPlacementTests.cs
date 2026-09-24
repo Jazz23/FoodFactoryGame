@@ -26,6 +26,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
     public sealed class EquipmentPlacementTests
     {
         private const string ScenePath = "Assets/Scenes/DevSite.unity";
+        private readonly InputTestFixture _input = new InputTestFixture();
         private string _directory;
         private SessionRoot _root;
         private EquipmentPresenter _presenter;
@@ -45,6 +46,8 @@ namespace FoodFactoryGame.Session.PlayModeTests
         [UnitySetUp]
         public IEnumerator SetUp()
         {
+            // Isolated input state: no real device (a wheel, the developer's own mouse) reaches the session under test.
+            _input.Setup();
             _results.Clear();
             _directory = Path.Combine(Path.GetTempPath(), "FoodFactoryEquipmentPlay", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(_directory);
@@ -73,18 +76,25 @@ namespace FoodFactoryGame.Session.PlayModeTests
         [UnityTearDown]
         public IEnumerator TearDown()
         {
-            _remoteSite?.Reset();
-            if (_remote != null)
+            try
             {
-                _remote.ClientManager.StopConnection();
-                UnityEngine.Object.Destroy(_remote.gameObject);
+                _remoteSite?.Reset();
+                if (_remote != null)
+                {
+                    _remote.ClientManager.StopConnection();
+                    UnityEngine.Object.Destroy(_remote.gameObject);
+                }
+                _remote = null;
+                if (_root != null) _root.Shutdown();
+                _root = null;
+                yield return null;
+                if (_directory != null && Directory.Exists(_directory)) Directory.Delete(_directory, true);
+                _directory = null;
             }
-            _remote = null;
-            if (_root != null) _root.Shutdown();
-            _root = null;
-            yield return null;
-            if (_directory != null && Directory.Exists(_directory)) Directory.Delete(_directory, true);
-            _directory = null;
+            finally
+            {
+                _input.TearDown();
+            }
         }
 
         private void CreateRemote()
@@ -487,12 +497,6 @@ namespace FoodFactoryGame.Session.PlayModeTests
                 }
             }
 
-            var settings = InputSystem.settings;
-            var behavior = settings.editorInputBehaviorInPlayMode;
-            settings.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
-            var background = settings.backgroundBehavior;
-            // Runs from an unfocused Editor too: keep virtual devices enabled without application focus.
-            settings.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus;
             var keyboard = InputSystem.AddDevice<Keyboard>();
             try
             {
@@ -521,8 +525,6 @@ namespace FoodFactoryGame.Session.PlayModeTests
             finally
             {
                 InputSystem.RemoveDevice(keyboard);
-                settings.editorInputBehaviorInPlayMode = behavior;
-                settings.backgroundBehavior = background;
                 interaction.CloseScreen();
             }
         }
@@ -546,11 +548,6 @@ namespace FoodFactoryGame.Session.PlayModeTests
                 }
             }
 
-            var settings = InputSystem.settings;
-            var behavior = settings.editorInputBehaviorInPlayMode;
-            settings.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
-            var background = settings.backgroundBehavior;
-            settings.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus;
             var keyboard = InputSystem.AddDevice<Keyboard>();
             var mouse = InputSystem.AddDevice<Mouse>();
             IEnumerator Press(Key key)
@@ -607,8 +604,6 @@ namespace FoodFactoryGame.Session.PlayModeTests
             {
                 InputSystem.RemoveDevice(keyboard);
                 InputSystem.RemoveDevice(mouse);
-                settings.editorInputBehaviorInPlayMode = behavior;
-                settings.backgroundBehavior = background;
                 interaction.CloseScreen();
             }
         }
@@ -618,13 +613,6 @@ namespace FoodFactoryGame.Session.PlayModeTests
         {
             yield return StartHost();
             var interaction = UnityEngine.Object.FindAnyObjectByType<EquipmentInteraction>();
-            var settings = InputSystem.settings;
-            var behavior = settings.editorInputBehaviorInPlayMode;
-            // The test runner's window may not focus the Game view; route the virtual mouse to the player regardless.
-            settings.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
-            var background = settings.backgroundBehavior;
-            // Runs from an unfocused Editor too: keep virtual devices enabled without application focus.
-            settings.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus;
             var mouse = InputSystem.AddDevice<Mouse>();
             try
             {
@@ -647,8 +635,6 @@ namespace FoodFactoryGame.Session.PlayModeTests
             finally
             {
                 InputSystem.RemoveDevice(mouse);
-                settings.editorInputBehaviorInPlayMode = behavior;
-                settings.backgroundBehavior = background;
                 interaction.CloseScreen();
             }
         }

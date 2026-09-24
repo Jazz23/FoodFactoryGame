@@ -13,6 +13,7 @@ using FoodFactoryGame.Session.Equipment;
 using FoodFactoryGame.Session.Player;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 
@@ -21,6 +22,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
     public sealed class BuildingPresenterTests
     {
         private const string ScenePath = "Assets/Scenes/DevSite.unity";
+        private readonly InputTestFixture _input = new InputTestFixture();
         private string _directory;
         private SessionRoot _root;
         private BuildingPresenter _presenter;
@@ -36,6 +38,8 @@ namespace FoodFactoryGame.Session.PlayModeTests
         [UnitySetUp]
         public IEnumerator SetUp()
         {
+            // Isolated input state: no real device (a wheel, the developer's own mouse) reaches the session under test.
+            _input.Setup();
             _directory = Path.Combine(Path.GetTempPath(), "FoodFactoryBuildingPlay", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(_directory);
             yield return SceneManager.LoadSceneAsync(ScenePath, LoadSceneMode.Single);
@@ -56,11 +60,18 @@ namespace FoodFactoryGame.Session.PlayModeTests
         [UnityTearDown]
         public IEnumerator TearDown()
         {
-            if (_root != null) _root.Shutdown();
-            _root = null;
-            yield return null;
-            if (_directory != null && Directory.Exists(_directory)) Directory.Delete(_directory, true);
-            _directory = null;
+            try
+            {
+                if (_root != null) _root.Shutdown();
+                _root = null;
+                yield return null;
+                if (_directory != null && Directory.Exists(_directory)) Directory.Delete(_directory, true);
+                _directory = null;
+            }
+            finally
+            {
+                _input.TearDown();
+            }
         }
 
         private IEnumerator StandIn(int cellX, int cellZ)

@@ -130,6 +130,12 @@ Driving a player build from a script (used for the placement captures): the play
 
 Session tests: `FoodFactoryGame.Session.EditModeTests` (assembly, editor) and `FoodFactoryGame.Session.PlayModeTests` (assembly, playmode, async; make sure the open scene is not dirty). The PlayMode tests load the real `DevSite`, call `SessionRoot.Configure` with a temporary save directory and identity files and a free UDP port, and add a second client-only NetworkManager for the remote client. They expect one `SpawnablePrefabs is null on session-test-remote` error from FishNet's editor `Reset` (declared with `LogAssert.Expect`), and emit "2 audio listeners" warnings because both local clients own a camera in one process. Current counts and run identities are in [the session verification record](verification/session-20260922.md).
 
+Input isolation (so the developer can keep using other controllers, such as a racing wheel, while agents work in the Editor):
+
+- Each Session PlayMode fixture owns an `InputTestFixture` (from `Unity.InputSystem.TestFramework`). It calls `Setup()` before loading `DevSite` and `TearDown()` in a `finally` at the end of `[UnityTearDown]`. While a test runs, the Input System has no real devices and drops all native input. Tests add virtual `Mouse`/`Keyboard` devices and queue state for them; do not change focus settings in tests. New PlayMode fixtures that load scenes with input-reading components must follow the same pattern.
+- `Assets/InputSystem.inputsettings.asset`, registered as `com.unity.input.settings`, sets Background Behavior to **Reset And Disable All Devices** and Play Mode Input Behavior to **All Devices Respect Game View Focus**. Outside tests, a play session in the Editor ignores every device, the wheel included, unless the Game view is focused. A player build still pauses when it loses focus (`runInBackground: 0`).
+- To keep the Editor off a controller entirely, run tests from a separate command-line checkout (below). Nothing more is isolated than that: the Editor still lists real devices while it is idle.
+
 For a separate checkout with its Editor closed, the batch equivalent is:
 
 ```powershell
@@ -147,22 +153,26 @@ Inspect the saved build scene and open-scene state first:
 {"name":"list_open_scenes","arguments":{}}
 ```
 
-Do not save or replace an unrelated open scene. The baseline explicitly builds the existing saved starter scene:
+Do not save or replace an unrelated open scene. Stop play mode and wait for compilation with no console errors first. Build the saved `DevSite` scene, the only build scene, to `build/Session`, the path the session commands above use:
 
 ```json
-{"name":"build","arguments":{"target":"StandaloneWindows64","outputPath":"build/Baseline/FoodFactoryGame.exe","options":["Development","DetailedBuildReport"],"scenes":["Assets/Scenes/SampleScene.unity"],"confirm":true}}
+{"name":"build","arguments":{"target":"StandaloneWindows64","outputPath":"build/Session/FoodFactoryGame.exe","options":["Development","DetailedBuildReport"],"scenes":["Assets/Scenes/DevSite.unity"],"confirm":true}}
 {"name":"build_status","arguments":{}}
 ```
 
 Poll until `completed`, require a successful BuildReport, and retain its build ID, summary, warnings/errors, and output location. A queued response or dry run is not a successful build. The full report can be large; store it and inspect summary/failure details.
 
-Launch the player with an explicit log path in an existing artifact directory:
+Manual equivalent in the Editor: **File → Build Profiles**, Windows platform, confirm `Scenes/DevSite` is the only checked scene, optionally enable **Development Build**, then **Build** into `build/Session` as `FoodFactoryGame.exe`. Many FishNet vendor warnings are expected (see the verification record below).
+
+Launch the player with an explicit log path, an isolated save, and an identity file in an existing artifact directory:
 
 ```powershell
-Start-Process -FilePath ".\build\Baseline\FoodFactoryGame.exe" -ArgumentList '-screen-fullscreen 0 -screen-width 1280 -screen-height 720 -logFile "<absolute-artifact-directory>\baseline-player.log"' -PassThru
+Start-Process -FilePath ".\build\Session\FoodFactoryGame.exe" -ArgumentList '-screen-fullscreen 0 -screen-width 1280 -screen-height 720 -save "<absolute-artifact-directory>\player-save" -identity "<absolute-artifact-directory>\player.db" -logFile "<absolute-artifact-directory>\player.log"' -PassThru
 ```
 
-Verify that the player stays alive, creates a responsive window, initializes graphics, and has no startup exceptions in its log. Close the specific process launched for the check. This proves starter-player startup, not gameplay, multiplayer, or visual acceptance.
+Without `-host`, `-server`, or `-connect` the player opens the session menu. Verify that the player stays alive, creates a responsive window, initializes graphics, and has no startup exceptions in its log. Close the specific process launched for the check. This proves player startup, not gameplay, multiplayer, or visual acceptance; use the two-process check above for a session.
+
+The 2026-09-21 record below predates `DevSite` and describes a `SampleScene` build to `build/Baseline`.
 
 ## Verification Record - 2026-09-21
 

@@ -25,6 +25,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
     public sealed class BeltPlacementTests
     {
         private const string ScenePath = "Assets/Scenes/DevSite.unity";
+        private readonly InputTestFixture _input = new InputTestFixture();
         private string _directory;
         private SessionRoot _root;
         private BeltPresenter _belts;
@@ -32,8 +33,6 @@ namespace FoodFactoryGame.Session.PlayModeTests
         private PlayerHud _hud;
         private Mouse _mouse;
         private Keyboard _keyboard;
-        private InputSettings.EditorInputBehaviorInPlayMode _behavior;
-        private InputSettings.BackgroundBehavior _background;
         private PlayerAvatar _avatar;
         private Vector3 _aimOffset;
 
@@ -47,6 +46,8 @@ namespace FoodFactoryGame.Session.PlayModeTests
         [UnitySetUp]
         public IEnumerator SetUp()
         {
+            // Isolated input state: no real device (a wheel, the developer's own mouse) reaches the session under test.
+            _input.Setup();
             _directory = Path.Combine(Path.GetTempPath(), "FoodFactoryBeltPlay", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(_directory);
             yield return SceneManager.LoadSceneAsync(ScenePath, LoadSceneMode.Single);
@@ -64,12 +65,6 @@ namespace FoodFactoryGame.Session.PlayModeTests
             });
             using (var socket = new UdpClient(new IPEndPoint(IPAddress.Loopback, 0)))
                 _root.NetworkManager.TransportManager.Transport.SetPort((ushort)((IPEndPoint)socket.Client.LocalEndPoint).Port);
-            var settings = InputSystem.settings;
-            _behavior = settings.editorInputBehaviorInPlayMode;
-            _background = settings.backgroundBehavior;
-            // The test runner's window may not focus the Game view; route virtual devices to the player regardless.
-            settings.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
-            settings.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus;
             _mouse = InputSystem.AddDevice<Mouse>();
             _keyboard = InputSystem.AddDevice<Keyboard>();
         }
@@ -77,17 +72,22 @@ namespace FoodFactoryGame.Session.PlayModeTests
         [UnityTearDown]
         public IEnumerator TearDown()
         {
-            if (_mouse != null) InputSystem.RemoveDevice(_mouse);
-            if (_keyboard != null) InputSystem.RemoveDevice(_keyboard);
-            _mouse = null;
-            _keyboard = null;
-            InputSystem.settings.editorInputBehaviorInPlayMode = _behavior;
-            InputSystem.settings.backgroundBehavior = _background;
-            if (_root != null) _root.Shutdown();
-            _root = null;
-            yield return null;
-            if (_directory != null && Directory.Exists(_directory)) Directory.Delete(_directory, true);
-            _directory = null;
+            try
+            {
+                if (_mouse != null) InputSystem.RemoveDevice(_mouse);
+                if (_keyboard != null) InputSystem.RemoveDevice(_keyboard);
+                _mouse = null;
+                _keyboard = null;
+                if (_root != null) _root.Shutdown();
+                _root = null;
+                yield return null;
+                if (_directory != null && Directory.Exists(_directory)) Directory.Delete(_directory, true);
+                _directory = null;
+            }
+            finally
+            {
+                _input.TearDown();
+            }
         }
 
         private GoodsSnapshot Server => _root.ServerWorld.Snapshot();
