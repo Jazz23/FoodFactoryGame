@@ -212,6 +212,11 @@ namespace FoodFactoryGame.Session
 
         private void ReleaseServer()
         {
+            // The bridge holds the world save while serving and ticks between commits (decision 0016); FishNet may stop it a
+            // frame later, so save the pending ticks and close the save now.
+            if (ServerWorld != null && _options != null && !ServerWorld.TryCommitDurably(_options.WorldPath))
+                Debug.LogWarning("[Session] Could not save the last clock ticks while stopping; the save keeps its previous revision.");
+            if (_options != null) GoodsSnapshotStore.Release(_options.WorldPath);
             ServerBridge = null;
             ServerWorld = null;
             _registry?.Dispose();

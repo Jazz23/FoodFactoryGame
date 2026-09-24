@@ -16,7 +16,11 @@ namespace FoodFactoryGame.Goods.Network
         private readonly Dictionary<NetworkConnection, string> _subscriptions = new();
         private readonly Dictionary<string, long> _clientRevisions = new();
         private const float StatsIntervalSeconds = 60f;
+        // Decision 0016: clock ticks run in memory and are saved this often (player commands still save at once), so a
+        // crash loses at most this much simulated time.
+        private const long CommitIntervalSeconds = 10;
         private float _clockRemainder;
+        private long _uncommittedSeconds;
         private float _statsRemainder;
         private string _savePath;
         private bool _persistenceFailed;
@@ -35,6 +39,8 @@ namespace FoodFactoryGame.Goods.Network
             _world = world;
             _resolvePlayer = resolvePlayer;
             _savePath = savePath;
+            // The served save commits repeatedly, so it keeps one WAL connection open until the server stops.
+            GoodsSnapshotStore.Hold(savePath);
             // Decision 0012 measurements describe this served world, not earlier saves in the same process.
             GoodsSnapshotStore.Stats.Reset();
         }
@@ -42,15 +48,29 @@ namespace FoodFactoryGame.Goods.Network
         public override void OnStopServer()
         {
             _subscriptions.Clear();
+            CloseSave();
             _world = null;
             _resolvePlayer = null;
             _savePath = null;
             _clockRemainder = 0;
+            _uncommittedSeconds = 0;
             _statsRemainder = 0;
             _persistenceFailed = false;
         }
 
         public override void OnStopClient() => _clientRevisions.Clear();
+
+        // Backstop for a bridge destroyed without OnStopServer, so pending ticks are saved and the held save's files can
+        // be closed and deleted.
+        private void OnDestroy() => CloseSave();
+
+        // A clean stop saves ticks not yet committed; only a crash loses them.
+        private void CloseSave()
+        {
+            if (_world != null && _savePath != null && !_world.TryCommitDurably(_savePath))
+                Debug.LogWarning("[Goods] Could not save the last clock ticks while stopping; the save keeps its previous revision.");
+            GoodsSnapshotStore.Release(_savePath);
+        }
 
         private void Update()
         {
@@ -64,15 +84,22 @@ namespace FoodFactoryGame.Goods.Network
             }
             _clockRemainder += Time.unscaledDeltaTime;
             if (_clockRemainder < 1f) return;
+            // While a commit is failing the clock waits, so memory never runs more than one interval ahead of the save.
+            if (_persistenceFailed && !TryCommit()) return;
             var seconds = (long)_clockRemainder;
-            if (!_world.TryAdvanceDurably(seconds, _savePath))
-            {
-                _persistenceFailed = true;
-                return;
-            }
+            _world.AdvanceUncommitted(seconds);
             _clockRemainder -= seconds;
-            _persistenceFailed = false;
+            _uncommittedSeconds += seconds;
+            if (_uncommittedSeconds >= CommitIntervalSeconds) TryCommit();
             Broadcast();
+        }
+
+        // Also a no-op when a player command has already saved the pending ticks.
+        private bool TryCommit()
+        {
+            _persistenceFailed = !_world.TryCommitDurably(_savePath);
+            if (!_persistenceFailed) _uncommittedSeconds = 0;
+            return !_persistenceFailed;
         }
 
         public void RequestTransfer(string requestId, string lotId, string destinationId, int quantity, string reservationId = "")

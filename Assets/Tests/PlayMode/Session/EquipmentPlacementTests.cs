@@ -330,7 +330,9 @@ namespace FoodFactoryGame.Session.PlayModeTests
             Assert.That(hud.ScreenRoot.Q<Label>("hud-progress-label").text, Does.StartWith("Serving a customer: Bread for $2.50"));
 
             yield return Until(() => { _remoteSite.Tick(); return RemoteCash() == DevWorld.StartingCash + 250; }, "remote sees one sale", 15f);
-            Assert.That(GoodsSnapshotStore.Load(_root.Options.WorldPath).Snapshot().Companies.Single().Cash, Is.GreaterThanOrEqualTo(DevWorld.StartingCash + 250));
+            // Sales happen in clock ticks, which are saved on the decision-0016 commit interval (10 s).
+            yield return Until(() => GoodsSnapshotStore.Load(_root.Options.WorldPath).Snapshot().Companies.Single().Cash >= DevWorld.StartingCash + 250,
+                "sale committed", 12f);
             yield return Until(() => hud.ScreenRoot.panel.visualTree.Q<Label>("hud-cash").text == PlayerHud.FormatCash(_root.ClientSite.Companies.Single().Cash), "host HUD shows the balance");
             yield return Until(() => { _remoteSite.Tick(); return RemoteCash() == DevWorld.StartingCash + 500; }, "remote sees both sales", 15f);
             interaction.CloseScreen();

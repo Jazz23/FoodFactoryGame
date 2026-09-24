@@ -134,7 +134,8 @@ namespace FoodFactoryGame.Goods.PlayModeTests
                 serverBridge.SiteReceived += baselines.Add;
                 // No subscription or site presentation. Server-owned time and condition must still advance.
                 yield return Until(() => world.Snapshot().Lots.Single().Spoiled, "unobserved site spoilage", 7f);
-                Assert.That(GoodsSnapshotStore.Load(path).Snapshot().Lots.Single().Spoiled, Is.True);
+                // Ticks are saved on the decision-0016 commit interval (10 s), not every second.
+                yield return Until(() => GoodsSnapshotStore.Load(path).Snapshot().Lots.Single().Spoiled, "spoilage committed", 12f);
                 Assert.That(baselines, Is.Empty);
                 serverBridge.RequestSite("restaurant");
                 yield return Until(() => baselines.Count > 0, "granted site baseline");

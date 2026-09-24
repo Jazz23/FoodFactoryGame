@@ -1,6 +1,9 @@
 // Commits verified versioned goods snapshots to a SQLite database in one transaction and recovers the newest valid one.
 // The newest row and the prior valid row are kept, so a damaged latest payload falls back to the previous commit.
+// Databases use WAL with FULL sync: one fsync per commit. A served world holds its connection open between commits,
+// because closing the last connection checkpoints and deletes the WAL, which costs as much as the old journal.
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Security.Cryptography;
@@ -24,8 +27,36 @@ namespace FoodFactoryGame.Goods
 
         private static readonly object SaveGate = new();
 
+        // Connections kept open by Hold, keyed by full path; null after a failed commit until the next Save reopens it.
+        // Guarded by SaveGate.
+        private static readonly Dictionary<string, SQLiteConnection> Held = new(StringComparer.OrdinalIgnoreCase);
+
         // Cost of every commit in this process, from snapshot serialization to the end of the transaction.
         public static GoodsCommitStats Stats { get; } = new();
+
+        // Keeps one connection to an existing database open for Save until Release. The database's files stay open
+        // (and cannot be deleted) meanwhile. Holding an already held path does nothing.
+        public static void Hold(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) throw new ArgumentException("Explicit save path required.");
+            var full = Path.GetFullPath(path);
+            if (!File.Exists(full)) throw new FileNotFoundException("No goods database.", full);
+            lock (SaveGate)
+            {
+                if (!Held.ContainsKey(full)) Held[full] = Open(full, true);
+            }
+        }
+
+        // Closes a held connection; the last close checkpoints the WAL into the database file. Unheld paths are ignored.
+        public static void Release(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return;
+            var full = Path.GetFullPath(path);
+            lock (SaveGate)
+            {
+                if (Held.Remove(full, out var db)) db?.Dispose();
+            }
+        }
 
         public static void Save(GoodsWorld world, string path)
         {
@@ -41,36 +72,52 @@ namespace FoodFactoryGame.Goods
             lock (SaveGate)
             {
                 timer.Start();
-                using var db = Open(full, true);
-                // IMMEDIATE takes the write lock before the revision check, so another process cannot commit in between.
-                // Waiting for another writer is contention, not commit cost, so it is left out of the measurement.
-                timer.Stop();
-                db.Execute("BEGIN IMMEDIATE");
-                timer.Start();
+                var held = Held.TryGetValue(full, out var db);
+                // A held path whose connection was dropped after a failure reopens here.
+                if (held && db == null) Held[full] = db = Open(full, true);
+                using var opened = held ? null : Open(full, true);
+                db ??= opened;
                 try
                 {
-                    var prior = LatestValid(db, true);
-                    if (prior != null)
+                    // IMMEDIATE takes the write lock before the revision check, so another process cannot commit in between.
+                    // Waiting for another writer is contention, not commit cost, so it is left out of the measurement.
+                    timer.Stop();
+                    db.Execute("BEGIN IMMEDIATE");
+                    timer.Start();
+                    try
                     {
-                        if (prior.WorldId != state.WorldId || prior.Revision > state.Revision
-                            || (prior.Revision == state.Revision && JsonUtility.ToJson(prior) != payload))
-                            throw new IOException("Refusing a stale or conflicting world snapshot.");
+                        var prior = LatestValid(db, true);
+                        if (prior != null)
+                        {
+                            if (prior.WorldId != state.WorldId || prior.Revision > state.Revision
+                                || (prior.Revision == state.Revision && JsonUtility.ToJson(prior) != payload))
+                                throw new IOException("Refusing a stale or conflicting world snapshot.");
+                        }
+                        if (prior == null || prior.Revision != state.Revision)
+                        {
+                            db.Execute("INSERT INTO snapshots (revision, world_id, schema_version, payload, sha256, saved_utc) VALUES (?, ?, ?, ?, ?, ?)",
+                                state.Revision, state.WorldId, state.SchemaVersion, payload, Digest(payload), DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+                            if (prior != null) db.Execute("DELETE FROM snapshots WHERE revision < ?", prior.Revision);
+                            wrote = true;
+                        }
+                        db.Execute("COMMIT");
                     }
-                    if (prior == null || prior.Revision != state.Revision)
+                    catch
                     {
-                        db.Execute("INSERT INTO snapshots (revision, world_id, schema_version, payload, sha256, saved_utc) VALUES (?, ?, ?, ?, ?, ?)",
-                            state.Revision, state.WorldId, state.SchemaVersion, payload, Digest(payload), DateTimeOffset.UtcNow.ToUnixTimeSeconds());
-                        if (prior != null) db.Execute("DELETE FROM snapshots WHERE revision < ?", prior.Revision);
-                        wrote = true;
+                        db.Execute("ROLLBACK");
+                        throw;
                     }
-                    db.Execute("COMMIT");
                 }
-                catch
+                catch when (held)
                 {
-                    db.Execute("ROLLBACK");
+                    // A held connection may be left mid-transaction if ROLLBACK failed; never reuse it after a failure.
+                    Held[full] = null;
+                    db.Dispose();
                     throw;
                 }
             }
+            // The save now holds this revision (written, or already identical).
+            world.MarkCommitted(state.Revision);
             if (wrote) Stats.Record(timer.Elapsed.TotalMilliseconds, Encoding.UTF8.GetByteCount(payload));
         }
 
@@ -79,9 +126,11 @@ namespace FoodFactoryGame.Goods
             if (string.IsNullOrWhiteSpace(path)) throw new ArgumentException("Explicit save path required.");
             var full = Path.GetFullPath(path);
             if (!File.Exists(full)) throw new FileNotFoundException("No goods database.", full);
-            // Opened read-write (never created) so SQLite can roll back a hot journal left by a crash.
+            // Opened read-write (never created) so SQLite can recover a WAL or roll back a hot journal left by a crash.
             using var db = Open(full, false);
-            return GoodsWorld.Restore(LatestValid(db, false) ?? throw new InvalidOperationException("No valid goods snapshot."));
+            var world = GoodsWorld.Restore(LatestValid(db, false) ?? throw new InvalidOperationException("No valid goods snapshot."));
+            world.MarkCommitted(world.Snapshot().Revision);
+            return world;
         }
 
         // Copies a pre-SQLite snapshot file (or its .previous fallback) into a new database; the legacy files are left as
@@ -117,7 +166,10 @@ namespace FoodFactoryGame.Goods
                     if (version == 0) throw new InvalidOperationException("Not an initialized goods database.");
                     return db;
                 }
-                // FULL sync: an acknowledged mutation must survive a crash immediately after the reply.
+                // WAL is stored in the database file, so later opens (including Load) use it too. FULL sync: an
+                // acknowledged mutation must survive a crash immediately after the reply.
+                if (!string.Equals(db.ExecuteScalar<string>("PRAGMA journal_mode = WAL"), "wal", StringComparison.OrdinalIgnoreCase))
+                    throw new IOException("The goods database could not switch to WAL.");
                 db.ExecuteScalar<string>("PRAGMA synchronous = FULL");
                 if (version == 0)
                 {

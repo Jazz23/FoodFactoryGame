@@ -96,6 +96,8 @@ namespace FoodFactoryGame.Goods
         // Item content, like recipes: registered by the server at start and never saved. Unregistered items stack to 1.
         private readonly Dictionary<string, int> _maxStacks = new();
         private GoodsSnapshot _state;
+        // Revision of the last successful save of this world (or of the save it was loaded from); -1 if never saved.
+        private long _committedRevision = -1;
 
         // Bootstrap is server-only: callers supply durable IDs; never expose this method to an RPC.
         public GoodsWorld(string worldId)
@@ -115,6 +117,18 @@ namespace FoodFactoryGame.Goods
         public GoodsSnapshot Snapshot()
         {
             lock (_gate) return JsonUtility.FromJson<GoodsSnapshot>(JsonUtility.ToJson(_state));
+        }
+
+        // True while the in-memory world is ahead of its last save (AdvanceUncommitted, or never saved).
+        public bool HasUncommittedChanges
+        {
+            get { lock (_gate) return _state.Revision != _committedRevision; }
+        }
+
+        // Called by GoodsSnapshotStore after a revision is committed to, or loaded from, a save.
+        internal void MarkCommitted(long revision)
+        {
+            lock (_gate) _committedRevision = revision;
         }
 
         public void Bootstrap(GoodsLocation location)
@@ -235,7 +249,8 @@ namespace FoodFactoryGame.Goods
             }
         }
 
-        // Volatile domain primitive for bootstrap/tests. Live ticking must use TryAdvanceDurably.
+        // Volatile domain primitive for bootstrap/tests. Live ticking uses AdvanceUncommitted plus TryCommitDurably
+        // (decision 0016), or TryAdvanceDurably.
         public void Advance(long seconds)
         {
             if (seconds < 0) throw new ArgumentOutOfRangeException(nameof(seconds));
@@ -391,6 +406,44 @@ namespace FoodFactoryGame.Goods
                     Advance(seconds);
                     return true;
                 }, () => false);
+            }
+        }
+
+        // Live clock step between commits (decision 0016): advances in memory only. The next TryCommitDurably, or any
+        // durable command (it saves the whole world), persists it; a crash before then loses it together with everything
+        // it produced, so goods and cash roll back as one revision. A failure restores the prior state and rethrows.
+        public void AdvanceUncommitted(long seconds)
+        {
+            if (seconds < 0) throw new ArgumentOutOfRangeException(nameof(seconds));
+            lock (_gate)
+            {
+                if (seconds == 0) return;
+                var before = Snapshot();
+                try { Advance(seconds); }
+                catch
+                {
+                    _state = before;
+                    throw;
+                }
+            }
+        }
+
+        // Saves the world if it is ahead of its last save. Returns false, leaving memory unchanged, if the save cannot
+        // commit; nothing pending returns true without touching the disk.
+        public bool TryCommitDurably(string savePath)
+        {
+            lock (_gate)
+            {
+                if (!HasUncommittedChanges) return true;
+                try
+                {
+                    GoodsSnapshotStore.Save(this, savePath);
+                    return true;
+                }
+                catch (Exception error) when (PersistenceError(error))
+                {
+                    return false;
+                }
             }
         }
 

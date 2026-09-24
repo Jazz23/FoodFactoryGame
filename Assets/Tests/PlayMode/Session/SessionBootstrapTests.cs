@@ -179,7 +179,10 @@ namespace FoodFactoryGame.Session.PlayModeTests
             Assert.That(_root.NetworkManager.IsClientStarted, Is.False);
             Assert.That(ServerAvatars, Is.Empty);
             Assert.That(UnityEngine.Object.FindObjectsByType<Camera>(), Is.Empty);
-            Assert.That(GoodsSnapshotStore.Load(_root.Options.WorldPath).Snapshot().ClockSeconds, Is.GreaterThanOrEqualTo(start + 2));
+            // Ticks between commits live in memory (decision 0016); a clean stop saves them.
+            var reached = _root.ServerWorld.Snapshot().ClockSeconds;
+            _root.Shutdown();
+            Assert.That(GoodsSnapshotStore.Load(_root.Options.WorldPath).Snapshot().ClockSeconds, Is.GreaterThanOrEqualTo(reached));
         }
     }
 }
