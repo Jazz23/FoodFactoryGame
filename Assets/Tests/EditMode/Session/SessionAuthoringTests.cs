@@ -7,6 +7,7 @@ using FishNet.Object;
 using FoodFactoryGame.Goods;
 using FoodFactoryGame.Goods.Network;
 using FoodFactoryGame.Session.Belts;
+using FoodFactoryGame.Session.Buildings;
 using FoodFactoryGame.Session.Equipment;
 using FoodFactoryGame.Session.Player;
 using NUnit.Framework;
@@ -102,6 +103,10 @@ namespace FoodFactoryGame.Session.Tests
                 Assert.That(beltPresenters.Length, Is.EqualTo(1));
                 AssertAssigned(beltPresenters[0], "session", "straightPrefab", "leftCornerPrefab", "rightCornerPrefab", "treadMaterial", "itemMaterial");
                 Assert.That(objects.Any(x => x.GetComponent<BeltVisual>() != null), Is.False, "Belts are shown from replicated state only.");
+                // Building shells are shown from replicated state too (decision 0019).
+                var buildingPresenters = objects.SelectMany(x => x.GetComponents<BuildingPresenter>()).ToArray();
+                Assert.That(buildingPresenters.Length, Is.EqualTo(1));
+                AssertAssigned(buildingPresenters[0], "session", "wallMaterial", "floorMaterial", "roofMaterial");
                 var huds = objects.SelectMany(x => x.GetComponents<PlayerHud>()).ToArray();
                 Assert.That(huds.Length, Is.EqualTo(1));
                 AssertAssigned(huds[0], "document", "interaction");

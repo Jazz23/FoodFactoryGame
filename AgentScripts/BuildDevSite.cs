@@ -17,6 +17,7 @@ using FoodFactoryGame.Goods;
 using FoodFactoryGame.Goods.Network;
 using FoodFactoryGame.Session;
 using FoodFactoryGame.Session.Belts;
+using FoodFactoryGame.Session.Buildings;
 using FoodFactoryGame.Session.Equipment;
 using FoodFactoryGame.Session.Player;
 using UnityEditor;
@@ -53,10 +54,11 @@ public static class BuildDevSite
     private const string FridgeDefinitionPath = "Assets/Content/Equipment/Fridge.asset";
     private const string FridgeMaterialFolder = "Assets/Materials/Fridge";
     private const string OfferFolder = "Assets/Content/Offers";
+    private const string BuildingMaterialFolder = "Assets/Materials/Building";
 
     public static string Run()
     {
-        foreach (var folder in new[] { "Assets/UI", "Assets/Prefabs/Network", "Assets/Prefabs/Player", "Assets/Network", "Assets/Content/Equipment", "Assets/Content/Recipes", "Assets/Content/Items", "Assets/Materials", BeltMaterialFolder, BeltPrefabFolder, CounterMaterialFolder, FridgeMaterialFolder, "Assets/Prefabs/Equipment", OfferFolder })
+        foreach (var folder in new[] { "Assets/UI", "Assets/Prefabs/Network", "Assets/Prefabs/Player", "Assets/Network", "Assets/Content/Equipment", "Assets/Content/Recipes", "Assets/Content/Items", "Assets/Materials", BeltMaterialFolder, BeltPrefabFolder, CounterMaterialFolder, FridgeMaterialFolder, BuildingMaterialFolder, "Assets/Prefabs/Equipment", OfferFolder })
             Directory.CreateDirectory(folder);
         AssetDatabase.Refresh();
         var panelSettings = BuildPanelSettings();
@@ -87,8 +89,15 @@ public static class BuildDevSite
         var tread = BuildBeltMaterials();
         var beltPrefabs = new[] { BuildBeltPrefab("Conveyor_Straight_1m", "BeltStraight"), BuildBeltPrefab("Conveyor_Corner_Left_90", "BeltCornerLeft"), BuildBeltPrefab("Conveyor_Corner_Right_90", "BeltCornerRight") };
         var itemSprite = BuildItemSpriteMaterial();
+        // PROTOTYPE building shell look (decision 0019): plaster walls, tiled floor, dark roof.
+        var buildingMaterials = new[]
+        {
+            LitMaterial(BuildingMaterialFolder, "BuildingWall", new Color(0.86f, 0.82f, 0.74f), 0f, 0.25f),
+            LitMaterial(BuildingMaterialFolder, "BuildingFloor", new Color(0.7f, 0.72f, 0.74f), 0f, 0.55f),
+            LitMaterial(BuildingMaterialFolder, "BuildingRoof", new Color(0.32f, 0.2f, 0.17f), 0f, 0.2f)
+        };
         BuildScene(catalog, bridge, player, panelSettings, new[] { oven, counter, fridge }, new[] { bread, sellBread }, offers, items, ghostMaterial,
-            ghostModelMaterial, beltPrefabs, tread, itemSprite);
+            ghostModelMaterial, beltPrefabs, tread, itemSprite, buildingMaterials);
         EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
         AssetDatabase.SaveAssets();
         return "DevSite authored";
@@ -564,7 +573,7 @@ public static class BuildDevSite
 
     private static void BuildScene(SinglePrefabObjects catalog, NetworkObject bridge, NetworkObject player, PanelSettings panelSettings,
         EquipmentDefinition[] equipment, RecipeAsset[] recipeAssets, OfferAsset[] offerAssets, ItemDefinition[] items, Material ghostMaterial, Material ghostModelMaterial,
-        GameObject[] beltPrefabs, Material tread, Material itemSprite)
+        GameObject[] beltPrefabs, Material tread, Material itemSprite, Material[] buildingMaterials)
     {
         var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
@@ -578,8 +587,9 @@ public static class BuildDevSite
         var floor = GameObject.CreatePrimitive(PrimitiveType.Plane);
         floor.name = "Floor";
         floor.transform.localScale = new Vector3(4f, 1f, 4f);
-        // Static reference blocks so movement and camera orbit are visible in captures.
-        for (var index = 0; index < 4; index++)
+        // Static reference blocks so movement and camera orbit are visible in captures. The south block (index 3) would stand
+        // inside the dev restaurant shell, which is reference enough there.
+        for (var index = 0; index < 3; index++)
         {
             var block = GameObject.CreatePrimitive(PrimitiveType.Cube);
             block.name = $"Landmark {index + 1}";
@@ -665,6 +675,17 @@ public static class BuildDevSite
             serialized.FindProperty("rightCornerPrefab").objectReferenceValue = beltPrefabs[2];
             serialized.FindProperty("treadMaterial").objectReferenceValue = tread;
             serialized.FindProperty("itemMaterial").objectReferenceValue = itemSprite;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        var buildingObject = new GameObject("BuildingPresenter");
+        var buildings = buildingObject.AddComponent<BuildingPresenter>();
+        using (var serialized = new SerializedObject(buildings))
+        {
+            serialized.FindProperty("session").objectReferenceValue = session;
+            serialized.FindProperty("wallMaterial").objectReferenceValue = buildingMaterials[0];
+            serialized.FindProperty("floorMaterial").objectReferenceValue = buildingMaterials[1];
+            serialized.FindProperty("roofMaterial").objectReferenceValue = buildingMaterials[2];
             serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 

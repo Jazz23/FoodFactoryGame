@@ -4,6 +4,8 @@
 // the avatar at the floor ahead instead of through it. The top-down view looks straight down on the avatar with its yaw
 // snapped to a multiple of 90 degrees, so the world-aligned site grid reads as horizontal and vertical lines; Look does
 // not orbit it. Each view zooms its own distance in steps, and Yaw follows the blend so movement stays screen-relative.
+// Indoors uses the top-down view (GDD section 3): SetIndoors switches views only when the avatar crosses a building's
+// threshold, so SwitchCamera still overrides the view until the next crossing (decision 0019).
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -34,6 +36,7 @@ namespace FoodFactoryGame.Session.Player
         // 0 is the third-person view and 1 the top-down view; eased when applied.
         private float _blend;
         private float _topDownYaw;
+        private bool _indoors;
 
         public float Yaw => Mathf.LerpAngle(yaw, _topDownYaw, Eased);
         public float Pitch => pitch;
@@ -61,9 +64,20 @@ namespace FoodFactoryGame.Session.Player
             switchViewAction.action.Disable();
         }
 
-        private void OnSwitchView(InputAction.CallbackContext _)
+        private void OnSwitchView(InputAction.CallbackContext _) => SetTopDown(!TopDown);
+
+        // Presentation state from the local building presenter: true while the avatar stands inside a building.
+        public void SetIndoors(bool indoors)
         {
-            TopDown = !TopDown;
+            if (indoors == _indoors) return;
+            _indoors = indoors;
+            SetTopDown(indoors);
+        }
+
+        private void SetTopDown(bool topDown)
+        {
+            if (topDown == TopDown) return;
+            TopDown = topDown;
             // The orbit yaw does not change while top-down, so re-entering mid-blend picks the same grid-aligned yaw.
             if (TopDown) _topDownYaw = Mathf.Round(yaw / 90f) * 90f;
         }

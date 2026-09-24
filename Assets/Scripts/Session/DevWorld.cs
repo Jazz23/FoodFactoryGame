@@ -1,7 +1,8 @@
 // Loads the committed world save or creates the DEVELOPMENT seed; the seed is placeholder content, not design data.
 // The seed is applied only to a brand-new world: an existing save never gains the layout, oven or storage dough retroactively.
-// Belts, the company and the sell counter are the exceptions: a save from before each existed gets the dev belt stock
-// (EnsureBeltStock), the dev company with its starting cash (EnsureCompany), or the dev counter (EnsureCounter) once.
+// Belts, the company, the sell counter and the restaurant shell are the exceptions: a save from before each existed gets the
+// dev belt stock (EnsureBeltStock), the dev company with its starting cash (EnsureCompany), the dev counter (EnsureCounter)
+// or the dev restaurant shell (EnsureBuilding) once.
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -42,6 +43,14 @@ namespace FoodFactoryGame.Session
         public const string CounterId = "dev-counter-1";
         public const int CounterCellX = 6;
         public const int CounterCellZ = 13;
+        // PROTOTYPE restaurant shell (decision 0019): 11x9 cells in the south-east of the grid, walls included, with a two-cell
+        // doorway in its north wall beside the spawn points. It clears the seeded oven and counter.
+        public const string RestaurantId = "dev-restaurant";
+        public const int RestaurantCellX = 9;
+        public const int RestaurantCellZ = 0;
+        public const int RestaurantWidth = 11;
+        public const int RestaurantDepth = 9;
+        public const int RestaurantDoorX = 13;
 
         public static IReadOnlyList<GoodsLot> StarterGoods => new[]
         {
@@ -71,6 +80,7 @@ namespace FoodFactoryGame.Session
                 EnsureBeltStock(loaded, worldPath);
                 EnsureCompany(loaded, worldPath);
                 EnsureCounter(loaded, worldPath, counter);
+                EnsureBuilding(loaded, worldPath);
                 return loaded;
             }
             var world = new GoodsWorld(WorldId);
@@ -84,6 +94,7 @@ namespace FoodFactoryGame.Session
             world.Bootstrap(BeltStock());
             world.Bootstrap(Company());
             world.Bootstrap(new SiteLayout { SiteId = SiteId, Width = GridWidth, Depth = GridDepth });
+            world.Bootstrap(Restaurant());
             if (oven != null) world.Bootstrap(oven.CreatePlaced(OvenId, SiteId, OvenCellX, OvenCellZ, 0));
             if (counter != null) world.Bootstrap(counter.CreatePlaced(CounterId, SiteId, CounterCellX, CounterCellZ, 0));
             GoodsSnapshotStore.Save(world, worldPath);
@@ -150,6 +161,34 @@ namespace FoodFactoryGame.Session
             }
             GoodsSnapshotStore.Save(world, worldPath);
             Debug.Log("[Session] Added the dev sell counter to this older save.");
+        }
+
+        public static GoodsBuilding Restaurant() => new()
+        {
+            Id = RestaurantId, SiteId = SiteId, CellX = RestaurantCellX, CellZ = RestaurantCellZ, Width = RestaurantWidth, Depth = RestaurantDepth,
+            Doors = new List<GridCell>
+            {
+                new() { X = RestaurantDoorX, Z = RestaurantCellZ + RestaurantDepth - 1 },
+                new() { X = RestaurantDoorX + 1, Z = RestaurantCellZ + RestaurantDepth - 1 }
+            }
+        };
+
+        // PROTOTYPE, one-time: buildings are never removed, so a dev site with none has never had one. It gets the dev
+        // restaurant shell, committed before serving; if equipment or belts stand where its walls go, the save is left alone
+        // with a warning.
+        private static void EnsureBuilding(GoodsWorld world, string worldPath)
+        {
+            var state = world.Snapshot();
+            if (state.Buildings.Any(x => x.SiteId == SiteId || x.Id == RestaurantId) || state.SiteLayouts.All(x => x.SiteId != SiteId)) return;
+            try { world.Bootstrap(Restaurant()); }
+            catch (System.ArgumentException)
+            {
+                Debug.LogWarning($"[Session] Something stands where the dev restaurant's walls go (cells {RestaurantCellX}-{RestaurantCellX + RestaurantWidth - 1}, "
+                    + $"{RestaurantCellZ}-{RestaurantCellZ + RestaurantDepth - 1}), so this older save gets no building; clear the walls and restart the server.");
+                return;
+            }
+            GoodsSnapshotStore.Save(world, worldPath);
+            Debug.Log("[Session] Added the dev restaurant shell to this older save.");
         }
     }
 }

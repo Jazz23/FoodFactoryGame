@@ -1,5 +1,5 @@
 // Pure grid rules shared by the server's placement check and the client's placement preview; the server always re-checks.
-// Placed equipment and belts share the grid: nothing may overlap anything else.
+// Placed equipment, belts and building walls share the grid: nothing may overlap anything else.
 using System.Linq;
 
 namespace FoodFactoryGame.Goods
@@ -24,8 +24,8 @@ namespace FoodFactoryGame.Goods
             return CellProblem(state, equipment.SiteId, cellX, cellZ, width, depth, equipment.Id);
         }
 
-        // Null when a footprint lies inside the site's layout and overlaps no placed equipment or belt other than ignoreId;
-        // otherwise "out-of-bounds" or "blocked".
+        // Null when a footprint lies inside the site's layout and overlaps no placed equipment, belt or building wall other
+        // than ignoreId; otherwise "out-of-bounds" or "blocked".
         public static string CellProblem(GoodsSnapshot state, string siteId, int cellX, int cellZ, int width, int depth, string ignoreId)
         {
             var layout = state.SiteLayouts?.FirstOrDefault(x => x.SiteId == siteId);
@@ -39,7 +39,37 @@ namespace FoodFactoryGame.Goods
             if (state.Belts != null && state.Belts.Any(x => x.Id != ignoreId && x.SiteId == siteId
                     && Overlaps(cellX, cellZ, width, depth, x.CellX, x.CellZ, 1, 1)))
                 return "blocked";
+            if (state.Buildings != null && state.Buildings.Any(x => x.SiteId == siteId && CoversWall(x, cellX, cellZ, width, depth)))
+                return "blocked";
             return null;
+        }
+
+        public static bool OnPerimeter(GoodsBuilding building, int cellX, int cellZ) =>
+            Overlaps(cellX, cellZ, 1, 1, building.CellX, building.CellZ, building.Width, building.Depth)
+            && (cellX == building.CellX || cellX == building.CellX + building.Width - 1
+                || cellZ == building.CellZ || cellZ == building.CellZ + building.Depth - 1);
+
+        // A door may be any perimeter cell except a corner, so every wall run stays attached at the corners.
+        public static bool IsDoorCell(GoodsBuilding building, int cellX, int cellZ) =>
+            OnPerimeter(building, cellX, cellZ)
+            && !((cellX == building.CellX || cellX == building.CellX + building.Width - 1)
+                && (cellZ == building.CellZ || cellZ == building.CellZ + building.Depth - 1));
+
+        public static bool IsWall(GoodsBuilding building, int cellX, int cellZ) =>
+            OnPerimeter(building, cellX, cellZ) && !building.Doors.Any(x => x.X == cellX && x.Z == cellZ);
+
+        // Strictly inside the walls; door cells are not interior.
+        public static bool IsInterior(GoodsBuilding building, int cellX, int cellZ) =>
+            cellX > building.CellX && cellX < building.CellX + building.Width - 1
+            && cellZ > building.CellZ && cellZ < building.CellZ + building.Depth - 1;
+
+        public static bool CoversWall(GoodsBuilding building, int cellX, int cellZ, int width, int depth)
+        {
+            if (!Overlaps(cellX, cellZ, width, depth, building.CellX, building.CellZ, building.Width, building.Depth)) return false;
+            for (var x = cellX; x < cellX + width; x++)
+            for (var z = cellZ; z < cellZ + depth; z++)
+                if (IsWall(building, x, z)) return true;
+            return false;
         }
     }
 }

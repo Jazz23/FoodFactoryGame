@@ -264,6 +264,12 @@ namespace FoodFactoryGame.Goods
             // v5 had no sale jobs; every job's SaleCents reads 0 (a goods job). The version still changes so an older build
             // refuses a v6 save instead of quarantining its sale jobs as invalid.
             if (state != null && state.SchemaVersion == 5) state.SchemaVersion = 6;
+            // v6 had no buildings; the server's seed owner adds the dev shell before serving (DevWorld.EnsureBuilding).
+            if (state != null && state.SchemaVersion == 6)
+            {
+                state.Buildings ??= new();
+                state.SchemaVersion = 7;
+            }
             GoodsWorld.Validate(state);
             return state;
         }
