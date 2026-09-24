@@ -10,6 +10,7 @@ using FoodFactoryGame.Goods;
 using FoodFactoryGame.Session.Equipment;
 using FoodFactoryGame.Session.Player;
 using UnityEngine;
+using UnityEngine.AI;
 using UnityEngine.Rendering;
 
 namespace FoodFactoryGame.Session.Buildings
@@ -209,8 +210,10 @@ namespace FoodFactoryGame.Session.Buildings
                 var width = alongX ? run.Count : 1;
                 var depth = alongX ? 1 : run.Count;
                 var center = SiteGridSpace.FootprintCenter(layout, run[0].X, run[0].Z, width, depth, level);
-                Box(parent, $"Wall {run[0].X},{run[0].Z}", wallMaterial, center + Vector3.up * SiteGridSpace.LevelHeight * 0.5f,
+                var wall = Box(parent, $"Wall {run[0].X},{run[0].Z}", wallMaterial, center + Vector3.up * SiteGridSpace.LevelHeight * 0.5f,
                     new Vector3(width * SiteGrid.CellSize, SiteGridSpace.LevelHeight, depth * SiteGrid.CellSize), true);
+                // Ground walls carve the baked NavMesh so walking employees use the doorways (the unit cube's scale sizes it).
+                if (level == 0) wall.gameObject.AddComponent<NavMeshObstacle>().carving = true;
                 run.Clear();
             }
         }

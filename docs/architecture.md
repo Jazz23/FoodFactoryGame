@@ -221,6 +221,18 @@ Decision: [0020](decisions/0020-factory-floors-and-elevator.md). First construct
 
 Prototype: floor price, height limit, storey height, the dev factory's size and position, elevator placed where the player stands, instant construction. Open: conveyor lifts, build time/cancellation/disruption (GDD 29.2, 29.3, 29.7), buying buildings, employees using the elevator, a gamepad elevator binding, and moving a shaft.
 
+## Implemented: prototype following employee (2026-09-24)
+
+PROTOTYPE, no decision record yet; no server rule or schema change. Employees are not part of the goods world.
+
+- Art: `ArtSource/Employee/Employee_Asset.blend` (rigid meshes parented to 15 bones; `Employee_Walk` plus a new `Employee_Idle` action) exported to `Assets/Art/Models/Employee/Employee.fbx` at 0.43 scale (about 1.84 m), Generic rig, looping `Idle` and `Walk` clips. `Assets/Prefabs/Employee/Employee.controller`: Idle ↔ Walk on `Speed`; Walk plays at `WalkRate`.
+- `Assets/Prefabs/Employee/Employee.prefab`: `NetworkObject`, server-authoritative `NetworkTransform`, `NavMeshAgent` (1.5 m/s, stops 2 m away) and `EmployeeFollower` (`Assets/Scripts/Session/Employees`). Only the server enables the agent and sets its destination, to the nearest spawned `PlayerAvatar` every 0.25 s. Every peer animates from the movement it sees, so clients never path-find.
+- Navigation uses the AI Navigation package (`com.unity.ai.navigation` 2.0.14): a `NavMeshSurface` baked from physics colliders to `Assets/Scenes/SampleScene/NavMesh-Navigation.asset`. Ground-level placed machines (`EquipmentPresenter`, a box the size of the footprint) and ground walls (`BuildingPresenter`) carry carving `NavMeshObstacle`s, so a machine placed at runtime blocks paths straight away. Obstacles come from client presentation, so a dedicated server with no presenters would not see them. Upper storeys have no NavMesh.
+- `Assets/Scenes/SampleScene.unity` is a copy of `DevSite` (same session setup, so hosting, joining, the inventory and placement all work the same) plus the NavMesh and one employee placed in the scene. It is still not a build scene. Rebuild it with the body of `AgentScripts/BuildSampleScene.cs` through MCP `execute_code`; running it appends the employee prefab to `DefaultPrefabObjects.asset`.
+- Evidence (2026-09-24, host with an isolated save in play mode): the employee followed the host; paths went around the seeded oven and around an oven bought and placed during play; a capture showed the walk animation; no console errors.
+
+Open: employee hiring and ownership, jobs, persistence, following between storeys or elevators, and obstacles that do not depend on the server running presenters.
+
 ## Required Constraints for Future Implementation
 
 - The server owns gameplay state; clients request validated actions through the command contract in decision 0002.

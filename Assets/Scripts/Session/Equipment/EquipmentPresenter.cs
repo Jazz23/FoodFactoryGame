@@ -6,6 +6,7 @@ using System.Linq;
 using FoodFactoryGame.Goods;
 using FoodFactoryGame.Session.Buildings;
 using UnityEngine;
+using UnityEngine.AI;
 
 namespace FoodFactoryGame.Session.Equipment
 {
@@ -82,6 +83,16 @@ namespace FoodFactoryGame.Session.Equipment
             var root = new GameObject($"Equipment {equipment.Id}");
             root.transform.SetParent(transform, false);
             EquipmentModel.Create(definition, root.transform);
+            // Ground machines carve the baked NavMesh so walking employees path around them. The box is the unrotated
+            // footprint in the root's (rotated) space; upper storeys have no NavMesh yet.
+            if (equipment.Level == 0)
+            {
+                var obstacle = root.AddComponent<NavMeshObstacle>();
+                obstacle.shape = NavMeshObstacleShape.Box;
+                obstacle.size = new Vector3(equipment.Width * SiteGrid.CellSize, 2f, equipment.Depth * SiteGrid.CellSize);
+                obstacle.center = Vector3.up;
+                obstacle.carving = true;
+            }
             var visual = root.AddComponent<EquipmentVisual>();
             visual.Bind(equipment.Id, equipment.Kind);
             return visual;
