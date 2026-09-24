@@ -14,6 +14,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using FoodFactoryGame.Goods;
+using FoodFactoryGame.Session.Buildings;
 using FoodFactoryGame.Session.Player;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -56,6 +57,8 @@ namespace FoodFactoryGame.Session.Equipment
         private static readonly int BaseColor = Shader.PropertyToID("_BaseColor");
 
         [SerializeField] private SessionRoot session;
+        // Knows the local avatar's building and level: placement and aiming use the floor the avatar stands on (decision 0020).
+        [SerializeField] private BuildingPresenter buildings;
         // Flat footprint under the ghost, coloured by whether the placement preview passes.
         [SerializeField] private Renderer ghost;
         // Transparent material for the machine ghost; tinted per renderer with the valid/invalid colour at ghostAlpha.
@@ -84,6 +87,7 @@ namespace FoodFactoryGame.Session.Equipment
         private OrbitCameraRig _rig;
         private GoodsEquipment _held;
         private (int X, int Z) _target;
+        private int _targetLevel;
         private int _rotation;
         private bool _released;
         private bool? _appliedLock;
@@ -121,6 +125,9 @@ namespace FoodFactoryGame.Session.Equipment
         public int Rotation => _rotation;
         public SessionRoot Session => session;
         public string LocalPlayerId => session.Authenticator.LocalPlayerId;
+        // Floor the local avatar stands on; aims, previews and placement requests use it.
+        public int Level => buildings.LocalLevel;
+        public BuildingPresenter Buildings => buildings;
         public string InventoryId => LocalPlayerId == null ? null : GoodsWorld.InventoryLocationId(LocalPlayerId);
 
         // Hotbar slots (null when empty). Machine kinds fill them in the order of the session's equipment content once that is
@@ -243,14 +250,15 @@ namespace FoodFactoryGame.Session.Equipment
                         "Storage: click or shift+click to move goods in and out; hover a stack to see when it spoils; E or Esc closes" + suffix,
                     InteractionScreen.Machine => "Machine: put ingredients in the input, take results from the output (shift+click moves a stack); E or Esc closes" + suffix,
                     _ => _released ? "Cursor released: click to resume" + suffix
-                        : "E: inventory (pick belts or goods to carry them out), 1-9: hotbar, left click: open machine, right click: pick up, R: turn belt, F: take an item off a belt" + suffix
+                        : ElevatorHint() + "E: inventory (pick belts or goods to carry them out), 1-9: hotbar, left click: open machine, right click: pick up, R: turn belt, F: take an item off a belt" + suffix
                 };
                 return;
             }
             var (width, depth) = SiteGrid.Footprint(_held.Width, _held.Depth, _rotation);
             _target = SiteGridSpace.AnchorAt(layout, point, width, depth);
-            var problem = SiteGrid.PlacementProblem(site, _held, _target.X, _target.Z, _rotation);
-            var center = SiteGridSpace.FootprintCenter(layout, _target.X, _target.Z, width, depth);
+            _targetLevel = Level;
+            var problem = SiteGrid.PlacementProblem(site, _held, _target.X, _target.Z, _rotation, _targetLevel);
+            var center = SiteGridSpace.FootprintCenter(layout, _target.X, _target.Z, width, depth, _targetLevel);
             var color = problem == null ? validColor : invalidColor;
             ghost.gameObject.SetActive(true);
             ghost.transform.SetPositionAndRotation(center + Vector3.up * 0.03f, Quaternion.identity);
@@ -477,8 +485,28 @@ namespace FoodFactoryGame.Session.Equipment
                 return;
             }
             if (!ghost.gameObject.activeSelf || HasPendingRequests) return;
-            Debug.Log($"[Equipment] Requesting placement of {_held.Id} at ({_target.X}, {_target.Z}) rotation {_rotation}.");
-            bridge.RequestPlace(Track(), _held.Id, _target.X, _target.Z, _rotation);
+            Debug.Log($"[Equipment] Requesting placement of {_held.Id} at ({_target.X}, {_target.Z}) level {_targetLevel} rotation {_rotation}.");
+            bridge.RequestPlace(Track(), _held.Id, _target.X, _target.Z, _rotation, _targetLevel);
+        }
+
+        // Orders one more floor for the factory the local avatar stands in (decision 0020); the first one puts the elevator on
+        // the avatar's cell. The company pays; the server checks the building, price and cell and replies with the outcome.
+        public void AddFloor()
+        {
+            var bridge = _subscription?.Bridge;
+            var building = buildings.LocalBuilding;
+            if (bridge == null || building == null) return;
+            LastRejection = null;
+            var (x, z) = buildings.LocalCell;
+            Debug.Log($"[Buildings] Requesting a floor for {building.Id} (elevator cell ({x}, {z})).");
+            bridge.RequestAddFloor(Track(), building.Id, x, z);
+        }
+
+        private string ElevatorHint()
+        {
+            var building = buildings.LocalBuilding;
+            if (building == null || !SiteGrid.IsShaft(building, buildings.LocalCell.X, buildings.LocalCell.Z)) return "";
+            return $"Elevator (floor {Level + 1} of {building.Floors}): PgUp up, PgDn down. ";
         }
 
         private void OnRemove(InputAction.CallbackContext _)
@@ -579,7 +607,8 @@ namespace FoodFactoryGame.Session.Equipment
         {
             var ray = AimRay();
             point = default;
-            if (!new Plane(Vector3.up, Vector3.zero).Raycast(ray, out var distance) || distance > maximumRayDistance) return false;
+            var floor = new Plane(Vector3.up, Vector3.up * (Level * SiteGridSpace.LevelHeight));
+            if (!floor.Raycast(ray, out var distance) || distance > maximumRayDistance) return false;
             point = ray.GetPoint(distance);
             return true;
         }

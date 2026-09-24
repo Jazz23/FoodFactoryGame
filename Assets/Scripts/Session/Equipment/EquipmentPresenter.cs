@@ -4,6 +4,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using FoodFactoryGame.Goods;
+using FoodFactoryGame.Session.Buildings;
 using UnityEngine;
 
 namespace FoodFactoryGame.Session.Equipment
@@ -12,8 +13,10 @@ namespace FoodFactoryGame.Session.Equipment
     public sealed class EquipmentPresenter : MonoBehaviour
     {
         [SerializeField] private SessionRoot session;
+        [SerializeField] private BuildingPresenter buildings;
 
         private readonly Dictionary<string, EquipmentVisual> _visuals = new();
+        private readonly Dictionary<string, GoodsEquipment> _placed = new();
         private GoodsSnapshot _shown;
 
         public IReadOnlyDictionary<string, EquipmentVisual> Visuals => _visuals;
@@ -21,7 +24,18 @@ namespace FoodFactoryGame.Session.Equipment
         private void Update()
         {
             var site = session.ClientSite;
-            if (ReferenceEquals(site, _shown)) return;
+            if (!ReferenceEquals(site, _shown)) Refresh(site);
+            // Machines on a storey the local view hides (decision 0020) are hidden with it, colliders included.
+            foreach (var (id, visual) in _visuals)
+            {
+                var equipment = _placed[id];
+                var shown = !buildings.HidesLevel(equipment.CellX, equipment.CellZ, equipment.Level);
+                if (visual.gameObject.activeSelf != shown) visual.gameObject.SetActive(shown);
+            }
+        }
+
+        private void Refresh(GoodsSnapshot site)
+        {
             _shown = site;
             var layout = site?.SiteLayouts.FirstOrDefault(x => x.SiteId == DevWorld.SiteId);
             var placed = layout == null ? new List<GoodsEquipment>()
@@ -30,6 +44,7 @@ namespace FoodFactoryGame.Session.Equipment
             {
                 Destroy(_visuals[id].gameObject);
                 _visuals.Remove(id);
+                _placed.Remove(id);
             }
             foreach (var equipment in placed)
             {
@@ -39,6 +54,7 @@ namespace FoodFactoryGame.Session.Equipment
                     if (visual == null) continue;
                     _visuals.Add(equipment.Id, visual);
                 }
+                _placed[equipment.Id] = equipment;
                 visual.transform.SetPositionAndRotation(SiteGridSpace.Center(layout, equipment), SiteGridSpace.Rotation(equipment.Rotation));
                 visual.SetRunning(site.Jobs.Any(x => x.StationId == equipment.Id && x.State == StationJobState.Running));
             }
@@ -51,6 +67,7 @@ namespace FoodFactoryGame.Session.Equipment
             foreach (var visual in _visuals.Values)
                 if (visual != null) Destroy(visual.gameObject);
             _visuals.Clear();
+            _placed.Clear();
             _shown = null;
         }
 

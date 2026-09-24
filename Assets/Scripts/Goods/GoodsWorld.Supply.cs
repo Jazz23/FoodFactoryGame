@@ -104,7 +104,7 @@ namespace FoodFactoryGame.Goods
                     equipment.SiteId = siteId;
                     equipment.State = EquipmentState.Held;
                     equipment.HolderId = playerId;
-                    equipment.CellX = equipment.CellZ = equipment.Rotation = 0;
+                    equipment.CellX = equipment.CellZ = equipment.Rotation = equipment.Level = 0;
                     _state.Equipment.Add(equipment);
                     var bought = Record(requestId, playerId, true, "bought", null);
                     bought.EquipmentId = deliveredId;

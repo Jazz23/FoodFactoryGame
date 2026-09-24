@@ -202,6 +202,24 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
+                },
+                {
+                    "name": "FloorUp",
+                    "type": "Button",
+                    "id": "7c2e9a41-3d5b-4f86-a1e0-9b4d6c2f8e13",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "FloorDown",
+                    "type": "Button",
+                    "id": "e4b17d93-6a28-4c5f-8e3b-1f9a7d4c2b60",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -895,6 +913,28 @@
                     "processors": "",
                     "groups": ";Gamepad",
                     "action": "PlaceItem",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "3f8a6c25-9d1e-4b74-a2c9-6e0d5b8f1a37",
+                    "path": "<Keyboard>/pageUp",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Keyboard&Mouse",
+                    "action": "FloorUp",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "b95d2e71-4c0a-4f38-9e6b-8a3c1d7f5e24",
+                    "path": "<Keyboard>/pageDown",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Keyboard&Mouse",
+                    "action": "FloorDown",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

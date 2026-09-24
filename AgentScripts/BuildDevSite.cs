@@ -657,27 +657,7 @@ public static class BuildDevSite
             serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 
-        var presenterObject = new GameObject("EquipmentPresenter");
-        var presenter = presenterObject.AddComponent<EquipmentPresenter>();
-        using (var serialized = new SerializedObject(presenter))
-        {
-            serialized.FindProperty("session").objectReferenceValue = session;
-            serialized.ApplyModifiedPropertiesWithoutUndo();
-        }
-
-        var beltObject = new GameObject("BeltPresenter");
-        var belts = beltObject.AddComponent<BeltPresenter>();
-        using (var serialized = new SerializedObject(belts))
-        {
-            serialized.FindProperty("session").objectReferenceValue = session;
-            serialized.FindProperty("straightPrefab").objectReferenceValue = beltPrefabs[0];
-            serialized.FindProperty("leftCornerPrefab").objectReferenceValue = beltPrefabs[1];
-            serialized.FindProperty("rightCornerPrefab").objectReferenceValue = beltPrefabs[2];
-            serialized.FindProperty("treadMaterial").objectReferenceValue = tread;
-            serialized.FindProperty("itemMaterial").objectReferenceValue = itemSprite;
-            serialized.ApplyModifiedPropertiesWithoutUndo();
-        }
-
+        // Created first: the equipment and belt presenters and the interaction read the local floor from it (decision 0020).
         var buildingObject = new GameObject("BuildingPresenter");
         var buildings = buildingObject.AddComponent<BuildingPresenter>();
         using (var serialized = new SerializedObject(buildings))
@@ -686,6 +666,37 @@ public static class BuildDevSite
             serialized.FindProperty("wallMaterial").objectReferenceValue = buildingMaterials[0];
             serialized.FindProperty("floorMaterial").objectReferenceValue = buildingMaterials[1];
             serialized.FindProperty("roofMaterial").objectReferenceValue = buildingMaterials[2];
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+        var rider = buildingObject.AddComponent<ElevatorRider>();
+        using (var serialized = new SerializedObject(rider))
+        {
+            serialized.FindProperty("buildings").objectReferenceValue = buildings;
+            serialized.FindProperty("floorUpAction").objectReferenceValue = Action("FloorUp");
+            serialized.FindProperty("floorDownAction").objectReferenceValue = Action("FloorDown");
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        var presenterObject = new GameObject("EquipmentPresenter");
+        var presenter = presenterObject.AddComponent<EquipmentPresenter>();
+        using (var serialized = new SerializedObject(presenter))
+        {
+            serialized.FindProperty("session").objectReferenceValue = session;
+            serialized.FindProperty("buildings").objectReferenceValue = buildings;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        var beltObject = new GameObject("BeltPresenter");
+        var belts = beltObject.AddComponent<BeltPresenter>();
+        using (var serialized = new SerializedObject(belts))
+        {
+            serialized.FindProperty("session").objectReferenceValue = session;
+            serialized.FindProperty("buildings").objectReferenceValue = buildings;
+            serialized.FindProperty("straightPrefab").objectReferenceValue = beltPrefabs[0];
+            serialized.FindProperty("leftCornerPrefab").objectReferenceValue = beltPrefabs[1];
+            serialized.FindProperty("rightCornerPrefab").objectReferenceValue = beltPrefabs[2];
+            serialized.FindProperty("treadMaterial").objectReferenceValue = tread;
+            serialized.FindProperty("itemMaterial").objectReferenceValue = itemSprite;
             serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 
@@ -717,6 +728,7 @@ public static class BuildDevSite
             serialized.FindProperty("placeItemAction").objectReferenceValue = Action("PlaceItem");
             serialized.FindProperty("takeItemAction").objectReferenceValue = Action("TakeItem");
             serialized.FindProperty("belts").objectReferenceValue = belts;
+            serialized.FindProperty("buildings").objectReferenceValue = buildings;
             serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 

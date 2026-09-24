@@ -47,6 +47,8 @@ namespace FoodFactoryGame.Session.Equipment
         private readonly HashSet<string> _refusedRemovals = new();
         private readonly Dictionary<BeltShape, List<(GameObject Root, Renderer[] Renderers)>> _beltGhosts = new();
         private bool _dragging;
+        // Floor the pending belts (keyed by cell) were placed on; changing floors drops their ghosts and ends a drag.
+        private int _beltLevel;
         private (int X, int Z) _dragHead;
         private (int X, int Z)? _aimCell;
         private GoodsBelt _aimBelt;
@@ -70,6 +72,13 @@ namespace FoodFactoryGame.Session.Equipment
         // cursor carries no goods, so the machine controls take over.
         private bool UpdateBelts(GoodsSnapshot site, SiteLayout layout, string suffix)
         {
+            if (_beltLevel != Level)
+            {
+                // Answers to requests still in flight find no ghost and are only reported.
+                _beltLevel = Level;
+                _pendingBelts.Clear();
+                _dragging = false;
+            }
             ExpirePendingBelts(site);
             var active = site != null && layout != null && _camera != null && Screen == InteractionScreen.None;
             _aimCell = null;
@@ -118,7 +127,7 @@ namespace FoodFactoryGame.Session.Equipment
             {
                 _aimPoint = point;
                 _aimCell = BeltPath.CellAt(layout, point);
-                _aimBelt = site.Belts.FirstOrDefault(x => x.CellX == _aimCell.Value.X && x.CellZ == _aimCell.Value.Z);
+                _aimBelt = LevelBelts(site).FirstOrDefault(x => x.CellX == _aimCell.Value.X && x.CellZ == _aimCell.Value.Z);
             }
         }
 
@@ -162,10 +171,13 @@ namespace FoodFactoryGame.Session.Equipment
             }
         }
 
-        // Existing belts with pending placements and turns applied, for ghost shapes.
+        // Belts on the local avatar's floor: the only ones this client aims at, previews against or places.
+        private IEnumerable<GoodsBelt> LevelBelts(GoodsSnapshot site) => BeltPresenter.OnLevel(site.Belts, Level);
+
+        // Existing belts on this floor with pending placements and turns applied, for ghost shapes.
         private List<GoodsBelt> PlannedBelts(GoodsSnapshot site)
         {
-            var planned = site.Belts.Where(x => !_pendingBelts.ContainsKey((x.CellX, x.CellZ)))
+            var planned = LevelBelts(site).Where(x => !_pendingBelts.ContainsKey((x.CellX, x.CellZ)))
                 .Select(x => new GoodsBelt { Id = x.Id, CellX = x.CellX, CellZ = x.CellZ, Direction = x.Direction }).ToList();
             planned.AddRange(_pendingBelts.Select(x => new GoodsBelt { CellX = x.Key.X, CellZ = x.Key.Z, Direction = x.Value.Direction }));
             return planned;
@@ -178,8 +190,8 @@ namespace FoodFactoryGame.Session.Equipment
         private string BeltProblem(GoodsSnapshot site, (int X, int Z) cell)
         {
             if (_pendingBelts.ContainsKey(cell)) return null;
-            if (site.Belts.Any(x => x.CellX == cell.X && x.CellZ == cell.Z)) return null;
-            var problem = SiteGrid.CellProblem(site, DevWorld.SiteId, cell.X, cell.Z, 1, 1, null);
+            if (LevelBelts(site).Any(x => x.CellX == cell.X && x.CellZ == cell.Z)) return null;
+            var problem = SiteGrid.CellProblem(site, DevWorld.SiteId, cell.X, cell.Z, 1, 1, null, Level);
             if (problem != null) return problem;
             return BeltsCarried(site) - _pendingBelts.Count(x => x.Value.NewBelt) > 0 ? null : "no-belts";
         }
@@ -192,7 +204,7 @@ namespace FoodFactoryGame.Session.Equipment
         {
             var bridge = _subscription?.Bridge;
             if (bridge == null) return;
-            var existing = site.Belts.FirstOrDefault(x => x.CellX == cell.X && x.CellZ == cell.Z);
+            var existing = LevelBelts(site).FirstOrDefault(x => x.CellX == cell.X && x.CellZ == cell.Z);
             if (_pendingBelts.TryGetValue(cell, out var pending) ? pending.Direction == direction : existing?.Direction == direction) return;
             var problem = BeltProblem(site, cell);
             if (problem != null)
@@ -202,7 +214,7 @@ namespace FoodFactoryGame.Session.Equipment
             }
             var requestId = Track();
             _pendingBelts[cell] = new PendingBelt { RequestId = requestId, Direction = direction, NewBelt = existing == null && pending?.NewBelt != false };
-            bridge.RequestPlaceBelt(requestId, DevWorld.SiteId, cell.X, cell.Z, direction);
+            bridge.RequestPlaceBelt(requestId, DevWorld.SiteId, cell.X, cell.Z, direction, _beltLevel);
         }
 
         // Drops pending belts the baseline now shows, and accepted ones whose baseline never came.
@@ -211,7 +223,8 @@ namespace FoodFactoryGame.Session.Equipment
             if (_pendingBelts.Count == 0) return;
             foreach (var pair in _pendingBelts.ToList())
             {
-                var shown = site?.Belts.Any(x => x.CellX == pair.Key.X && x.CellZ == pair.Key.Z && x.Direction == pair.Value.Direction) == true;
+                var shown = site?.Belts.Any(x => x.CellX == pair.Key.X && x.CellZ == pair.Key.Z && x.Level == _beltLevel
+                    && x.Direction == pair.Value.Direction) == true;
                 var stale = pair.Value.AcceptedAt >= 0f && Time.unscaledTime - pair.Value.AcceptedAt > PendingBeltSeconds;
                 if ((shown && pair.Value.AcceptedAt >= 0f) || stale || site == null) _pendingBelts.Remove(pair.Key);
             }
@@ -301,7 +314,7 @@ namespace FoodFactoryGame.Session.Equipment
                 LastRejection = "aim at a belt";
                 return;
             }
-            var shape = BeltRules.Shape(BeltRules.ByCell(site.Belts), _aimBelt);
+            var shape = BeltRules.Shape(BeltRules.ByCell(BeltPresenter.OnLevel(site.Belts, _aimBelt.Level)), _aimBelt);
             var nearest = site.Lots.Where(x => x.LocationId == _aimBelt.LocationId)
                 .OrderBy(x => Vector3.ProjectOnPlane(BeltPath.WorldPoint(layout, _aimBelt, shape, x.BeltPosition) - _aimPoint, Vector3.up).sqrMagnitude)
                 .FirstOrDefault();
@@ -347,7 +360,7 @@ namespace FoodFactoryGame.Session.Equipment
                 return;
             }
             var position = BeltRules.FreePosition(RidingPositions(site, _aimBelt));
-            var shape = BeltRules.Shape(BeltRules.ByCell(site.Belts), _aimBelt);
+            var shape = BeltRules.Shape(BeltRules.ByCell(BeltPresenter.OnLevel(site.Belts, _aimBelt.Level)), _aimBelt);
             var point = BeltPath.WorldPoint(layout, _aimBelt, shape, position < 0 ? BeltRules.Middle : position)
                         + Vector3.up * (belts.ItemSize * 0.5f);
             ShowItemGhost(CursorGoods.ItemId, point);
@@ -389,7 +402,7 @@ namespace FoodFactoryGame.Session.Equipment
                 used[shape] = index + 1;
                 var ghost = BeltGhost(shape, index);
                 ghost.Root.SetActive(true);
-                ghost.Root.transform.SetPositionAndRotation(BeltPath.CellCenter(layout, cell.X, cell.Z), BeltPath.ModelRotation(shape, direction));
+                ghost.Root.transform.SetPositionAndRotation(BeltPath.CellCenter(layout, cell.X, cell.Z, _beltLevel), BeltPath.ModelRotation(shape, direction));
                 var color = valid ? validColor : invalidColor;
                 color.a = ghostAlpha;
                 foreach (var renderer in ghost.Renderers)

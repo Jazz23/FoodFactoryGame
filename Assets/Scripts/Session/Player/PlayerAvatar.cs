@@ -57,6 +57,24 @@ namespace FoodFactoryGame.Session.Player
                     turnDegreesPerSecond * Time.deltaTime);
         }
 
+        // Owner-only presentation move, such as an elevator ride between floors (decision 0020); the controller is paused so
+        // it does not resolve the jump as a collision.
+        public void Teleport(Vector3 position)
+        {
+            if (!IsOwner) return;
+            controller.enabled = false;
+            transform.position = position;
+            controller.enabled = true;
+            _verticalSpeed = 0f;
+        }
+
+        // Presentation only: hides this avatar's renderers on this client, such as a player on a storey the viewer hides.
+        public void SetHidden(bool hidden)
+        {
+            foreach (var renderer in GetComponentsInChildren<Renderer>())
+                if (renderer.enabled == hidden) renderer.enabled = !hidden;
+        }
+
         // Placeholder identification until character art exists: a stable hue per display name.
         private void Tint(string displayName)
         {

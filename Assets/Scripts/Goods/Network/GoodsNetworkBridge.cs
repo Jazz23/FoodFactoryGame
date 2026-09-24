@@ -127,9 +127,25 @@ namespace FoodFactoryGame.Goods.Network
             if (IsClientStarted) ServerPickUp(requestId, equipmentId);
         }
 
-        public void RequestPlace(string requestId, string equipmentId, int cellX, int cellZ, int rotation)
+        // Level is the floor to place on: 0 is the ground, higher levels are upper floors of a building (decision 0020).
+        public void RequestPlace(string requestId, string equipmentId, int cellX, int cellZ, int rotation, int level = 0)
         {
-            if (IsClientStarted) ServerPlace(requestId, equipmentId, cellX, cellZ, rotation);
+            if (IsClientStarted) ServerPlace(requestId, equipmentId, cellX, cellZ, rotation, level);
+        }
+
+        // Pays for one more floor of a factory; the first one puts the elevator at the given interior cell (AddFloorDurably).
+        public void RequestAddFloor(string requestId, string buildingId, int elevatorX, int elevatorZ)
+        {
+            if (IsClientStarted) ServerAddFloor(requestId, buildingId, elevatorX, elevatorZ);
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        private void ServerAddFloor(string requestId, string buildingId, int elevatorX, int elevatorZ, NetworkConnection sender = null)
+        {
+            if (!TryIdentify(sender, requestId, out var player)) return;
+            var result = _world.AddFloorDurably(player, requestId, buildingId, elevatorX, elevatorZ, _savePath);
+            Reply(sender, result);
+            if (result.Accepted) Broadcast();
         }
 
         // One batch per request: the server checks the station, recipe, busy state and inputs (StartJobDurably).
@@ -139,9 +155,9 @@ namespace FoodFactoryGame.Goods.Network
         }
 
         // Places a belt from the player's inventory on an empty cell, or turns the belt already there (PlaceBeltDurably).
-        public void RequestPlaceBelt(string requestId, string siteId, int cellX, int cellZ, int direction)
+        public void RequestPlaceBelt(string requestId, string siteId, int cellX, int cellZ, int direction, int level = 0)
         {
-            if (IsClientStarted) ServerPlaceBelt(requestId, siteId, cellX, cellZ, direction);
+            if (IsClientStarted) ServerPlaceBelt(requestId, siteId, cellX, cellZ, direction, level);
         }
 
         public void RequestRemoveBelt(string requestId, string beltId)
@@ -171,10 +187,10 @@ namespace FoodFactoryGame.Goods.Network
         }
 
         [ServerRpc(RequireOwnership = false)]
-        private void ServerPlaceBelt(string requestId, string siteId, int cellX, int cellZ, int direction, NetworkConnection sender = null)
+        private void ServerPlaceBelt(string requestId, string siteId, int cellX, int cellZ, int direction, int level, NetworkConnection sender = null)
         {
             if (!TryIdentify(sender, requestId, out var player)) return;
-            var result = _world.PlaceBeltDurably(player, requestId, siteId, cellX, cellZ, direction, _savePath);
+            var result = _world.PlaceBeltDurably(player, requestId, siteId, cellX, cellZ, direction, _savePath, level);
             Reply(sender, result);
             if (result.Accepted) Broadcast();
         }
@@ -231,10 +247,10 @@ namespace FoodFactoryGame.Goods.Network
         }
 
         [ServerRpc(RequireOwnership = false)]
-        private void ServerPlace(string requestId, string equipmentId, int cellX, int cellZ, int rotation, NetworkConnection sender = null)
+        private void ServerPlace(string requestId, string equipmentId, int cellX, int cellZ, int rotation, int level, NetworkConnection sender = null)
         {
             if (!TryIdentify(sender, requestId, out var player)) return;
-            var result = _world.PlaceDurably(player, requestId, equipmentId, cellX, cellZ, rotation, _savePath);
+            var result = _world.PlaceDurably(player, requestId, equipmentId, cellX, cellZ, rotation, _savePath, level);
             Reply(sender, result);
             if (result.Accepted) Broadcast();
         }

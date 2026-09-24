@@ -26,6 +26,8 @@ namespace FoodFactoryGame.Goods
         public int CellX;
         public int CellZ;
         public int Rotation;
+        // Floor the piece stands on while placed: 0 is the ground, higher levels are upper floors of a building (decision 0020).
+        public int Level;
         // Copied from content when the piece is created, like a job's recipe copy, so recovery never needs registered content.
         public int Width;
         public int Depth;
@@ -75,7 +77,7 @@ namespace FoodFactoryGame.Goods
                     || copy.Width < 1 || copy.Depth < 1 || copy.InputCapacity < 1 || copy.OutputCapacity < 1
                     || _state.Equipment.Any(x => x.Id == copy.Id) || _state.Stations.Any(x => x.Id == copy.Id)
                     || _state.Locations.Any(x => x.Id == copy.InputLocationId || x.Id == copy.OutputLocationId)
-                    || SiteGrid.PlacementProblem(_state, copy, copy.CellX, copy.CellZ, copy.Rotation) != null)
+                    || SiteGrid.PlacementProblem(_state, copy, copy.CellX, copy.CellZ, copy.Rotation, copy.Level) != null)
                     throw new ArgumentException("Invalid, duplicate or unplaceable equipment.");
                 _state.Equipment.Add(copy);
                 AddPlacedParts(copy);
@@ -160,7 +162,7 @@ namespace FoodFactoryGame.Goods
                 _state.Locations.RemoveAll(x => x.Id == equipment.InputLocationId || x.Id == equipment.OutputLocationId);
                 equipment.State = EquipmentState.Held;
                 equipment.HolderId = playerId;
-                equipment.CellX = equipment.CellZ = equipment.Rotation = 0;
+                equipment.CellX = equipment.CellZ = equipment.Rotation = equipment.Level = 0;
                 var result = Record(requestId, playerId, true, "picked-up", null);
                 result.JobId = job?.Id;
                 _state.Outcomes[_state.Outcomes.Count - 1].JobId = job?.Id;
@@ -174,8 +176,8 @@ namespace FoodFactoryGame.Goods
         }
 
         // Volatile primitive for tests. Live request handlers must call PlaceDurably.
-        // Player position is not checked: it is presentation-only (decision 0005).
-        public GoodsOutcome Place(string playerId, string requestId, string equipmentId, int cellX, int cellZ, int rotation)
+        // Player position is not checked: it is presentation-only (decision 0005). Level 0 is the ground floor.
+        public GoodsOutcome Place(string playerId, string requestId, string equipmentId, int cellX, int cellZ, int rotation, int level = 0)
         {
             lock (_gate)
             {
@@ -188,7 +190,7 @@ namespace FoodFactoryGame.Goods
                     return Record(requestId, playerId, false, "forbidden", null);
                 if (equipment.State != EquipmentState.Held || equipment.HolderId != playerId)
                     return Record(requestId, playerId, false, "not-held", null);
-                var problem = SiteGrid.PlacementProblem(_state, equipment, cellX, cellZ, rotation);
+                var problem = SiteGrid.PlacementProblem(_state, equipment, cellX, cellZ, rotation, level);
                 if (problem != null) return Record(requestId, playerId, false, problem, null);
 
                 equipment.State = EquipmentState.Placed;
@@ -196,14 +198,16 @@ namespace FoodFactoryGame.Goods
                 equipment.CellX = cellX;
                 equipment.CellZ = cellZ;
                 equipment.Rotation = rotation;
+                equipment.Level = level;
                 AddPlacedParts(equipment);
                 return Record(requestId, playerId, true, "placed", null);
             }
         }
 
-        public GoodsOutcome PlaceDurably(string playerId, string requestId, string equipmentId, int cellX, int cellZ, int rotation, string savePath)
+        public GoodsOutcome PlaceDurably(string playerId, string requestId, string equipmentId, int cellX, int cellZ, int rotation, string savePath,
+            int level = 0)
         {
-            return Commit(playerId, requestId, savePath, () => Place(playerId, requestId, equipmentId, cellX, cellZ, rotation));
+            return Commit(playerId, requestId, savePath, () => Place(playerId, requestId, equipmentId, cellX, cellZ, rotation, level));
         }
 
         private void AddPlacedParts(GoodsEquipment equipment)
@@ -243,7 +247,7 @@ namespace FoodFactoryGame.Goods
                 var valid = equipment.State == EquipmentState.Held
                     ? !string.IsNullOrWhiteSpace(equipment.HolderId) && station == null && input == null && output == null
                     : string.IsNullOrEmpty(equipment.HolderId)
-                        && SiteGrid.PlacementProblem(state, equipment, equipment.CellX, equipment.CellZ, equipment.Rotation) == null
+                        && SiteGrid.PlacementProblem(state, equipment, equipment.CellX, equipment.CellZ, equipment.Rotation, equipment.Level) == null
                         && station != null && station.SiteId == equipment.SiteId && station.Kind == equipment.Kind
                         && station.InputLocationId == equipment.InputLocationId && station.OutputLocationId == equipment.OutputLocationId
                         && input != null && input.SiteId == equipment.SiteId && input.Capacity == equipment.InputCapacity

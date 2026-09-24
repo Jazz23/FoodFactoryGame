@@ -270,6 +270,19 @@ namespace FoodFactoryGame.Goods
                 state.Buildings ??= new();
                 state.SchemaVersion = 7;
             }
+            // v7 had no floors (decision 0020): every building was a one-storey restaurant, and every placed piece and belt
+            // stood on the ground, so their Level reads 0.
+            if (state != null && state.SchemaVersion == 7)
+            {
+                foreach (var building in state.Buildings ?? new())
+                {
+                    if (building == null) continue;
+                    building.Kind = GoodsWorld.RestaurantKind;
+                    building.Floors = 1;
+                    building.ElevatorX = building.ElevatorZ = 0;
+                }
+                state.SchemaVersion = 8;
+            }
             GoodsWorld.Validate(state);
             return state;
         }

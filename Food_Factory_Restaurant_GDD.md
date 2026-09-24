@@ -150,6 +150,47 @@ but weak dinner traffic.
 - Construction requires money only. Construction work is outsourced
   rather than performed by the player or employees.
 
+## Construction
+
+Confirmed requirements (sections 5, 15, 18, 25-27):
+
+- Construction is outsourced and paid for with money. The player and employees do not build; there are no construction materials, construction jobs, or construction research.
+- Properties are purchased outright. Construction happens on land the player owns.
+- Structural changes to buildings (not only new buildings) are construction.
+- Factories can add floors. Goods move between floors by conveyor lifts; workers and bulk/manual loads use freight elevators.
+- Buildings are procedurally generated with the map, and some of them are available for purchase. Adding floors to an owned building is a construction option. Whether players can construct fully custom buildings is undecided. (Project owner, 2026-09-24.)
+- Rail track and stations are player-built infrastructure. Roads are public and are never constructed by the player.
+- Construction is planned in build/planning mode and completed by paying the required cost.
+- Indoors uses the top-down camera aligned to the building grid, so building layouts are grid-based.
+
+Required by the development constraints (`AGENTS.md`), not optional design:
+
+- The server validates and owns every construction order, its payment, and its progress. A client only requests an order.
+- A construction order charges its cost exactly once. A rejected, failed, or cancelled order never charges without delivering, charges twice, or deletes goods or equipment.
+- Construction that would cover placed equipment, belts, or goods is rejected, or those items are moved to a recorded location first. They are never silently destroyed.
+- Construction in progress is saved in SQLite and continues while the world simulation runs, whether or not any client is viewing the site.
+
+Proposal - what counts as construction (not yet approved):
+
+- **Construction:** buying and building on land, building shells (outer walls, doors, footprint), interior walls, extra floors, demolition, elevator and conveyor-lift shafts, and rail track, stations, and loading infrastructure.
+- **Not construction:** machines, furniture, storage, refrigeration units, and conveyor belts. These are purchased equipment that the player or an employee places, moves, and picks up directly, as equipment purchases and placement work today. Placing equipment costs no construction fee and does not wait for contractors.
+- This split keeps restaurant and factory layout editing hands-on and fast, while structural growth is a deliberate, planned investment.
+
+Proposal - construction order flow (not yet approved):
+
+1. In build/planning mode the player draws or selects a structural change on owned land. A preview shows validity problems (not owned, overlaps, blocks a required doorway, covers equipment) and the price.
+2. The player confirms. The server validates the order again and charges the company.
+3. The order completes immediately or becomes a construction site visible to all clients until it completes, depending on the timing decision (section 29.2 and 29.3).
+4. On completion the structure becomes normal server state: walls block movement and placement, interior cells become usable floor area, and new floors become reachable through their elevators and lifts.
+
+Proposal - costs (not yet approved):
+
+- Price scales with the size of the change (for example, per wall cell, per floor cell, per extra story, per track segment), plus a fixed charge per order so many tiny orders are not cheaper than one planned order.
+- Land and district set a price multiplier: expensive districts cost more to build in as well as to buy.
+- Upper floors cost more per cell than ground floors, so vertical expansion is a response to scarce land rather than the default.
+
+Open construction decisions are listed in section 29.
+
 ## Restaurant Space Tradeoff
 
 - More tables increase potential customers and revenue.
@@ -478,6 +519,10 @@ support them.
 
 - Physical goods representation: LOCKED - location-based goods with selective visual representations (section 28).
 
+- Buildings and floors: LOCKED - buildings are procedurally generated and some are purchasable; adding floors is a construction option. Fully custom buildings are undecided (section 29.4). Adding floors: factories only, freight elevator, immediate on payment, conveyor lifts later (section 29.8).
+
+- Construction details: open - construction scope, timing, disruption, custom buildings, empty land, demolition, cancellation, and floor rules (section 29).
+
 Decision process: handle these one at a time. For each decision, present
 three distinct options, select one, and update this document.
 
@@ -629,3 +674,73 @@ Accepted technical design with implementation pending:
 - Simulation scheduling, replication/interest rules, and persistence contracts are defined in `docs/decisions/0002-authoritative-multiplayer-foundation.md`; the selected physical goods model is detailed in `docs/decisions/0003-physical-goods-model.md`. Both still require runtime verification.
 
 The accepted development starting point is an authoritative server with a listen-server path and a headless-compatible simulation, as recorded in `docs/decisions/0002-authoritative-multiplayer-foundation.md`. This does not select the shipped hosting model, dedicated hosting, host migration, or post-disconnect/offline progression. Record implementation status in `docs/architecture.md`; resource facts and setup gaps are tracked in `dev_resources.md`.
+
+# 29. Open Decisions: Construction
+
+None of 29.1-29.7 is selected. The owner's decisions on adding floors are recorded in 29.8. Section 5 records the confirmed construction requirements and the current proposals. Existing implementation: building shells exist as server data with walls on grid cells, created only by the server (`docs/decisions/0019-building-shells-and-indoor-camera.md`), and a factory can buy extra floors (`docs/decisions/0020-factory-floors-and-elevator.md`); buildings cannot be bought yet. Implementation choices made for those slices, including prototype prices, do not select any option below.
+
+## 29.1 Construction Scope
+
+- A. Structure only - shells, walls, doors, floors, demolition, shafts, and rail are construction; machines, furniture, storage, and belts are purchased equipment placed directly by characters. (Section 5 proposal.)
+- B. Structure plus fixed installations - refrigeration rooms, elevators, and large machines also require outsourced installation; small equipment is placed directly.
+- C. Everything through build mode - all layout changes, including equipment, are construction orders placed by contractors.
+
+## 29.2 Construction Timing
+
+- A. Instant - the structure appears as soon as the order is paid.
+- B. Build time - each order takes simulated time scaled by its size; a construction site is visible until it completes.
+- C. Build time with rush - as B, but the player can pay extra to shorten or skip the wait.
+
+## 29.3 Disruption During Construction
+
+- A. None - the site operates normally; only the new structure's cells are unavailable until it completes.
+- B. Local disruption - the affected cells and a working area around them are blocked while work is in progress.
+- C. Building closure - structural work closes the affected building (no customers, no station jobs) until it completes.
+
+## 29.4 Layout Freedom
+
+Owner direction (2026-09-24): buildings are procedurally generated and some are available for purchase; adding floors is an option. Whether players can also construct fully custom buildings is undecided. The options below apply only if custom buildings are added.
+
+- A. Catalog shells - the player chooses from predefined building shells and floor plans that fit a lot.
+- B. Rectangular shells - the player sizes a rectangular shell on owned land, then places doors and interior walls freely.
+- C. Freeform walls - the player draws any wall layout on the grid, including non-rectangular buildings.
+
+Related open detail: walls currently occupy whole cells. Interior walls on cell edges would keep more floor area usable but need a separate occupancy rule (decision 0019).
+
+## 29.5 Land
+
+Owner direction (2026-09-24): purchasable properties include procedurally generated buildings. Whether empty land is sold, and how, is undecided.
+
+- A. Fixed parcels - land is sold as predefined lots, some empty and some with existing buildings.
+- B. Grid land - the player buys any unowned cells, subject to district price.
+- C. Parcels that can be merged - predefined lots can be bought together and combined into one larger site.
+
+## 29.6 Demolition and Resale
+
+- A. Demolition costs money and returns nothing.
+- B. Demolition costs money; selling land with buildings returns part of the construction value.
+- C. Demolition is free; buildings add to resale value, supporting the recovery options in section 14.
+
+## 29.7 Cancellation and Payment
+
+Applies only if 29.2 selects B or C.
+
+- A. Pay up front, no refund - cancelling an order in progress forfeits its cost.
+- B. Pay up front, partial refund - cancelling returns the unspent share of the cost.
+- C. Pay in stages - cost is charged as work progresses; if the company cannot pay, work pauses.
+
+In every option, cancellation must leave goods, equipment, and cash in a consistent recorded state (section 5).
+
+## 29.8 Decision Record: Adding Floors
+
+Selected by the project owner on 2026-09-24 for the first floors slice:
+
+- Which buildings: factories only, as in section 5. [SELECTED] (Alternative: any owned building, including restaurants.)
+- Moving between floors: freight elevator, as in section 27. [SELECTED] (Alternatives: stairs and an elevator; a temporary
+  development floor switch.)
+- Timing: a paid floor exists immediately. [SELECTED] (Alternatives: build time; build time with a rush payment.) This
+  applies to floors only; general construction timing (29.2) remains open.
+- Conveyor lifts: in a later slice. [SELECTED] Until then, goods reach upper floors by being carried in the elevator.
+
+Status: selected and implemented (`docs/decisions/0020-factory-floors-and-elevator.md`). Where the elevator goes, floor
+prices, the height limit, and storey height are implementation prototype values, not design decisions.

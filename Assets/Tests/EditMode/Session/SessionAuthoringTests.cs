@@ -107,6 +107,14 @@ namespace FoodFactoryGame.Session.Tests
                 var buildingPresenters = objects.SelectMany(x => x.GetComponents<BuildingPresenter>()).ToArray();
                 Assert.That(buildingPresenters.Length, Is.EqualTo(1));
                 AssertAssigned(buildingPresenters[0], "session", "wallMaterial", "floorMaterial", "roofMaterial");
+                // Floors (decision 0020): one elevator control, and every view of placed things reads the local level.
+                var riders = objects.SelectMany(x => x.GetComponents<ElevatorRider>()).ToArray();
+                Assert.That(riders.Length, Is.EqualTo(1));
+                AssertAssigned(riders[0], "buildings", "floorUpAction", "floorDownAction");
+                foreach (var levelled in objects.SelectMany(x => x.GetComponents<MonoBehaviour>())
+                             .Where(x => x is EquipmentPresenter || x is BeltPresenter || x is EquipmentInteraction))
+                    using (var serialized = new SerializedObject(levelled))
+                        Assert.That(serialized.FindProperty("buildings").objectReferenceValue, Is.SameAs(buildingPresenters[0]), levelled.GetType().Name);
                 var huds = objects.SelectMany(x => x.GetComponents<PlayerHud>()).ToArray();
                 Assert.That(huds.Length, Is.EqualTo(1));
                 AssertAssigned(huds[0], "document", "interaction");
@@ -362,7 +370,9 @@ namespace FoodFactoryGame.Session.Tests
             Assert.That(player.FindAction("QuickTransfer").bindings.Any(x => x.path == "<Keyboard>/shift"), Is.True, "Shift+click quick-transfers a stack.");
             Assert.That(player.FindAction("PlaceItem").bindings.Any(x => x.path == "<Keyboard>/z"), Is.True, "Z puts one item on a belt.");
             Assert.That(player.FindAction("TakeItem").bindings.Any(x => x.path == "<Keyboard>/f"), Is.True, "F takes an item off a belt.");
-            foreach (var name in new[] { "Place", "Remove", "Inventory", "ClearCursor", "CloseScreen", "PlaceItem", "TakeItem" })
+            Assert.That(player.FindAction("FloorUp").bindings.Any(x => x.path == "<Keyboard>/pageUp"), Is.True, "PgUp rides the elevator up.");
+            Assert.That(player.FindAction("FloorDown").bindings.Any(x => x.path == "<Keyboard>/pageDown"), Is.True, "PgDn rides the elevator down.");
+            foreach (var name in new[] { "Place", "Remove", "Inventory", "ClearCursor", "CloseScreen", "PlaceItem", "TakeItem", "FloorUp", "FloorDown" })
                 Assert.That(player.FindAction(name).interactions, Is.Empty, $"{name} is a press, not a hold.");
             // Each hotbar key reads as its slot number through a scale processor.
             var hotbar = player.FindAction("Hotbar");

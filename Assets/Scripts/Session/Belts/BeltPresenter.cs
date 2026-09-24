@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using FoodFactoryGame.Goods;
+using FoodFactoryGame.Session.Buildings;
 using FoodFactoryGame.Session.Equipment;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -19,6 +20,7 @@ namespace FoodFactoryGame.Session.Belts
         private static readonly int BaseMap = Shader.PropertyToID("_BaseMap");
 
         [SerializeField] private SessionRoot session;
+        [SerializeField] private BuildingPresenter buildings;
         // Tile-centred models travelling +Z: straight, and corners entering from behind and turning left or right.
         [SerializeField] private GameObject straightPrefab;
         [SerializeField] private GameObject leftCornerPrefab;
@@ -82,7 +84,23 @@ namespace FoodFactoryGame.Session.Belts
             var site = session.ClientSite;
             if (!ReferenceEquals(site, _shown)) Refresh(site);
             UpdateItems(site);
+            // Belts and riding goods on a storey the local view hides (decision 0020) are hidden with it, colliders included.
+            foreach (var (id, view) in _belts)
+            {
+                var shown = !Hidden(_beltById[id]);
+                if (view.Root.activeSelf != shown) view.Root.SetActive(shown);
+            }
+            foreach (var view in _items.Values)
+            {
+                var shown = !Hidden(_beltById[view.BeltId]);
+                if (view.Renderer.enabled != shown) view.Renderer.enabled = shown;
+            }
         }
+
+        private bool Hidden(GoodsBelt belt) => buildings.HidesLevel(belt.CellX, belt.CellZ, belt.Level);
+
+        // Belts on one floor, whose shapes and links depend only on each other.
+        public static IEnumerable<GoodsBelt> OnLevel(IEnumerable<GoodsBelt> belts, int level) => belts.Where(x => x.Level == level);
 
         // Shape of a belt that exists, or would exist, at a cell: used by the placement ghost.
         public BeltShape ShapeAt(IEnumerable<GoodsBelt> belts, int cellX, int cellZ, int direction) =>
@@ -102,7 +120,8 @@ namespace FoodFactoryGame.Session.Belts
             _shown = site;
             _layout = site?.SiteLayouts.FirstOrDefault(x => x.SiteId == DevWorld.SiteId);
             var belts = _layout == null ? new List<GoodsBelt>() : site.Belts.Where(x => x.SiteId == DevWorld.SiteId).ToList();
-            var cells = BeltRules.ByCell(belts);
+            // Each floor is its own belt network (decision 0020).
+            var floors = belts.GroupBy(x => x.Level).ToDictionary(x => x.Key, x => BeltRules.ByCell(x));
             _beltById.Clear();
             _shapes.Clear();
             _links.Clear();
@@ -110,8 +129,8 @@ namespace FoodFactoryGame.Session.Belts
             foreach (var belt in belts)
             {
                 _beltById[belt.Id] = belt;
-                _shapes[belt.Id] = BeltRules.Shape(cells, belt);
-                _links[belt.Id] = BeltRules.Link(cells, belt);
+                _shapes[belt.Id] = BeltRules.Shape(floors[belt.Level], belt);
+                _links[belt.Id] = BeltRules.Link(floors[belt.Level], belt);
                 _beltOfLocation[belt.LocationId] = belt.Id;
             }
             foreach (var id in _belts.Keys.Where(x => !_beltById.ContainsKey(x)).ToList())
@@ -134,7 +153,7 @@ namespace FoodFactoryGame.Session.Belts
                     _belts.Add(belt.Id, view);
                 }
                 view.Direction = belt.Direction;
-                view.Root.transform.SetPositionAndRotation(BeltPath.CellCenter(_layout, belt.CellX, belt.CellZ),
+                view.Root.transform.SetPositionAndRotation(BeltPath.CellCenter(_layout, belt.CellX, belt.CellZ, belt.Level),
                     BeltPath.ModelRotation(shape, belt.Direction));
             }
         }

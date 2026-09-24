@@ -24,10 +24,11 @@ namespace FoodFactoryGame.Session.Belts
             };
         }
 
-        public static Vector3 CellCenter(SiteLayout layout, int cellX, int cellZ) => SiteGridSpace.FootprintCenter(layout, cellX, cellZ, 1, 1);
+        public static Vector3 CellCenter(SiteLayout layout, int cellX, int cellZ, int level = 0) =>
+            SiteGridSpace.FootprintCenter(layout, cellX, cellZ, 1, 1, level);
 
         public static Vector3 WorldPoint(SiteLayout layout, GoodsBelt belt, BeltShape shape, float position) =>
-            CellCenter(layout, belt.CellX, belt.CellZ)
+            CellCenter(layout, belt.CellX, belt.CellZ, belt.Level)
             + SiteGridSpace.Rotation(belt.Direction) * LocalPoint(shape, position / BeltRules.UnitsPerTile) * SiteGrid.CellSize;
 
         // A curved belt is drawn with the corner model entering along the feeder's travel (see BeltPresenter).

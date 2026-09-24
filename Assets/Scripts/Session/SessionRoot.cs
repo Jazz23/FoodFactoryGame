@@ -159,6 +159,7 @@ namespace FoodFactoryGame.Session
             // Recipes are content, not saved state, so they are registered on every start, including a recovered save.
             foreach (var recipe in recipes) ServerWorld.RegisterRecipe(recipe.ToDefinition());
             foreach (var offer in offers) offer.RegisterWith(ServerWorld);
+            ServerWorld.RegisterFloorOffer(DevWorld.FloorOffer);
             // Machines run by themselves, Factorio-style (decision 0008); like recipes, this is configuration, not saved.
             ServerWorld.AutomaticJobs = true;
             _registry = new PlayerRegistry(_options.RegistryPath);

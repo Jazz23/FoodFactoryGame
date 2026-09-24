@@ -17,6 +17,8 @@ namespace FoodFactoryGame.Goods
         public int CellZ;
         // Travel direction, 0..3 (BeltRules.Step).
         public int Direction;
+        // Floor the belt runs on (decision 0020); belts link only to belts on the same level.
+        public int Level;
 
         public string LocationId => Id + ":items";
     }
@@ -34,8 +36,8 @@ namespace FoodFactoryGame.Goods
 
         // Volatile primitive for tests. Live request handlers must call PlaceBeltDurably.
         // An empty cell takes a new belt made from one belt item in the player's inventory; a cell that already holds a
-        // belt is turned to the requested direction at no cost (Factorio's drag over an existing belt).
-        public GoodsOutcome PlaceBelt(string playerId, string requestId, string siteId, int cellX, int cellZ, int direction)
+        // belt is turned to the requested direction at no cost (Factorio's drag over an existing belt). Level 0 is the ground.
+        public GoodsOutcome PlaceBelt(string playerId, string requestId, string siteId, int cellX, int cellZ, int direction, int level = 0)
         {
             lock (_gate)
             {
@@ -46,14 +48,14 @@ namespace FoodFactoryGame.Goods
                 if (!_state.Grants.Any(x => x.PlayerId == playerId && x.SiteId == siteId))
                     return Record(requestId, playerId, false, "forbidden", null);
                 if (direction < 0 || direction > 3) return Record(requestId, playerId, false, "invalid-rotation", null);
-                var existing = _state.Belts.FirstOrDefault(x => x.SiteId == siteId && x.CellX == cellX && x.CellZ == cellZ);
+                var existing = _state.Belts.FirstOrDefault(x => x.SiteId == siteId && x.Level == level && x.CellX == cellX && x.CellZ == cellZ);
                 if (existing != null)
                 {
                     if (existing.Direction == direction) return Record(requestId, playerId, true, "unchanged", null);
                     existing.Direction = direction;
                     return Record(requestId, playerId, true, "rotated", null);
                 }
-                var problem = SiteGrid.CellProblem(_state, siteId, cellX, cellZ, 1, 1, null);
+                var problem = SiteGrid.CellProblem(_state, siteId, cellX, cellZ, 1, 1, null, level);
                 if (problem != null) return Record(requestId, playerId, false, problem, null);
                 var inventory = _state.Locations.FirstOrDefault(x => x.Id == InventoryLocationId(playerId));
                 if (inventory == null || inventory.SiteId != siteId) return Record(requestId, playerId, false, "no-inventory", null);
@@ -67,7 +69,8 @@ namespace FoodFactoryGame.Goods
                 if (source.Quantity == 0) _state.Lots.Remove(source);
                 var belt = new GoodsBelt
                 {
-                    Id = "belt-" + Guid.NewGuid().ToString("N"), SiteId = siteId, CellX = cellX, CellZ = cellZ, Direction = direction
+                    Id = "belt-" + Guid.NewGuid().ToString("N"), SiteId = siteId, CellX = cellX, CellZ = cellZ, Direction = direction,
+                    Level = level
                 };
                 _state.Belts.Add(belt);
                 _state.Locations.Add(new GoodsLocation
@@ -78,9 +81,10 @@ namespace FoodFactoryGame.Goods
             }
         }
 
-        public GoodsOutcome PlaceBeltDurably(string playerId, string requestId, string siteId, int cellX, int cellZ, int direction, string savePath)
+        public GoodsOutcome PlaceBeltDurably(string playerId, string requestId, string siteId, int cellX, int cellZ, int direction, string savePath,
+            int level = 0)
         {
-            return Commit(playerId, requestId, savePath, () => PlaceBelt(playerId, requestId, siteId, cellX, cellZ, direction));
+            return Commit(playerId, requestId, savePath, () => PlaceBelt(playerId, requestId, siteId, cellX, cellZ, direction, level));
         }
 
         // Volatile primitive for tests. Live request handlers must call RemoveBeltDurably.
@@ -220,9 +224,10 @@ namespace FoodFactoryGame.Goods
             if (_state.Belts.Count == 0) return;
             var riding = _state.Lots.Where(x => IsBeltLocation(x.LocationId)).ToList();
             if (riding.Count == 0) return;
-            var cells = new Dictionary<string, Dictionary<(int, int), GoodsBelt>>();
-            foreach (var site in _state.Belts.GroupBy(x => x.SiteId)) cells[site.Key] = BeltRules.ByCell(site);
-            var links = _state.Belts.ToDictionary(x => x.Id, x => BeltRules.Link(cells[x.SiteId], x));
+            // Each floor of each site is its own belt network.
+            var cells = new Dictionary<(string, int), Dictionary<(int, int), GoodsBelt>>();
+            foreach (var floor in _state.Belts.GroupBy(x => (x.SiteId, x.Level))) cells[floor.Key] = BeltRules.ByCell(floor);
+            var links = _state.Belts.ToDictionary(x => x.Id, x => BeltRules.Link(cells[(x.SiteId, x.Level)], x));
             var order = new List<GoodsBelt>();
             var visited = new HashSet<string>();
             foreach (var belt in _state.Belts.OrderBy(x => x.Id, StringComparer.Ordinal))
@@ -284,7 +289,7 @@ namespace FoodFactoryGame.Goods
         private static void ValidateBelts(GoodsSnapshot state)
         {
             if (state.Belts.Any(x => x == null || string.IsNullOrWhiteSpace(x.Id) || x.Direction < 0 || x.Direction > 3
-                    || SiteGrid.CellProblem(state, x.SiteId, x.CellX, x.CellZ, 1, 1, x.Id) != null
+                    || SiteGrid.CellProblem(state, x.SiteId, x.CellX, x.CellZ, 1, 1, x.Id, x.Level) != null
                     || !state.Locations.Any(y => y.Id == x.LocationId && y.SiteId == x.SiteId && y.Kind == BeltLocationKind))
                 || state.Belts.GroupBy(x => x.Id).Any(x => x.Count() != 1)
                 || state.Locations.Any(x => x.Kind == BeltLocationKind && !state.Belts.Any(y => y.LocationId == x.Id)))

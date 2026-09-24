@@ -8,7 +8,8 @@
 // or item to the hotbar slot (the cursor stack goes back where it was); an empty cursor takes up the slot's machine or item.
 // The site company's cash is shown top right, read from the latest baseline. Edible goods slots show the ambient time left
 // before their first lot spoils, frozen (blue) while refrigerated because refrigeration pauses spoilage (decision 0018), and
-// the hover line gives the full time; a machine with no recipes (the fridge) opens as plain storage.
+// the hover line gives the full time; a machine with no recipes (the fridge) opens as plain storage. Inside a factory the
+// inventory screen also offers its next floor (decision 0020).
 // Presentation only: slot positions are this client's arrangement of the replicated stacks, never saved or sent, and
 // progress is interpolated for at most one clock step past the latest baseline.
 using System;
@@ -393,6 +394,8 @@ namespace FoodFactoryGame.Session.Equipment
             // The cursor stack stays on the pointer outside screens, so its count is shown there too.
             if (interaction.CursorGoods != null) text.Append('|').Append(interaction.CursorLots(_site).Sum(x => x.Quantity));
             if (interaction.Screen == InteractionScreen.None) return text.ToString();
+            var building = interaction.Buildings.LocalBuilding;
+            text.Append('|').Append(building?.Id).Append(building?.Floors);
             foreach (var grid in _grids.OrderBy(x => x.Key, StringComparer.Ordinal))
             {
                 text.Append('#').Append(grid.Key);
@@ -476,6 +479,8 @@ namespace FoodFactoryGame.Session.Equipment
                 storage.Add(GridView(StorageGrid));
                 _screen.Add(storage);
                 if (interaction.Session.Offers.Count > 0) _screen.Add(SupplierWindow());
+                var building = interaction.Buildings.LocalBuilding;
+                if (building?.Kind == GoodsWorld.FactoryKind) _screen.Add(ConstructionWindow(building));
                 return;
             }
             var equipment = site.Equipment.FirstOrDefault(x => x.Id == interaction.OpenMachineId);
@@ -513,6 +518,39 @@ namespace FoodFactoryGame.Session.Equipment
 
         // Buys one pack of the offer, like its Buy button. Public so tests can drive the same path as the button.
         public void ClickOffer(string offerId) => interaction.Buy(offerId);
+
+        // Outsourced construction for the factory the avatar stands in (decision 0020): its floors and one Build button for the
+        // next floor at the content price. The first added floor puts the elevator on the avatar's cell. Like the supplier,
+        // affordability is not previewed; the server's reason is shown.
+        private VisualElement ConstructionWindow(GoodsBuilding building)
+        {
+            var window = Window("hud-construction", "Factory");
+            var floors = Caption($"Floors: {building.Floors} of {DevWorld.MaxFloors}", 12, Color.white, 4);
+            floors.name = "hud-floors";
+            window.Add(floors);
+            if (building.Floors >= DevWorld.MaxFloors)
+            {
+                window.Add(Caption("Top floor reached.", 12, Muted, 4));
+                return window;
+            }
+            var row = new VisualElement();
+            row.style.flexDirection = FlexDirection.Row;
+            row.style.alignItems = Align.Center;
+            row.style.marginTop = 4;
+            var label = Caption($"Add a floor  {FormatCash(GoodsWorld.FloorPriceCents(building, DevWorld.FloorOffer))}", 12, Color.white);
+            label.style.minWidth = 120;
+            row.Add(label);
+            // Not focusable: a focused button would order again on every keyboard Submit (Enter/Space) after the click.
+            var build = new Button(ClickAddFloor) { name = "hud-add-floor", text = "Build", focusable = false };
+            build.style.minWidth = 48;
+            row.Add(build);
+            window.Add(row);
+            if (!building.HasElevator) window.Add(Caption("The elevator goes where you stand.", 12, Muted, 4));
+            return window;
+        }
+
+        // Orders the next floor, like the Build button. Public so tests can drive the same path as the button.
+        public void ClickAddFloor() => interaction.AddFloor();
 
         // Input slot -> progress arrow -> output slot, like a Factorio furnace; the machine runs by itself (decision 0008).
         // A machine with no recipes is storage (the fridge, decision 0018): just its input grid.

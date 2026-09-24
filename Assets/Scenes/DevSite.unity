@@ -149,6 +149,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: FoodFactoryGame.Session::FoodFactoryGame.Session.Equipment.EquipmentPresenter
   session: {fileID: 1409180070}
+  buildings: {fileID: 1618508198}
 --- !u!4 &793648
 Transform:
   m_ObjectHideFlags: 0
@@ -525,6 +526,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: FoodFactoryGame.Session::FoodFactoryGame.Session.Belts.BeltPresenter
   session: {fileID: 1409180070}
+  buildings: {fileID: 1618508198}
   straightPrefab: {fileID: 3017358433126586535, guid: 596c7340ab1528f488793c9c7a869a3d, type: 3}
   leftCornerPrefab: {fileID: 8956891336948779353, guid: 3326192935e455c4894c565c0cb7d832, type: 3}
   rightCornerPrefab: {fileID: 961108269653535001, guid: 6d689fec61de25d4490191f29f652c56, type: 3}
@@ -722,6 +724,7 @@ MonoBehaviour:
   placeItemAction: {fileID: -5323955772092899608, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   takeItemAction: {fileID: -2323420383534807687, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   session: {fileID: 1409180070}
+  buildings: {fileID: 1618508198}
   ghost: {fileID: 2113735869}
   ghostModelMaterial: {fileID: 2100000, guid: 2c850730491a74a45ae513a8bcf63592, type: 2}
   ghostAlpha: 0.45
@@ -1047,6 +1050,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1618508199}
   - component: {fileID: 1618508198}
+  - component: {fileID: 1618508200}
   m_Layer: 0
   m_Name: BuildingPresenter
   m_TagString: Untagged
@@ -1070,8 +1074,8 @@ MonoBehaviour:
   wallMaterial: {fileID: 2100000, guid: 048e809b834e9ff418deb83115ef790f, type: 2}
   floorMaterial: {fileID: 2100000, guid: 48006a414127a7744ae61e3e4bb1fecb, type: 2}
   roofMaterial: {fileID: 2100000, guid: 94f6cfb2df23bd145a4fb6dba9a501ed, type: 2}
-  wallHeight: 3
   doorHeight: 2.2
+  elevatorColor: {r: 0.95, g: 0.75, b: 0.2, a: 1}
 --- !u!4 &1618508199
 Transform:
   m_ObjectHideFlags: 0
@@ -1087,6 +1091,21 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1618508200
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1618508197}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8971a9042e4aecf4e98f2a11eb62dd7d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: FoodFactoryGame.Session::FoodFactoryGame.Session.Buildings.ElevatorRider
+  buildings: {fileID: 1618508198}
+  floorUpAction: {fileID: -5075139547735932739, guid: 052faaac586de48259a63d0c4782560b, type: 3}
+  floorDownAction: {fileID: 7493342378920295076, guid: 052faaac586de48259a63d0c4782560b, type: 3}
 --- !u!1 &1697855442
 GameObject:
   m_ObjectHideFlags: 0
@@ -1097,6 +1116,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1697855444}
   - component: {fileID: 1697855443}
+  - component: {fileID: 1697855445}
   m_Layer: 0
   m_Name: Directional Light
   m_TagString: Untagged
@@ -1184,6 +1204,35 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1697855445
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1697855442}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.UniversalAdditionalLightData
+  m_UsePipelineSettings: 1
+  m_AdditionalLightsShadowResolutionTier: 2
+  m_CustomShadowLayers: 0
+  m_LightCookieSize: {x: 1, y: 1}
+  m_LightCookieOffset: {x: 0, y: 0}
+  m_SoftShadowQuality: 0
+  m_RenderingLayersMask:
+    serializedVersion: 0
+    m_Bits: 1
+  m_ShadowRenderingLayersMask:
+    serializedVersion: 0
+    m_Bits: 1
+  m_Version: 4
+  m_LightLayerMask: 1
+  m_ShadowLayerMask: 1
+  m_RenderingLayers: 1
+  m_ShadowRenderingLayers: 1
 --- !u!1 &1885904686
 GameObject:
   m_ObjectHideFlags: 0

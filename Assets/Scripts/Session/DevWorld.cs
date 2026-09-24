@@ -1,8 +1,8 @@
 // Loads the committed world save or creates the DEVELOPMENT seed; the seed is placeholder content, not design data.
 // The seed is applied only to a brand-new world: an existing save never gains the layout, oven or storage dough retroactively.
-// Belts, the company, the sell counter and the restaurant shell are the exceptions: a save from before each existed gets the
-// dev belt stock (EnsureBeltStock), the dev company with its starting cash (EnsureCompany), the dev counter (EnsureCounter)
-// or the dev restaurant shell (EnsureBuilding) once.
+// Belts, the company, the sell counter and the building shells are the exceptions: a save from before each existed gets the
+// dev belt stock (EnsureBeltStock), the dev company with its starting cash (EnsureCompany), the dev counter (EnsureCounter),
+// the dev restaurant shell (EnsureBuilding) or the dev factory shell (EnsureFactory) once.
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -51,6 +51,20 @@ namespace FoodFactoryGame.Session
         public const int RestaurantWidth = 11;
         public const int RestaurantDepth = 9;
         public const int RestaurantDoorX = 13;
+        // PROTOTYPE factory shell (decision 0020): 5x10 cells along the north-east edge, walls included (interior 3x8), with a
+        // two-cell doorway in its south wall. It clears the seeded oven and counter, the spawn points, every PlayMode test cell
+        // and everything placed in the owner's dev save.
+        public const string FactoryId = "dev-factory";
+        public const int FactoryCellX = 15;
+        public const int FactoryCellZ = 10;
+        public const int FactoryWidth = 5;
+        public const int FactoryDepth = 10;
+        public const int FactoryDoorX = 16;
+        // PROTOTYPE construction prices (whole cents per interior cell of a new floor) and height limit, ground floor included.
+        public const long FloorCentsPerCell = 500;
+        public const int MaxFloors = 3;
+
+        public static FloorOffer FloorOffer => new() { CentsPerCell = FloorCentsPerCell, MaxFloors = MaxFloors };
 
         public static IReadOnlyList<GoodsLot> StarterGoods => new[]
         {
@@ -81,6 +95,7 @@ namespace FoodFactoryGame.Session
                 EnsureCompany(loaded, worldPath);
                 EnsureCounter(loaded, worldPath, counter);
                 EnsureBuilding(loaded, worldPath);
+                EnsureFactory(loaded, worldPath);
                 return loaded;
             }
             var world = new GoodsWorld(WorldId);
@@ -95,6 +110,7 @@ namespace FoodFactoryGame.Session
             world.Bootstrap(Company());
             world.Bootstrap(new SiteLayout { SiteId = SiteId, Width = GridWidth, Depth = GridDepth });
             world.Bootstrap(Restaurant());
+            world.Bootstrap(Factory());
             if (oven != null) world.Bootstrap(oven.CreatePlaced(OvenId, SiteId, OvenCellX, OvenCellZ, 0));
             if (counter != null) world.Bootstrap(counter.CreatePlaced(CounterId, SiteId, CounterCellX, CounterCellZ, 0));
             GoodsSnapshotStore.Save(world, worldPath);
@@ -173,13 +189,14 @@ namespace FoodFactoryGame.Session
             }
         };
 
-        // PROTOTYPE, one-time: buildings are never removed, so a dev site with none has never had one. It gets the dev
-        // restaurant shell, committed before serving; if equipment or belts stand where its walls go, the save is left alone
-        // with a warning.
+        // PROTOTYPE, one-time: buildings are never removed, so a save without the dev restaurant has never had it. It gets the
+        // dev restaurant shell, committed before serving; if equipment or belts stand where its walls go, the save is left
+        // alone with a warning.
         private static void EnsureBuilding(GoodsWorld world, string worldPath)
         {
             var state = world.Snapshot();
-            if (state.Buildings.Any(x => x.SiteId == SiteId || x.Id == RestaurantId) || state.SiteLayouts.All(x => x.SiteId != SiteId)) return;
+            // Keyed by ID: the dev factory may already stand on a site whose restaurant was skipped.
+            if (state.Buildings.Any(x => x.Id == RestaurantId) || state.SiteLayouts.All(x => x.SiteId != SiteId)) return;
             try { world.Bootstrap(Restaurant()); }
             catch (System.ArgumentException)
             {
@@ -189,6 +206,30 @@ namespace FoodFactoryGame.Session
             }
             GoodsSnapshotStore.Save(world, worldPath);
             Debug.Log("[Session] Added the dev restaurant shell to this older save.");
+        }
+
+        public static GoodsBuilding Factory() => new()
+        {
+            Id = FactoryId, SiteId = SiteId, Kind = GoodsWorld.FactoryKind, CellX = FactoryCellX, CellZ = FactoryCellZ,
+            Width = FactoryWidth, Depth = FactoryDepth,
+            Doors = new List<GridCell> { new() { X = FactoryDoorX, Z = FactoryCellZ }, new() { X = FactoryDoorX + 1, Z = FactoryCellZ } }
+        };
+
+        // PROTOTYPE, one-time, like EnsureBuilding: a save without the dev factory (it is never removed) gets it, committed
+        // before serving; if equipment or belts stand where its walls go, the save is left alone with a warning.
+        private static void EnsureFactory(GoodsWorld world, string worldPath)
+        {
+            var state = world.Snapshot();
+            if (state.Buildings.Any(x => x.Id == FactoryId) || state.SiteLayouts.All(x => x.SiteId != SiteId)) return;
+            try { world.Bootstrap(Factory()); }
+            catch (System.ArgumentException)
+            {
+                Debug.LogWarning($"[Session] Something stands where the dev factory's walls go (cells {FactoryCellX}-{FactoryCellX + FactoryWidth - 1}, "
+                    + $"{FactoryCellZ}-{FactoryCellZ + FactoryDepth - 1}), so this save gets no factory; clear the walls and restart the server.");
+                return;
+            }
+            GoodsSnapshotStore.Save(world, worldPath);
+            Debug.Log("[Session] Added the dev factory shell to this save.");
         }
     }
 }
