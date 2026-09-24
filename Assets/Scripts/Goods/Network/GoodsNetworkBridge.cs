@@ -60,8 +60,7 @@ namespace FoodFactoryGame.Goods.Network
             }
             _clockRemainder -= seconds;
             _persistenceFailed = false;
-            foreach (var pair in new List<KeyValuePair<NetworkConnection, string>>(_subscriptions))
-                SendSite(pair.Key, pair.Value);
+            Broadcast();
         }
 
         public void RequestTransfer(string requestId, string lotId, string destinationId, int quantity, string reservationId = "")
@@ -82,6 +81,108 @@ namespace FoodFactoryGame.Goods.Network
         public void RequestCancellation(string requestId, string reservationId)
         {
             if (IsClientStarted) ServerCancel(requestId, reservationId);
+        }
+
+        public void RequestPickUp(string requestId, string equipmentId)
+        {
+            if (IsClientStarted) ServerPickUp(requestId, equipmentId);
+        }
+
+        public void RequestPlace(string requestId, string equipmentId, int cellX, int cellZ, int rotation)
+        {
+            if (IsClientStarted) ServerPlace(requestId, equipmentId, cellX, cellZ, rotation);
+        }
+
+        // One batch per request: the server checks the station, recipe, busy state and inputs (StartJobDurably).
+        public void RequestStartJob(string requestId, string stationId, string recipeId)
+        {
+            if (IsClientStarted) ServerStartJob(requestId, stationId, recipeId);
+        }
+
+        // Places a belt from the player's inventory on an empty cell, or turns the belt already there (PlaceBeltDurably).
+        public void RequestPlaceBelt(string requestId, string siteId, int cellX, int cellZ, int direction)
+        {
+            if (IsClientStarted) ServerPlaceBelt(requestId, siteId, cellX, cellZ, direction);
+        }
+
+        public void RequestRemoveBelt(string requestId, string beltId)
+        {
+            if (IsClientStarted) ServerRemoveBelt(requestId, beltId);
+        }
+
+        // Puts one unit of a lot on a belt (PlaceOnBeltDurably).
+        public void RequestPlaceOnBelt(string requestId, string lotId, string beltId)
+        {
+            if (IsClientStarted) ServerPlaceOnBelt(requestId, lotId, beltId);
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        private void ServerPlaceBelt(string requestId, string siteId, int cellX, int cellZ, int direction, NetworkConnection sender = null)
+        {
+            if (!TryIdentify(sender, requestId, out var player)) return;
+            var result = _world.PlaceBeltDurably(player, requestId, siteId, cellX, cellZ, direction, _savePath);
+            Reply(sender, result);
+            if (result.Accepted) Broadcast();
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        private void ServerRemoveBelt(string requestId, string beltId, NetworkConnection sender = null)
+        {
+            if (!TryIdentify(sender, requestId, out var player)) return;
+            var result = _world.RemoveBeltDurably(player, requestId, beltId, _savePath);
+            Reply(sender, result);
+            if (result.Accepted) Broadcast();
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        private void ServerPlaceOnBelt(string requestId, string lotId, string beltId, NetworkConnection sender = null)
+        {
+            if (!TryIdentify(sender, requestId, out var player)) return;
+            var result = _world.PlaceOnBeltDurably(player, requestId, lotId, beltId, _savePath);
+            Reply(sender, result);
+            if (result.Accepted) Broadcast();
+        }
+
+        // Takes one riding item off a belt into the requester's inventory (TakeFromBeltDurably).
+        public void RequestTakeFromBelt(string requestId, string lotId)
+        {
+            if (IsClientStarted) ServerTakeFromBelt(requestId, lotId);
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        private void ServerTakeFromBelt(string requestId, string lotId, NetworkConnection sender = null)
+        {
+            if (!TryIdentify(sender, requestId, out var player)) return;
+            var result = _world.TakeFromBeltDurably(player, requestId, lotId, _savePath);
+            Reply(sender, result);
+            if (result.Accepted) Broadcast();
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        private void ServerStartJob(string requestId, string stationId, string recipeId, NetworkConnection sender = null)
+        {
+            if (!TryIdentify(sender, requestId, out var player)) return;
+            var result = _world.StartJobDurably(player, requestId, stationId, recipeId, _savePath);
+            Reply(sender, result);
+            if (result.Accepted) Broadcast();
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        private void ServerPickUp(string requestId, string equipmentId, NetworkConnection sender = null)
+        {
+            if (!TryIdentify(sender, requestId, out var player)) return;
+            var result = _world.PickUpDurably(player, requestId, equipmentId, _savePath);
+            Reply(sender, result);
+            if (result.Accepted) Broadcast();
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        private void ServerPlace(string requestId, string equipmentId, int cellX, int cellZ, int rotation, NetworkConnection sender = null)
+        {
+            if (!TryIdentify(sender, requestId, out var player)) return;
+            var result = _world.PlaceDurably(player, requestId, equipmentId, cellX, cellZ, rotation, _savePath);
+            Reply(sender, result);
+            if (result.Accepted) Broadcast();
         }
 
         [ServerRpc(RequireOwnership = false)]
@@ -108,8 +209,12 @@ namespace FoodFactoryGame.Goods.Network
                 Quantity = quantity, ReservationId = reservationId
             }, _savePath);
             Reply(sender, result);
-            if (!result.Accepted) return;
-            // A subscriber gets a complete revisioned baseline, never unauthorized state or inferred deltas.
+            if (result.Accepted) Broadcast();
+        }
+
+        // A subscriber gets a complete revisioned baseline, never unauthorized state or inferred deltas.
+        private void Broadcast()
+        {
             foreach (var pair in new List<KeyValuePair<NetworkConnection, string>>(_subscriptions))
                 SendSite(pair.Key, pair.Value);
         }

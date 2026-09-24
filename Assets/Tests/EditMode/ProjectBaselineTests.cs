@@ -1,6 +1,7 @@
 // Checks imported dependency and starter-authoring integrity without changing open scenes or application saves.
 using System.Linq;
 using FishNet.Managing;
+using FoodFactoryGame.Session;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -46,7 +47,7 @@ namespace FoodFactoryGame.Baseline.Tests
         }
 
         [Test]
-        public void EnabledBuildScenesLoadWithoutMissingScriptsAndHaveCamera()
+        public void EnabledBuildScenesLoadWithoutMissingScriptsAndHaveCameraSource()
         {
             var scenes = EditorBuildSettings.scenes.Where(scene => scene.enabled).ToArray();
             Assert.That(scenes, Is.Not.Empty, "At least one baseline scene must be enabled for the player build.");
@@ -63,8 +64,13 @@ namespace FoodFactoryGame.Baseline.Tests
                         Assert.That(GameObjectUtility.GetMonoBehavioursWithMissingScriptCount(transform.gameObject),
                             Is.Zero, $"Missing script on {entry.path}: {transform.name}");
                     }
-                    Assert.That(transforms.Any(transform => transform.GetComponent<Camera>() != null),
-                        Is.True, $"The baseline scene {entry.path} must have a camera.");
+                    // A session scene is intentionally camera-free: the local player's prefab supplies the view.
+                    var sessionCamera = transforms.Select(transform => transform.GetComponent<SessionRoot>())
+                        .Where(root => root != null)
+                        .Select(root => new SerializedObject(root).FindProperty("playerPrefab").objectReferenceValue as Component)
+                        .Any(player => player != null && player.GetComponentInChildren<Camera>(true) != null);
+                    Assert.That(sessionCamera || transforms.Any(transform => transform.GetComponent<Camera>() != null),
+                        Is.True, $"The build scene {entry.path} must have a camera or a session player prefab with one.");
                 }
                 finally
                 {

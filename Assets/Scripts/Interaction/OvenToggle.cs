@@ -1,11 +1,13 @@
-// Controls the oven's local presentation state; authoritative production state will replace this prototype later.
+// Oven presentation: heater glow, chamber light and fans. On DevSite the EquipmentPresenter drives it from the replicated
+// job state; Toggle remains only for the SampleScene click prototype.
+using FoodFactoryGame.Session.Equipment;
 using UnityEngine;
 
 namespace FoodFactoryGame.Interaction
 {
 
 [DisallowMultipleComponent]
-public sealed class OvenToggle : MonoBehaviour
+public sealed class OvenToggle : MonoBehaviour, IEquipmentRunningDisplay
 {
     private static readonly int EmissionColor = Shader.PropertyToID("_EmissionColor");
 
@@ -49,6 +51,14 @@ public sealed class OvenToggle : MonoBehaviour
     public void Toggle()
     {
         SetPowered(!isPowered);
+    }
+
+    public void SetRunning(bool running)
+    {
+        if (running != isPowered)
+        {
+            SetPowered(running);
+        }
     }
 
     public void SetPowered(bool powered)

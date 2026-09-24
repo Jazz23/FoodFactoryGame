@@ -1,0 +1,100 @@
+// Loads the committed world save or creates the DEVELOPMENT seed; the seed is placeholder content, not design data.
+// The seed is applied only to a brand-new world: an existing save never gains the layout, oven or storage dough retroactively.
+// Belts are the one exception: a save from before belts existed gets the dev belt stock once (EnsureBeltStock).
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using FoodFactoryGame.Goods;
+using FoodFactoryGame.Session.Equipment;
+using UnityEngine;
+
+namespace FoodFactoryGame.Session
+{
+    public static class DevWorld
+    {
+        public const string WorldId = "dev-world";
+        public const string SiteId = "dev-site";
+        public const string StorageId = "dev-site-storage";
+        public const string OvenId = "dev-oven-1";
+        // PROTOTYPE values: a 20x20 one-metre grid, the seeded oven's anchor cell, and the slot counts of each player's
+        // inventory and the dev storage (decision 0009: capacity counts slots; a slot holds one stack up to the item's max).
+        public const int GridWidth = 20;
+        public const int GridDepth = 20;
+        public const int OvenCellX = 12;
+        public const int OvenCellZ = 13;
+        public const int InventoryCapacity = 30;
+        public const int StorageCapacity = 30;
+        // PROTOTYPE ingredients until something produces dough: stock in the dev storage and a few for each new player.
+        public const string DoughItemId = "dough";
+        public const int StorageDough = 20;
+        public const int StarterDough = 5;
+        public const long DoughSpoilAfterSeconds = 7200;
+        // PROTOTYPE belts until belts can be bought or made: stock in the dev storage and some for each new player.
+        public const string StorageBeltsLotId = "dev-storage-belts";
+        public const int StorageBelts = 200;
+        public const int StarterBelts = 50;
+
+        public static IReadOnlyList<GoodsLot> StarterGoods => new[]
+        {
+            new GoodsLot { ItemId = DoughItemId, Quantity = StarterDough, SpoilAfterSeconds = DoughSpoilAfterSeconds },
+            new GoodsLot { ItemId = GoodsWorld.BeltItemId, Quantity = StarterBelts, SpoilAfterSeconds = GoodsWorld.NonPerishableSeconds }
+        };
+
+        // Returns a world that matches its committed snapshot, as GoodsNetworkBridge.InitializeServer requires.
+        // Without an oven definition the seed has the layout but no equipment. Item max stacks (content) are registered
+        // before the seed, because the seed's goods are counted in slots.
+        public static GoodsWorld LoadOrCreate(string worldPath, EquipmentDefinition oven = null, IEnumerable<ItemDefinition> items = null)
+        {
+            if (File.Exists(worldPath) || File.Exists(worldPath + ".previous"))
+            {
+                var loaded = GoodsSnapshotStore.Load(worldPath);
+                Register(loaded, items);
+                EnsureBeltStock(loaded, worldPath);
+                return loaded;
+            }
+            var world = new GoodsWorld(WorldId);
+            Register(world, items);
+            world.Bootstrap(new GoodsLocation { Id = StorageId, SiteId = SiteId, Kind = "storage", Capacity = StorageCapacity });
+            world.Bootstrap(new GoodsLot
+            {
+                Id = "dev-storage-dough", ItemId = DoughItemId, OwnerId = SiteId, LocationId = StorageId,
+                Quantity = StorageDough, SpoilAfterSeconds = DoughSpoilAfterSeconds
+            });
+            world.Bootstrap(BeltStock());
+            world.Bootstrap(new SiteLayout { SiteId = SiteId, Width = GridWidth, Depth = GridDepth });
+            if (oven != null) world.Bootstrap(oven.CreatePlaced(OvenId, SiteId, OvenCellX, OvenCellZ, 0));
+            GoodsSnapshotStore.Save(world, worldPath);
+            return world;
+        }
+
+        private static void Register(GoodsWorld world, IEnumerable<ItemDefinition> items)
+        {
+            foreach (var item in items ?? Enumerable.Empty<ItemDefinition>())
+                if (item != null) world.RegisterItem(item.Id, item.MaxStack);
+        }
+
+        private static GoodsLot BeltStock() => new()
+        {
+            Id = StorageBeltsLotId, ItemId = GoodsWorld.BeltItemId, OwnerId = SiteId, LocationId = StorageId,
+            Quantity = StorageBelts, SpoilAfterSeconds = GoodsWorld.NonPerishableSeconds
+        };
+
+        // PROTOTYPE, one-time: belts are never destroyed (placing turns an item into a belt, removing turns it back), so a
+        // world with no belt items and no placed belts has never had belts. Such a save gets the dev storage belt stock,
+        // committed before serving; if the storage has no room it is left alone.
+        private static void EnsureBeltStock(GoodsWorld world, string worldPath)
+        {
+            var state = world.Snapshot();
+            if (state.Belts.Count > 0 || state.Lots.Any(x => x.ItemId == GoodsWorld.BeltItemId)
+                || state.Lots.Any(x => x.Id == StorageBeltsLotId) || state.Locations.All(x => x.Id != StorageId)) return;
+            try { world.Bootstrap(BeltStock()); }
+            catch (System.ArgumentException)
+            {
+                Debug.LogWarning("[Session] The dev storage is too full for the belt stock; free two slots and restart the server.");
+                return;
+            }
+            GoodsSnapshotStore.Save(world, worldPath);
+            Debug.Log($"[Session] Added {StorageBelts} dev belts to the storage of this older save.");
+        }
+    }
+}

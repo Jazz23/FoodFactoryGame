@@ -1,0 +1,1 @@
+{"name":"FoodFactoryGame.Session.PlayModeTests","rootNamespace":"FoodFactoryGame.Session.PlayModeTests","references":["FoodFactoryGame.Session","FoodFactoryGame.Goods","FoodFactoryGame.Goods.Network","FishNet.Runtime","Unity.InputSystem"],"includePlatforms":[],"defineConstraints":["UNITY_INCLUDE_TESTS"],"optionalUnityReferences":["TestAssemblies"],"autoReferenced":false}

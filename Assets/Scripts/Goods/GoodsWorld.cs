@@ -26,6 +26,8 @@ namespace FoodFactoryGame.Goods
         public long ExposureSeconds;
         public long SpoilAfterSeconds;
         public bool Spoiled;
+        // Path position (BeltRules units) while the lot rides a belt; 0 anywhere else.
+        public int BeltPosition;
     }
 
     [Serializable] public sealed class GoodsReservation
@@ -66,7 +68,7 @@ namespace FoodFactoryGame.Goods
 
     [Serializable] public sealed class GoodsSnapshot
     {
-        public const int CurrentSchema = 2;
+        public const int CurrentSchema = 4;
         public int SchemaVersion = CurrentSchema;
         public string WorldId;
         public long ClockSeconds;
@@ -78,11 +80,16 @@ namespace FoodFactoryGame.Goods
         public List<GoodsGrant> Grants = new();
         public List<GoodsStation> Stations = new();
         public List<StationJob> Jobs = new();
+        public List<GoodsEquipment> Equipment = new();
+        public List<SiteLayout> SiteLayouts = new();
+        public List<GoodsBelt> Belts = new();
     }
 
     public sealed partial class GoodsWorld
     {
         private readonly object _gate = new();
+        // Item content, like recipes: registered by the server at start and never saved. Unregistered items stack to 1.
+        private readonly Dictionary<string, int> _maxStacks = new();
         private GoodsSnapshot _state;
 
         // Bootstrap is server-only: callers supply durable IDs; never expose this method to an RPC.
@@ -124,7 +131,7 @@ namespace FoodFactoryGame.Goods
                 if (lot == null || string.IsNullOrWhiteSpace(lot.Id) || string.IsNullOrWhiteSpace(lot.ItemId)
                     || string.IsNullOrWhiteSpace(lot.OwnerId) || lot.Quantity < 1 || lot.SpoilAfterSeconds < 1
                     || lot.ExposureSeconds < 0 || lot.Spoiled != (lot.ExposureSeconds >= lot.SpoilAfterSeconds)
-                    || _state.Lots.Any(x => x.Id == lot.Id) || !Fits(lot.LocationId, lot.Quantity))
+                    || _state.Lots.Any(x => x.Id == lot.Id) || !Fits(lot.LocationId, lot.ItemId, lot.Spoiled, lot.Quantity))
                     throw new ArgumentException("Invalid lot or location capacity.");
                 _state.Lots.Add(JsonUtility.FromJson<GoodsLot>(JsonUtility.ToJson(lot)));
                 _state.Revision++;
@@ -141,6 +148,62 @@ namespace FoodFactoryGame.Goods
                 {
                     _state.Grants.Add(new GoodsGrant { PlayerId = playerId, SiteId = siteId });
                     _state.Revision++;
+                }
+            }
+        }
+
+        // Server-only admission path: an existing grant (and inventory, if requested) succeeds without a write; anything
+        // missing is created in one commit before success. Returns false with the prior state restored if the snapshot
+        // cannot commit. inventoryCapacity > 0 ensures the player's inventory location on the site with at least that many
+        // slots (an older, smaller inventory is enlarged, never shrunk). Starter goods (item, quantity and spoil threshold
+        // only) are added, owned by the site, only when that inventory is created, so reconnecting never grants them again.
+        public bool TryGrantDurably(string playerId, string siteId, string savePath, int inventoryCapacity = 0,
+            IReadOnlyList<GoodsLot> starterGoods = null)
+        {
+            lock (_gate)
+            {
+                // Invalid grants throw here, before any mutation, rather than masquerading as I/O failure.
+                if (string.IsNullOrWhiteSpace(playerId) || !_state.Locations.Any(x => x.SiteId == siteId))
+                    throw new ArgumentException("Invalid grant.");
+                starterGoods ??= Array.Empty<GoodsLot>();
+                if (starterGoods.Any(x => x == null || string.IsNullOrWhiteSpace(x.ItemId) || x.Quantity < 1 || x.SpoilAfterSeconds < 1)
+                    || GoodsSlots.SlotsUsed(starterGoods, MaxStackLocked) > Math.Max(0, inventoryCapacity))
+                    throw new ArgumentException("Invalid starter goods or they exceed the inventory capacity.");
+                var inventoryId = InventoryLocationId(playerId);
+                var inventory = _state.Locations.FirstOrDefault(x => x.Id == inventoryId);
+                var needsInventory = inventoryCapacity > 0 && inventory == null;
+                var needsSlots = inventory != null && inventory.Capacity < inventoryCapacity;
+                if (needsInventory && _state.Lots.Any(x => x.Id.StartsWith($"starter:{playerId}:", StringComparison.Ordinal)))
+                    throw new InvalidOperationException($"Starter goods for {playerId} exist without an inventory.");
+                if (CanView(playerId, siteId) && !needsInventory && !needsSlots) return true;
+                var before = Snapshot();
+                if (needsSlots)
+                {
+                    inventory.Capacity = inventoryCapacity;
+                    _state.Revision++;
+                }
+                if (needsInventory)
+                {
+                    Bootstrap(new GoodsLocation { Id = inventoryId, SiteId = siteId, Kind = "carried", Capacity = inventoryCapacity });
+                    for (var index = 0; index < starterGoods.Count; index++)
+                        Bootstrap(new GoodsLot
+                        {
+                            Id = $"starter:{playerId}:{index}", ItemId = starterGoods[index].ItemId, OwnerId = siteId,
+                            LocationId = inventoryId, Quantity = starterGoods[index].Quantity,
+                            SpoilAfterSeconds = starterGoods[index].SpoilAfterSeconds
+                        });
+                }
+                Grant(playerId, siteId);
+                try
+                {
+                    GoodsSnapshotStore.Save(this, savePath);
+                    return true;
+                }
+                catch (Exception error)
+                {
+                    _state = before;
+                    if (!PersistenceError(error)) throw;
+                    return false;
                 }
             }
         }
@@ -162,6 +225,9 @@ namespace FoodFactoryGame.Goods
                 view.Stations = view.Stations.Where(x => x.SiteId == siteId).ToList();
                 var stationIds = new HashSet<string>(view.Stations.Select(x => x.Id));
                 view.Jobs = view.Jobs.Where(x => stationIds.Contains(x.StationId)).ToList();
+                view.Equipment = view.Equipment.Where(x => x.SiteId == siteId).ToList();
+                view.SiteLayouts = view.SiteLayouts.Where(x => x.SiteId == siteId).ToList();
+                view.Belts = view.Belts.Where(x => x.SiteId == siteId).ToList();
                 view.Reservations.Clear();
                 view.Outcomes.Clear();
                 view.Grants.Clear();
@@ -186,6 +252,8 @@ namespace FoodFactoryGame.Goods
                     lot.Spoiled = lot.ExposureSeconds >= lot.SpoilAfterSeconds;
                 }
                 ProgressJobs(seconds);
+                StartReadyJobs();
+                MoveBeltItems(seconds);
                 _state.Revision++;
             }
         }
@@ -237,7 +305,9 @@ namespace FoodFactoryGame.Goods
                 var source = _state.Locations.First(x => x.Id == lot.LocationId);
                 if (!Allowed(playerId, source.Id) || lot.OwnerId != source.SiteId)
                     return Record(intent.RequestId, playerId, false, "forbidden", null);
-                if (destination == null || lot.LocationId == destination.Id)
+                // Goods ride belts only through PlaceOnBelt and leave them only through TakeFromBelt or with the belt (RemoveBelt).
+                if (destination == null || lot.LocationId == destination.Id || source.Kind == BeltLocationKind
+                    || destination.Kind == BeltLocationKind)
                     return Record(intent.RequestId, playerId, false, "invalid-route", null);
                 if (source.SiteId != destination.SiteId || !Allowed(playerId, destination.Id))
                     return Record(intent.RequestId, playerId, false, "forbidden", null);
@@ -247,7 +317,7 @@ namespace FoodFactoryGame.Goods
                         : reservation.LotId != lot.Id || reservation.PlayerId != playerId || reservation.Quantity != intent.Quantity
                           || intent.Quantity > Available(lot) + reservation.Quantity))
                     return Record(intent.RequestId, playerId, false, "quantity-or-reservation", null);
-                if (!Fits(destination.Id, intent.Quantity))
+                if (!Fits(destination.Id, lot.ItemId, lot.Spoiled, intent.Quantity))
                     return Record(intent.RequestId, playerId, false, "capacity", null);
 
                 // All checks precede the single locked mutation. A partial move is a split with a new durable ID.
@@ -266,6 +336,7 @@ namespace FoodFactoryGame.Goods
                     });
                 }
                 if (reservation != null) reservation.Active = false;
+                StartReadyJobs();
                 return Record(intent.RequestId, playerId, true, "transferred", movedId);
             }
         }
@@ -366,7 +437,8 @@ namespace FoodFactoryGame.Goods
                 if (first == null || second == null || first == second || first.ItemId != second.ItemId
                     || first.OwnerId != second.OwnerId || first.LocationId != second.LocationId
                     || first.ExposureSeconds != second.ExposureSeconds || first.SpoilAfterSeconds != second.SpoilAfterSeconds
-                    || first.Spoiled != second.Spoiled || _state.Reservations.Any(x => x.Active && (x.LotId == firstId || x.LotId == secondId))) return false;
+                    || first.Spoiled != second.Spoiled || IsBeltLocation(first.LocationId)
+                    || _state.Reservations.Any(x => x.Active && (x.LotId == firstId || x.LotId == secondId))) return false;
                 checked { first.Quantity += second.Quantity; }
                 _state.Lots.Remove(second);
                 _state.Revision++;
@@ -395,10 +467,36 @@ namespace FoodFactoryGame.Goods
             var location = _state.Locations.First(x => x.Id == locationId);
             return _state.Grants.Any(x => x.PlayerId == player && x.SiteId == location.SiteId);
         }
-        private bool Fits(string id, int quantity)
+
+        // Server content: the largest quantity of an item one slot holds. Register every item before serving requests;
+        // an item never registered stacks to 1, so its capacity counts units.
+        public void RegisterItem(string itemId, int maxStack)
+        {
+            lock (_gate)
+            {
+                if (string.IsNullOrWhiteSpace(itemId) || maxStack < 1 || _maxStacks.ContainsKey(itemId))
+                    throw new ArgumentException("Invalid or duplicate item.");
+                _maxStacks.Add(itemId, maxStack);
+            }
+        }
+
+        public int MaxStack(string itemId)
+        {
+            lock (_gate) return MaxStackLocked(itemId);
+        }
+
+        private int MaxStackLocked(string itemId) => itemId != null && _maxStacks.TryGetValue(itemId, out var size) ? size : 1;
+
+        // Capacity is checked only when goods enter a location. Spoiling (a new stack) or a smaller max stack in content can
+        // leave a location over its slots; that blocks further entries and never removes goods.
+        private bool Fits(string id, string itemId, bool spoiled, int quantity) => quantity > 0
+            && GoodsSlots.FreeUnits(_state.Locations.FirstOrDefault(x => x.Id == id), _state.Lots, itemId, spoiled, MaxStackLocked) >= quantity;
+
+        private bool FitsAll(string id, IEnumerable<GoodsLot> incoming)
         {
             var location = _state.Locations.FirstOrDefault(x => x.Id == id);
-            return location != null && quantity > 0 && (long)_state.Lots.Where(x => x.LocationId == id).Sum(x => (long)x.Quantity) + quantity <= location.Capacity;
+            return location != null
+                && GoodsSlots.SlotsUsed(_state.Lots.Where(x => x.LocationId == id).Concat(incoming), MaxStackLocked) <= location.Capacity;
         }
 
         public static void Validate(GoodsSnapshot state)
@@ -406,7 +504,7 @@ namespace FoodFactoryGame.Goods
             if (state == null || state.SchemaVersion != GoodsSnapshot.CurrentSchema || string.IsNullOrWhiteSpace(state.WorldId)
                 || state.ClockSeconds < 0 || state.Revision < 0 || state.Locations == null || state.Lots == null
                 || state.Grants == null || state.Reservations == null || state.Outcomes == null
-                || state.Stations == null || state.Jobs == null)
+                || state.Stations == null || state.Jobs == null || state.Equipment == null || state.SiteLayouts == null || state.Belts == null)
                 throw new InvalidOperationException("Unsupported or invalid goods snapshot schema.");
             if (state.Locations.Any(x => x == null || string.IsNullOrWhiteSpace(x.Id) || string.IsNullOrWhiteSpace(x.SiteId) || x.Capacity < 1)
                 || state.Locations.GroupBy(x => x.Id).Any(x => x.Count() != 1)
@@ -416,7 +514,6 @@ namespace FoodFactoryGame.Goods
                     || x.Spoiled != (x.ExposureSeconds >= x.SpoilAfterSeconds)
                     || !state.Locations.Any(y => y.Id == x.LocationId))
                 || state.Lots.GroupBy(x => x.Id).Any(x => x.Count() != 1)
-                || state.Locations.Any(x => state.Lots.Where(y => y.LocationId == x.Id).Sum(y => (long)y.Quantity) > x.Capacity)
                 || state.Reservations.Any(x => x == null || string.IsNullOrWhiteSpace(x.Id) || x.Quantity < 1
                     || (x.Active && !state.Lots.Any(y => y.Id == x.LotId)))
                 || state.Reservations.GroupBy(x => x.Id).Any(x => x.Count() != 1)
@@ -427,6 +524,8 @@ namespace FoodFactoryGame.Goods
                     || !state.Locations.Any(y => y.SiteId == x.SiteId)))
                 throw new InvalidOperationException("Goods snapshot violates identity, capacity, or reservation invariants.");
             ValidateProduction(state);
+            ValidateEquipment(state);
+            ValidateBelts(state);
         }
     }
 }

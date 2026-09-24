@@ -1,6 +1,29 @@
 {
+  "permissions": {
+    "allow": [
+      "mcp__blender__get_addon_status",
+      "mcp__blender__get_scene_info",
+      "mcp__blender__execute_blender_code",
+      "mcp__blender__get_viewport_screenshot",
+      "Bash(xargs wc -l)",
+      "WebSearch",
+      "Bash(cd /e/Projects/Unity/FoodFactoryGame/Assets/Scripts/Session && cat Equipment/EquipmentPresenter.cs Equipment/EquipmentModel.cs Equipment/SiteGridSpace.cs Equipment/ItemDefinition.cs Equipment/EquipmentDefinition.cs Equipment/EquipmentVisual.cs ClientSiteSubscription.cs SessionAdmission.cs FoodFactoryGame.Session.asmdef ../Goods/GoodsSlots.cs)",
+      "Bash(python -c ' *)",
+      "Bash(mkdir -p Assets/Art/Models/Belt)",
+      "Bash(cp ArtSource/Belt/Conveyor_Straight_1m.fbx ArtSource/Belt/Conveyor_Corner_Left_90.fbx ArtSource/Belt/Conveyor_Corner_Right_90.fbx ArtSource/Belt/Conveyor_Tread_BaseColor.png Assets/Art/Models/Belt/)",
+      "mcp__unity__editor_status",
+      "mcp__unity__console_status",
+      "mcp__unity__eval",
+      "Bash(powershell -ExecutionPolicy Bypass -File AgentScripts/DrawItemIcons.ps1)",
+      "Bash(perl -0pi -e ' *)",
+      "Bash(perl -pi -e 's/DevWorld\\\\.LoadOrCreate\\\\\\(WorldPath\\\\\\)/DevWorld.LoadOrCreate\\(WorldPath, items: ContentItems\\(\\)\\)/g' Assets/Tests/EditMode/Session/PlayerRegistryTests.cs)",
+      "Bash(perl -0pi -e 's/\\(        private SessionAdmission Open\\\\\\(out GoodsWorld world\\\\\\)\\)/        \\\\/\\\\/ The dev seed counts its goods in slots, so it needs the real item content \\(max stacks\\) just as the server has.\\\\n        private static ItemDefinition[] ContentItems\\(\\) => AssetDatabase.FindAssets\\(\"t:ItemDefinition\", new[] { \"Assets\\\\/Content\\\\/Items\" }\\)\\\\n            .Select\\(x => AssetDatabase.LoadAssetAtPath<ItemDefinition>\\(AssetDatabase.GUIDToAssetPath\\(x\\)\\)\\).ToArray\\(\\);\\\\n\\\\n$1/; s/using FoodFactoryGame.Goods;\\\\n/using FoodFactoryGame.Goods;\\\\nusing FoodFactoryGame.Session.Equipment;\\\\n/; s/using UnityEngine;\\\\n/using UnityEditor;\\\\nusing UnityEngine;\\\\n/' Assets/Tests/EditMode/Session/PlayerRegistryTests.cs)",
+      "mcp__unity__recompile",
+      "mcp__unity__run_tests"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "unity"
-  ],
-  "enableAllProjectMcpServers": true
+  ]
 }

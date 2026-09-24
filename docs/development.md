@@ -49,7 +49,7 @@ Assembly: `FoodFactoryGame.Baseline.EditModeTests`.
 
 The runner may return a completed result immediately despite `async_tests=true`. Otherwise poll `test_status`. Archive the result before starting another run; this command reports the most recent run. Require exactly four tests for the current baseline, all passed, none skipped. Zero matched tests is failure.
 
-Checks: FishNet runtime availability, all entries in the default network prefab collection resolving, starter Player/UI input actions importing, and enabled starter scenes loading without missing scripts and with a camera. These are setup checks, not gameplay or multiplayer acceptance.
+Checks: FishNet runtime availability, all entries in the default network prefab collection resolving, starter Player/UI input actions importing, and enabled build scenes loading without missing scripts and with a camera source (a scene camera, or a `SessionRoot` whose player prefab has one; `DevSite` intentionally has no scene camera). These are setup checks, not gameplay or multiplayer acceptance.
 
 The tests use preview scenes and do not write save data or modify application databases. Future stateful tests must receive explicit isolated save paths.
 
@@ -90,6 +90,43 @@ verified workflows today; the isolated goods-domain and goods listen-server test
 The bounded goods domain has an exercised EditMode workflow: confirm `editor_status` reports **play mode stopped**, compile and poll `recompile_status`, then run `run_tests` with `mode: editor`, `filter_type: assembly`, `filter: FoodFactoryGame.Goods.EditModeTests`; require 17 matched/17 passed. Run the unchanged baseline separately with `FoodFactoryGame.Baseline.EditModeTests` (4 matched/4 passed). Test fixtures create and delete unique isolated directories under the OS temp path. The exact run identities, counts, resolved test-runner precondition failure, and remaining unverified multiplayer checks are recorded in [the verification artifact](verification/goods-20260922.md). The Pipeline runner returns no native artifact path on synchronous completion; preserve this recorded result or use an explicitly configured CI XML run for future machine-ingested evidence.
 
 The goods listen-server PlayMode test has an exercised workflow: make sure the active scene is **not dirty** (the Test Runner otherwise blocks on its save-scene prompt and the async run never enters Play mode), then run `run_tests` with `mode: playmode`, `async_tests: true`, `filter_type: assembly`, `filter: FoodFactoryGame.Goods.PlayModeTests`; require 1 matched/1 passed. The synchronous HTTP call is dropped by the Play-mode domain reload, so read the result from `test_status` or the async response. Unity writes the NUnit XML to `%USERPROFILE%/AppData/LocalLow/DefaultCompany/FoodFactoryGame/TestResults.xml` and overwrites it on each run; copy it to `docs/verification/artifacts/` when it is evidence. The fixture prefab `Assets/Tests/PlayMode/Goods/GoodsBridgeFixture.prefab` is intentionally authored non-spawnable so FishNet’s default-prefab generator never adds it to `Assets/DefaultPrefabObjects.asset`; the test enables spawning in memory only.
+
+## Session Bootstrap (host, join, multi-process)
+
+Decisions: [0005](decisions/0005-session-bootstrap-and-player-identity.md). `Assets/Scenes/DevSite.unity` is the only build scene. It is authored by `AgentScripts/BuildDevSite.cs`, which is idempotent and keeps asset GUIDs; re-run it with MCP `run_script` (`file: AgentScripts/BuildDevSite.cs`, `entry: BuildDevSite.Run`) rather than editing the scene or prefab YAML. Running it also makes FishNet's generator append the spawnable prefabs to `DefaultPrefabObjects.asset`; that is expected. It re-saves `Player.prefab` and `GoodsNetworkBridge.prefab` with FishNet's cached `NetworkObject` fields unset, and the generator then logs `… have the same assetPath hash of 0`. Run the MCP `eval` `EditorApplication.ExecuteMenuItem("Tools/Fish-Networking/Utility/Refresh Default Prefabs")` afterwards to restore the hashes, and revert the reordering it makes in `DefaultPrefabObjects.asset`. The other cached fields (`PrefabId`, `NetworkBehaviours`, …) flip between raw and filled as FishNet processes the prefabs; the session PlayMode tests pass with either.
+
+MCP `capture_game_view` resolves `save_path` under `Assets/` and refuses `..`. Save captures to `Temp/<run>/…` (that is, `Assets/Temp/<run>`), then move them to `docs/verification/` and delete the folder, so no capture is imported as an asset.
+
+Where state lives (real play, not tests):
+
+| What | Default | Override |
+| --- | --- | --- |
+| World snapshot | `%USERPROFILE%\AppData\LocalLow\DefaultCompany\FoodFactoryGame\Saves\dev-world\world.snapshot` (+ `.previous`) | `-save <directory>` |
+| Player registry (SQLite) | same directory, `players.db` | `-save <directory>` |
+| Client secret | `...\FoodFactoryGame\Identity\client.secret` | `-identity <file>` |
+
+Deleting the save directory resets the dev world and all identities. Deleting a client secret makes that client a new player. Two processes on one machine must use different `-identity` files, or the second is rejected with `already-connected`.
+
+Starting a session:
+
+- From the menu: enter a name, then **Host**, or **Join** with an address (default `127.0.0.1`). Tugboat's port is 7770 (UDP). The status line shows rejection reasons.
+- From the command line (skips the menu): `-host`, `-server` (no local player, for `-batchmode -nographics`), or `-connect <address>`, plus optional `-name <display>`, `-save <dir>`, `-identity <file>`.
+- Controls ([decision 0007](decisions/0007-player-controls-and-working-oven.md), [0008](decisions/0008-slot-grid-ui-and-automatic-machines.md)): WASD/left stick moves relative to the camera; the mouse/right stick always orbits (the pointer is locked to a centre crosshair); scroll zooms. E opens/closes the inventory (a slot grid of your goods and machines beside the dev storage). 1–9, or clicking a machine in the grid, put a held machine kind on the cursor (see-through green/red ghost, R rotates, Q clears); left click places it, or with an empty cursor opens the machine under the crosshair; right click picks the machine up. On a screen, click a slot to pick its stack up (the icon follows the pointer) and click another slot to put it down; dropping on another container moves the goods. The oven starts by itself as soon as dough is in its input and keeps going while dough remains and the output has room. Esc closes a screen, or releases the pointer until the next click. The readout shows the hint and the server's last rejection reason. Belts ([decision 0010](decisions/0010-conveyor-belts.md)): click the belt stack in the inventory and close it with E; the belts stay on the cursor (icon beside the crosshair) with a ghost belt at the crosshair. R turns the ghost; hold left click and move forward to lay a line; press R mid-drag with the crosshair off to the side of the line to turn a corner toward it, laying belts out to and including the crosshair's cell, and keep dragging (R over any belt mid-drag does nothing). R can be held through the drag, so the line follows the crosshair round each turn. R on a belt with an empty cursor turns it; hold right click over belts to take them up (their items come back too). Carry any other stack out the same way, aim at a belt (a ghost of the item shows where it lands) and press Z to put one on it; F takes the item nearest the crosshair off a belt into your inventory, whatever the cursor holds.
+- Don't edit scripts while the Editor is in play mode during a live check: Unity's recompile-and-continue reloads the domain, which drops the FishNet session (the subscription loses its bridge) and turns null strings into empty ones. Stop play mode first.
+- The dev seed (a 20×20 grid, one oven, 20 dough and 200 belts in storage) is applied only when a world is created, and players get 5 starter dough and 50 belts only when their inventory is created. A save made before these steps lacks them, so delete it to get them; the one exception is the storage belts, which a save that has never had belts receives once on the next server start.
+
+Two-process check on one machine (use an existing artifact directory for logs and isolated saves):
+
+```powershell
+Start-Process -FilePath ".\build\Session\FoodFactoryGame.exe" -ArgumentList '-screen-fullscreen 0 -screen-width 1280 -screen-height 720 -host -name Host -save "<artifacts>\host-save" -identity "<artifacts>\host.secret" -logFile "<artifacts>\host.log"'
+Start-Process -FilePath ".\build\Session\FoodFactoryGame.exe" -ArgumentList '-screen-fullscreen 0 -screen-width 1280 -screen-height 720 -connect 127.0.0.1 -name Guest -identity "<artifacts>\guest.secret" -logFile "<artifacts>\guest.log"'
+```
+
+Evidence: both logs contain `[Session] Joined as player-...` with different IDs, the host log contains `[Session] Hosting`, and captures of both windows show two avatars and matching site revisions in the readout.
+
+Driving a player build from a script (used for the placement captures): the players read keys by scan code, so synthetic key events need a real scan code (`MapVirtualKey`); zero-scan-code events are ignored. Don't move player windows with `MoveWindow` before sending mouse input, because the player then reports a pointer position offset from the real cursor. Leave windows where Unity opens them and capture each one with `PrintWindow`, so overlapping windows don't matter. Run the helper DPI-aware, and check that it really took focus before sending input.
+
+Session tests: `FoodFactoryGame.Session.EditModeTests` (assembly, editor) and `FoodFactoryGame.Session.PlayModeTests` (assembly, playmode, async; make sure the open scene is not dirty). The PlayMode tests load the real `DevSite`, call `SessionRoot.Configure` with a temporary save directory and identity files and a free UDP port, and add a second client-only NetworkManager for the remote client. They expect one `SpawnablePrefabs is null on session-test-remote` error from FishNet's editor `Reset` (declared with `LogAssert.Expect`), and emit "2 audio listeners" warnings because both local clients own a camera in one process. Current counts and run identities are in [the session verification record](verification/session-20260922.md).
 
 For a separate checkout with its Editor closed, the batch equivalent is:
 

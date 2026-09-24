@@ -84,12 +84,25 @@ namespace FoodFactoryGame.Goods
             var state = JsonUtility.FromJson<GoodsSnapshot>(envelope.Payload);
             // An unknown new schema is never interpreted as an older backup.
             if (state != null && state.SchemaVersion > GoodsSnapshot.CurrentSchema) throw new NotSupportedException("Newer goods snapshot schema.");
-            // v1 had no stations or jobs; it is upgraded in memory and written as v2 by the next commit.
+            // Older schemas are upgraded in memory and written as the current schema by the next commit.
+            // v1 had no stations or jobs. v2 had no equipment or layouts; a v2 station without equipment then fails validation.
             if (state != null && state.SchemaVersion == 1)
             {
                 state.Stations = new();
                 state.Jobs = new();
                 state.SchemaVersion = 2;
+            }
+            if (state != null && state.SchemaVersion == 2)
+            {
+                state.Equipment ??= new();
+                state.SiteLayouts ??= new();
+                state.SchemaVersion = 3;
+            }
+            // v3 had no belts; no lot rode one, so every BeltPosition reads 0.
+            if (state != null && state.SchemaVersion == 3)
+            {
+                state.Belts ??= new();
+                state.SchemaVersion = 4;
             }
             GoodsWorld.Validate(state);
             return state;
