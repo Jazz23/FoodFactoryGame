@@ -75,6 +75,7 @@ namespace FoodFactoryGame.Goods.Tests
             var v4 = JsonUtility.ToJson(legacy.Snapshot()).Replace("\"SchemaVersion\":5", "\"SchemaVersion\":4").Replace(",\"Companies\":[]", "");
             Assert.That(v4, Does.Not.Contain("Companies"));
             SnapshotDatabase.WritePayload(PathForSave, v4);
+            Assert.That(SnapshotDatabase.LatestSchemaColumn(PathForSave), Is.EqualTo(4), "The row looks like a real v4 commit.");
 
             var loaded = GoodsSnapshotStore.Load(PathForSave);
             Assert.That(loaded.Snapshot().SchemaVersion, Is.EqualTo(GoodsSnapshot.CurrentSchema));
@@ -82,6 +83,7 @@ namespace FoodFactoryGame.Goods.Tests
             loaded.Bootstrap(Company("co", 50, "restaurant"));
             GoodsSnapshotStore.Save(loaded, PathForSave);
             Assert.That(SnapshotDatabase.LatestPayload(PathForSave), Does.Contain("\"SchemaVersion\":5"));
+            Assert.That(SnapshotDatabase.LatestSchemaColumn(PathForSave), Is.EqualTo(5));
             Assert.That(GoodsSnapshotStore.Load(PathForSave).Snapshot().Companies.Single().Cash, Is.EqualTo(50));
         }
 
@@ -149,7 +151,7 @@ namespace FoodFactoryGame.Goods.Tests
         }
 
         [Test]
-        public void CommitStatsCountOnlyCommittedSaves()
+        public void CommitStatsCountOnlyWrittenSavesAndReset()
         {
             var stats = GoodsSnapshotStore.Stats;
             var before = stats.Commits;
@@ -162,7 +164,14 @@ namespace FoodFactoryGame.Goods.Tests
 
             Assert.That(_world.AdjustCashDurably("co", 1, MissingPath), Is.EqualTo("persistence-unavailable"));
             Assert.That(stats.Commits, Is.EqualTo(before + 1), "A failed save is not a commit.");
+            GoodsSnapshotStore.Save(_world, PathForSave);
+            Assert.That(stats.Commits, Is.EqualTo(before + 1), "Saving an already stored revision writes nothing.");
             Assert.That(stats.Summary(), Does.StartWith("[Goods] commits="));
+
+            stats.Reset();
+            Assert.That((stats.Commits, stats.MaxMilliseconds, stats.LastPayloadBytes), Is.EqualTo((0L, 0d, 0)));
+            Assert.That(_world.AdjustCashDurably("co", 1, PathForSave), Is.Null);
+            Assert.That(stats.Commits, Is.EqualTo(1), "Counting restarts for the served world.");
         }
     }
 }

@@ -181,35 +181,29 @@ namespace FoodFactoryGame.Goods
                 if (needsInventory && _state.Lots.Any(x => x.Id.StartsWith($"starter:{playerId}:", StringComparison.Ordinal)))
                     throw new InvalidOperationException($"Starter goods for {playerId} exist without an inventory.");
                 if (CanView(playerId, siteId) && !needsInventory && !needsSlots) return true;
-                var before = Snapshot();
-                if (needsSlots)
+                return Durably(savePath, () =>
                 {
-                    inventory.Capacity = inventoryCapacity;
-                    _state.Revision++;
-                }
-                if (needsInventory)
-                {
-                    Bootstrap(new GoodsLocation { Id = inventoryId, SiteId = siteId, Kind = "carried", Capacity = inventoryCapacity });
-                    for (var index = 0; index < starterGoods.Count; index++)
-                        Bootstrap(new GoodsLot
-                        {
-                            Id = $"starter:{playerId}:{index}", ItemId = starterGoods[index].ItemId, OwnerId = siteId,
-                            LocationId = inventoryId, Quantity = starterGoods[index].Quantity,
-                            SpoilAfterSeconds = starterGoods[index].SpoilAfterSeconds
-                        });
-                }
-                Grant(playerId, siteId);
-                try
-                {
-                    GoodsSnapshotStore.Save(this, savePath);
+                    // Re-resolved inside: Durably restores a copied state on failure, so no reference may cross it.
+                    var target = _state.Locations.FirstOrDefault(x => x.Id == inventoryId);
+                    if (needsSlots)
+                    {
+                        target.Capacity = inventoryCapacity;
+                        _state.Revision++;
+                    }
+                    if (needsInventory)
+                    {
+                        Bootstrap(new GoodsLocation { Id = inventoryId, SiteId = siteId, Kind = "carried", Capacity = inventoryCapacity });
+                        for (var index = 0; index < starterGoods.Count; index++)
+                            Bootstrap(new GoodsLot
+                            {
+                                Id = $"starter:{playerId}:{index}", ItemId = starterGoods[index].ItemId, OwnerId = siteId,
+                                LocationId = inventoryId, Quantity = starterGoods[index].Quantity,
+                                SpoilAfterSeconds = starterGoods[index].SpoilAfterSeconds
+                            });
+                    }
+                    Grant(playerId, siteId);
                     return true;
-                }
-                catch (Exception error)
-                {
-                    _state = before;
-                    if (!PersistenceError(error)) throw;
-                    return false;
-                }
+                }, () => false);
             }
         }
 
@@ -392,23 +386,30 @@ namespace FoodFactoryGame.Goods
             {
                 if (seconds < 0) throw new ArgumentOutOfRangeException(nameof(seconds));
                 if (seconds == 0) return true;
-                var before = Snapshot();
-                try
+                return Durably(savePath, () =>
                 {
                     Advance(seconds);
-                    GoodsSnapshotStore.Save(this, savePath);
                     return true;
-                }
-                catch (Exception error)
-                {
-                    _state = before;
-                    if (!PersistenceError(error)) throw;
-                    return false;
-                }
+                }, () => false);
             }
         }
 
         private GoodsOutcome Commit(string playerId, string requestId, string savePath, Func<GoodsOutcome> action)
+        {
+            lock (_gate)
+            {
+                var revision = _state.Revision;
+                return Durably(savePath, action, () => new GoodsOutcome
+                {
+                    RequestId = requestId, PlayerId = playerId, Reason = "persistence-unavailable", Revision = revision
+                });
+            }
+        }
+
+        // The one durable boundary: runs the mutation and commits it if the revision changed. Any exception restores the
+        // prior state; a persistence failure then returns unavailable(), anything else is rethrown. Validate inputs that
+        // should throw (ArgumentException counts as a persistence failure here) before calling this.
+        private T Durably<T>(string savePath, Func<T> action, Func<T> unavailable)
         {
             lock (_gate)
             {
@@ -423,10 +424,7 @@ namespace FoodFactoryGame.Goods
                 {
                     _state = before;
                     if (!PersistenceError(error)) throw;
-                    return new GoodsOutcome
-                    {
-                        RequestId = requestId, PlayerId = playerId, Reason = "persistence-unavailable", Revision = before.Revision
-                    };
+                    return unavailable();
                 }
             }
         }

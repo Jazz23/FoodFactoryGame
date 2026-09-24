@@ -153,7 +153,8 @@ Decision: [0012](decisions/0012-company-cash.md). Step 1 of the sell loop: cash 
 - Persistence: payload schema **v5** (`world.db` `user_version` still 1); v4 upgrades in memory with no companies. `View` includes only the owning company of the viewed site, so cash reaches clients in the existing full site baseline with no new RPC.
 - Dev seed (`DevWorld`): PROTOTYPE `dev-company` owns `dev-site` with 50000 cents. `EnsureCompany` adds it once to an older save, committed before serving.
 - HUD: `PlayerHud` shows the site company's cash top right (`hud-cash`, `PlayerHud.FormatCash`), display only.
-- Measurement: `GoodsSnapshotStore.Stats` (`GoodsCommitStats`) records each committed save's time (serialization to end of transaction) and payload bytes; failed saves are not counted. The server bridge logs `[Goods] commits=… avg=…ms max=…ms payload=…KB` every 60 s and warns once per process past 50 ms or 1 MB. The counters are per process (per domain), so in the Editor they include test saves until the next domain reload.
+- Measurement: `GoodsSnapshotStore.Stats` (`GoodsCommitStats`) records each save that writes a new revision: its time (serialization plus the transaction's own work, excluding waits for the save lock or another writer) and payload bytes. Failed saves and saves of an already-stored revision are not counted. `GoodsNetworkBridge.InitializeServer` resets the counters and one-time warnings, so they describe the served world only. The bridge logs `[Goods] commits=… avg=…ms max=…ms payload=…KB` every 60 s and warns once per served world past 50 ms or 1 MB.
+- Every durable command, the clock tick, admission grants and `AdjustCashDurably` go through one private boundary, `GoodsWorld.Durably` (run, commit if the revision changed, restore the prior state on any failure).
 Open: debt, several companies per world, member permissions, prices; sales (step 2), purchases (step 3).
 
 ## Required Constraints for Future Implementation

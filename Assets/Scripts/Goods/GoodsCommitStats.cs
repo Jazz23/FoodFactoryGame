@@ -1,6 +1,7 @@
 // Measures what each committed goods save costs, so the JSON-payload-or-relational-tables question (decision 0012) is decided
-// from numbers. Report-only and in memory: nothing here is persisted or changes save behaviour. Only commits count; a save
-// that fails or rolls back is not recorded.
+// from numbers. Report-only and in memory: nothing here is persisted or changes save behaviour. Only saves that write a new
+// revision count; a save that fails, rolls back, or finds its revision already stored is not recorded. Time covers
+// serialization and the transaction's own work, not waiting for the save lock or another writer.
 using System.Globalization;
 using UnityEngine;
 
@@ -26,6 +27,19 @@ namespace FoodFactoryGame.Goods
         public double MaxMilliseconds { get { lock (_gate) return _maxMilliseconds; } }
         public double AverageMilliseconds { get { lock (_gate) return _commits == 0 ? 0 : _totalMilliseconds / _commits; } }
         public int LastPayloadBytes { get { lock (_gate) return _lastPayloadBytes; } }
+
+        // The server calls this when it starts serving a world, so the counters and one-time warnings describe that world
+        // only, not saves made earlier in the same process (Editor tests, a previous session).
+        public void Reset()
+        {
+            lock (_gate)
+            {
+                _commits = 0;
+                _totalMilliseconds = _maxMilliseconds = _lastMilliseconds = 0;
+                _lastPayloadBytes = 0;
+                _warnedSlow = _warnedLarge = false;
+            }
+        }
 
         internal void Record(double milliseconds, int payloadBytes)
         {

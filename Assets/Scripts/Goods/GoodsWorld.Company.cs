@@ -23,7 +23,7 @@ namespace FoodFactoryGame.Goods
         {
             lock (_gate)
             {
-                if (company == null || string.IsNullOrWhiteSpace(company.Id) || company.Cash < 0 || company.SiteIds == null
+                if (company is null || string.IsNullOrWhiteSpace(company.Id) || company.Cash < 0 || company.SiteIds is null
                     || _state.Companies.Any(x => x.Id == company.Id)
                     || company.SiteIds.Any(x => string.IsNullOrWhiteSpace(x) || _state.Locations.All(y => y.SiteId != x))
                     || company.SiteIds.Distinct().Count() != company.SiteIds.Count
@@ -49,19 +49,9 @@ namespace FoodFactoryGame.Goods
             {
                 if (_state.Companies.All(x => x.Id != companyId)) return "unknown-company";
                 if (delta == 0 || delta == long.MinValue) return "invalid-amount";
-                var before = Snapshot();
-                try
-                {
-                    if (!(delta > 0 ? TryCredit(companyId, delta) : TryDebit(companyId, -delta))) return "insufficient-funds";
-                    GoodsSnapshotStore.Save(this, savePath);
-                    return null;
-                }
-                catch (Exception error)
-                {
-                    _state = before;
-                    if (!PersistenceError(error)) throw;
-                    return "persistence-unavailable";
-                }
+                return Durably(savePath,
+                    () => (delta > 0 ? TryCredit(companyId, delta) : TryDebit(companyId, -delta)) ? null : "insufficient-funds",
+                    () => "persistence-unavailable");
             }
         }
 
@@ -69,7 +59,7 @@ namespace FoodFactoryGame.Goods
         private bool TryCredit(string companyId, long cents)
         {
             var company = _state.Companies.FirstOrDefault(x => x.Id == companyId);
-            if (company == null || cents <= 0) return false;
+            if (company is null || cents <= 0) return false;
             checked { company.Cash += cents; }
             _state.Revision++;
             return true;
@@ -79,7 +69,7 @@ namespace FoodFactoryGame.Goods
         private bool TryDebit(string companyId, long cents)
         {
             var company = _state.Companies.FirstOrDefault(x => x.Id == companyId);
-            if (company == null || cents <= 0 || company.Cash < cents) return false;
+            if (company is null || cents <= 0 || company.Cash < cents) return false;
             company.Cash -= cents;
             _state.Revision++;
             return true;
@@ -87,8 +77,8 @@ namespace FoodFactoryGame.Goods
 
         private static void ValidateCompanies(GoodsSnapshot state)
         {
-            var owned = state.Companies.Where(x => x?.SiteIds != null).SelectMany(x => x.SiteIds).ToList();
-            if (state.Companies.Any(x => x == null || string.IsNullOrWhiteSpace(x.Id) || x.Cash < 0 || x.SiteIds == null
+            var owned = state.Companies.Where(x => x?.SiteIds is not null).SelectMany(x => x.SiteIds).ToList();
+            if (state.Companies.Any(x => x is null || string.IsNullOrWhiteSpace(x.Id) || x.Cash < 0 || x.SiteIds is null
                     || x.SiteIds.Any(y => string.IsNullOrWhiteSpace(y) || state.Locations.All(z => z.SiteId != y)))
                 || state.Companies.GroupBy(x => x.Id).Any(x => x.Count() != 1)
                 || owned.Distinct().Count() != owned.Count)

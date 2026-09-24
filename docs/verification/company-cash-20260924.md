@@ -23,3 +23,12 @@ New coverage:
 First `[Goods]` measurement: `commits=268 avg=6.5ms max=32.0ms payload=2.0KB`, about 60 s after the host started. The counters are per process, and this Editor had run the test suites in the same domain, so the count and timings include test saves. The payload size is the dev world's.
 
 Not verified: a player build; a two-process session; a sale or purchase (not implemented).
+
+## Review fixes (same day)
+
+A `/code-review` pass (high) found 9 issues, all fixed: commit stats now reset when the server starts serving a world, count only saves that write a new revision, and exclude lock/writer waits; one private `GoodsWorld.Durably` boundary replaces four copies of snapshot/commit/restore; the HUD reformats cash only when it changes; test helpers are shared (`SessionTestFiles`, `SnapshotDatabase.Digest`), `WritePayload` also sets the row's `schema_version`, and the v4 fixture no longer depends on field order; new code uses null pattern matching.
+
+| Run | Filter | Matched | Result | Artifact |
+| --- | --- | --- | --- | --- |
+| Live Editor `run_tests` editor, async | none (all EditMode) | 107 | 107 passed | status only (XML overwritten by the PlayMode run) |
+| Live Editor `run_tests` playmode, async (NUnit test-run id 2) | none (all PlayMode) | 12 | 11 passed, 1 failed (the known hover test above) | [playmode-review-fixes.xml](company-cash-20260924/playmode-review-fixes.xml) |

@@ -36,11 +36,17 @@ namespace FoodFactoryGame.Goods
             var state = world.Snapshot();
             GoodsWorld.Validate(state);
             var payload = JsonUtility.ToJson(state);
+            timer.Stop();
+            var wrote = false;
             lock (SaveGate)
             {
+                timer.Start();
                 using var db = Open(full, true);
                 // IMMEDIATE takes the write lock before the revision check, so another process cannot commit in between.
+                // Waiting for another writer is contention, not commit cost, so it is left out of the measurement.
+                timer.Stop();
                 db.Execute("BEGIN IMMEDIATE");
+                timer.Start();
                 try
                 {
                     var prior = LatestValid(db, true);
@@ -55,6 +61,7 @@ namespace FoodFactoryGame.Goods
                         db.Execute("INSERT INTO snapshots (revision, world_id, schema_version, payload, sha256, saved_utc) VALUES (?, ?, ?, ?, ?, ?)",
                             state.Revision, state.WorldId, state.SchemaVersion, payload, Digest(payload), DateTimeOffset.UtcNow.ToUnixTimeSeconds());
                         if (prior != null) db.Execute("DELETE FROM snapshots WHERE revision < ?", prior.Revision);
+                        wrote = true;
                     }
                     db.Execute("COMMIT");
                 }
@@ -64,7 +71,7 @@ namespace FoodFactoryGame.Goods
                     throw;
                 }
             }
-            Stats.Record(timer.Elapsed.TotalMilliseconds, Encoding.UTF8.GetByteCount(payload));
+            if (wrote) Stats.Record(timer.Elapsed.TotalMilliseconds, Encoding.UTF8.GetByteCount(payload));
         }
 
         public static GoodsWorld Load(string path)

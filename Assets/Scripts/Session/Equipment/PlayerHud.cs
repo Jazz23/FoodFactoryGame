@@ -66,6 +66,8 @@ namespace FoodFactoryGame.Session.Equipment
         private VisualElement _crosshair;
         private VisualElement _hotbar;
         private Label _cash;
+        // Balance the cash label shows, so the text is rebuilt only when it changes (never a real balance before the first).
+        private long _shownCash = long.MinValue;
         private VisualElement _screen;
         private VisualElement _cursor;
         private VisualElement _progressFill;
@@ -144,9 +146,13 @@ namespace FoodFactoryGame.Session.Equipment
             var screenOpen = active && interaction.Screen != InteractionScreen.None;
             _crosshair.style.display = active && interaction.PointerLocked ? DisplayStyle.Flex : DisplayStyle.None;
             _hotbar.style.display = active ? DisplayStyle.Flex : DisplayStyle.None;
-            var company = active ? site.Companies?.FirstOrDefault() : null;
-            _cash.style.display = company != null ? DisplayStyle.Flex : DisplayStyle.None;
-            if (company != null) _cash.text = FormatCash(company.Cash);
+            var hasCompany = active && site.Companies is { Count: > 0 };
+            _cash.style.display = hasCompany ? DisplayStyle.Flex : DisplayStyle.None;
+            if (hasCompany && site.Companies[0].Cash != _shownCash)
+            {
+                _shownCash = site.Companies[0].Cash;
+                _cash.text = FormatCash(_shownCash);
+            }
             _screen.style.display = screenOpen ? DisplayStyle.Flex : DisplayStyle.None;
             if (!active)
             {

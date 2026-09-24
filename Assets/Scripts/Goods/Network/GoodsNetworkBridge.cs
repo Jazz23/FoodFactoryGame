@@ -35,6 +35,8 @@ namespace FoodFactoryGame.Goods.Network
             _world = world;
             _resolvePlayer = resolvePlayer;
             _savePath = savePath;
+            // Decision 0012 measurements describe this served world, not earlier saves in the same process.
+            GoodsSnapshotStore.Stats.Reset();
         }
 
         public override void OnStopServer()
