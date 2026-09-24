@@ -128,6 +128,21 @@ namespace FoodFactoryGame.Goods.Network
             if (IsClientStarted) ServerPlaceOnBelt(requestId, lotId, beltId);
         }
 
+        // Buys one pack of a supplier offer with the site company's cash into the requester's inventory (BuyDurably).
+        public void RequestPurchase(string requestId, string siteId, string offerId)
+        {
+            if (IsClientStarted) ServerPurchase(requestId, siteId, offerId);
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        private void ServerPurchase(string requestId, string siteId, string offerId, NetworkConnection sender = null)
+        {
+            if (!TryIdentify(sender, requestId, out var player)) return;
+            var result = _world.BuyDurably(player, requestId, siteId, offerId, _savePath);
+            Reply(sender, result);
+            if (result.Accepted) Broadcast();
+        }
+
         [ServerRpc(RequireOwnership = false)]
         private void ServerPlaceBelt(string requestId, string siteId, int cellX, int cellZ, int direction, NetworkConnection sender = null)
         {

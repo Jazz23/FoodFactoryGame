@@ -336,6 +336,51 @@ namespace FoodFactoryGame.Session.PlayModeTests
             interaction.CloseScreen();
         }
 
+        // Decision 0014: the host buys through the supplier window's path and a remote client over UDP buys with a raw request;
+        // both packs land in the buyers' inventories, the shared company pays for both, a retried request is not charged
+        // twice, and the committed save agrees.
+        [UnityTest]
+        public IEnumerator HostAndRemoteBuyFromTheSupplierWithCompanyCash()
+        {
+            yield return StartHost();
+            var hostId = _root.Authenticator.LocalPlayerId;
+            CreateRemote();
+            yield return ConnectRemote();
+            var remoteId = _remoteAuth.LocalPlayerId;
+            var interaction = UnityEngine.Object.FindAnyObjectByType<EquipmentInteraction>();
+            var hud = UnityEngine.Object.FindAnyObjectByType<PlayerHud>();
+            int Dough(GoodsSnapshot site, string player) =>
+                site.Lots.Where(x => x.LocationId == GoodsWorld.InventoryLocationId(player) && x.ItemId == DevWorld.DoughItemId).Sum(x => x.Quantity);
+
+            yield return Until(() => { if (interaction.Screen == InteractionScreen.None) interaction.ToggleInventory(); return interaction.Screen == InteractionScreen.Inventory; }, "inventory screen");
+            yield return null;
+            Assert.That(hud.ScreenRoot.Q<Button>("hud-offer-supplier-dough-5"), Is.Not.Null, "The supplier window lists the dough offer.");
+            hud.ClickOffer("supplier-dough-5");
+            yield return Until(() => Dough(_root.ClientSite, hostId) == DevWorld.StarterDough + 5 && !interaction.HasPendingRequests, "host's dough arrives");
+            Assert.That(interaction.LastRejection, Is.Null);
+
+            var remote = _remoteSite.Bridge;
+            remote.RequestPurchase("remote-buy", DevWorld.SiteId, "supplier-dough-5");
+            yield return Await("remote-buy");
+            Assert.That(_results["remote-buy"].Reason, Is.EqualTo("bought"));
+            _results.Remove("remote-buy");
+            remote.RequestPurchase("remote-buy", DevWorld.SiteId, "supplier-dough-5");
+            yield return Await("remote-buy");
+            Assert.That(_results["remote-buy"].Reason, Is.EqualTo("bought"), "A retry replays the first outcome.");
+
+            const long spent = 2 * 250;
+            yield return Until(() =>
+            {
+                _remoteSite.Tick();
+                return _remoteSite.Latest.Companies.Single().Cash == DevWorld.StartingCash - spent
+                    && Dough(_remoteSite.Latest, remoteId) == DevWorld.StarterDough + 5;
+            }, "remote sees its dough and the shared balance");
+            var saved = GoodsSnapshotStore.Load(_root.Options.WorldPath).Snapshot();
+            Assert.That((saved.Companies.Single().Cash, Dough(saved, hostId), Dough(saved, remoteId)),
+                Is.EqualTo((DevWorld.StartingCash - spent, DevWorld.StarterDough + 5, DevWorld.StarterDough + 5)));
+            interaction.CloseScreen();
+        }
+
         [UnityTest]
         public IEnumerator ShiftClickSendsAStackAcrossOrFillsTheOtherContainer()
         {

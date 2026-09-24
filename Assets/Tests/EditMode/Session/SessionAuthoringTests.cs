@@ -81,6 +81,8 @@ namespace FoodFactoryGame.Session.Tests
                     Assert.That(roots[0].EquipmentDefinitions.Select(AssetDatabase.GetAssetPath),
                         Is.EqualTo(new[] { OvenDefinitionPath, CounterDefinitionPath }));
                     Assert.That(roots[0].Recipes.Select(AssetDatabase.GetAssetPath), Is.EqualTo(new[] { BreadRecipePath, SellBreadRecipePath }));
+                    Assert.That(roots[0].Offers.Select(AssetDatabase.GetAssetPath),
+                        Is.EqualTo(new[] { "Assets/Content/Offers/Dough5.asset", "Assets/Content/Offers/Belt10.asset" }));
                 }
                 var panels = objects.SelectMany(x => x.GetComponents<SessionPanel>()).ToArray();
                 Assert.That(panels.Length, Is.EqualTo(1));
@@ -214,6 +216,20 @@ namespace FoodFactoryGame.Session.Tests
                 Is.EqualTo((DevWorld.CounterKind, 5L, 250L, "", 0)));
             Assert.That(definition.Inputs.Select(x => (x.ItemId, x.Quantity)), Is.EqualTo(new[] { ("bread", 1) }));
             Assert.DoesNotThrow(() => new FoodFactoryGame.Goods.GoodsWorld("authoring-check").RegisterRecipe(definition));
+        }
+
+        // Decision 0014: every supplier offer is valid server content for an item the dev world has a definition for.
+        [Test]
+        public void SupplierOffersAreValidContentForKnownItems()
+        {
+            var offers = new[] { "Dough5", "Belt10" }.Select(x => AssetDatabase.LoadAssetAtPath<OfferAsset>($"Assets/Content/Offers/{x}.asset")).ToArray();
+            Assert.That(offers.All(x => x != null), Is.True);
+            Assert.That(offers.Select(x => (x.ItemId, x.Quantity, x.PriceCents)),
+                Is.EqualTo(new[] { (DevWorld.DoughItemId, 5, 250L), (FoodFactoryGame.Goods.GoodsWorld.BeltItemId, 10, 500L) }));
+            var items = SessionTestFiles.ContentItems().Select(x => x.Id).ToList();
+            Assert.That(offers.All(x => items.Contains(x.ItemId)), Is.True, "Every offer has an item definition (icon, stack size).");
+            var world = new FoodFactoryGame.Goods.GoodsWorld("authoring-check");
+            foreach (var offer in offers) Assert.DoesNotThrow(() => world.RegisterOffer(offer.ToDefinition()));
         }
 
         [Test]

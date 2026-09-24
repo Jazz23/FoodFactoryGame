@@ -1,0 +1,863 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="125" result="Passed" total="125" passed="125" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:28Z" duration="2.1117988">
+  <test-suite type="TestSuite" id="1162" name="FoodFactoryGame" fullname="FoodFactoryGame" runstate="Runnable" testcasecount="125" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:28Z" duration="2.111799" total="125" passed="125" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="EditMode" />
+    </properties>
+    <test-suite type="Assembly" id="1006" name="FoodFactoryGame.Baseline.EditModeTests.dll" fullname="E:/Projects/Unity/FoodFactoryGame/Library/ScriptAssemblies/FoodFactoryGame.Baseline.EditModeTests.dll" runstate="Runnable" testcasecount="4" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.090242" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="32400" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="EditMode" />
+        <property name="EditorOnly" value="True" />
+      </properties>
+      <test-suite type="TestSuite" id="1007" name="FoodFactoryGame" fullname="FoodFactoryGame" runstate="Runnable" testcasecount="4" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.089830" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-suite type="TestSuite" id="1008" name="Baseline" fullname="FoodFactoryGame.Baseline" runstate="Runnable" testcasecount="4" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.089649" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <test-suite type="TestSuite" id="1009" name="Tests" fullname="FoodFactoryGame.Baseline.Tests" runstate="Runnable" testcasecount="4" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.089447" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-suite type="TestFixture" id="1001" name="ProjectBaselineTests" fullname="FoodFactoryGame.Baseline.Tests.ProjectBaselineTests" classname="FoodFactoryGame.Baseline.Tests.ProjectBaselineTests" runstate="Runnable" testcasecount="4" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.088399" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-case id="1003" name="DefaultNetworkPrefabReferencesResolve" fullname="FoodFactoryGame.Baseline.Tests.ProjectBaselineTests.DefaultNetworkPrefabReferencesResolve" methodname="DefaultNetworkPrefabReferencesResolve" classname="FoodFactoryGame.Baseline.Tests.ProjectBaselineTests" runstate="Runnable" seed="121736431" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.031465" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1005" name="EnabledBuildScenesLoadWithoutMissingScriptsAndHaveCameraSource" fullname="FoodFactoryGame.Baseline.Tests.ProjectBaselineTests.EnabledBuildScenesLoadWithoutMissingScriptsAndHaveCameraSource" methodname="EnabledBuildScenesLoadWithoutMissingScriptsAndHaveCameraSource" classname="FoodFactoryGame.Baseline.Tests.ProjectBaselineTests" runstate="Runnable" seed="306834404" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.038985" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1002" name="FishNetRuntimeIsAvailable" fullname="FoodFactoryGame.Baseline.Tests.ProjectBaselineTests.FishNetRuntimeIsAvailable" methodname="FishNetRuntimeIsAvailable" classname="FoodFactoryGame.Baseline.Tests.ProjectBaselineTests" runstate="Runnable" seed="1102955480" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.000433" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1004" name="StarterInputActionsImportWithPlayerAndUiMaps" fullname="FoodFactoryGame.Baseline.Tests.ProjectBaselineTests.StarterInputActionsImportWithPlayerAndUiMaps" methodname="StarterInputActionsImportWithPlayerAndUiMaps" classname="FoodFactoryGame.Baseline.Tests.ProjectBaselineTests" runstate="Runnable" seed="1924530546" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.003091" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+    <test-suite type="Assembly" id="1103" name="FoodFactoryGame.Goods.EditModeTests.dll" fullname="E:/Projects/Unity/FoodFactoryGame/Library/ScriptAssemblies/FoodFactoryGame.Goods.EditModeTests.dll" runstate="Runnable" testcasecount="85" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:27Z" duration="1.196436" total="85" passed="85" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="32400" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="EditMode" />
+        <property name="EditorOnly" value="True" />
+      </properties>
+      <test-suite type="TestSuite" id="1104" name="FoodFactoryGame" fullname="FoodFactoryGame" runstate="Runnable" testcasecount="85" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:27Z" duration="1.188110" total="85" passed="85" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-suite type="TestSuite" id="1105" name="Goods" fullname="FoodFactoryGame.Goods" runstate="Runnable" testcasecount="85" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:27Z" duration="1.179361" total="85" passed="85" failed="0" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <test-suite type="TestSuite" id="1106" name="Tests" fullname="FoodFactoryGame.Goods.Tests" runstate="Runnable" testcasecount="85" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:27Z" duration="1.177641" total="85" passed="85" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-suite type="TestFixture" id="1010" name="BeltTests" fullname="FoodFactoryGame.Goods.Tests.BeltTests" classname="FoodFactoryGame.Goods.Tests.BeltTests" runstate="Runnable" testcasecount="14" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.205483" total="14" passed="14" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-case id="1017" name="ALoopKeepsCirculating" fullname="FoodFactoryGame.Goods.Tests.BeltTests.ALoopKeepsCirculating" methodname="ALoopKeepsCirculating" classname="FoodFactoryGame.Goods.Tests.BeltTests" runstate="Runnable" seed="1693432919" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.035213" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1022" name="BeltsAndRidingItemsSurviveSaveAndFailedCommits" fullname="FoodFactoryGame.Goods.Tests.BeltTests.BeltsAndRidingItemsSurviveSaveAndFailedCommits" methodname="BeltsAndRidingItemsSurviveSaveAndFailedCommits" classname="FoodFactoryGame.Goods.Tests.BeltTests" runstate="Runnable" seed="351032183" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.068071" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1018" name="GoodsOnlyEnterAndLeaveBeltsThroughBeltCommands" fullname="FoodFactoryGame.Goods.Tests.BeltTests.GoodsOnlyEnterAndLeaveBeltsThroughBeltCommands" methodname="GoodsOnlyEnterAndLeaveBeltsThroughBeltCommands" classname="FoodFactoryGame.Goods.Tests.BeltTests" runstate="Runnable" seed="1640927635" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.005817" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1015" name="ItemsTravelOneTilePerSecondAndQueueAtTheEnd" fullname="FoodFactoryGame.Goods.Tests.BeltTests.ItemsTravelOneTilePerSecondAndQueueAtTheEnd" methodname="ItemsTravelOneTilePerSecondAndQueueAtTheEnd" classname="FoodFactoryGame.Goods.Tests.BeltTests" runstate="Runnable" seed="502335104" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.014628" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1016" name="OneLongStepMatchesManyShortOnes" fullname="FoodFactoryGame.Goods.Tests.BeltTests.OneLongStepMatchesManyShortOnes" methodname="OneLongStepMatchesManyShortOnes" classname="FoodFactoryGame.Goods.Tests.BeltTests" runstate="Runnable" seed="549950242" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.003295" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1011" name="PlacingConsumesOneBeltAndDraggingOverABeltOnlyTurnsIt" fullname="FoodFactoryGame.Goods.Tests.BeltTests.PlacingConsumesOneBeltAndDraggingOverABeltOnlyTurnsIt" methodname="PlacingConsumesOneBeltAndDraggingOverABeltOnlyTurnsIt" classname="FoodFactoryGame.Goods.Tests.BeltTests" runstate="Runnable" seed="180140574" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.005012" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1012" name="RejectedPlacementsChangeNothing" fullname="FoodFactoryGame.Goods.Tests.BeltTests.RejectedPlacementsChangeNothing" methodname="RejectedPlacementsChangeNothing" classname="FoodFactoryGame.Goods.Tests.BeltTests" runstate="Runnable" seed="501307343" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.004136" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1021" name="RemovingABeltReturnsItAndItsItemsOrNothing" fullname="FoodFactoryGame.Goods.Tests.BeltTests.RemovingABeltReturnsItAndItsItemsOrNothing" methodname="RemovingABeltReturnsItAndItsItemsOrNothing" classname="FoodFactoryGame.Goods.Tests.BeltTests" runstate="Runnable" seed="746850272" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.003365" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1023" name="SchemaV3SaveLoadsAsCurrentWithoutBelts" fullname="FoodFactoryGame.Goods.Tests.BeltTests.SchemaV3SaveLoadsAsCurrentWithoutBelts" methodname="SchemaV3SaveLoadsAsCurrentWithoutBelts" classname="FoodFactoryGame.Goods.Tests.BeltTests" runstate="Runnable" seed="881814654" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.022860" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1013" name="ShapesAndLinksFollowFactorioRules" fullname="FoodFactoryGame.Goods.Tests.BeltTests.ShapesAndLinksFollowFactorioRules" methodname="ShapesAndLinksFollowFactorioRules" classname="FoodFactoryGame.Goods.Tests.BeltTests" runstate="Runnable" seed="2115068585" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.004889" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1014" name="SideLoadingEntersAtTheMiddle" fullname="FoodFactoryGame.Goods.Tests.BeltTests.SideLoadingEntersAtTheMiddle" methodname="SideLoadingEntersAtTheMiddle" classname="FoodFactoryGame.Goods.Tests.BeltTests" runstate="Runnable" seed="484340125" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.002067" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1019" name="TakingAnItemOffABeltReturnsThatUnitOrNothing" fullname="FoodFactoryGame.Goods.Tests.BeltTests.TakingAnItemOffABeltReturnsThatUnitOrNothing" methodname="TakingAnItemOffABeltReturnsThatUnitOrNothing" classname="FoodFactoryGame.Goods.Tests.BeltTests" runstate="Runnable" seed="2087134047" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.023667" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1020" name="TakingFromABeltIntoAFullInventoryChangesNothing" fullname="FoodFactoryGame.Goods.Tests.BeltTests.TakingFromABeltIntoAFullInventoryChangesNothing" methodname="TakingFromABeltIntoAFullInventoryChangesNothing" classname="FoodFactoryGame.Goods.Tests.BeltTests" runstate="Runnable" seed="84912015" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.002112" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1024" name="ValidateRejectsInconsistentBelts" fullname="FoodFactoryGame.Goods.Tests.BeltTests.ValidateRejectsInconsistentBelts" methodname="ValidateRejectsInconsistentBelts" classname="FoodFactoryGame.Goods.Tests.BeltTests" runstate="Runnable" seed="868516817" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.005679" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+            </test-suite>
+            <test-suite type="TestFixture" id="1025" name="CompanyCashTests" fullname="FoodFactoryGame.Goods.Tests.CompanyCashTests" classname="FoodFactoryGame.Goods.Tests.CompanyCashTests" runstate="Runnable" testcasecount="8" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.133418" total="8" passed="8" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-case id="1026" name="BootstrapRejectsInvalidCompaniesWithoutChangingTheWorld" fullname="FoodFactoryGame.Goods.Tests.CompanyCashTests.BootstrapRejectsInvalidCompaniesWithoutChangingTheWorld" methodname="BootstrapRejectsInvalidCompaniesWithoutChangingTheWorld" classname="FoodFactoryGame.Goods.Tests.CompanyCashTests" runstate="Runnable" seed="1181645374" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.004892" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1031" name="CashNeverGoesNegativeOrOverflows" fullname="FoodFactoryGame.Goods.Tests.CompanyCashTests.CashNeverGoesNegativeOrOverflows" methodname="CashNeverGoesNegativeOrOverflows" classname="FoodFactoryGame.Goods.Tests.CompanyCashTests" runstate="Runnable" seed="1514782734" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.024611" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1033" name="CommitStatsCountOnlyWrittenSavesAndReset" fullname="FoodFactoryGame.Goods.Tests.CompanyCashTests.CommitStatsCountOnlyWrittenSavesAndReset" methodname="CommitStatsCountOnlyWrittenSavesAndReset" classname="FoodFactoryGame.Goods.Tests.CompanyCashTests" runstate="Runnable" seed="1830083990" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.024395" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1027" name="CompaniesAndCashSurviveWorldDatabaseRoundTrip" fullname="FoodFactoryGame.Goods.Tests.CompanyCashTests.CompaniesAndCashSurviveWorldDatabaseRoundTrip" methodname="CompaniesAndCashSurviveWorldDatabaseRoundTrip" classname="FoodFactoryGame.Goods.Tests.CompanyCashTests" runstate="Runnable" seed="1029654514" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.012086" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1032" name="FailedCommitRestoresCash" fullname="FoodFactoryGame.Goods.Tests.CompanyCashTests.FailedCommitRestoresCash" methodname="FailedCommitRestoresCash" classname="FoodFactoryGame.Goods.Tests.CompanyCashTests" runstate="Runnable" seed="865868397" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.012031" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1029" name="InvalidCompanyRowsAreRejectedAndQuarantined" fullname="FoodFactoryGame.Goods.Tests.CompanyCashTests.InvalidCompanyRowsAreRejectedAndQuarantined" methodname="InvalidCompanyRowsAreRejectedAndQuarantined" classname="FoodFactoryGame.Goods.Tests.CompanyCashTests" runstate="Runnable" seed="805875679" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.026350" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1028" name="SchemaV4RowInWorldDatabaseLoadsAsCurrentWithoutCompanies" fullname="FoodFactoryGame.Goods.Tests.CompanyCashTests.SchemaV4RowInWorldDatabaseLoadsAsCurrentWithoutCompanies" methodname="SchemaV4RowInWorldDatabaseLoadsAsCurrentWithoutCompanies" classname="FoodFactoryGame.Goods.Tests.CompanyCashTests" runstate="Runnable" seed="1389062881" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.023167" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1030" name="SiteViewShowsOnlyTheOwningCompany" fullname="FoodFactoryGame.Goods.Tests.CompanyCashTests.SiteViewShowsOnlyTheOwningCompany" methodname="SiteViewShowsOnlyTheOwningCompany" classname="FoodFactoryGame.Goods.Tests.CompanyCashTests" runstate="Runnable" seed="1952780400" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.002896" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+            </test-suite>
+            <test-suite type="TestFixture" id="1034" name="EquipmentTests" fullname="FoodFactoryGame.Goods.Tests.EquipmentTests" classname="FoodFactoryGame.Goods.Tests.EquipmentTests" runstate="Runnable" testcasecount="9" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.124023" total="9" passed="9" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-case id="1040" name="AdmissionGrantCreatesInventoryOnceAndBackfillsExistingGrants" fullname="FoodFactoryGame.Goods.Tests.EquipmentTests.AdmissionGrantCreatesInventoryOnceAndBackfillsExistingGrants" methodname="AdmissionGrantCreatesInventoryOnceAndBackfillsExistingGrants" classname="FoodFactoryGame.Goods.Tests.EquipmentTests" runstate="Runnable" seed="665473443" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.030053" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1038" name="FailedCommitsRollBackPickupAndPlacement" fullname="FoodFactoryGame.Goods.Tests.EquipmentTests.FailedCommitsRollBackPickupAndPlacement" methodname="FailedCommitsRollBackPickupAndPlacement" classname="FoodFactoryGame.Goods.Tests.EquipmentTests" runstate="Runnable" seed="715398586" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.022089" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1037" name="FootprintRotationsSwapWidthAndDepth" fullname="FoodFactoryGame.Goods.Tests.EquipmentTests.FootprintRotationsSwapWidthAndDepth" methodname="FootprintRotationsSwapWidthAndDepth" classname="FoodFactoryGame.Goods.Tests.EquipmentTests" runstate="Runnable" seed="373795468" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.001458" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1039" name="HeldEquipmentSurvivesReloadNeitherPlacedNorLost" fullname="FoodFactoryGame.Goods.Tests.EquipmentTests.HeldEquipmentSurvivesReloadNeitherPlacedNorLost" methodname="HeldEquipmentSurvivesReloadNeitherPlacedNorLost" classname="FoodFactoryGame.Goods.Tests.EquipmentTests" runstate="Runnable" seed="698417415" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.022724" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1035" name="PickupThenPlaceElsewhereKeepsIdentityAndRecreatesStation" fullname="FoodFactoryGame.Goods.Tests.EquipmentTests.PickupThenPlaceElsewhereKeepsIdentityAndRecreatesStation" methodname="PickupThenPlaceElsewhereKeepsIdentityAndRecreatesStation" classname="FoodFactoryGame.Goods.Tests.EquipmentTests" runstate="Runnable" seed="112830433" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.003692" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1036" name="RejectionsChangeNothing" fullname="FoodFactoryGame.Goods.Tests.EquipmentTests.RejectionsChangeNothing" methodname="RejectionsChangeNothing" classname="FoodFactoryGame.Goods.Tests.EquipmentTests" runstate="Runnable" seed="1419745574" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.001512" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1042" name="SchemaV2SaveLoadsAsCurrentWithoutEquipment" fullname="FoodFactoryGame.Goods.Tests.EquipmentTests.SchemaV2SaveLoadsAsCurrentWithoutEquipment" methodname="SchemaV2SaveLoadsAsCurrentWithoutEquipment" classname="FoodFactoryGame.Goods.Tests.EquipmentTests" runstate="Runnable" seed="1231602157" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.017275" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1041" name="StarterGoodsArriveOnlyWithANewInventory" fullname="FoodFactoryGame.Goods.Tests.EquipmentTests.StarterGoodsArriveOnlyWithANewInventory" methodname="StarterGoodsArriveOnlyWithANewInventory" classname="FoodFactoryGame.Goods.Tests.EquipmentTests" runstate="Runnable" seed="726733394" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.018206" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1043" name="ValidateRejectsInconsistentEquipment" fullname="FoodFactoryGame.Goods.Tests.EquipmentTests.ValidateRejectsInconsistentEquipment" methodname="ValidateRejectsInconsistentEquipment" classname="FoodFactoryGame.Goods.Tests.EquipmentTests" runstate="Runnable" seed="1173410631" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.004156" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+            </test-suite>
+            <test-suite type="TestFixture" id="1044" name="GoodsWorldTests" fullname="FoodFactoryGame.Goods.Tests.GoodsWorldTests" classname="FoodFactoryGame.Goods.Tests.GoodsWorldTests" runstate="Runnable" testcasecount="17" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:27Z" duration="0.218633" total="17" passed="17" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-case id="1047" name="CapacityAndQuantityRejectionAreAtomic" fullname="FoodFactoryGame.Goods.Tests.GoodsWorldTests.CapacityAndQuantityRejectionAreAtomic" methodname="CapacityAndQuantityRejectionAreAtomic" classname="FoodFactoryGame.Goods.Tests.GoodsWorldTests" runstate="Runnable" seed="1096956751" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.001990" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1060" name="CorruptLatestRecoversPreviousAndNewerSchemaIsRejected" fullname="FoodFactoryGame.Goods.Tests.GoodsWorldTests.CorruptLatestRecoversPreviousAndNewerSchemaIsRejected" methodname="CorruptLatestRecoversPreviousAndNewerSchemaIsRejected" classname="FoodFactoryGame.Goods.Tests.GoodsWorldTests" runstate="Runnable" seed="653641972" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.031092" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1046" name="DifferentExposureAtSameLocationCannotMerge" fullname="FoodFactoryGame.Goods.Tests.GoodsWorldTests.DifferentExposureAtSameLocationCannotMerge" methodname="DifferentExposureAtSameLocationCannotMerge" classname="FoodFactoryGame.Goods.Tests.GoodsWorldTests" runstate="Runnable" seed="1865721173" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.001657" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1052" name="DuplicateAndUnauthorizedRequestsCannotMutateInventory" fullname="FoodFactoryGame.Goods.Tests.GoodsWorldTests.DuplicateAndUnauthorizedRequestsCannotMutateInventory" methodname="DuplicateAndUnauthorizedRequestsCannotMutateInventory" classname="FoodFactoryGame.Goods.Tests.GoodsWorldTests" runstate="Runnable" seed="1122608876" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.001226" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1056" name="DurableClockAndExposureRecoverWithoutClientOrPresentation" fullname="FoodFactoryGame.Goods.Tests.GoodsWorldTests.DurableClockAndExposureRecoverWithoutClientOrPresentation" methodname="DurableClockAndExposureRecoverWithoutClientOrPresentation" classname="FoodFactoryGame.Goods.Tests.GoodsWorldTests" runstate="Runnable" seed="1095148197" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:26Z" duration="0.040069" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1054" name="DurableReservationCancellationAndReplaySurviveRestartWithoutLoss" fullname="FoodFactoryGame.Goods.Tests.GoodsWorldTests.DurableReservationCancellationAndReplaySurviveRestartWithoutLoss" methodname="DurableReservationCancellationAndReplaySurviveRestartWithoutLoss" classname="FoodFactoryGame.Goods.Tests.GoodsWorldTests" runstate="Runnable" seed="1609465157" result="Passed" start-time="2026-09-24 05:33:26Z" end-time="2026-09-24 05:33:27Z" duration="0.030594" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1058" name="DurableTransferAcknowledgesOnlyPersistedMutationAndRollsBackOnFailure" fullname="FoodFactoryGame.Goods.Tests.GoodsWorldTests.DurableTransferAcknowledgesOnlyPersistedMutationAndRollsBackOnFailure" methodname="DurableTransferAcknowledgesOnlyPersistedMutationAndRollsBackOnFailure" classname="FoodFactoryGame.Goods.Tests.GoodsWorldTests" runstate="Runnable" seed="1900815698" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.015782" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1055" name="FailedReservationCommitCannotAcknowledgeOrLeaveClaim" fullname="FoodFactoryGame.Goods.Tests.GoodsWorldTests.FailedReservationCommitCannotAcknowledgeOrLeaveClaim" methodname="FailedReservationCommitCannotAcknowledgeOrLeaveClaim" classname="FoodFactoryGame.Goods.Tests.GoodsWorldTests" runstate="Runnable" seed="1932105544" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.015597" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1053" name="ForeignRequestIdCannotPoisonAuthorizedActorEvenAfterRecovery" fullname="FoodFactoryGame.Goods.Tests.GoodsWorldTests.ForeignRequestIdCannotPoisonAuthorizedActorEvenAfterRecovery" methodname="ForeignRequestIdCannotPoisonAuthorizedActorEvenAfterRecovery" classname="FoodFactoryGame.Goods.Tests.GoodsWorldTests" runstate="Runnable" seed="532288209" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.021256" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1051" name="MergeWithConsumedReservationStillRestores" fullname="FoodFactoryGame.Goods.Tests.GoodsWorldTests.MergeWithConsumedReservationStillRestores" methodname="MergeWithConsumedReservationStillRestores" classname="FoodFactoryGame.Goods.Tests.GoodsWorldTests" runstate="Runnable" seed="1632839136" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.011658" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1059" name="OlderSnapshotCannotOverwriteCommittedTransfer" fullname="FoodFactoryGame.Goods.Tests.GoodsWorldTests.OlderSnapshotCannotOverwriteCommittedTransfer" methodname="OlderSnapshotCannotOverwriteCommittedTransfer" classname="FoodFactoryGame.Goods.Tests.GoodsWorldTests" runstate="Runnable" seed="21794304" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.019106" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1048" name="RefrigerationStopsFutureExposureButMovingNeverResetsHistory" fullname="FoodFactoryGame.Goods.Tests.GoodsWorldTests.RefrigerationStopsFutureExposureButMovingNeverResetsHistory" methodname="RefrigerationStopsFutureExposureButMovingNeverResetsHistory" classname="FoodFactoryGame.Goods.Tests.GoodsWorldTests" runstate="Runnable" seed="631875531" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.001174" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1049" name="ReservationPreventsOtherClaimsAndCancellationReleasesWithoutMoving" fullname="FoodFactoryGame.Goods.Tests.GoodsWorldTests.ReservationPreventsOtherClaimsAndCancellationReleasesWithoutMoving" methodname="ReservationPreventsOtherClaimsAndCancellationReleasesWithoutMoving" classname="FoodFactoryGame.Goods.Tests.GoodsWorldTests" runstate="Runnable" seed="636185129" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.001312" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1050" name="ReservedSplitLeavesOtherReservationsValid" fullname="FoodFactoryGame.Goods.Tests.GoodsWorldTests.ReservedSplitLeavesOtherReservationsValid" methodname="ReservedSplitLeavesOtherReservationsValid" classname="FoodFactoryGame.Goods.Tests.GoodsWorldTests" runstate="Runnable" seed="760197737" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.001379" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1057" name="SnapshotRestoresStableIdsTerminalOutcomesAndPendingReservation" fullname="FoodFactoryGame.Goods.Tests.GoodsWorldTests.SnapshotRestoresStableIdsTerminalOutcomesAndPendingReservation" methodname="SnapshotRestoresStableIdsTerminalOutcomesAndPendingReservation" classname="FoodFactoryGame.Goods.Tests.GoodsWorldTests" runstate="Runnable" seed="187413167" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.017107" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1045" name="SplitPreservesHistoryAndCompatibleMergeDoesNotDiscardGoods" fullname="FoodFactoryGame.Goods.Tests.GoodsWorldTests.SplitPreservesHistoryAndCompatibleMergeDoesNotDiscardGoods" methodname="SplitPreservesHistoryAndCompatibleMergeDoesNotDiscardGoods" classname="FoodFactoryGame.Goods.Tests.GoodsWorldTests" runstate="Runnable" seed="1444472395" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.001840" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1061" name="UnobservedSiteAdvancesWithoutCameraClientOrScene" fullname="FoodFactoryGame.Goods.Tests.GoodsWorldTests.UnobservedSiteAdvancesWithoutCameraClientOrScene" methodname="UnobservedSiteAdvancesWithoutCameraClientOrScene" classname="FoodFactoryGame.Goods.Tests.GoodsWorldTests" runstate="Runnable" seed="2041405687" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.000914" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+            </test-suite>
+            <test-suite type="TestFixture" id="1062" name="PurchaseTests" fullname="FoodFactoryGame.Goods.Tests.PurchaseTests" classname="FoodFactoryGame.Goods.Tests.PurchaseTests" runstate="Runnable" testcasecount="5" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.119638" total="5" passed="5" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-case id="1064" name="BuyingPaysAndDeliversFreshGoodsToTheBuyer" fullname="FoodFactoryGame.Goods.Tests.PurchaseTests.BuyingPaysAndDeliversFreshGoodsToTheBuyer" methodname="BuyingPaysAndDeliversFreshGoodsToTheBuyer" classname="FoodFactoryGame.Goods.Tests.PurchaseTests" runstate="Runnable" seed="1839826847" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.024960" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1067" name="FailedCommitRollsBackCashAndGoods" fullname="FoodFactoryGame.Goods.Tests.PurchaseTests.FailedCommitRollsBackCashAndGoods" methodname="FailedCommitRollsBackCashAndGoods" classname="FoodFactoryGame.Goods.Tests.PurchaseTests" runstate="Runnable" seed="711345050" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.022903" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1063" name="OffersMustBeValidContent" fullname="FoodFactoryGame.Goods.Tests.PurchaseTests.OffersMustBeValidContent" methodname="OffersMustBeValidContent" classname="FoodFactoryGame.Goods.Tests.PurchaseTests" runstate="Runnable" seed="1922111741" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.014562" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1066" name="RejectionsChangeNothing" fullname="FoodFactoryGame.Goods.Tests.PurchaseTests.RejectionsChangeNothing" methodname="RejectionsChangeNothing" classname="FoodFactoryGame.Goods.Tests.PurchaseTests" runstate="Runnable" seed="2120999445" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.022779" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1065" name="RetriedRequestIsNeverChargedTwice" fullname="FoodFactoryGame.Goods.Tests.PurchaseTests.RetriedRequestIsNeverChargedTwice" methodname="RetriedRequestIsNeverChargedTwice" classname="FoodFactoryGame.Goods.Tests.PurchaseTests" runstate="Runnable" seed="751033502" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.032255" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+            </test-suite>
+            <test-suite type="TestFixture" id="1068" name="SaleTests" fullname="FoodFactoryGame.Goods.Tests.SaleTests" classname="FoodFactoryGame.Goods.Tests.SaleTests" runstate="Runnable" testcasecount="8" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.064397" total="8" passed="8" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-case id="1070" name="CounterSellsOneBreadPerServiceTimeAndPaysTheCompany" fullname="FoodFactoryGame.Goods.Tests.SaleTests.CounterSellsOneBreadPerServiceTimeAndPaysTheCompany" methodname="CounterSellsOneBreadPerServiceTimeAndPaysTheCompany" classname="FoodFactoryGame.Goods.Tests.SaleTests" runstate="Runnable" seed="1721792964" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.010265" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1074" name="FailedTickCommitRollsBackGoodsAndCashTogether" fullname="FoodFactoryGame.Goods.Tests.SaleTests.FailedTickCommitRollsBackGoodsAndCashTogether" methodname="FailedTickCommitRollsBackGoodsAndCashTogether" classname="FoodFactoryGame.Goods.Tests.SaleTests" runstate="Runnable" seed="1759769710" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.018161" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1073" name="PickingUpMidSaleRefundsTheGoodsAndPaysNothing" fullname="FoodFactoryGame.Goods.Tests.SaleTests.PickingUpMidSaleRefundsTheGoodsAndPaysNothing" methodname="PickingUpMidSaleRefundsTheGoodsAndPaysNothing" classname="FoodFactoryGame.Goods.Tests.SaleTests" runstate="Runnable" seed="1272704003" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.002353" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1069" name="SaleRecipesMustHaveExactlyOneResult" fullname="FoodFactoryGame.Goods.Tests.SaleTests.SaleRecipesMustHaveExactlyOneResult" methodname="SaleRecipesMustHaveExactlyOneResult" classname="FoodFactoryGame.Goods.Tests.SaleTests" runstate="Runnable" seed="1237943561" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.001192" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1075" name="SaleSavedMidWayCompletesExactlyOnceAfterReload" fullname="FoodFactoryGame.Goods.Tests.SaleTests.SaleSavedMidWayCompletesExactlyOnceAfterReload" methodname="SaleSavedMidWayCompletesExactlyOnceAfterReload" classname="FoodFactoryGame.Goods.Tests.SaleTests" runstate="Runnable" seed="977037254" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.011176" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1076" name="SchemaV5RowLoadsAsCurrent" fullname="FoodFactoryGame.Goods.Tests.SaleTests.SchemaV5RowLoadsAsCurrent" methodname="SchemaV5RowLoadsAsCurrent" classname="FoodFactoryGame.Goods.Tests.SaleTests" runstate="Runnable" seed="1262480280" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.014766" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1072" name="SiteWithoutACompanyDoesNotSell" fullname="FoodFactoryGame.Goods.Tests.SaleTests.SiteWithoutACompanyDoesNotSell" methodname="SiteWithoutACompanyDoesNotSell" classname="FoodFactoryGame.Goods.Tests.SaleTests" runstate="Runnable" seed="520882731" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.002277" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1071" name="SpoiledGoodsNeverSell" fullname="FoodFactoryGame.Goods.Tests.SaleTests.SpoiledGoodsNeverSell" methodname="SpoiledGoodsNeverSell" classname="FoodFactoryGame.Goods.Tests.SaleTests" runstate="Runnable" seed="1362413685" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.001795" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+            </test-suite>
+            <test-suite type="TestFixture" id="1077" name="SlotCapacityTests" fullname="FoodFactoryGame.Goods.Tests.SlotCapacityTests" classname="FoodFactoryGame.Goods.Tests.SlotCapacityTests" runstate="Runnable" testcasecount="7" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.058772" total="7" passed="7" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-case id="1079" name="EachItemNeedsItsOwnSlot" fullname="FoodFactoryGame.Goods.Tests.SlotCapacityTests.EachItemNeedsItsOwnSlot" methodname="EachItemNeedsItsOwnSlot" classname="FoodFactoryGame.Goods.Tests.SlotCapacityTests" runstate="Runnable" seed="695416180" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.002249" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1081" name="GrantEnlargesASmallerInventoryAndNeverShrinksIt" fullname="FoodFactoryGame.Goods.Tests.SlotCapacityTests.GrantEnlargesASmallerInventoryAndNeverShrinksIt" methodname="GrantEnlargesASmallerInventoryAndNeverShrinksIt" classname="FoodFactoryGame.Goods.Tests.SlotCapacityTests" runstate="Runnable" seed="471198526" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.016035" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1084" name="ItemRegistrationRejectsInvalidOrDuplicateContent" fullname="FoodFactoryGame.Goods.Tests.SlotCapacityTests.ItemRegistrationRejectsInvalidOrDuplicateContent" methodname="ItemRegistrationRejectsInvalidOrDuplicateContent" classname="FoodFactoryGame.Goods.Tests.SlotCapacityTests" runstate="Runnable" seed="187821965" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.001096" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1083" name="SavedMachinesTakeContentBufferSlotsWithoutLosingGoods" fullname="FoodFactoryGame.Goods.Tests.SlotCapacityTests.SavedMachinesTakeContentBufferSlotsWithoutLosingGoods" methodname="SavedMachinesTakeContentBufferSlotsWithoutLosingGoods" classname="FoodFactoryGame.Goods.Tests.SlotCapacityTests" runstate="Runnable" seed="2625171" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.013242" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1080" name="SpoilingSplitsAStackAndOverfullnessBlocksEntryWithoutLosingGoods" fullname="FoodFactoryGame.Goods.Tests.SlotCapacityTests.SpoilingSplitsAStackAndOverfullnessBlocksEntryWithoutLosingGoods" methodname="SpoilingSplitsAStackAndOverfullnessBlocksEntryWithoutLosingGoods" classname="FoodFactoryGame.Goods.Tests.SlotCapacityTests" runstate="Runnable" seed="2032225053" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.012040" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1078" name="StacksFillSlotsUpToTheirMaxStack" fullname="FoodFactoryGame.Goods.Tests.SlotCapacityTests.StacksFillSlotsUpToTheirMaxStack" methodname="StacksFillSlotsUpToTheirMaxStack" classname="FoodFactoryGame.Goods.Tests.SlotCapacityTests" runstate="Runnable" seed="204332225" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.001758" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1082" name="StarterGoodsAreCountedInSlots" fullname="FoodFactoryGame.Goods.Tests.SlotCapacityTests.StarterGoodsAreCountedInSlots" methodname="StarterGoodsAreCountedInSlots" classname="FoodFactoryGame.Goods.Tests.SlotCapacityTests" runstate="Runnable" seed="751495722" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.009788" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+            </test-suite>
+            <test-suite type="TestFixture" id="1085" name="StationJobTests" fullname="FoodFactoryGame.Goods.Tests.StationJobTests" classname="FoodFactoryGame.Goods.Tests.StationJobTests" runstate="Runnable" testcasecount="17" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.249234" total="17" passed="17" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-case id="1088" name="AutomaticStationStartsOnTransferAndRunsUntilInputsRunOut" fullname="FoodFactoryGame.Goods.Tests.StationJobTests.AutomaticStationStartsOnTransferAndRunsUntilInputsRunOut" methodname="AutomaticStationStartsOnTransferAndRunsUntilInputsRunOut" classname="FoodFactoryGame.Goods.Tests.StationJobTests" runstate="Runnable" seed="601661119" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.021714" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1089" name="AutomaticStationWaitsForRoomInItsOutput" fullname="FoodFactoryGame.Goods.Tests.StationJobTests.AutomaticStationWaitsForRoomInItsOutput" methodname="AutomaticStationWaitsForRoomInItsOutput" classname="FoodFactoryGame.Goods.Tests.StationJobTests" runstate="Runnable" seed="1038888501" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.002102" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1096" name="CorruptLatestRecoversRunningJobFromPrevious" fullname="FoodFactoryGame.Goods.Tests.StationJobTests.CorruptLatestRecoversRunningJobFromPrevious" methodname="CorruptLatestRecoversRunningJobFromPrevious" classname="FoodFactoryGame.Goods.Tests.StationJobTests" runstate="Runnable" seed="225788176" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.038147" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1100" name="DurablePickupSurvivesReloadAndFailedCommitRollsBack" fullname="FoodFactoryGame.Goods.Tests.StationJobTests.DurablePickupSurvivesReloadAndFailedCommitRollsBack" methodname="DurablePickupSurvivesReloadAndFailedCommitRollsBack" classname="FoodFactoryGame.Goods.Tests.StationJobTests" runstate="Runnable" seed="163088249" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.024921" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1094" name="FailedCommitsRollBackStartAndTick" fullname="FoodFactoryGame.Goods.Tests.StationJobTests.FailedCommitsRollBackStartAndTick" methodname="FailedCommitsRollBackStartAndTick" classname="FoodFactoryGame.Goods.Tests.StationJobTests" runstate="Runnable" seed="929936311" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.026010" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1093" name="FullOutputBlocksJobUntilRoomWithoutLoss" fullname="FoodFactoryGame.Goods.Tests.StationJobTests.FullOutputBlocksJobUntilRoomWithoutLoss" methodname="FullOutputBlocksJobUntilRoomWithoutLoss" classname="FoodFactoryGame.Goods.Tests.StationJobTests" runstate="Runnable" seed="707968781" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.005789" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1095" name="JobSavedMidRunCompletesExactlyOnceAfterReload" fullname="FoodFactoryGame.Goods.Tests.StationJobTests.JobSavedMidRunCompletesExactlyOnceAfterReload" methodname="JobSavedMidRunCompletesExactlyOnceAfterReload" classname="FoodFactoryGame.Goods.Tests.StationJobTests" runstate="Runnable" seed="1548225935" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.047226" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1092" name="OneLargeStepMatchesManySmallStepsIncludingOvershoot" fullname="FoodFactoryGame.Goods.Tests.StationJobTests.OneLargeStepMatchesManySmallStepsIncludingOvershoot" methodname="OneLargeStepMatchesManySmallStepsIncludingOvershoot" classname="FoodFactoryGame.Goods.Tests.StationJobTests" runstate="Runnable" seed="491593070" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.008806" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1098" name="PickupOfBlockedJobHandsOverFinishedOutput" fullname="FoodFactoryGame.Goods.Tests.StationJobTests.PickupOfBlockedJobHandsOverFinishedOutput" methodname="PickupOfBlockedJobHandsOverFinishedOutput" classname="FoodFactoryGame.Goods.Tests.StationJobTests" runstate="Runnable" seed="1201730566" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.004164" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1097" name="PickupRefundsInputsAndSweepsBuffersIntoInventory" fullname="FoodFactoryGame.Goods.Tests.StationJobTests.PickupRefundsInputsAndSweepsBuffersIntoInventory" methodname="PickupRefundsInputsAndSweepsBuffersIntoInventory" classname="FoodFactoryGame.Goods.Tests.StationJobTests" runstate="Runnable" seed="1377000200" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.007359" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1099" name="PickupRejectionsLeaveJobRunning" fullname="FoodFactoryGame.Goods.Tests.StationJobTests.PickupRejectionsLeaveJobRunning" methodname="PickupRejectionsLeaveJobRunning" classname="FoodFactoryGame.Goods.Tests.StationJobTests" runstate="Runnable" seed="2043534555" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.006279" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1087" name="RejectionsLeaveGoodsUntouched" fullname="FoodFactoryGame.Goods.Tests.StationJobTests.RejectionsLeaveGoodsUntouched" methodname="RejectionsLeaveGoodsUntouched" classname="FoodFactoryGame.Goods.Tests.StationJobTests" runstate="Runnable" seed="111626332" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.005870" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1091" name="ReplayReturnsOriginalJobAndOtherPlayerGetsOwnOutcome" fullname="FoodFactoryGame.Goods.Tests.StationJobTests.ReplayReturnsOriginalJobAndOtherPlayerGetsOwnOutcome" methodname="ReplayReturnsOriginalJobAndOtherPlayerGetsOwnOutcome" classname="FoodFactoryGame.Goods.Tests.StationJobTests" runstate="Runnable" seed="609687747" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.003208" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1090" name="ReservedQuantityIsNotConsumed" fullname="FoodFactoryGame.Goods.Tests.StationJobTests.ReservedQuantityIsNotConsumed" methodname="ReservedQuantityIsNotConsumed" classname="FoodFactoryGame.Goods.Tests.StationJobTests" runstate="Runnable" seed="1898606216" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.001664" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1101" name="SchemaV1SaveLoadsAsCurrentAndIsRewrittenAsCurrent" fullname="FoodFactoryGame.Goods.Tests.StationJobTests.SchemaV1SaveLoadsAsCurrentAndIsRewrittenAsCurrent" methodname="SchemaV1SaveLoadsAsCurrentAndIsRewrittenAsCurrent" classname="FoodFactoryGame.Goods.Tests.StationJobTests" runstate="Runnable" seed="1847771720" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.021129" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1086" name="StartConsumesMostExposedInputsAndCompletionCreatesOutput" fullname="FoodFactoryGame.Goods.Tests.StationJobTests.StartConsumesMostExposedInputsAndCompletionCreatesOutput" methodname="StartConsumesMostExposedInputsAndCompletionCreatesOutput" classname="FoodFactoryGame.Goods.Tests.StationJobTests" runstate="Runnable" seed="1694542122" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.007148" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1102" name="ValidateRejectsInvalidStationsAndJobs" fullname="FoodFactoryGame.Goods.Tests.StationJobTests.ValidateRejectsInvalidStationsAndJobs" methodname="ValidateRejectsInvalidStationsAndJobs" classname="FoodFactoryGame.Goods.Tests.StationJobTests" runstate="Runnable" seed="2141519553" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.008170" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+    <test-suite type="Assembly" id="1149" name="FoodFactoryGame.Session.EditModeTests.dll" fullname="E:/Projects/Unity/FoodFactoryGame/Library/ScriptAssemblies/FoodFactoryGame.Session.EditModeTests.dll" runstate="Runnable" testcasecount="36" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:28Z" duration="0.808801" total="36" passed="36" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="32400" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="EditMode" />
+        <property name="EditorOnly" value="True" />
+      </properties>
+      <test-suite type="TestSuite" id="1150" name="FoodFactoryGame" fullname="FoodFactoryGame" runstate="Runnable" testcasecount="36" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:28Z" duration="0.805343" total="36" passed="36" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-suite type="TestSuite" id="1151" name="Session" fullname="FoodFactoryGame.Session" runstate="Runnable" testcasecount="36" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:28Z" duration="0.801600" total="36" passed="36" failed="0" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <test-suite type="TestSuite" id="1152" name="Tests" fullname="FoodFactoryGame.Session.Tests" runstate="Runnable" testcasecount="36" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:28Z" duration="0.798165" total="36" passed="36" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-suite type="TestFixture" id="1107" name="DevWorldCompanyTests" fullname="FoodFactoryGame.Session.Tests.DevWorldCompanyTests" classname="FoodFactoryGame.Session.Tests.DevWorldCompanyTests" runstate="Runnable" testcasecount="2" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.089859" total="2" passed="2" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-case id="1108" name="NewWorldStartsWithTheDevCompany" fullname="FoodFactoryGame.Session.Tests.DevWorldCompanyTests.NewWorldStartsWithTheDevCompany" methodname="NewWorldStartsWithTheDevCompany" classname="FoodFactoryGame.Session.Tests.DevWorldCompanyTests" runstate="Runnable" seed="1908458327" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.029138" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1109" name="OlderSaveGainsTheDevCompanyExactlyOnce" fullname="FoodFactoryGame.Session.Tests.DevWorldCompanyTests.OlderSaveGainsTheDevCompanyExactlyOnce" methodname="OlderSaveGainsTheDevCompanyExactlyOnce" classname="FoodFactoryGame.Session.Tests.DevWorldCompanyTests" runstate="Runnable" seed="483548992" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.058953" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <output><![CDATA[[Session] Imported C:\Users\Deven\AppData\Local\Temp\FoodFactorySessionTests\786fad037ce5419c96e560e464931173\world.snapshot into C:\Users\Deven\AppData\Local\Temp\FoodFactorySessionTests\786fad037ce5419c96e560e464931173\world.db; the old file was left in place.
+[Session] Added dev-company with 50000 cents to this older save.
+]]></output>
+              </test-case>
+            </test-suite>
+            <test-suite type="TestFixture" id="1110" name="DevWorldCounterTests" fullname="FoodFactoryGame.Session.Tests.DevWorldCounterTests" classname="FoodFactoryGame.Session.Tests.DevWorldCounterTests" runstate="Runnable" testcasecount="2" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.084216" total="2" passed="2" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-case id="1111" name="NewWorldHasThePlacedCounterAndItSellsForTheDevCompany" fullname="FoodFactoryGame.Session.Tests.DevWorldCounterTests.NewWorldHasThePlacedCounterAndItSellsForTheDevCompany" methodname="NewWorldHasThePlacedCounterAndItSellsForTheDevCompany" classname="FoodFactoryGame.Session.Tests.DevWorldCounterTests" runstate="Runnable" seed="173372355" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.032392" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1112" name="OlderSaveGainsTheCounterOnceAndAHeldCounterIsNeverReplaced" fullname="FoodFactoryGame.Session.Tests.DevWorldCounterTests.OlderSaveGainsTheCounterOnceAndAHeldCounterIsNeverReplaced" methodname="OlderSaveGainsTheCounterOnceAndAHeldCounterIsNeverReplaced" classname="FoodFactoryGame.Session.Tests.DevWorldCounterTests" runstate="Runnable" seed="1138863580" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.050173" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <output><![CDATA[[Session] Added the dev sell counter to this older save.
+]]></output>
+              </test-case>
+            </test-suite>
+            <test-suite type="TestFixture" id="1113" name="PlayerRegistryTests" fullname="FoodFactoryGame.Session.Tests.PlayerRegistryTests" classname="FoodFactoryGame.Session.Tests.PlayerRegistryTests" runstate="Runnable" testcasecount="20" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:28Z" duration="0.542589" total="20" passed="20" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-case id="1131" name="ClientIdentityIsCreatedOnceAndReused" fullname="FoodFactoryGame.Session.Tests.PlayerRegistryTests.ClientIdentityIsCreatedOnceAndReused" methodname="ClientIdentityIsCreatedOnceAndReused" classname="FoodFactoryGame.Session.Tests.PlayerRegistryTests" runstate="Runnable" seed="1483909213" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.028475" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1134" name="CommandLineSelectsModeAndIsolatedPaths" fullname="FoodFactoryGame.Session.Tests.PlayerRegistryTests.CommandLineSelectsModeAndIsolatedPaths" methodname="CommandLineSelectsModeAndIsolatedPaths" classname="FoodFactoryGame.Session.Tests.PlayerRegistryTests" runstate="Runnable" seed="927612782" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.002591" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1116" name="DifferentSecretWithSameNameGetsDifferentId" fullname="FoodFactoryGame.Session.Tests.PlayerRegistryTests.DifferentSecretWithSameNameGetsDifferentId" methodname="DifferentSecretWithSameNameGetsDifferentId" classname="FoodFactoryGame.Session.Tests.PlayerRegistryTests" runstate="Runnable" seed="1847295419" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.041580" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1117" name="DuplicateOfConnectedPlayerIsRejectedBeforeAnyWrite" fullname="FoodFactoryGame.Session.Tests.PlayerRegistryTests.DuplicateOfConnectedPlayerIsRejectedBeforeAnyWrite" methodname="DuplicateOfConnectedPlayerIsRejectedBeforeAnyWrite" classname="FoodFactoryGame.Session.Tests.PlayerRegistryTests" runstate="Runnable" seed="1736779055" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.045388" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1130" name="DurableGrantRejectsUnknownSiteWithoutWriting" fullname="FoodFactoryGame.Session.Tests.PlayerRegistryTests.DurableGrantRejectsUnknownSiteWithoutWriting" methodname="DurableGrantRejectsUnknownSiteWithoutWriting" classname="FoodFactoryGame.Session.Tests.PlayerRegistryTests" runstate="Runnable" seed="10559646" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:27Z" duration="0.017564" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1126" name="FailedGrantCommitRejectsAndRetryReusesIdentity" fullname="FoodFactoryGame.Session.Tests.PlayerRegistryTests.FailedGrantCommitRejectsAndRetryReusesIdentity" methodname="FailedGrantCommitRejectsAndRetryReusesIdentity" classname="FoodFactoryGame.Session.Tests.PlayerRegistryTests" runstate="Runnable" seed="440252058" result="Passed" start-time="2026-09-24 05:33:27Z" end-time="2026-09-24 05:33:28Z" duration="0.029739" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-suite type="ParameterizedMethod" id="1124" name="InvalidNameOrSecretIsRejectedWithoutWrites" fullname="FoodFactoryGame.Session.Tests.PlayerRegistryTests.InvalidNameOrSecretIsRejectedWithoutWrites" classname="FoodFactoryGame.Session.Tests.PlayerRegistryTests" runstate="Runnable" testcasecount="6" result="Passed" start-time="2026-09-24 05:33:28Z" end-time="2026-09-24 05:33:28Z" duration="0.127038" total="6" passed="6" failed="0" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <test-case id="1118" name="InvalidNameOrSecretIsRejectedWithoutWrites(&quot;&quot;,&quot;aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&quot;,&quot;invalid-name&quot;)" fullname="FoodFactoryGame.Session.Tests.PlayerRegistryTests.InvalidNameOrSecretIsRejectedWithoutWrites(&quot;&quot;,&quot;aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&quot;,&quot;invalid-name&quot;)" methodname="InvalidNameOrSecretIsRejectedWithoutWrites" classname="FoodFactoryGame.Session.Tests.PlayerRegistryTests" runstate="Runnable" seed="1593414870" result="Passed" start-time="2026-09-24 05:33:28Z" end-time="2026-09-24 05:33:28Z" duration="0.020184" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1119" name="InvalidNameOrSecretIsRejectedWithoutWrites(&quot;   &quot;,&quot;aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&quot;,&quot;invalid-name&quot;)" fullname="FoodFactoryGame.Session.Tests.PlayerRegistryTests.InvalidNameOrSecretIsRejectedWithoutWrites(&quot;   &quot;,&quot;aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&quot;,&quot;invalid-name&quot;)" methodname="InvalidNameOrSecretIsRejectedWithoutWrites" classname="FoodFactoryGame.Session.Tests.PlayerRegistryTests" runstate="Runnable" seed="1079234853" result="Passed" start-time="2026-09-24 05:33:28Z" end-time="2026-09-24 05:33:28Z" duration="0.020274" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1120" name="InvalidNameOrSecretIsRejectedWithoutWrites(&quot;123456789012345678901234567890123&quot;,&quot;aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&quot;,&quot;invalid-name&quot;)" fullname="FoodFactoryGame.Session.Tests.PlayerRegistryTests.InvalidNameOrSecretIsRejectedWithoutWrites(&quot;123456789012345678901234567890123&quot;,&quot;aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&quot;,&quot;invalid-name&quot;)" methodname="InvalidNameOrSecretIsRejectedWithoutWrites" classname="FoodFactoryGame.Session.Tests.PlayerRegistryTests" runstate="Runnable" seed="459165107" result="Passed" start-time="2026-09-24 05:33:28Z" end-time="2026-09-24 05:33:28Z" duration="0.023475" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1121" name="InvalidNameOrSecretIsRejectedWithoutWrites(&quot;tab\tname&quot;,&quot;aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&quot;,&quot;invalid-name&quot;)" fullname="FoodFactoryGame.Session.Tests.PlayerRegistryTests.InvalidNameOrSecretIsRejectedWithoutWrites(&quot;tab\tname&quot;,&quot;aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&quot;,&quot;invalid-name&quot;)" methodname="InvalidNameOrSecretIsRejectedWithoutWrites" classname="FoodFactoryGame.Session.Tests.PlayerRegistryTests" runstate="Runnable" seed="930795477" result="Passed" start-time="2026-09-24 05:33:28Z" end-time="2026-09-24 05:33:28Z" duration="0.020512" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1122" name="InvalidNameOrSecretIsRejectedWithoutWrites(&quot;Alice&quot;,&quot;&quot;,&quot;invalid-secret&quot;)" fullname="FoodFactoryGame.Session.Tests.PlayerRegistryTests.InvalidNameOrSecretIsRejectedWithoutWrites(&quot;Alice&quot;,&quot;&quot;,&quot;invalid-secret&quot;)" methodname="InvalidNameOrSecretIsRejectedWithoutWrites" classname="FoodFactoryGame.Session.Tests.PlayerRegistryTests" runstate="Runnable" seed="5967597" result="Passed" start-time="2026-09-24 05:33:28Z" end-time="2026-09-24 05:33:28Z" duration="0.020312" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1123" name="InvalidNameOrSecretIsRejectedWithoutWrites(&quot;Alice&quot;,&quot;short-secret&quot;,&quot;invalid-secret&quot;)" fullname="FoodFactoryGame.Session.Tests.PlayerRegistryTests.InvalidNameOrSecretIsRejectedWithoutWrites(&quot;Alice&quot;,&quot;short-secret&quot;,&quot;invalid-secret&quot;)" methodname="InvalidNameOrSecretIsRejectedWithoutWrites" classname="FoodFactoryGame.Session.Tests.PlayerRegistryTests" runstate="Runnable" seed="1454482425" result="Passed" start-time="2026-09-24 05:33:28Z" end-time="2026-09-24 05:33:28Z" duration="0.019972" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+              </test-suite>
+              <test-case id="1132" name="LegacyClientSecretIsImportedOnceAndLeftInPlace" fullname="FoodFactoryGame.Session.Tests.PlayerRegistryTests.LegacyClientSecretIsImportedOnceAndLeftInPlace" methodname="LegacyClientSecretIsImportedOnceAndLeftInPlace" classname="FoodFactoryGame.Session.Tests.PlayerRegistryTests" runstate="Runnable" seed="1619224273" result="Passed" start-time="2026-09-24 05:33:28Z" end-time="2026-09-24 05:33:28Z" duration="0.012014" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1133" name="LegacyWorldSnapshotIsImportedOnceAndLeftInPlace" fullname="FoodFactoryGame.Session.Tests.PlayerRegistryTests.LegacyWorldSnapshotIsImportedOnceAndLeftInPlace" methodname="LegacyWorldSnapshotIsImportedOnceAndLeftInPlace" classname="FoodFactoryGame.Session.Tests.PlayerRegistryTests" runstate="Runnable" seed="751316146" result="Passed" start-time="2026-09-24 05:33:28Z" end-time="2026-09-24 05:33:28Z" duration="0.043480" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <output><![CDATA[[Session] Imported C:\Users\Deven\AppData\Local\Temp\FoodFactorySessionTests\2964c2a664594752a2ecb5aa0d6277b7\world.snapshot into C:\Users\Deven\AppData\Local\Temp\FoodFactorySessionTests\2964c2a664594752a2ecb5aa0d6277b7\world.db; the old file was left in place.
+]]></output>
+              </test-case>
+              <test-case id="1129" name="NewerRegistrySchemaIsRefused" fullname="FoodFactoryGame.Session.Tests.PlayerRegistryTests.NewerRegistrySchemaIsRefused" methodname="NewerRegistrySchemaIsRefused" classname="FoodFactoryGame.Session.Tests.PlayerRegistryTests" runstate="Runnable" seed="1755771136" result="Passed" start-time="2026-09-24 05:33:28Z" end-time="2026-09-24 05:33:28Z" duration="0.010582" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1114" name="NewSecretCreatesIdentityAndCommitsGrantBeforeAdmission" fullname="FoodFactoryGame.Session.Tests.PlayerRegistryTests.NewSecretCreatesIdentityAndCommitsGrantBeforeAdmission" methodname="NewSecretCreatesIdentityAndCommitsGrantBeforeAdmission" classname="FoodFactoryGame.Session.Tests.PlayerRegistryTests" runstate="Runnable" seed="646203025" result="Passed" start-time="2026-09-24 05:33:28Z" end-time="2026-09-24 05:33:28Z" duration="0.030663" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1125" name="OversizedSecretIsRejected" fullname="FoodFactoryGame.Session.Tests.PlayerRegistryTests.OversizedSecretIsRejected" methodname="OversizedSecretIsRejected" classname="FoodFactoryGame.Session.Tests.PlayerRegistryTests" runstate="Runnable" seed="2032163245" result="Passed" start-time="2026-09-24 05:33:28Z" end-time="2026-09-24 05:33:28Z" duration="0.020051" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1115" name="SameSecretResolvesSameIdAfterReopeningStores" fullname="FoodFactoryGame.Session.Tests.PlayerRegistryTests.SameSecretResolvesSameIdAfterReopeningStores" methodname="SameSecretResolvesSameIdAfterReopeningStores" classname="FoodFactoryGame.Session.Tests.PlayerRegistryTests" runstate="Runnable" seed="1273776321" result="Passed" start-time="2026-09-24 05:33:28Z" end-time="2026-09-24 05:33:28Z" duration="0.039410" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1128" name="SecretsAreNeverStoredOrExposed" fullname="FoodFactoryGame.Session.Tests.PlayerRegistryTests.SecretsAreNeverStoredOrExposed" methodname="SecretsAreNeverStoredOrExposed" classname="FoodFactoryGame.Session.Tests.PlayerRegistryTests" runstate="Runnable" seed="668336790" result="Passed" start-time="2026-09-24 05:33:28Z" end-time="2026-09-24 05:33:28Z" duration="0.033112" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1127" name="UnwritableRegistryRejectsNewPlayer" fullname="FoodFactoryGame.Session.Tests.PlayerRegistryTests.UnwritableRegistryRejectsNewPlayer" methodname="UnwritableRegistryRejectsNewPlayer" classname="FoodFactoryGame.Session.Tests.PlayerRegistryTests" runstate="Runnable" seed="2118182473" result="Passed" start-time="2026-09-24 05:33:28Z" end-time="2026-09-24 05:33:28Z" duration="0.036415" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+            </test-suite>
+            <test-suite type="TestFixture" id="1135" name="SessionAuthoringTests" fullname="FoodFactoryGame.Session.Tests.SessionAuthoringTests" classname="FoodFactoryGame.Session.Tests.SessionAuthoringTests" runstate="Runnable" testcasecount="12" result="Passed" start-time="2026-09-24 05:33:28Z" end-time="2026-09-24 05:33:28Z" duration="0.075528" total="12" passed="12" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-suite type="ParameterizedMethod" id="1141" name="BeltPrefabsAreTileCentredWithTriggerAndScrollingTread" fullname="FoodFactoryGame.Session.Tests.SessionAuthoringTests.BeltPrefabsAreTileCentredWithTriggerAndScrollingTread" classname="FoodFactoryGame.Session.Tests.SessionAuthoringTests" runstate="Runnable" testcasecount="3" result="Passed" start-time="2026-09-24 05:33:28Z" end-time="2026-09-24 05:33:28Z" duration="0.023085" total="3" passed="3" failed="0" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <test-case id="1138" name="BeltPrefabsAreTileCentredWithTriggerAndScrollingTread(&quot;Assets/Prefabs/Belts/BeltStraight.prefab&quot;)" fullname="FoodFactoryGame.Session.Tests.SessionAuthoringTests.BeltPrefabsAreTileCentredWithTriggerAndScrollingTread(&quot;Assets/Prefabs/Belts/BeltStraight.prefab&quot;)" methodname="BeltPrefabsAreTileCentredWithTriggerAndScrollingTread" classname="FoodFactoryGame.Session.Tests.SessionAuthoringTests" runstate="Runnable" seed="1822930427" result="Passed" start-time="2026-09-24 05:33:28Z" end-time="2026-09-24 05:33:28Z" duration="0.019804" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1139" name="BeltPrefabsAreTileCentredWithTriggerAndScrollingTread(&quot;Assets/Prefabs/Belts/BeltCornerLeft.prefab&quot;)" fullname="FoodFactoryGame.Session.Tests.SessionAuthoringTests.BeltPrefabsAreTileCentredWithTriggerAndScrollingTread(&quot;Assets/Prefabs/Belts/BeltCornerLeft.prefab&quot;)" methodname="BeltPrefabsAreTileCentredWithTriggerAndScrollingTread" classname="FoodFactoryGame.Session.Tests.SessionAuthoringTests" runstate="Runnable" seed="1024958932" result="Passed" start-time="2026-09-24 05:33:28Z" end-time="2026-09-24 05:33:28Z" duration="0.001292" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1140" name="BeltPrefabsAreTileCentredWithTriggerAndScrollingTread(&quot;Assets/Prefabs/Belts/BeltCornerRight.prefab&quot;)" fullname="FoodFactoryGame.Session.Tests.SessionAuthoringTests.BeltPrefabsAreTileCentredWithTriggerAndScrollingTread(&quot;Assets/Prefabs/Belts/BeltCornerRight.prefab&quot;)" methodname="BeltPrefabsAreTileCentredWithTriggerAndScrollingTread" classname="FoodFactoryGame.Session.Tests.SessionAuthoringTests" runstate="Runnable" seed="262989517" result="Passed" start-time="2026-09-24 05:33:28Z" end-time="2026-09-24 05:33:28Z" duration="0.001101" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+              </test-suite>
+              <test-case id="1145" name="BreadRecipeTurnsDoughIntoBreadInTheOven" fullname="FoodFactoryGame.Session.Tests.SessionAuthoringTests.BreadRecipeTurnsDoughIntoBreadInTheOven" methodname="BreadRecipeTurnsDoughIntoBreadInTheOven" classname="FoodFactoryGame.Session.Tests.SessionAuthoringTests" runstate="Runnable" seed="1575699892" result="Passed" start-time="2026-09-24 05:33:28Z" end-time="2026-09-24 05:33:28Z" duration="0.002905" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1142" name="CounterDefinitionHasFootprintIconAndServerFreeVisual" fullname="FoodFactoryGame.Session.Tests.SessionAuthoringTests.CounterDefinitionHasFootprintIconAndServerFreeVisual" methodname="CounterDefinitionHasFootprintIconAndServerFreeVisual" classname="FoodFactoryGame.Session.Tests.SessionAuthoringTests" runstate="Runnable" seed="157567017" result="Passed" start-time="2026-09-24 05:33:28Z" end-time="2026-09-24 05:33:28Z" duration="0.003276" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1136" name="DevSiteIsTheOnlyBuildSceneAndIsWiredForSessions" fullname="FoodFactoryGame.Session.Tests.SessionAuthoringTests.DevSiteIsTheOnlyBuildSceneAndIsWiredForSessions" methodname="DevSiteIsTheOnlyBuildSceneAndIsWiredForSessions" classname="FoodFactoryGame.Session.Tests.SessionAuthoringTests" runstate="Runnable" seed="1708409964" result="Passed" start-time="2026-09-24 05:33:28Z" end-time="2026-09-24 05:33:28Z" duration="0.019425" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1147" name="GamePrefabCatalogListsOnlyProjectSpawnables" fullname="FoodFactoryGame.Session.Tests.SessionAuthoringTests.GamePrefabCatalogListsOnlyProjectSpawnables" methodname="GamePrefabCatalogListsOnlyProjectSpawnables" classname="FoodFactoryGame.Session.Tests.SessionAuthoringTests" runstate="Runnable" seed="1690826265" result="Passed" start-time="2026-09-24 05:33:28Z" end-time="2026-09-24 05:33:28Z" duration="0.001388" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1137" name="OvenDefinitionHasFootprintCapacitiesAndServerFreeVisual" fullname="FoodFactoryGame.Session.Tests.SessionAuthoringTests.OvenDefinitionHasFootprintCapacitiesAndServerFreeVisual" methodname="OvenDefinitionHasFootprintCapacitiesAndServerFreeVisual" classname="FoodFactoryGame.Session.Tests.SessionAuthoringTests" runstate="Runnable" seed="1712802728" result="Passed" start-time="2026-09-24 05:33:28Z" end-time="2026-09-24 05:33:28Z" duration="0.004872" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1148" name="PlayerMapHasMovementCameraAndEquipmentActions" fullname="FoodFactoryGame.Session.Tests.SessionAuthoringTests.PlayerMapHasMovementCameraAndEquipmentActions" methodname="PlayerMapHasMovementCameraAndEquipmentActions" classname="FoodFactoryGame.Session.Tests.SessionAuthoringTests" runstate="Runnable" seed="1267612050" result="Passed" start-time="2026-09-24 05:33:28Z" end-time="2026-09-24 05:33:28Z" duration="0.002956" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1146" name="PlayerPrefabHasNetworkedBodyAndDisabledOwnerRig" fullname="FoodFactoryGame.Session.Tests.SessionAuthoringTests.PlayerPrefabHasNetworkedBodyAndDisabledOwnerRig" methodname="PlayerPrefabHasNetworkedBodyAndDisabledOwnerRig" classname="FoodFactoryGame.Session.Tests.SessionAuthoringTests" runstate="Runnable" seed="1219356338" result="Passed" start-time="2026-09-24 05:33:28Z" end-time="2026-09-24 05:33:28Z" duration="0.002645" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1143" name="SellBreadRecipeSellsOneBreadAtTheCounter" fullname="FoodFactoryGame.Session.Tests.SessionAuthoringTests.SellBreadRecipeSellsOneBreadAtTheCounter" methodname="SellBreadRecipeSellsOneBreadAtTheCounter" classname="FoodFactoryGame.Session.Tests.SessionAuthoringTests" runstate="Runnable" seed="1973960161" result="Passed" start-time="2026-09-24 05:33:28Z" end-time="2026-09-24 05:33:28Z" duration="0.001275" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1144" name="SupplierOffersAreValidContentForKnownItems" fullname="FoodFactoryGame.Session.Tests.SessionAuthoringTests.SupplierOffersAreValidContentForKnownItems" methodname="SupplierOffersAreValidContentForKnownItems" classname="FoodFactoryGame.Session.Tests.SessionAuthoringTests" runstate="Runnable" seed="216505961" result="Passed" start-time="2026-09-24 05:33:28Z" end-time="2026-09-24 05:33:28Z" duration="0.007998" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <output><![CDATA[Saving results to: C:/Users/Deven/AppData/LocalLow/DefaultCompany/FoodFactoryGame\TestResults.xml
+]]></output>
+              </test-case>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

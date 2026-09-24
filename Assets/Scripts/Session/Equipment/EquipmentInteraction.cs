@@ -233,7 +233,7 @@ namespace FoodFactoryGame.Session.Equipment
                 if (_ghostModel != null) _ghostModel.SetActive(false);
                 Status = site == null ? "" : Screen switch
                 {
-                    InteractionScreen.Inventory => "Inventory: click a slot to pick up or put down, shift+click to move a stack across, 1-9 over a stack or dropping it on the hotbar assigns it there; E or Esc closes" + suffix,
+                    InteractionScreen.Inventory => "Inventory: click a slot to pick up or put down, shift+click to move a stack across, 1-9 over a stack or dropping it on the hotbar assigns it there, Buy spends company cash at the supplier; E or Esc closes" + suffix,
                     // A sale station (decision 0013) has no results to take: it sells its input for the company.
                     InteractionScreen.Machine when session.Recipes.Any(x => x != null && x.IsSale
                         && x.StationKind == site.Equipment.FirstOrDefault(y => y.Id == OpenMachineId)?.Kind) =>
@@ -439,6 +439,16 @@ namespace FoodFactoryGame.Session.Equipment
                 Debug.Log($"[Equipment] Requesting transfer of {take} {lot.ItemId} from {lot.LocationId} to {destinationId}.");
                 bridge.RequestTransfer(requestId, lot.Id, destinationId, take);
             }
+        }
+
+        // Buys one pack of a supplier offer (decision 0014); the server checks funds and inventory room and replies with the
+        // outcome. Nothing changes locally until the next baseline.
+        public void Buy(string offerId)
+        {
+            var bridge = _subscription?.Bridge;
+            if (bridge == null || string.IsNullOrEmpty(offerId)) return;
+            LastRejection = null;
+            bridge.RequestPurchase(Track(), DevWorld.SiteId, offerId);
         }
 
         private void OnPlace(InputAction.CallbackContext _)

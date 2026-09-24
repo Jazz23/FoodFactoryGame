@@ -166,7 +166,18 @@ Decision: [0013](decisions/0013-sell-counter.md). Step 2 of the sell loop: edibl
 - Content: `RecipeAsset.saleCents`; `Assets/Content/Equipment/Counter.asset` (kind `counter`, 2x1, input 2 slots, unused output 1 slot), `Assets/Prefabs/Equipment/Counter.prefab` (primitives, one root box collider, `Assets/Materials/Counter`), `Assets/Art/Icons/Counter.png`, `Assets/Content/Recipes/SellBread.asset` (`counter-sell-bread`: 1 bread, 5 s, 250 cents). All authored by `AgentScripts/BuildDevSite.cs`; `SessionRoot` lists `[oven, counter]` and `[bread, sell bread]`.
 - Dev seed (`DevWorld`): `dev-counter-1` placed at cells (6, 13) in new worlds; `EnsureCounter` adds it once to a save with no counter (committed before serving; warns and skips if the cells are taken).
 - Presentation: the machine screen shows a sale station's prices (`hud-sale-prices`) instead of an output grid; progress reads "Serving a customer: <item> for <price>"; an ownerless site reads "no company to sell for"; the readout hint is counter-specific.
-Open: player-set prices, menus, real customers and demand (GDD sections 7 and 23), competing sale recipes on one counter (lowest recipe ID wins), purchases (step 3).
+Open: player-set prices, menus, real customers and demand (GDD sections 7 and 23), competing sale recipes on one counter (lowest recipe ID wins). Purchases: step 3, below.
+
+## Implemented: supplier purchases (2026-09-24)
+
+Decision: [0014](decisions/0014-supplier-purchases.md). Step 3 of the sell loop: company cash buys inputs. PROTOTYPE stand-in for supply logistics.
+
+- Domain (`GoodsWorld.Supply.cs`): `PurchaseOffer` content (`RegisterOffer`, never saved). `BuyDurably(player, request, site, offer)` through the existing `Commit` wrapper: identity/replay, `forbidden`, `invalid-offer`, `no-company`, `no-inventory`, `capacity`, `insufficient-funds`, then `TryDebit` and a fresh lot `buy:<player>:<request>` in the buyer's inventory, recorded as `bought` with `MovedLotId`. A retried request replays; a failed commit changes nothing. No schema change.
+- Network: `GoodsNetworkBridge.RequestPurchase(request, site, offer)` → `ServerPurchase` (connection-resolved player, broadcast on accept).
+- Content: `OfferAsset` (`Assets/Content/Offers/Dough5.asset` 5 dough $2.50, `Belt10.asset` 10 belts $5.00), authored by `BuildDevSite`; `SessionRoot.offers` registers them on every server start and exposes `Offers`.
+- Presentation: `EquipmentInteraction.Buy(offer)`; the inventory screen's Supplier window (`hud-supplier`, `hud-offer-<id>` buttons, `PlayerHud.ClickOffer`).
+- The dev starter goods and storage stock are kept (open question in decision 0014).
+Open: member spending permissions, bulk quantities, supplier stock, delivery times, buying equipment.
 
 ## Required Constraints for Future Implementation
 
@@ -176,7 +187,7 @@ Open: player-set prices, menus, real customers and demand (GDD sections 7 and 23
 - Player and employee operational rules should be shared; input and AI choose actions through those rules.
 - Visual objects must not become the sole owners of authoritative simulation state.
 
-These remain accepted contracts; only the bounded goods slice, its station jobs, equipment placement, the working oven, conveyor belts, company cash and the sell counter above have a runtime interface. Sales credit cash inside the clock tick; no purchase or player payment command exists yet.
+These remain accepted contracts; only the bounded goods slice, its station jobs, equipment placement, the working oven, conveyor belts, company cash, the sell counter and supplier purchases above have a runtime interface. Sales credit cash inside the clock tick; purchases are the one player payment command.
 
 ## Planned / Undecided
 

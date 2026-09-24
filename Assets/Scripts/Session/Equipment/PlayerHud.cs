@@ -458,11 +458,40 @@ namespace FoodFactoryGame.Session.Equipment
                 var storage = Window("hud-storage", $"Storage  {Units(site, DevWorld.StorageId)}");
                 storage.Add(GridView(StorageGrid));
                 _screen.Add(storage);
+                if (interaction.Session.Offers.Count > 0) _screen.Add(SupplierWindow());
                 return;
             }
             var equipment = site.Equipment.FirstOrDefault(x => x.Id == interaction.OpenMachineId);
             if (equipment != null) _screen.Add(MachineWindow(site, equipment));
         }
+
+        // Supplier offers (decision 0014): one row per pack with its price and a Buy button. The company pays; the goods arrive
+        // in this player's inventory once the server accepts. Affordability is not previewed; the server's reason is shown.
+        private VisualElement SupplierWindow()
+        {
+            var window = Window("hud-supplier", "Supplier");
+            foreach (var offer in interaction.Session.Offers.Where(x => x != null))
+            {
+                var row = new VisualElement { name = $"hud-offer-row-{offer.Id}" };
+                row.style.flexDirection = FlexDirection.Row;
+                row.style.alignItems = Align.Center;
+                row.style.marginTop = 4;
+                row.Add(Icon(ItemIcon(offer.ItemId), ItemName(offer.ItemId), 1f));
+                var label = Caption($"{offer.Quantity} {ItemName(offer.ItemId)}  {FormatCash(offer.PriceCents)}", 12, Color.white);
+                label.style.minWidth = 120;
+                label.style.marginLeft = 6;
+                row.Add(label);
+                var id = offer.Id;
+                var buy = new Button(() => ClickOffer(id)) { name = $"hud-offer-{id}", text = "Buy" };
+                buy.style.minWidth = 48;
+                row.Add(buy);
+                window.Add(row);
+            }
+            return window;
+        }
+
+        // Buys one pack of the offer, like its Buy button. Public so tests can drive the same path as the button.
+        public void ClickOffer(string offerId) => interaction.Buy(offerId);
 
         // Input slot -> progress arrow -> output slot, like a Factorio furnace; the machine runs by itself (decision 0008).
         private VisualElement MachineWindow(GoodsSnapshot site, GoodsEquipment equipment)
