@@ -79,7 +79,7 @@ namespace FoodFactoryGame.Goods.PlayModeTests
             Assert.That(prefab, Is.Not.Null, "The isolated bridge fixture prefab must be authored by Unity Editor.");
             _directory = Path.Combine(Path.GetTempPath(), "FoodFactoryGoodsListen", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(_directory);
-            var path = Path.Combine(_directory, "goods.snapshot");
+            var path = Path.Combine(_directory, "goods.db");
             var world = new GoodsWorld("test-listen-world");
             world.Bootstrap(new GoodsLocation { Id = "storage", SiteId = "restaurant", Kind = "storage", Capacity = 20 });
             world.Bootstrap(new GoodsLocation { Id = "kitchen", SiteId = "restaurant", Kind = "machine-buffer", Capacity = 6 });

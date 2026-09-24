@@ -2,8 +2,6 @@
 using System;
 using System.IO;
 using System.Linq;
-using System.Security.Cryptography;
-using System.Text;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -11,17 +9,11 @@ namespace FoodFactoryGame.Goods.Tests
 {
     public sealed class StationJobTests
     {
-        [Serializable] private sealed class TestEnvelope
-        {
-            public string Payload;
-            public string Sha256;
-        }
-
         private GoodsWorld _world;
         private string _saveDirectory;
 
-        private string PathForSave => Path.Combine(_saveDirectory, "goods.snapshot");
-        private string BadPath => Path.Combine(_saveDirectory, "missing", "goods.snapshot");
+        private string PathForSave => Path.Combine(_saveDirectory, "goods.db");
+        private string BadPath => Path.Combine(_saveDirectory, "missing", "goods.db");
 
         [SetUp]
         public void SetUp()
@@ -316,7 +308,7 @@ namespace FoodFactoryGame.Goods.Tests
             GoodsSnapshotStore.Save(_world, PathForSave);
             var started = _world.StartJobDurably("chef", "bake", "oven-1", "bake", PathForSave);
             Assert.That(_world.TryAdvanceDurably(2, PathForSave), Is.True);
-            File.WriteAllText(PathForSave, "corrupt");
+            SnapshotDatabase.CorruptLatest(PathForSave);
 
             _world = GoodsSnapshotStore.Load(PathForSave);
             var job = _world.Snapshot().Jobs.Single();
@@ -418,7 +410,12 @@ namespace FoodFactoryGame.Goods.Tests
             Assert.That(v1, Does.Not.Contain("Stations"));
             Assert.That(v1, Does.Not.Contain("Equipment"));
             Assert.That(v1, Does.Contain("\"SchemaVersion\":1"));
-            File.WriteAllText(PathForSave, JsonUtility.ToJson(new TestEnvelope { Payload = v1, Sha256 = Digest(v1) }), new UTF8Encoding(false));
+            var legacyPath = Path.Combine(_saveDirectory, "legacy.snapshot");
+            SnapshotDatabase.WriteLegacy(legacyPath, v1);
+            GoodsSnapshotStore.ImportLegacy(legacyPath, PathForSave, true);
+            Assert.That(File.Exists(PathForSave), Is.False, "A dry run writes nothing.");
+            GoodsSnapshotStore.ImportLegacy(legacyPath, PathForSave, false);
+            Assert.Throws<IOException>(() => GoodsSnapshotStore.ImportLegacy(legacyPath, PathForSave, false));
 
             var loaded = GoodsSnapshotStore.Load(PathForSave);
             var state = loaded.Snapshot();
@@ -429,7 +426,7 @@ namespace FoodFactoryGame.Goods.Tests
             Assert.That(state.Lots.Single().Quantity, Is.EqualTo(10));
 
             Assert.That(loaded.TryAdvanceDurably(1, PathForSave), Is.True);
-            var written = JsonUtility.FromJson<TestEnvelope>(File.ReadAllText(PathForSave)).Payload;
+            var written = SnapshotDatabase.LatestPayload(PathForSave);
             Assert.That(written, Does.Contain("\"SchemaVersion\":4"));
             Assert.That(written, Does.Contain("\"Stations\":[]"));
             Assert.That(GoodsSnapshotStore.Load(PathForSave).Snapshot().ClockSeconds, Is.EqualTo(1));
@@ -471,12 +468,6 @@ namespace FoodFactoryGame.Goods.Tests
                 lot.LocationId = "pantry";
                 s.Lots.Add(lot);
             })), "output ID collision");
-        }
-
-        private static string Digest(string payload)
-        {
-            using var sha = SHA256.Create();
-            return Convert.ToBase64String(sha.ComputeHash(Encoding.UTF8.GetBytes(payload)));
         }
     }
 }

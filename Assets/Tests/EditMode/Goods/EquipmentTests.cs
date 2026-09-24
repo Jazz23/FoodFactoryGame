@@ -2,8 +2,6 @@
 using System;
 using System.IO;
 using System.Linq;
-using System.Security.Cryptography;
-using System.Text;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -11,17 +9,11 @@ namespace FoodFactoryGame.Goods.Tests
 {
     public sealed class EquipmentTests
     {
-        [Serializable] private sealed class TestEnvelope
-        {
-            public string Payload;
-            public string Sha256;
-        }
-
         private GoodsWorld _world;
         private string _saveDirectory;
 
-        private string PathForSave => Path.Combine(_saveDirectory, "goods.snapshot");
-        private string BadPath => Path.Combine(_saveDirectory, "missing", "goods.snapshot");
+        private string PathForSave => Path.Combine(_saveDirectory, "goods.db");
+        private string BadPath => Path.Combine(_saveDirectory, "missing", "goods.db");
 
         [SetUp]
         public void SetUp()
@@ -211,14 +203,19 @@ namespace FoodFactoryGame.Goods.Tests
             var current = JsonUtility.ToJson(legacy.Snapshot());
             var v2 = current.Replace("\"SchemaVersion\":4", "\"SchemaVersion\":2").Replace(",\"Equipment\":[],\"SiteLayouts\":[],\"Belts\":[]", "");
             Assert.That(v2, Does.Not.Contain("Equipment"));
-            File.WriteAllText(PathForSave, JsonUtility.ToJson(new TestEnvelope { Payload = v2, Sha256 = Digest(v2) }), new UTF8Encoding(false));
+            var legacyPath = Path.Combine(_saveDirectory, "legacy.snapshot");
+            SnapshotDatabase.WriteLegacy(legacyPath, v2);
+            GoodsSnapshotStore.ImportLegacy(legacyPath, PathForSave, true);
+            Assert.That(File.Exists(PathForSave), Is.False, "A dry run writes nothing.");
+            GoodsSnapshotStore.ImportLegacy(legacyPath, PathForSave, false);
+            Assert.Throws<IOException>(() => GoodsSnapshotStore.ImportLegacy(legacyPath, PathForSave, false));
 
             var loaded = GoodsSnapshotStore.Load(PathForSave);
             Assert.That(loaded.Snapshot().SchemaVersion, Is.EqualTo(GoodsSnapshot.CurrentSchema));
             Assert.That(loaded.Snapshot().Equipment, Is.Empty);
             Assert.That(loaded.Snapshot().SiteLayouts, Is.Empty);
             Assert.That(loaded.TryAdvanceDurably(1, PathForSave), Is.True);
-            Assert.That(JsonUtility.FromJson<TestEnvelope>(File.ReadAllText(PathForSave)).Payload, Does.Contain("\"SchemaVersion\":4"));
+            Assert.That(SnapshotDatabase.LatestPayload(PathForSave), Does.Contain("\"SchemaVersion\":4"));
         }
 
         [Test]
@@ -249,12 +246,6 @@ namespace FoodFactoryGame.Goods.Tests
             Assert.That(_world.PickUp("chef", "pick", "oven-1").Accepted, Is.True);
             Assert.DoesNotThrow(() => GoodsWorld.Restore(_world.Snapshot()));
             Assert.Throws<InvalidOperationException>(() => GoodsWorld.Restore(Mutate(s => s.Equipment.Single(x => x.Id == "oven-1").HolderId = "")), "held without a holder");
-        }
-
-        private static string Digest(string payload)
-        {
-            using var sha = SHA256.Create();
-            return Convert.ToBase64String(sha.ComputeHash(Encoding.UTF8.GetBytes(payload)));
         }
     }
 }

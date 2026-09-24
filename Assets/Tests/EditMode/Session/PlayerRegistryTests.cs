@@ -2,6 +2,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using FoodFactoryGame.Goods;
 using FoodFactoryGame.Session.Equipment;
@@ -203,26 +204,61 @@ namespace FoodFactoryGame.Session.Tests
         [Test]
         public void ClientIdentityIsCreatedOnceAndReused()
         {
-            var path = Path.Combine(_directory, "Identity", "client.secret");
+            var path = Path.Combine(_directory, "Identity", "identity.db");
             var first = ClientIdentity.LoadOrCreate(path);
             Assert.That(first.Length, Is.InRange(PlayerRegistry.MinSecretLength, PlayerRegistry.MaxSecretLength));
             Assert.That(ClientIdentity.LoadOrCreate(path), Is.EqualTo(first));
-            Assert.That(ClientIdentity.LoadOrCreate(Path.Combine(_directory, "other.secret")), Is.Not.EqualTo(first));
-            File.WriteAllText(path, "corrupt");
+            Assert.That(ClientIdentity.LoadOrCreate(Path.Combine(_directory, "other.db")), Is.Not.EqualTo(first));
+            using (var db = new SQLiteConnection(path)) db.Execute("UPDATE identity SET secret = 'corrupt'");
             Assert.Throws<InvalidDataException>(() => ClientIdentity.LoadOrCreate(path));
         }
+
+        [Test]
+        public void LegacyClientSecretIsImportedOnceAndLeftInPlace()
+        {
+            var legacy = Path.Combine(_directory, SessionOptions.LegacyIdentityFileName);
+            File.WriteAllText(legacy, SecretA + "\n");
+            var path = Path.Combine(_directory, "identity.db");
+            Assert.That(ClientIdentity.LoadOrCreate(path, legacy), Is.EqualTo(SecretA));
+            File.WriteAllText(legacy, SecretB);
+            Assert.That(ClientIdentity.LoadOrCreate(path, legacy), Is.EqualTo(SecretA), "The database wins once it exists.");
+            Assert.That(File.Exists(legacy), Is.True);
+        }
+
+        [Test]
+        public void LegacyWorldSnapshotIsImportedOnceAndLeftInPlace()
+        {
+            var seeded = DevWorld.LoadOrCreate(Path.Combine(_directory, "seed.db"), items: ContentItems());
+            var payload = JsonUtility.ToJson(seeded.Snapshot());
+            string digest;
+            using (var sha = SHA256.Create()) digest = Convert.ToBase64String(sha.ComputeHash(Encoding.UTF8.GetBytes(payload)));
+            var legacy = Path.Combine(_directory, SessionOptions.LegacyWorldFileName);
+            File.WriteAllText(legacy, "{\"Payload\":" + JsonString(payload) + ",\"Sha256\":\"" + digest + "\"}");
+            var imported = DevWorld.LoadOrCreate(WorldPath, items: ContentItems(), legacyWorldPath: legacy);
+            Assert.That(JsonUtility.ToJson(imported.Snapshot()), Is.EqualTo(payload));
+            Assert.That(JsonUtility.ToJson(GoodsSnapshotStore.Load(WorldPath).Snapshot()), Is.EqualTo(payload));
+            Assert.That(File.ReadAllText(legacy), Does.Contain(digest), "The legacy file is not modified.");
+            imported.Advance(1);
+            GoodsSnapshotStore.Save(imported, WorldPath);
+            var reopened = DevWorld.LoadOrCreate(WorldPath, items: ContentItems(), legacyWorldPath: legacy);
+            Assert.That(reopened.Snapshot().ClockSeconds, Is.EqualTo(1), "An existing database is never re-imported.");
+        }
+
+        private static string JsonString(string value) => "\"" + value.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
 
         [Test]
         public void CommandLineSelectsModeAndIsolatedPaths()
         {
             var options = SessionOptions.FromCommandLine(new[]
             {
-                "game.exe", "-connect", "10.0.0.5", "-name", "Bob", "-save", _directory, "-identity", Path.Combine(_directory, "bob.secret")
+                "game.exe", "-connect", "10.0.0.5", "-name", "Bob", "-save", _directory, "-identity", Path.Combine(_directory, "bob.db")
             });
             Assert.That(options.Mode, Is.EqualTo(SessionMode.Client));
             Assert.That(options.Address, Is.EqualTo("10.0.0.5"));
             Assert.That(options.DisplayName, Is.EqualTo("Bob"));
-            Assert.That(options.WorldPath, Is.EqualTo(Path.Combine(Path.GetFullPath(_directory), "world.snapshot")));
+            Assert.That(options.WorldPath, Is.EqualTo(Path.Combine(Path.GetFullPath(_directory), "world.db")));
+            Assert.That(options.LegacyWorldPath, Is.EqualTo(Path.Combine(Path.GetFullPath(_directory), "world.snapshot")));
+            Assert.That(options.LegacyIdentityPath, Is.Null, "An explicit identity path has no legacy file.");
             Assert.That(options.RegistryPath, Is.EqualTo(Path.Combine(Path.GetFullPath(_directory), "players.db")));
             Assert.That(SessionOptions.FromCommandLine(new[] { "-host" }).Mode, Is.EqualTo(SessionMode.Host));
             Assert.That(SessionOptions.FromCommandLine(new[] { "-server" }).Mode, Is.EqualTo(SessionMode.Server));

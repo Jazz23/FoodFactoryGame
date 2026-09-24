@@ -32,7 +32,7 @@ namespace FoodFactoryGame.Goods.Tests
         private GoodsOutcome Move(string request, int quantity, string destination = "kitchen", string reservation = "") =>
             _world.Transfer("chef", new TransferIntent { RequestId = request, LotId = "lot-1", DestinationId = destination, Quantity = quantity, ReservationId = reservation });
 
-        private string PathForSave => Path.Combine(_saveDirectory, "goods.snapshot");
+        private string PathForSave => Path.Combine(_saveDirectory, "goods.db");
 
         [Test]
         public void SplitPreservesHistoryAndCompatibleMergeDoesNotDiscardGoods()
@@ -245,7 +245,7 @@ namespace FoodFactoryGame.Goods.Tests
         {
             GoodsSnapshotStore.Save(_world, PathForSave);
             var intent = new TransferIntent { RequestId = "durable", LotId = "lot-1", DestinationId = "kitchen", Quantity = 2 };
-            var failed = _world.TransferDurably("chef", intent, Path.Combine(_saveDirectory, "missing", "goods.snapshot"));
+            var failed = _world.TransferDurably("chef", intent, Path.Combine(_saveDirectory, "missing", "goods.db"));
             Assert.That(failed.Reason, Is.EqualTo("persistence-unavailable"));
             Assert.That(_world.Snapshot().Lots.Single().Quantity, Is.EqualTo(10));
             var committed = _world.TransferDurably("chef", intent, PathForSave);
@@ -275,12 +275,13 @@ namespace FoodFactoryGame.Goods.Tests
             GoodsSnapshotStore.Save(_world, PathForSave);
             _world.Advance(2);
             GoodsSnapshotStore.Save(_world, PathForSave);
-            File.WriteAllText(PathForSave, "corrupt");
+            SnapshotDatabase.CorruptLatest(PathForSave);
             Assert.That(GoodsSnapshotStore.Load(PathForSave).Snapshot().ClockSeconds, Is.Zero);
             var recovered = GoodsSnapshotStore.Load(PathForSave);
             recovered.Advance(3);
             GoodsSnapshotStore.Save(recovered, PathForSave);
-            File.WriteAllText(PathForSave, "corrupt-again");
+            Assert.That(SnapshotDatabase.Quarantined(PathForSave), Is.EqualTo(1), "The damaged row is kept aside, not reused.");
+            SnapshotDatabase.CorruptLatest(PathForSave, "corrupt-again");
             Assert.That(GoodsSnapshotStore.Load(PathForSave).Snapshot().ClockSeconds, Is.Zero,
                 "The valid backup must survive a save after recovery.");
             var newer = _world.Snapshot();

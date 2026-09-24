@@ -61,7 +61,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
             _root.Configure(new SessionOptions
             {
                 SaveDirectory = Path.Combine(_directory, "save"),
-                IdentityPath = Path.Combine(_directory, "host.secret"),
+                IdentityPath = Path.Combine(_directory, "host.db"),
                 DisplayName = "Host",
                 Address = "127.0.0.1"
             });
@@ -106,7 +106,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
             var tugboat = go.GetComponent<Tugboat>();
             tugboat.SetPort(_port);
             tugboat.SetClientAddress("127.0.0.1");
-            _remoteAuth.SetClientCredentials("Remote", ClientIdentity.LoadOrCreate(Path.Combine(_directory, "remote.secret")));
+            _remoteAuth.SetClientCredentials("Remote", ClientIdentity.LoadOrCreate(Path.Combine(_directory, "remote.db")));
             _remoteSite = new ClientSiteSubscription(_remote, DevWorld.SiteId);
             _remoteSite.ResultReceived += Store;
         }

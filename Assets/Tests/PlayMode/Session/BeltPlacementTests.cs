@@ -58,7 +58,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
             _root.Configure(new SessionOptions
             {
                 SaveDirectory = Path.Combine(_directory, "save"),
-                IdentityPath = Path.Combine(_directory, "host.secret"),
+                IdentityPath = Path.Combine(_directory, "host.db"),
                 DisplayName = "Host",
                 Address = "127.0.0.1"
             });

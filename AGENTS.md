@@ -18,6 +18,7 @@
 
 - The server owns gameplay state. Clients request actions; validate inventory transfers, payments, and job claims authoritatively.
 - Client visibility, camera position, and presentation scene loading must not determine whether a site's simulation exists or progresses.
+- All persisted data uses SQLite (`docs/decisions/0011-sqlite-for-all-data-storage.md`); do not add save files, `PlayerPrefs`, or other stores. Unity-authored content assets are not data storage.
 - Preserve stable identities and gameplay state across persistence and recovery. Failed/cancelled operations must not silently delete goods or equipment or duplicate inventory/payments.
 - Distant-site operation while the world runs does not imply offline progression or host migration. Player count, hosting/disconnect behavior, and physical-goods representation remain open in the GDD.
 

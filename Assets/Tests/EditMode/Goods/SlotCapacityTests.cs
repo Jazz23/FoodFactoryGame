@@ -75,7 +75,7 @@ namespace FoodFactoryGame.Goods.Tests
             Assert.That(state.Lots.Single(x => x.Id == "old").Spoiled, Is.True);
             Assert.That(GoodsSlots.SlotsUsed(state.Lots.Where(x => x.LocationId == "crate"), _world.MaxStack), Is.EqualTo(2));
             Assert.That(Move("into-crate", "dough", 1, "crate").Reason, Is.EqualTo("capacity"));
-            var path = Path.Combine(_saveDirectory, "goods.snapshot");
+            var path = Path.Combine(_saveDirectory, "goods.db");
             GoodsSnapshotStore.Save(_world, path);
             var restored = GoodsSnapshotStore.Load(path).Snapshot();
             Assert.That(restored.Lots.Where(x => x.LocationId == "crate").Sum(x => x.Quantity), Is.EqualTo(10), "Over-full is recoverable state, not corruption.");
@@ -84,7 +84,7 @@ namespace FoodFactoryGame.Goods.Tests
         [Test]
         public void GrantEnlargesASmallerInventoryAndNeverShrinksIt()
         {
-            var path = Path.Combine(_saveDirectory, "goods.snapshot");
+            var path = Path.Combine(_saveDirectory, "goods.db");
             var inventory = GoodsWorld.InventoryLocationId("sous");
             Assert.That(_world.TryGrantDurably("sous", "restaurant", path, 10), Is.True);
             Assert.That(_world.TryGrantDurably("sous", "restaurant", path, 30), Is.True);
@@ -98,7 +98,7 @@ namespace FoodFactoryGame.Goods.Tests
         [Test]
         public void StarterGoodsAreCountedInSlots()
         {
-            var path = Path.Combine(_saveDirectory, "goods.snapshot");
+            var path = Path.Combine(_saveDirectory, "goods.db");
             var twenty = new[] { new GoodsLot { ItemId = "dough", Quantity = 20, SpoilAfterSeconds = 100 } };
             Assert.That(_world.TryGrantDurably("sous", "restaurant", path, 1, twenty), Is.True);
             var tooMany = new[] { new GoodsLot { ItemId = "dough", Quantity = 21, SpoilAfterSeconds = 100 } };
@@ -108,7 +108,7 @@ namespace FoodFactoryGame.Goods.Tests
         [Test]
         public void SavedMachinesTakeContentBufferSlotsWithoutLosingGoods()
         {
-            var path = Path.Combine(_saveDirectory, "goods.snapshot");
+            var path = Path.Combine(_saveDirectory, "goods.db");
             _world.Bootstrap(new SiteLayout { SiteId = "restaurant", Width = 10, Depth = 10 });
             _world.Bootstrap(new GoodsEquipment { Id = "oven-1", Kind = "oven", SiteId = "restaurant", Width = 1, Depth = 1, InputCapacity = 10, OutputCapacity = 4 });
             Assert.That(Move("salt-in", "salt", 3, "oven-1:in").Accepted, Is.True);

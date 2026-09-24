@@ -30,8 +30,8 @@ namespace FoodFactoryGame.Session.PlayModeTests
         private DevAuthenticator _remoteAuth;
         private ushort _port;
 
-        private string HostSecretPath => Path.Combine(_directory, "host.secret");
-        private string RemoteSecretPath => Path.Combine(_directory, "remote.secret");
+        private string HostSecretPath => Path.Combine(_directory, "host.db");
+        private string RemoteSecretPath => Path.Combine(_directory, "remote.db");
 
         private static IEnumerator Until(Func<bool> predicate, string step, float timeout = 10f)
         {

@@ -43,9 +43,18 @@ namespace FoodFactoryGame.Session
         // Returns a world that matches its committed snapshot, as GoodsNetworkBridge.InitializeServer requires.
         // Without an oven definition the seed has the layout but no equipment. Item max stacks (content) are registered
         // before the seed, because the seed's goods are counted in slots.
-        public static GoodsWorld LoadOrCreate(string worldPath, EquipmentDefinition oven = null, IEnumerable<ItemDefinition> items = null)
+        // A pre-SQLite snapshot at legacyWorldPath is imported once, after a dry run, when no database exists yet.
+        public static GoodsWorld LoadOrCreate(string worldPath, EquipmentDefinition oven = null, IEnumerable<ItemDefinition> items = null,
+            string legacyWorldPath = null)
         {
-            if (File.Exists(worldPath) || File.Exists(worldPath + ".previous"))
+            if (!File.Exists(worldPath) && !string.IsNullOrWhiteSpace(legacyWorldPath)
+                && (File.Exists(legacyWorldPath) || File.Exists(legacyWorldPath + ".previous")))
+            {
+                GoodsSnapshotStore.ImportLegacy(legacyWorldPath, worldPath, true);
+                GoodsSnapshotStore.ImportLegacy(legacyWorldPath, worldPath, false);
+                Debug.Log($"[Session] Imported {legacyWorldPath} into {worldPath}; the old file was left in place.");
+            }
+            if (File.Exists(worldPath))
             {
                 var loaded = GoodsSnapshotStore.Load(worldPath);
                 Register(loaded, items);

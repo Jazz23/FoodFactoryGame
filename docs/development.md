@@ -101,11 +101,11 @@ Where state lives (real play, not tests):
 
 | What | Default | Override |
 | --- | --- | --- |
-| World snapshot | `%USERPROFILE%\AppData\LocalLow\DefaultCompany\FoodFactoryGame\Saves\dev-world\world.snapshot` (+ `.previous`) | `-save <directory>` |
+| World snapshot (SQLite) | `%USERPROFILE%\AppData\LocalLow\DefaultCompany\FoodFactoryGame\Saves\dev-world\world.db` | `-save <directory>` |
 | Player registry (SQLite) | same directory, `players.db` | `-save <directory>` |
-| Client secret | `...\FoodFactoryGame\Identity\client.secret` | `-identity <file>` |
+| Client secret (SQLite) | `...\FoodFactoryGame\Identity\identity.db` | `-identity <file>` |
 
-Deleting the save directory resets the dev world and all identities. Deleting a client secret makes that client a new player. Two processes on one machine must use different `-identity` files, or the second is rejected with `already-connected`.
+All stored data is SQLite ([decision 0011](decisions/0011-sqlite-for-all-data-storage.md)). A pre-SQLite `world.snapshot` in the save directory and the default `Identity\client.secret` are imported once when their database does not exist yet, and left in place; an old plain-text secret passed with `-identity` is not imported. Deleting the save directory resets the dev world and all identities. Deleting a client identity database makes that client a new player. Two processes on one machine must use different `-identity` files, or the second is rejected with `already-connected`.
 
 Starting a session:
 
@@ -118,8 +118,8 @@ Starting a session:
 Two-process check on one machine (use an existing artifact directory for logs and isolated saves):
 
 ```powershell
-Start-Process -FilePath ".\build\Session\FoodFactoryGame.exe" -ArgumentList '-screen-fullscreen 0 -screen-width 1280 -screen-height 720 -host -name Host -save "<artifacts>\host-save" -identity "<artifacts>\host.secret" -logFile "<artifacts>\host.log"'
-Start-Process -FilePath ".\build\Session\FoodFactoryGame.exe" -ArgumentList '-screen-fullscreen 0 -screen-width 1280 -screen-height 720 -connect 127.0.0.1 -name Guest -identity "<artifacts>\guest.secret" -logFile "<artifacts>\guest.log"'
+Start-Process -FilePath ".\build\Session\FoodFactoryGame.exe" -ArgumentList '-screen-fullscreen 0 -screen-width 1280 -screen-height 720 -host -name Host -save "<artifacts>\host-save" -identity "<artifacts>\host.db" -logFile "<artifacts>\host.log"'
+Start-Process -FilePath ".\build\Session\FoodFactoryGame.exe" -ArgumentList '-screen-fullscreen 0 -screen-width 1280 -screen-height 720 -connect 127.0.0.1 -name Guest -identity "<artifacts>\guest.db" -logFile "<artifacts>\guest.log"'
 ```
 
 Evidence: both logs contain `[Session] Joined as player-...` with different IDs, the host log contains `[Session] Hosting`, and captures of both windows show two avatars and matching site revisions in the readout.

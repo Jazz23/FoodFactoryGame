@@ -4,8 +4,6 @@
 using System;
 using System.IO;
 using System.Linq;
-using System.Security.Cryptography;
-using System.Text;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -13,17 +11,11 @@ namespace FoodFactoryGame.Goods.Tests
 {
     public sealed class BeltTests
     {
-        [Serializable] private sealed class TestEnvelope
-        {
-            public string Payload;
-            public string Sha256;
-        }
-
         private GoodsWorld _world;
         private string _saveDirectory;
         private int _request;
 
-        private string PathForSave => Path.Combine(_saveDirectory, "goods.snapshot");
+        private string PathForSave => Path.Combine(_saveDirectory, "goods.db");
 
         [SetUp]
         public void SetUp()
@@ -259,7 +251,7 @@ namespace FoodFactoryGame.Goods.Tests
 
             // A failed commit and a full inventory leave the item riding.
             GoodsSnapshotStore.Save(_world, PathForSave);
-            var bad = Path.Combine(_saveDirectory, "missing", "goods.snapshot");
+            var bad = Path.Combine(_saveDirectory, "missing", "goods.db");
             Assert.That(_world.TakeFromBeltDurably("chef", "take-bad", riding, bad).Reason, Is.EqualTo("persistence-unavailable"));
             Assert.That(Riding().Single().Id, Is.EqualTo(riding));
             Assert.That(_world.TakeFromBelt("sous", Next(), riding).Reason, Is.EqualTo("taken-from-belt"), "Any granted player may take it.");
@@ -328,7 +320,7 @@ namespace FoodFactoryGame.Goods.Tests
         public void BeltsAndRidingItemsSurviveSaveAndFailedCommits()
         {
             GoodsSnapshotStore.Save(_world, PathForSave);
-            var bad = Path.Combine(_saveDirectory, "missing", "goods.snapshot");
+            var bad = Path.Combine(_saveDirectory, "missing", "goods.db");
             Assert.That(_world.PlaceBeltDurably("chef", "place", "site", 0, 0, 1, bad).Reason, Is.EqualTo("persistence-unavailable"));
             Assert.That(_world.Snapshot().Belts, Is.Empty);
             Assert.That(Carried(GoodsWorld.BeltItemId), Is.EqualTo(10));
@@ -352,12 +344,17 @@ namespace FoodFactoryGame.Goods.Tests
             var current = JsonUtility.ToJson(_world.Snapshot());
             var v3 = current.Replace("\"SchemaVersion\":4", "\"SchemaVersion\":3").Replace(",\"BeltPosition\":0", "").Replace(",\"Belts\":[]", "");
             Assert.That(v3, Does.Not.Contain("Belt\""));
-            File.WriteAllText(PathForSave, JsonUtility.ToJson(new TestEnvelope { Payload = v3, Sha256 = Digest(v3) }), new UTF8Encoding(false));
+            var legacyPath = Path.Combine(_saveDirectory, "legacy.snapshot");
+            SnapshotDatabase.WriteLegacy(legacyPath, v3);
+            GoodsSnapshotStore.ImportLegacy(legacyPath, PathForSave, true);
+            Assert.That(File.Exists(PathForSave), Is.False, "A dry run writes nothing.");
+            GoodsSnapshotStore.ImportLegacy(legacyPath, PathForSave, false);
+            Assert.Throws<IOException>(() => GoodsSnapshotStore.ImportLegacy(legacyPath, PathForSave, false));
             var loaded = GoodsSnapshotStore.Load(PathForSave);
             Assert.That(loaded.Snapshot().SchemaVersion, Is.EqualTo(4));
             Assert.That(loaded.Snapshot().Belts, Is.Empty);
             Assert.That(loaded.TryAdvanceDurably(1, PathForSave), Is.True);
-            Assert.That(JsonUtility.FromJson<TestEnvelope>(File.ReadAllText(PathForSave)).Payload, Does.Contain("\"SchemaVersion\":4"));
+            Assert.That(SnapshotDatabase.LatestPayload(PathForSave), Does.Contain("\"SchemaVersion\":4"));
         }
 
         [Test]
@@ -381,12 +378,6 @@ namespace FoodFactoryGame.Goods.Tests
             Assert.Throws<InvalidOperationException>(() => GoodsWorld.Restore(Mutate(s => s.Belts.Clear())), "belt location without a belt");
             Assert.Throws<InvalidOperationException>(() => GoodsWorld.Restore(Mutate(s => s.Lots.Single(x => x.BeltPosition > 0).Quantity = 2)), "stacked riding lot");
             Assert.Throws<InvalidOperationException>(() => GoodsWorld.Restore(Mutate(s => s.Lots.Single(x => x.BeltPosition > 0).BeltPosition = BeltRules.UnitsPerTile)), "off the belt");
-        }
-
-        private static string Digest(string payload)
-        {
-            using var sha = SHA256.Create();
-            return Convert.ToBase64String(sha.ComputeHash(Encoding.UTF8.GetBytes(payload)));
         }
     }
 }

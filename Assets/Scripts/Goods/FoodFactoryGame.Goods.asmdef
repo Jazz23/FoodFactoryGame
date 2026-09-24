@@ -1,1 +1,1 @@
-{"name":"FoodFactoryGame.Goods","rootNamespace":"FoodFactoryGame.Goods","references":[],"autoReferenced":true}
+{"name":"FoodFactoryGame.Goods","rootNamespace":"FoodFactoryGame.Goods","references":["Gilzoide.SqliteNet"],"autoReferenced":true}

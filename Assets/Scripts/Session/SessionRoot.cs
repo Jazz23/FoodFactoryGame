@@ -148,7 +148,8 @@ namespace FoodFactoryGame.Session
             // The world is committed before FishNet listens, so the bridge never serves an uncommitted state.
             // Max stacks are content: capacity counts slots, so they are registered (inside LoadOrCreate, before the seed)
             // ahead of any request.
-            ServerWorld = DevWorld.LoadOrCreate(_options.WorldPath, equipmentDefinitions.FirstOrDefault(x => x != null && x.Kind == "oven"), items);
+            ServerWorld = DevWorld.LoadOrCreate(_options.WorldPath, equipmentDefinitions.FirstOrDefault(x => x != null && x.Kind == "oven"), items,
+                _options.LegacyWorldPath);
             // Machine buffer slot counts follow content, so a saved machine created with older counts is brought up to date.
             foreach (var definition in equipmentDefinitions.Where(x => x != null))
                 ServerWorld.ApplyEquipmentCapacitiesDurably(definition.Kind, definition.InputCapacity, definition.OutputCapacity, _options.WorldPath);
@@ -165,7 +166,7 @@ namespace FoodFactoryGame.Session
 
         private void StartClient()
         {
-            var secret = ClientIdentity.LoadOrCreate(_options.IdentityPath);
+            var secret = ClientIdentity.LoadOrCreate(_options.IdentityPath, _options.LegacyIdentityPath);
             authenticator.SetClientCredentials(_options.DisplayName, secret);
             networkManager.TransportManager.Transport.SetClientAddress(_options.Address);
             SetStatus($"Connecting to {_options.Address}...");

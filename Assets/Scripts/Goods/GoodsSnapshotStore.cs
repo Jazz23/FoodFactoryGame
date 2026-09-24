@@ -1,12 +1,15 @@
-// Writes a verified versioned goods snapshot atomically and recovers the last valid committed copy.
+// Commits verified versioned goods snapshots to a SQLite database in one transaction and recovers the newest valid one.
+// The newest row and the prior valid row are kept, so a damaged latest payload falls back to the previous commit.
 using System;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
+using SQLite;
 using UnityEngine;
 
 namespace FoodFactoryGame.Goods
 {
+    // Envelope of the pre-SQLite snapshot file; read only by ImportLegacy.
     [Serializable] internal sealed class GoodsEnvelope
     {
         public string Payload;
@@ -15,6 +18,9 @@ namespace FoodFactoryGame.Goods
 
     public static class GoodsSnapshotStore
     {
+        // Database layout version (PRAGMA user_version), separate from the snapshot payload's SchemaVersion.
+        public const int DatabaseSchema = 1;
+
         private static readonly object SaveGate = new();
 
         public static void Save(GoodsWorld world, string path)
@@ -25,41 +31,32 @@ namespace FoodFactoryGame.Goods
             var state = world.Snapshot();
             GoodsWorld.Validate(state);
             var payload = JsonUtility.ToJson(state);
-            var envelope = JsonUtility.ToJson(new GoodsEnvelope { Payload = payload, Sha256 = Digest(payload) });
-            var temporary = full + ".pending";
             lock (SaveGate)
             {
-                if (File.Exists(full))
-                {
-                    GoodsSnapshot prior;
-                    try { prior = ReadValid(full); }
-                    catch (Exception error) when (error is IOException || error is InvalidOperationException || error is ArgumentException)
-                    {
-                        // Recover the last valid committed file before rotation so .previous never becomes corrupt.
-                        ReadValid(full + ".previous");
-                        File.Replace(full + ".previous", full, full + ".corrupt");
-                        prior = ReadValid(full);
-                    }
-                    if (prior.WorldId != state.WorldId || prior.Revision > state.Revision
-                        || (prior.Revision == state.Revision && JsonUtility.ToJson(prior) != payload))
-                        throw new IOException("Refusing a stale or conflicting world snapshot.");
-                }
+                using var db = Open(full, true);
+                // IMMEDIATE takes the write lock before the revision check, so another process cannot commit in between.
+                db.Execute("BEGIN IMMEDIATE");
                 try
                 {
-                    using (var stream = new FileStream(temporary, FileMode.Create, FileAccess.Write, FileShare.None))
-                    using (var writer = new StreamWriter(stream, new UTF8Encoding(false)))
+                    var prior = LatestValid(db, true);
+                    if (prior != null)
                     {
-                        writer.Write(envelope);
-                        writer.Flush();
-                        stream.Flush(true);
+                        if (prior.WorldId != state.WorldId || prior.Revision > state.Revision
+                            || (prior.Revision == state.Revision && JsonUtility.ToJson(prior) != payload))
+                            throw new IOException("Refusing a stale or conflicting world snapshot.");
                     }
-                    ReadValid(temporary);
-                    if (File.Exists(full)) File.Replace(temporary, full, full + ".previous");
-                    else File.Move(temporary, full);
+                    if (prior == null || prior.Revision != state.Revision)
+                    {
+                        db.Execute("INSERT INTO snapshots (revision, world_id, schema_version, payload, sha256, saved_utc) VALUES (?, ?, ?, ?, ?, ?)",
+                            state.Revision, state.WorldId, state.SchemaVersion, payload, Digest(payload), DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+                        if (prior != null) db.Execute("DELETE FROM snapshots WHERE revision < ?", prior.Revision);
+                    }
+                    db.Execute("COMMIT");
                 }
-                finally
+                catch
                 {
-                    if (File.Exists(temporary)) File.Delete(temporary);
+                    db.Execute("ROLLBACK");
+                    throw;
                 }
             }
         }
@@ -68,20 +65,109 @@ namespace FoodFactoryGame.Goods
         {
             if (string.IsNullOrWhiteSpace(path)) throw new ArgumentException("Explicit save path required.");
             var full = Path.GetFullPath(path);
-            try { return GoodsWorld.Restore(ReadValid(full)); }
+            if (!File.Exists(full)) throw new FileNotFoundException("No goods database.", full);
+            // Opened read-write (never created) so SQLite can roll back a hot journal left by a crash.
+            using var db = Open(full, false);
+            return GoodsWorld.Restore(LatestValid(db, false) ?? throw new InvalidOperationException("No valid goods snapshot."));
+        }
+
+        // Copies a pre-SQLite snapshot file (or its .previous fallback) into a new database; the legacy files are left as
+        // they are. A dry run validates and upgrades in memory and writes nothing. Refuses to touch an existing database.
+        public static GoodsWorld ImportLegacy(string legacyPath, string databasePath, bool dryRun)
+        {
+            if (string.IsNullOrWhiteSpace(legacyPath) || string.IsNullOrWhiteSpace(databasePath))
+                throw new ArgumentException("Explicit legacy and database paths required.");
+            var legacy = Path.GetFullPath(legacyPath);
+            if (File.Exists(Path.GetFullPath(databasePath))) throw new IOException("The goods database already exists; nothing was imported.");
+            GoodsSnapshot state;
+            try { state = ReadLegacy(legacy); }
             catch (Exception error) when (error is IOException || error is InvalidOperationException || error is ArgumentException)
             {
-                // The previous committed snapshot remains available after a torn/corrupt latest write.
-                return GoodsWorld.Restore(ReadValid(full + ".previous"));
+                state = ReadLegacy(legacy + ".previous");
+            }
+            var world = GoodsWorld.Restore(state);
+            if (!dryRun) Save(world, databasePath);
+            return world;
+        }
+
+        private static SQLiteConnection Open(string full, bool create)
+        {
+            var flags = SQLiteOpenFlags.ReadWrite | SQLiteOpenFlags.FullMutex | (create ? SQLiteOpenFlags.Create : 0);
+            var db = new SQLiteConnection(full, flags);
+            try
+            {
+                db.BusyTimeout = TimeSpan.FromSeconds(5);
+                var version = db.ExecuteScalar<int>("PRAGMA user_version");
+                if (version > DatabaseSchema) throw new NotSupportedException("Newer goods database schema.");
+                if (!create)
+                {
+                    if (version == 0) throw new InvalidOperationException("Not an initialized goods database.");
+                    return db;
+                }
+                // FULL sync: an acknowledged mutation must survive a crash immediately after the reply.
+                db.ExecuteScalar<string>("PRAGMA synchronous = FULL");
+                if (version == 0)
+                {
+                    db.RunInTransaction(() =>
+                    {
+                        db.Execute("CREATE TABLE IF NOT EXISTS snapshots ("
+                            + "revision INTEGER PRIMARY KEY NOT NULL, "
+                            + "world_id TEXT NOT NULL, "
+                            + "schema_version INTEGER NOT NULL, "
+                            + "payload TEXT NOT NULL, "
+                            + "sha256 TEXT NOT NULL, "
+                            + "saved_utc INTEGER NOT NULL)");
+                        // Rows that fail verification are moved here, not deleted, so damage stays inspectable.
+                        db.Execute("CREATE TABLE IF NOT EXISTS quarantined_snapshots ("
+                            + "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                            + "revision INTEGER NOT NULL, "
+                            + "payload TEXT, "
+                            + "sha256 TEXT, "
+                            + "quarantined_utc INTEGER NOT NULL)");
+                        db.Execute($"PRAGMA user_version = {DatabaseSchema}");
+                    });
+                }
+                return db;
+            }
+            catch
+            {
+                db.Dispose();
+                throw;
             }
         }
 
-        private static GoodsSnapshot ReadValid(string path)
+        // Newest row that verifies, or null for an empty database. When writable, unverifiable newer rows are quarantined
+        // so the next commit cannot collide with them; a newer schema is never read as an older backup and always throws.
+        private static GoodsSnapshot LatestValid(SQLiteConnection db, bool quarantine)
+        {
+            foreach (var revision in db.QueryScalars<long>("SELECT revision FROM snapshots ORDER BY revision DESC"))
+            {
+                var payload = db.ExecuteScalar<string>("SELECT payload FROM snapshots WHERE revision = ?", revision);
+                var sha = db.ExecuteScalar<string>("SELECT sha256 FROM snapshots WHERE revision = ?", revision);
+                try { return ReadValid(payload, sha); }
+                catch (Exception error) when (error is InvalidOperationException || error is ArgumentException)
+                {
+                    if (!quarantine) continue;
+                    db.Execute("INSERT INTO quarantined_snapshots (revision, payload, sha256, quarantined_utc) VALUES (?, ?, ?, ?)",
+                        revision, payload, sha, DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+                    db.Execute("DELETE FROM snapshots WHERE revision = ?", revision);
+                }
+            }
+            return null;
+        }
+
+        private static GoodsSnapshot ReadLegacy(string path)
         {
             var envelope = JsonUtility.FromJson<GoodsEnvelope>(File.ReadAllText(path, Encoding.UTF8));
-            if (envelope == null || string.IsNullOrEmpty(envelope.Payload) || envelope.Sha256 != Digest(envelope.Payload))
+            if (envelope == null) throw new InvalidOperationException("Goods snapshot checksum mismatch.");
+            return ReadValid(envelope.Payload, envelope.Sha256);
+        }
+
+        private static GoodsSnapshot ReadValid(string payload, string sha)
+        {
+            if (string.IsNullOrEmpty(payload) || sha != Digest(payload))
                 throw new InvalidOperationException("Goods snapshot checksum mismatch.");
-            var state = JsonUtility.FromJson<GoodsSnapshot>(envelope.Payload);
+            var state = JsonUtility.FromJson<GoodsSnapshot>(payload);
             // An unknown new schema is never interpreted as an older backup.
             if (state != null && state.SchemaVersion > GoodsSnapshot.CurrentSchema) throw new NotSupportedException("Newer goods snapshot schema.");
             // Older schemas are upgraded in memory and written as the current schema by the next commit.
