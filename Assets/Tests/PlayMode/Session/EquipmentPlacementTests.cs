@@ -383,6 +383,37 @@ namespace FoodFactoryGame.Session.PlayModeTests
             interaction.CloseScreen();
         }
 
+        // Decision 0017: the supplier's oven arrives held by the buyer, shows in the inventory like a picked-up machine and
+        // places as a second working oven.
+        [UnityTest]
+        public IEnumerator HostBuysAnOvenFromTheSupplierAndPlacesIt()
+        {
+            yield return StartHost();
+            var hostId = _root.Authenticator.LocalPlayerId;
+            var interaction = UnityEngine.Object.FindAnyObjectByType<EquipmentInteraction>();
+            var hud = UnityEngine.Object.FindAnyObjectByType<PlayerHud>();
+            GoodsEquipment Bought(GoodsSnapshot site) => site.Equipment.SingleOrDefault(x => x.Id != DevWorld.OvenId && x.Kind == "oven");
+
+            yield return Until(() => { if (interaction.Screen == InteractionScreen.None) interaction.ToggleInventory(); return interaction.Screen == InteractionScreen.Inventory; }, "inventory screen");
+            yield return null;
+            Assert.That(hud.ScreenRoot.Q<Button>("hud-offer-supplier-oven"), Is.Not.Null, "The supplier window lists the oven.");
+            hud.ClickOffer("supplier-oven");
+            yield return Until(() => Bought(_root.ClientSite) != null && !interaction.HasPendingRequests, "bought oven arrives");
+            Assert.That(interaction.LastRejection, Is.Null);
+            var oven = Bought(_root.ClientSite);
+            Assert.That((oven.State, oven.HolderId), Is.EqualTo((EquipmentState.Held, hostId)));
+            Assert.That(_root.ClientSite.Companies.Single().Cash, Is.EqualTo(DevWorld.StartingCash - 15000));
+            yield return Until(() => hud.SlotOf(PlayerHud.InventoryGrid, PlayerHud.MachineKey("oven")) >= 0, "oven in an inventory slot");
+            interaction.CloseScreen();
+
+            _root.ClientSubscription.Bridge.RequestPlace("place-bought", oven.Id, 4, 5, 0);
+            yield return Await("place-bought");
+            Assert.That(_results["place-bought"].Accepted, Is.True, _results["place-bought"].Reason);
+            yield return Until(() => _presenter.Visuals.ContainsKey(oven.Id), "bought oven visual");
+            var saved = GoodsSnapshotStore.Load(_root.Options.WorldPath).Snapshot();
+            Assert.That((saved.Companies.Single().Cash, saved.Stations.Any(x => x.Id == oven.Id)), Is.EqualTo((DevWorld.StartingCash - 15000, true)));
+        }
+
         [UnityTest]
         public IEnumerator ShiftClickSendsAStackAcrossOrFillsTheOtherContainer()
         {

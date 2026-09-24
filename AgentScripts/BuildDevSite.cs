@@ -64,11 +64,13 @@ public static class BuildDevSite
         var bread = BuildBreadRecipe();
         var counter = BuildEquipmentDefinition(CounterDefinitionPath, DevWorld.CounterKind, 2, 1, 2, 1, BuildCounterPrefab(), ImportIcon("Counter"));
         var sellBread = BuildSellBreadRecipe();
-        // PROTOTYPE supplier prices (decision 0014): dough at 50 cents a unit leaves $2.00 margin on a $2.50 bread.
+        // PROTOTYPE supplier prices (decision 0014): dough at 50 cents a unit leaves $2.00 margin on a $2.50 bread. An oven
+        // (decision 0017) costs $150.00, 75 breads of margin, so the $500.00 start can afford one while keeping ingredient money.
         var offers = new[]
         {
             BuildOffer("Dough5", "supplier-dough-5", DevWorld.DoughItemId, 5, 250, DevWorld.DoughSpoilAfterSeconds),
-            BuildOffer("Belt10", "supplier-belt-10", GoodsWorld.BeltItemId, 10, 500, GoodsWorld.NonPerishableSeconds)
+            BuildOffer("Belt10", "supplier-belt-10", GoodsWorld.BeltItemId, 10, 500, GoodsWorld.NonPerishableSeconds),
+            BuildOffer("Oven1", "supplier-oven", "", 1, 15000, 1, oven)
         };
         // PROTOTYPE stack sizes: dough and bread 20, belts 100 (Factorio's belt stack).
         var items = new[] { BuildItem(DevWorld.DoughItemId, "Dough", 20), BuildItem("bread", "Bread", 20), BuildItem(GoodsWorld.BeltItemId, "Belt", 100) };
@@ -228,7 +230,8 @@ public static class BuildDevSite
         return recipe;
     }
 
-    private static OfferAsset BuildOffer(string asset, string id, string itemId, int quantity, int priceCents, long spoilAfterSeconds)
+    private static OfferAsset BuildOffer(string asset, string id, string itemId, int quantity, int priceCents, long spoilAfterSeconds,
+        EquipmentDefinition equipment = null)
     {
         var path = $"{OfferFolder}/{asset}.asset";
         var offer = AssetDatabase.LoadAssetAtPath<OfferAsset>(path);
@@ -240,6 +243,7 @@ public static class BuildDevSite
         using (var serialized = new SerializedObject(offer))
         {
             serialized.FindProperty("id").stringValue = id;
+            serialized.FindProperty("equipment").objectReferenceValue = equipment;
             serialized.FindProperty("itemId").stringValue = itemId;
             serialized.FindProperty("quantity").intValue = quantity;
             serialized.FindProperty("priceCents").intValue = priceCents;

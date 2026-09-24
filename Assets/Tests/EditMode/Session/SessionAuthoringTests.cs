@@ -82,7 +82,7 @@ namespace FoodFactoryGame.Session.Tests
                         Is.EqualTo(new[] { OvenDefinitionPath, CounterDefinitionPath }));
                     Assert.That(roots[0].Recipes.Select(AssetDatabase.GetAssetPath), Is.EqualTo(new[] { BreadRecipePath, SellBreadRecipePath }));
                     Assert.That(roots[0].Offers.Select(AssetDatabase.GetAssetPath),
-                        Is.EqualTo(new[] { "Assets/Content/Offers/Dough5.asset", "Assets/Content/Offers/Belt10.asset" }));
+                        Is.EqualTo(new[] { "Assets/Content/Offers/Dough5.asset", "Assets/Content/Offers/Belt10.asset", "Assets/Content/Offers/Oven1.asset" }));
                 }
                 var panels = objects.SelectMany(x => x.GetComponents<SessionPanel>()).ToArray();
                 Assert.That(panels.Length, Is.EqualTo(1));
@@ -230,6 +230,19 @@ namespace FoodFactoryGame.Session.Tests
             Assert.That(offers.All(x => items.Contains(x.ItemId)), Is.True, "Every offer has an item definition (icon, stack size).");
             var world = new FoodFactoryGame.Goods.GoodsWorld("authoring-check");
             foreach (var offer in offers) Assert.DoesNotThrow(() => world.RegisterOffer(offer.ToDefinition()));
+        }
+
+        // Decision 0017: the oven offer sells the authored oven definition as valid server content, one machine per purchase.
+        [Test]
+        public void SupplierOvenOfferSellsTheOvenDefinition()
+        {
+            var offer = AssetDatabase.LoadAssetAtPath<OfferAsset>("Assets/Content/Offers/Oven1.asset");
+            Assert.That(offer, Is.Not.Null);
+            Assert.That((AssetDatabase.GetAssetPath(offer.Equipment), offer.Quantity, offer.PriceCents), Is.EqualTo((OvenDefinitionPath, 1, 15000L)));
+            var template = offer.ToEquipmentOffer().Equipment;
+            Assert.That((template.Kind, template.Width, template.Depth), Is.EqualTo(("oven", offer.Equipment.Width, offer.Equipment.Depth)));
+            var world = new FoodFactoryGame.Goods.GoodsWorld("authoring-check");
+            Assert.DoesNotThrow(() => offer.RegisterWith(world));
         }
 
         [Test]

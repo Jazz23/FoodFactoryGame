@@ -179,7 +179,16 @@ Decision: [0014](decisions/0014-supplier-purchases.md). Step 3 of the sell loop:
 - Content: `OfferAsset` (`Assets/Content/Offers/Dough5.asset` 5 dough $2.50, `Belt10.asset` 10 belts $5.00), authored by `BuildDevSite`; `SessionRoot.offers` registers them on every server start and exposes `Offers`.
 - Presentation: `EquipmentInteraction.Buy(offer)`; the inventory screen's Supplier window (`hud-supplier`, `hud-offer-<id>` buttons, `PlayerHud.ClickOffer`).
 - The dev starter goods and storage stock are kept alongside purchases (owner decision, 2026-09-24; decision 0014).
-Open: member spending permissions, bulk quantities, supplier stock, delivery times, buying equipment.
+Open: member spending permissions, bulk quantities, supplier stock, delivery times. Equipment: below.
+
+## Implemented: equipment purchases (2026-09-24)
+
+Decision: [0017](decisions/0017-equipment-purchases.md). Company cash buys machines, which are delivered held by the buyer.
+
+- Domain (`GoodsWorld.Supply.cs`): `EquipmentOffer { Id, PriceCents, Equipment template }` (`RegisterEquipmentOffer`, never saved; one ID space shared with `PurchaseOffer`). `Buy` accepts either kind. For a machine it checks `no-layout` in place of `capacity`, then `TryDebit` and a new `Held` `GoodsEquipment` `buy:<player>:<request>` (holder = buyer), recorded as `bought` with `GoodsOutcome.EquipmentId`. Replay, rejection and failed-commit rules are the same as for goods. No schema change.
+- Content: `OfferAsset.equipment` (optional `EquipmentDefinition`; `RegisterWith` picks the kind); `EquipmentDefinition.CreateTemplate()`. `Assets/Content/Offers/Oven1.asset`: one oven for $150.00 (PROTOTYPE).
+- Presentation: the Supplier window shows machine offers with the machine icon. A bought machine appears in the inventory and is placed like a picked-up one.
+Open: resale/salvage, delivery or installation time, offering the counter.
 
 ## Required Constraints for Future Implementation
 
@@ -189,7 +198,7 @@ Open: member spending permissions, bulk quantities, supplier stock, delivery tim
 - Player and employee operational rules should be shared; input and AI choose actions through those rules.
 - Visual objects must not become the sole owners of authoritative simulation state.
 
-These remain accepted contracts; only the bounded goods slice, its station jobs, equipment placement, the working oven, conveyor belts, company cash, the sell counter and supplier purchases above have a runtime interface. Sales credit cash inside the clock tick; purchases are the one player payment command.
+These remain accepted contracts; only the bounded goods slice, its station jobs, equipment placement, the working oven, conveyor belts, company cash, the sell counter, supplier purchases and equipment purchases above have a runtime interface. Sales credit cash inside the clock tick; purchases are the one player payment command.
 
 ## Planned / Undecided
 

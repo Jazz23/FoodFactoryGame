@@ -33,5 +33,12 @@ namespace FoodFactoryGame.Session.Equipment
             CellX = cellX, CellZ = cellZ, Rotation = rotation, Width = width, Depth = depth,
             InputCapacity = inputCapacity, OutputCapacity = outputCapacity, OutputRefrigerated = outputRefrigerated
         };
+
+        // Kind, footprint and capacities only: the server gives a bought piece its ID, site and holder (decision 0017).
+        public GoodsEquipment CreateTemplate() => new()
+        {
+            Kind = kind, State = EquipmentState.Held, Width = width, Depth = depth,
+            InputCapacity = inputCapacity, OutputCapacity = outputCapacity, OutputRefrigerated = outputRefrigerated
+        };
     }
 }

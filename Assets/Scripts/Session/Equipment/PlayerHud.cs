@@ -465,7 +465,7 @@ namespace FoodFactoryGame.Session.Equipment
             if (equipment != null) _screen.Add(MachineWindow(site, equipment));
         }
 
-        // Supplier offers (decision 0014): one row per pack with its price and a Buy button. The company pays; the goods arrive
+        // Supplier offers (decisions 0014, 0017): one row per pack or machine with its price and a Buy button. The company pays; the goods arrive
         // in this player's inventory once the server accepts. Affordability is not previewed; the server's reason is shown.
         private VisualElement SupplierWindow()
         {
@@ -476,8 +476,11 @@ namespace FoodFactoryGame.Session.Equipment
                 row.style.flexDirection = FlexDirection.Row;
                 row.style.alignItems = Align.Center;
                 row.style.marginTop = 4;
-                row.Add(Icon(ItemIcon(offer.ItemId), ItemName(offer.ItemId), 1f));
-                var label = Caption($"{offer.Quantity} {ItemName(offer.ItemId)}  {FormatCash(offer.PriceCents)}", 12, Color.white);
+                // A machine offer (decision 0017) shows the machine; it arrives held, like a picked-up machine.
+                var machine = offer.Equipment != null ? offer.Equipment.Kind : null;
+                var offerName = machine != null ? Title(machine) : ItemName(offer.ItemId);
+                row.Add(Icon(machine != null ? MachineIcon(machine) : ItemIcon(offer.ItemId), offerName, 1f));
+                var label = Caption($"{offer.Quantity} {offerName}  {FormatCash(offer.PriceCents)}", 12, Color.white);
                 label.style.minWidth = 120;
                 label.style.marginLeft = 6;
                 row.Add(label);

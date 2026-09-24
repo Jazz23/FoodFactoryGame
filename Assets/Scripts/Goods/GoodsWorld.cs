@@ -52,6 +52,8 @@ namespace FoodFactoryGame.Goods
         public string MovedLotId;
         public string ReservationId;
         public string JobId;
+        // Machine created by the request (an equipment purchase, decision 0017); empty otherwise.
+        public string EquipmentId;
         public long Revision;
     }
 
