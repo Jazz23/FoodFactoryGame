@@ -1,4 +1,4 @@
-# Draws the DEVELOPMENT 2D item icons (dough, bread, oven) as 128x128 transparent PNGs with GDI+.
+# Draws the DEVELOPMENT 2D item icons (dough, bread, oven, belt, counter) as 128x128 transparent PNGs with GDI+.
 # Re-run to regenerate: powershell -ExecutionPolicy Bypass -File AgentScripts/DrawItemIcons.ps1
 # Unity imports them as sprites (AgentScripts/BuildDevSite.cs sets the import settings).
 Add-Type -AssemblyName System.Drawing
@@ -137,4 +137,35 @@ foreach ($y in 34, 64, 94) {
 }
 $g.DrawRectangle($dark, 26, 10, 76, 104)
 Save-Icon $bitmap $g 'Belt'
+
+# --- Counter: a wooden shop counter with a teal cash register and a gold coin (decision 0013 sell counter) ---
+$bitmap, $g = New-Icon
+Shadow $g 8 108 112 14
+$dark = New-Object System.Drawing.Pen (Color '#1f2a2e'), 4
+$dark.LineJoin = [System.Drawing.Drawing2D.LineJoin]::Round
+$front = New-Object System.Drawing.RectangleF 12, 62, 104, 50
+$wood = New-Object System.Drawing.Drawing2D.LinearGradientBrush $front, (Color '#b8743a'), (Color '#7a4a22'), 90
+$g.FillRectangle($wood, $front)
+$plank = New-Object System.Drawing.Pen (Color '#5e3818'), 2
+foreach ($x in 38, 64, 90) { $g.DrawLine($plank, $x, 64, $x, 110) }
+$g.DrawRectangle($dark, 12, 62, 104, 50)
+$top = New-Object System.Drawing.SolidBrush (Color '#f4efe0')
+$g.FillRectangle($top, 6, 54, 116, 10)
+$g.DrawRectangle($dark, 6, 54, 116, 10)
+$teal = New-Object System.Drawing.SolidBrush (Color '#2f7f86')
+$g.FillRectangle($teal, 58, 26, 46, 28)
+$g.DrawRectangle($dark, 58, 26, 46, 28)
+$screen = New-Object System.Drawing.SolidBrush (Color '#9be7c4')
+$g.FillRectangle($screen, 66, 14, 30, 12)
+$g.DrawRectangle($dark, 66, 14, 30, 12)
+$key = New-Object System.Drawing.SolidBrush (Color '#e8e2cf')
+foreach ($row in 0, 1) { foreach ($col in 0, 1, 2) { $g.FillRectangle($key, 64 + $col * 12, 32 + $row * 10, 8, 6) } }
+$gold = New-Object System.Drawing.SolidBrush (Color '#f2c230')
+$g.FillEllipse($gold, 18, 26, 28, 28)
+$g.DrawEllipse($dark, 18, 26, 28, 28)
+$mark = New-Object System.Drawing.Pen (Color '#8a6a10'), 3
+$g.DrawLine($mark, 32, 32, 32, 48)
+$g.DrawArc($mark, 26, 32, 12, 8, 90, 180)
+$g.DrawArc($mark, 26, 40, 12, 8, 270, 180)
+Save-Icon $bitmap $g 'Counter'
 "Icons written to $out"

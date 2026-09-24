@@ -405,8 +405,8 @@ namespace FoodFactoryGame.Goods.Tests
             legacy.Bootstrap(new GoodsLocation { Id = "storage", SiteId = "restaurant", Kind = "storage", Capacity = 20 });
             legacy.Bootstrap(new GoodsLot { Id = "lot-1", ItemId = "ingredient", OwnerId = "restaurant", LocationId = "storage", Quantity = 10, SpoilAfterSeconds = 10 });
             var current = JsonUtility.ToJson(legacy.Snapshot());
-            var v1 = current.Replace("\"SchemaVersion\":4", "\"SchemaVersion\":1").Replace(",\"BeltPosition\":0", "")
-                .Replace(",\"Stations\":[],\"Jobs\":[],\"Equipment\":[],\"SiteLayouts\":[],\"Belts\":[]", "");
+            var v1 = current.Replace($"\"SchemaVersion\":{GoodsSnapshot.CurrentSchema}", "\"SchemaVersion\":1").Replace(",\"BeltPosition\":0", "")
+                .Replace(",\"Stations\":[],\"Jobs\":[],\"Equipment\":[],\"SiteLayouts\":[],\"Belts\":[],\"Companies\":[]", "");
             Assert.That(v1, Does.Not.Contain("Stations"));
             Assert.That(v1, Does.Not.Contain("Equipment"));
             Assert.That(v1, Does.Contain("\"SchemaVersion\":1"));
@@ -427,7 +427,7 @@ namespace FoodFactoryGame.Goods.Tests
 
             Assert.That(loaded.TryAdvanceDurably(1, PathForSave), Is.True);
             var written = SnapshotDatabase.LatestPayload(PathForSave);
-            Assert.That(written, Does.Contain("\"SchemaVersion\":4"));
+            Assert.That(written, Does.Contain($"\"SchemaVersion\":{GoodsSnapshot.CurrentSchema}"));
             Assert.That(written, Does.Contain("\"Stations\":[]"));
             Assert.That(GoodsSnapshotStore.Load(PathForSave).Snapshot().ClockSeconds, Is.EqualTo(1));
         }

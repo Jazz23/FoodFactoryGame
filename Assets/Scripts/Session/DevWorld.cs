@@ -1,6 +1,7 @@
 // Loads the committed world save or creates the DEVELOPMENT seed; the seed is placeholder content, not design data.
 // The seed is applied only to a brand-new world: an existing save never gains the layout, oven or storage dough retroactively.
-// Belts are the one exception: a save from before belts existed gets the dev belt stock once (EnsureBeltStock).
+// Belts, the company and the sell counter are the exceptions: a save from before each existed gets the dev belt stock
+// (EnsureBeltStock), the dev company with its starting cash (EnsureCompany), or the dev counter (EnsureCounter) once.
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -33,6 +34,14 @@ namespace FoodFactoryGame.Session
         public const string StorageBeltsLotId = "dev-storage-belts";
         public const int StorageBelts = 200;
         public const int StarterBelts = 50;
+        // PROTOTYPE starting capital (whole cents) of the one company that owns the dev site (decision 0012).
+        public const string CompanyId = "dev-company";
+        public const long StartingCash = 50000;
+        // PROTOTYPE sell counter (decision 0013): one placed near the spawn points, left of the oven.
+        public const string CounterKind = "counter";
+        public const string CounterId = "dev-counter-1";
+        public const int CounterCellX = 6;
+        public const int CounterCellZ = 13;
 
         public static IReadOnlyList<GoodsLot> StarterGoods => new[]
         {
@@ -44,8 +53,9 @@ namespace FoodFactoryGame.Session
         // Without an oven definition the seed has the layout but no equipment. Item max stacks (content) are registered
         // before the seed, because the seed's goods are counted in slots.
         // A pre-SQLite snapshot at legacyWorldPath is imported once, after a dry run, when no database exists yet.
+        // Without a counter definition no counter is seeded or added.
         public static GoodsWorld LoadOrCreate(string worldPath, EquipmentDefinition oven = null, IEnumerable<ItemDefinition> items = null,
-            string legacyWorldPath = null)
+            string legacyWorldPath = null, EquipmentDefinition counter = null)
         {
             if (!File.Exists(worldPath) && !string.IsNullOrWhiteSpace(legacyWorldPath)
                 && (File.Exists(legacyWorldPath) || File.Exists(legacyWorldPath + ".previous")))
@@ -59,6 +69,8 @@ namespace FoodFactoryGame.Session
                 var loaded = GoodsSnapshotStore.Load(worldPath);
                 Register(loaded, items);
                 EnsureBeltStock(loaded, worldPath);
+                EnsureCompany(loaded, worldPath);
+                EnsureCounter(loaded, worldPath, counter);
                 return loaded;
             }
             var world = new GoodsWorld(WorldId);
@@ -70,8 +82,10 @@ namespace FoodFactoryGame.Session
                 Quantity = StorageDough, SpoilAfterSeconds = DoughSpoilAfterSeconds
             });
             world.Bootstrap(BeltStock());
+            world.Bootstrap(Company());
             world.Bootstrap(new SiteLayout { SiteId = SiteId, Width = GridWidth, Depth = GridDepth });
             if (oven != null) world.Bootstrap(oven.CreatePlaced(OvenId, SiteId, OvenCellX, OvenCellZ, 0));
+            if (counter != null) world.Bootstrap(counter.CreatePlaced(CounterId, SiteId, CounterCellX, CounterCellZ, 0));
             GoodsSnapshotStore.Save(world, worldPath);
             return world;
         }
@@ -104,6 +118,38 @@ namespace FoodFactoryGame.Session
             }
             GoodsSnapshotStore.Save(world, worldPath);
             Debug.Log($"[Session] Added {StorageBelts} dev belts to the storage of this older save.");
+        }
+
+        private static GoodsCompany Company() => new() { Id = CompanyId, Cash = StartingCash, SiteIds = new List<string> { SiteId } };
+
+        // One-time for saves from before companies (payload v4 and older): the dev site gets its company and starting cash,
+        // committed before serving. A site that already has a company is never given cash again.
+        private static void EnsureCompany(GoodsWorld world, string worldPath)
+        {
+            var state = world.Snapshot();
+            if (world.CompanyOfSite(SiteId) != null || state.Companies.Any(x => x.Id == CompanyId)
+                || state.Locations.All(x => x.SiteId != SiteId)) return;
+            world.Bootstrap(Company());
+            GoodsSnapshotStore.Save(world, worldPath);
+            Debug.Log($"[Session] Added {CompanyId} with {StartingCash} cents to this older save.");
+        }
+
+        // PROTOTYPE, one-time: equipment is never destroyed (pickup only holds it), so a world with no counter of any state has
+        // never had one. It gets the dev counter at its seed cell, committed before serving; if that cell is taken the
+        // save is left alone with a warning.
+        private static void EnsureCounter(GoodsWorld world, string worldPath, EquipmentDefinition counter)
+        {
+            var state = world.Snapshot();
+            if (counter == null || state.Equipment.Any(x => x.Kind == counter.Kind || x.Id == CounterId)
+                || state.SiteLayouts.All(x => x.SiteId != SiteId)) return;
+            try { world.Bootstrap(counter.CreatePlaced(CounterId, SiteId, CounterCellX, CounterCellZ, 0)); }
+            catch (System.ArgumentException)
+            {
+                Debug.LogWarning($"[Session] Cells ({CounterCellX}, {CounterCellZ}) are taken, so this older save gets no dev counter; clear them and restart the server.");
+                return;
+            }
+            GoodsSnapshotStore.Save(world, worldPath);
+            Debug.Log("[Session] Added the dev sell counter to this older save.");
         }
     }
 }

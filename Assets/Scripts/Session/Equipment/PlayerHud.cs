@@ -6,6 +6,7 @@
 // there, and shift+click sends it straight to the other open container, both with ordinary server-checked transfers.
 // On a screen a hotbar key over a stack, or clicking a hotbar slot with a stack on the cursor, assigns that stack's machine
 // or item to the hotbar slot (the cursor stack goes back where it was); an empty cursor takes up the slot's machine or item.
+// The site company's cash is shown top right, read from the latest baseline.
 // Presentation only: slot positions are this client's arrangement of the replicated stacks, never saved or sent, and
 // progress is interpolated for at most one clock step past the latest baseline.
 using System;
@@ -64,6 +65,9 @@ namespace FoodFactoryGame.Session.Equipment
         private readonly Dictionary<string, List<SlotContent>> _grids = new();
         private VisualElement _crosshair;
         private VisualElement _hotbar;
+        private Label _cash;
+        // Balance the cash label shows, so the text is rebuilt only when it changes (never a real balance before the first).
+        private long _shownCash = long.MinValue;
         private VisualElement _screen;
         private VisualElement _cursor;
         private VisualElement _progressFill;
@@ -112,7 +116,16 @@ namespace FoodFactoryGame.Session.Equipment
             _cursor = new VisualElement { name = "hud-cursor", pickingMode = PickingMode.Ignore };
             _cursor.style.position = Position.Absolute;
             _cursor.style.width = _cursor.style.height = IconSize;
+            // Company cash (decision 0012): display only, from the latest site baseline.
+            _cash = Caption("", 18, Heading);
+            _cash.name = "hud-cash";
+            _cash.style.position = Position.Absolute;
+            _cash.style.top = 12;
+            _cash.style.right = 16;
+            _cash.style.unityFontStyleAndWeight = FontStyle.Bold;
+            _cash.style.textShadow = new TextShadow { offset = new Vector2(1f, 1f), color = Color.black };
             layer.Add(_crosshair);
+            layer.Add(_cash);
             layer.Add(_hotbar);
             layer.Add(_screen);
             layer.Add(_cursor);
@@ -133,6 +146,13 @@ namespace FoodFactoryGame.Session.Equipment
             var screenOpen = active && interaction.Screen != InteractionScreen.None;
             _crosshair.style.display = active && interaction.PointerLocked ? DisplayStyle.Flex : DisplayStyle.None;
             _hotbar.style.display = active ? DisplayStyle.Flex : DisplayStyle.None;
+            var hasCompany = active && site.Companies is { Count: > 0 };
+            _cash.style.display = hasCompany ? DisplayStyle.Flex : DisplayStyle.None;
+            if (hasCompany && site.Companies[0].Cash != _shownCash)
+            {
+                _shownCash = site.Companies[0].Cash;
+                _cash.text = FormatCash(_shownCash);
+            }
             _screen.style.display = screenOpen ? DisplayStyle.Flex : DisplayStyle.None;
             if (!active)
             {
@@ -438,11 +458,41 @@ namespace FoodFactoryGame.Session.Equipment
                 var storage = Window("hud-storage", $"Storage  {Units(site, DevWorld.StorageId)}");
                 storage.Add(GridView(StorageGrid));
                 _screen.Add(storage);
+                if (interaction.Session.Offers.Count > 0) _screen.Add(SupplierWindow());
                 return;
             }
             var equipment = site.Equipment.FirstOrDefault(x => x.Id == interaction.OpenMachineId);
             if (equipment != null) _screen.Add(MachineWindow(site, equipment));
         }
+
+        // Supplier offers (decision 0014): one row per pack with its price and a Buy button. The company pays; the goods arrive
+        // in this player's inventory once the server accepts. Affordability is not previewed; the server's reason is shown.
+        private VisualElement SupplierWindow()
+        {
+            var window = Window("hud-supplier", "Supplier");
+            foreach (var offer in interaction.Session.Offers.Where(x => x != null))
+            {
+                var row = new VisualElement { name = $"hud-offer-row-{offer.Id}" };
+                row.style.flexDirection = FlexDirection.Row;
+                row.style.alignItems = Align.Center;
+                row.style.marginTop = 4;
+                row.Add(Icon(ItemIcon(offer.ItemId), ItemName(offer.ItemId), 1f));
+                var label = Caption($"{offer.Quantity} {ItemName(offer.ItemId)}  {FormatCash(offer.PriceCents)}", 12, Color.white);
+                label.style.minWidth = 120;
+                label.style.marginLeft = 6;
+                row.Add(label);
+                var id = offer.Id;
+                // Not focusable: a focused button would buy again on every keyboard Submit (Enter/Space) after the click.
+                var buy = new Button(() => ClickOffer(id)) { name = $"hud-offer-{id}", text = "Buy", focusable = false };
+                buy.style.minWidth = 48;
+                row.Add(buy);
+                window.Add(row);
+            }
+            return window;
+        }
+
+        // Buys one pack of the offer, like its Buy button. Public so tests can drive the same path as the button.
+        public void ClickOffer(string offerId) => interaction.Buy(offerId);
 
         // Input slot -> progress arrow -> output slot, like a Factorio furnace; the machine runs by itself (decision 0008).
         private VisualElement MachineWindow(GoodsSnapshot site, GoodsEquipment equipment)
@@ -468,7 +518,18 @@ namespace FoodFactoryGame.Session.Equipment
             _progressFill.style.backgroundColor = Highlight;
             arrow.Add(_progressFill);
             body.Add(arrow);
-            body.Add(Labelled(GridView(OutputGrid), $"Output {Units(site, equipment.OutputLocationId)}"));
+            // A sale station (decision 0013) turns its input into company cash, so it shows prices instead of an output grid.
+            var sales = SaleRecipes(equipment.Kind);
+            if (sales.Count == 0) body.Add(Labelled(GridView(OutputGrid), $"Output {Units(site, equipment.OutputLocationId)}"));
+            else
+            {
+                var prices = new VisualElement { name = "hud-sale-prices" };
+                prices.style.minWidth = 96;
+                prices.Add(Caption("Sells", 12, Heading));
+                foreach (var sale in sales)
+                    prices.Add(Caption($"{string.Join(" + ", sale.Inputs.Select(x => $"{x.quantity} {ItemName(x.itemId)}"))}  {FormatCash(sale.SaleCents)}", 12, Color.white, 4));
+                body.Add(prices);
+            }
             window.Add(body);
             _progressLabel = Caption("", 12, Muted, 6);
             _progressLabel.name = "hud-progress-label";
@@ -575,10 +636,14 @@ namespace FoodFactoryGame.Session.Equipment
                 var recipes = interaction.Session.Recipes.Where(x => x != null && x.StationKind == equipment?.Kind).ToList();
                 var ingredients = recipes.SelectMany(x => x.Inputs).Select(x => ItemName(x.itemId)).Distinct().ToList();
                 var output = site.Locations.FirstOrDefault(x => x.Id == equipment?.OutputLocationId);
+                var makes = recipes.Where(x => !x.IsSale).ToList();
                 // The server starts nothing while the output cannot take a batch (decision 0008), so say why it waits.
-                if (output != null && recipes.Count > 0
-                    && recipes.All(x => GoodsSlots.FreeUnits(site, output.Id, x.OutputItemId, false, interaction.Session.MaxStack) < x.OutputQuantity))
+                if (output != null && makes.Count > 0 && makes.Count == recipes.Count
+                    && makes.All(x => GoodsSlots.FreeUnits(site, output.Id, x.OutputItemId, false, interaction.Session.MaxStack) < x.OutputQuantity))
                     _progressLabel.text = "Stopped: output full, take the results out";
+                // A sale needs a company to pay (decision 0013); the baseline carries the site's company, if any.
+                else if (recipes.Count > 0 && recipes.All(x => x.IsSale) && site.Companies is not { Count: > 0 })
+                    _progressLabel.text = "Idle: this site has no company to sell for";
                 else _progressLabel.text = ingredients.Count == 0 ? "Idle: no recipes for this machine" : $"Idle: put {string.Join(" or ", ingredients)} in the input";
             }
             else if (job.State == StationJobState.Blocked)
@@ -590,7 +655,10 @@ namespace FoodFactoryGame.Session.Equipment
             {
                 var elapsed = job.DurationSeconds - job.RemainingSeconds + Mathf.Min(Time.unscaledTime - _siteSeenAt, 1f);
                 fraction = Mathf.Clamp01((float)(elapsed / job.DurationSeconds));
-                _progressLabel.text = $"Making {ItemName(job.OutputItemId)}: {job.DurationSeconds - job.RemainingSeconds}/{job.DurationSeconds} s";
+                var what = job.IsSale
+                    ? $"Serving a customer: {string.Join(" + ", job.Inputs.Select(x => ItemName(x.ItemId)).Distinct())} for {FormatCash(job.SaleCents)}"
+                    : $"Making {ItemName(job.OutputItemId)}";
+                _progressLabel.text = $"{what}: {job.DurationSeconds - job.RemainingSeconds}/{job.DurationSeconds} s";
             }
             _progressFill.style.width = new Length(fraction * 100f, LengthUnit.Percent);
         }
@@ -602,6 +670,9 @@ namespace FoodFactoryGame.Session.Equipment
             return location == null ? ""
                 : $"{GoodsSlots.SlotsUsed(site.Lots.Where(x => x.LocationId == locationId), interaction.Session.MaxStack)}/{location.Capacity}";
         }
+
+        private List<RecipeAsset> SaleRecipes(string kind) =>
+            interaction.Session.Recipes.Where(x => x != null && x.IsSale && x.StationKind == kind).ToList();
 
         private ItemDefinition Item(string itemId) => Items.FirstOrDefault(x => x != null && x.Id == itemId);
         private string ItemName(string itemId) => Item(itemId)?.DisplayName ?? Title(itemId);
@@ -681,6 +752,10 @@ namespace FoodFactoryGame.Session.Equipment
             }
             return icon;
         }
+
+        // Whole cents as dollars, e.g. 50000 -> "$500.00".
+        public static string FormatCash(long cents) =>
+            (cents < 0 ? "-$" : "$") + (Math.Abs((decimal)cents) / 100m).ToString("N2", CultureInfo.InvariantCulture);
 
         private static Label Count(int count)
         {

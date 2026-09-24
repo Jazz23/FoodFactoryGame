@@ -1,6 +1,6 @@
 // Verifies conveyor belts: placement from inventory and free re-orientation, grid sharing with equipment, belt shapes and
 // links (curves, side-loading), item movement, spacing and queuing, loops, taking single items off, removal returning
-// everything, and schema v4.
+// everything, and schema v4 (now upgraded to the current schema).
 using System;
 using System.IO;
 using System.Linq;
@@ -339,10 +339,10 @@ namespace FoodFactoryGame.Goods.Tests
         }
 
         [Test]
-        public void SchemaV3SaveLoadsAsV4WithoutBelts()
+        public void SchemaV3SaveLoadsAsCurrentWithoutBelts()
         {
             var current = JsonUtility.ToJson(_world.Snapshot());
-            var v3 = current.Replace("\"SchemaVersion\":4", "\"SchemaVersion\":3").Replace(",\"BeltPosition\":0", "").Replace(",\"Belts\":[]", "");
+            var v3 = current.Replace($"\"SchemaVersion\":{GoodsSnapshot.CurrentSchema}", "\"SchemaVersion\":3").Replace(",\"BeltPosition\":0", "").Replace(",\"Belts\":[],\"Companies\":[]", "");
             Assert.That(v3, Does.Not.Contain("Belt\""));
             var legacyPath = Path.Combine(_saveDirectory, "legacy.snapshot");
             SnapshotDatabase.WriteLegacy(legacyPath, v3);
@@ -351,10 +351,10 @@ namespace FoodFactoryGame.Goods.Tests
             GoodsSnapshotStore.ImportLegacy(legacyPath, PathForSave, false);
             Assert.Throws<IOException>(() => GoodsSnapshotStore.ImportLegacy(legacyPath, PathForSave, false));
             var loaded = GoodsSnapshotStore.Load(PathForSave);
-            Assert.That(loaded.Snapshot().SchemaVersion, Is.EqualTo(4));
+            Assert.That(loaded.Snapshot().SchemaVersion, Is.EqualTo(GoodsSnapshot.CurrentSchema));
             Assert.That(loaded.Snapshot().Belts, Is.Empty);
             Assert.That(loaded.TryAdvanceDurably(1, PathForSave), Is.True);
-            Assert.That(SnapshotDatabase.LatestPayload(PathForSave), Does.Contain("\"SchemaVersion\":4"));
+            Assert.That(SnapshotDatabase.LatestPayload(PathForSave), Does.Contain($"\"SchemaVersion\":{GoodsSnapshot.CurrentSchema}"));
         }
 
         [Test]

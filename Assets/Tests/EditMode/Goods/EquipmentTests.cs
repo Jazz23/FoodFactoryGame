@@ -201,7 +201,7 @@ namespace FoodFactoryGame.Goods.Tests
             var legacy = new GoodsWorld("legacy-world");
             legacy.Bootstrap(new GoodsLocation { Id = "storage", SiteId = "restaurant", Kind = "storage", Capacity = 20 });
             var current = JsonUtility.ToJson(legacy.Snapshot());
-            var v2 = current.Replace("\"SchemaVersion\":4", "\"SchemaVersion\":2").Replace(",\"Equipment\":[],\"SiteLayouts\":[],\"Belts\":[]", "");
+            var v2 = current.Replace($"\"SchemaVersion\":{GoodsSnapshot.CurrentSchema}", "\"SchemaVersion\":2").Replace(",\"Equipment\":[],\"SiteLayouts\":[],\"Belts\":[],\"Companies\":[]", "");
             Assert.That(v2, Does.Not.Contain("Equipment"));
             var legacyPath = Path.Combine(_saveDirectory, "legacy.snapshot");
             SnapshotDatabase.WriteLegacy(legacyPath, v2);
@@ -215,7 +215,7 @@ namespace FoodFactoryGame.Goods.Tests
             Assert.That(loaded.Snapshot().Equipment, Is.Empty);
             Assert.That(loaded.Snapshot().SiteLayouts, Is.Empty);
             Assert.That(loaded.TryAdvanceDurably(1, PathForSave), Is.True);
-            Assert.That(SnapshotDatabase.LatestPayload(PathForSave), Does.Contain("\"SchemaVersion\":4"));
+            Assert.That(SnapshotDatabase.LatestPayload(PathForSave), Does.Contain($"\"SchemaVersion\":{GoodsSnapshot.CurrentSchema}"));
         }
 
         [Test]

@@ -25,8 +25,13 @@ namespace FoodFactoryGame.Session.Equipment
         [SerializeField] private string outputItemId;
         [SerializeField, Min(1)] private int outputQuantity = 1;
         [SerializeField, Min(1)] private int outputSpoilAfterSeconds = 1;
+        // Sale recipe (decision 0013): above zero, the recipe sells its inputs for this many cents instead of making goods,
+        // and the output fields are ignored.
+        [SerializeField, Min(0)] private int saleCents;
 
         public string Id => id;
+        public bool IsSale => saleCents > 0;
+        public long SaleCents => saleCents;
         public string DisplayName => string.IsNullOrWhiteSpace(displayName) ? id : displayName;
         public string StationKind => stationKind;
         public int DurationSeconds => durationSeconds;
@@ -38,7 +43,8 @@ namespace FoodFactoryGame.Session.Equipment
         {
             Id = id, StationKind = stationKind, DurationSeconds = durationSeconds,
             Inputs = inputs.Select(x => new RecipeInput { ItemId = x.itemId, Quantity = x.quantity }).ToList(),
-            OutputItemId = outputItemId, OutputQuantity = outputQuantity, OutputSpoilAfterSeconds = outputSpoilAfterSeconds
+            OutputItemId = IsSale ? "" : outputItemId, OutputQuantity = IsSale ? 0 : outputQuantity,
+            OutputSpoilAfterSeconds = IsSale ? 0 : outputSpoilAfterSeconds, SaleCents = saleCents
         };
     }
 }

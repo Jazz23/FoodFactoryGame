@@ -197,11 +197,11 @@ namespace FoodFactoryGame.Session.PlayModeTests
                 return seen != null && seen.State == EquipmentState.Placed && seen.CellX == 4 && seen.CellZ == 5
                     && _remoteSite.Latest.Revision == _root.ClientSite.Revision;
             }, "remote sees the oven at its new cell");
-            yield return Until(() => _presenter.Visuals.Count == 1 && _presenter.Visuals.ContainsKey(DevWorld.OvenId), "one host visual");
+            yield return Until(() => _presenter.Visuals.Values.Count(x => x.Kind == "oven") == 1 && _presenter.Visuals.ContainsKey(DevWorld.OvenId), "one host oven visual");
             var placed = Oven(_root.ClientSite);
             Assert.That(placed.Rotation, Is.EqualTo(1));
             Assert.That(Vector3.Distance(_presenter.Visuals[DevWorld.OvenId].transform.position, Expected(placed)), Is.LessThan(0.001f));
-            Assert.That(_root.ServerWorld.Snapshot().Equipment.Count, Is.EqualTo(1));
+            Assert.That(_root.ServerWorld.Snapshot().Equipment.Count(x => x.Kind == "oven"), Is.EqualTo(1));
 
             // A holder who disconnects keeps the oven in their inventory and still holds it after reconnecting.
             remote.RequestPickUp("remote-pick", DevWorld.OvenId);
@@ -292,6 +292,92 @@ namespace FoodFactoryGame.Session.PlayModeTests
             yield return null;
             Assert.That(hud.SlotOf(PlayerHud.InventoryGrid, "bread"), Is.EqualTo(breadSlot), "Dropped goods land in the clicked slot.");
             Assert.That(Count(GoodsSnapshotStore.Load(_root.Options.WorldPath).Snapshot(), GoodsWorld.InventoryLocationId(hostId), "bread"), Is.GreaterThanOrEqualTo(1));
+            interaction.CloseScreen();
+        }
+
+        // Decision 0013: bread dropped into the seeded counter through the ordinary slot path sells on the server clock, the
+        // company cash rises in the committed save, the host HUD shows it, and a remote client receives it in its baseline.
+        [UnityTest]
+        public IEnumerator HostSellsBreadAtTheCounterAndRemoteSeesTheCash()
+        {
+            yield return StartHost();
+            var hostId = _root.Authenticator.LocalPlayerId;
+            CreateRemote();
+            yield return ConnectRemote();
+            var interaction = UnityEngine.Object.FindAnyObjectByType<EquipmentInteraction>();
+            var hud = UnityEngine.Object.FindAnyObjectByType<PlayerHud>();
+            long RemoteCash() => _remoteSite.Latest?.Companies.SingleOrDefault()?.Cash ?? -1;
+
+            // TEST fixture: two fresh bread in the host's inventory, committed like any server change.
+            _root.ServerWorld.Bootstrap(new GoodsLot
+            {
+                Id = "test-bread", ItemId = "bread", OwnerId = DevWorld.SiteId, LocationId = GoodsWorld.InventoryLocationId(hostId),
+                Quantity = 2, SpoilAfterSeconds = 3600
+            });
+            GoodsSnapshotStore.Save(_root.ServerWorld, _root.Options.WorldPath);
+            yield return Until(() => { _remoteSite.Tick(); return RemoteCash() == DevWorld.StartingCash; }, "remote sees the starting cash");
+
+            yield return Until(() => { interaction.OpenMachine(DevWorld.CounterId); return interaction.Screen == InteractionScreen.Machine; }, "counter screen");
+            yield return Until(() => hud.SlotOf(PlayerHud.InventoryGrid, "bread") >= 0, "bread in the inventory grid");
+            Assert.That(hud.ScreenRoot.Q<Button>("hud-input-slot-0"), Is.Not.Null);
+            Assert.That(hud.ScreenRoot.Q<Button>("hud-output-slot-0"), Is.Null, "A counter shows prices, not an output grid.");
+            Assert.That(hud.ScreenRoot.Q("hud-sale-prices"), Is.Not.Null);
+
+            hud.ClickSlot(PlayerHud.InventoryGrid, hud.SlotOf(PlayerHud.InventoryGrid, "bread"));
+            hud.ClickSlot(PlayerHud.InputGrid, 0);
+            yield return Until(() => _root.ClientSite.Jobs.Any(x => x.StationId == DevWorld.CounterId && x.IsSale), "a customer being served");
+            Assert.That(interaction.LastRejection, Is.Null);
+            Assert.That(hud.ScreenRoot.Q<Label>("hud-progress-label").text, Does.StartWith("Serving a customer: Bread for $2.50"));
+
+            yield return Until(() => { _remoteSite.Tick(); return RemoteCash() == DevWorld.StartingCash + 250; }, "remote sees one sale", 15f);
+            Assert.That(GoodsSnapshotStore.Load(_root.Options.WorldPath).Snapshot().Companies.Single().Cash, Is.GreaterThanOrEqualTo(DevWorld.StartingCash + 250));
+            yield return Until(() => hud.ScreenRoot.panel.visualTree.Q<Label>("hud-cash").text == PlayerHud.FormatCash(_root.ClientSite.Companies.Single().Cash), "host HUD shows the balance");
+            yield return Until(() => { _remoteSite.Tick(); return RemoteCash() == DevWorld.StartingCash + 500; }, "remote sees both sales", 15f);
+            interaction.CloseScreen();
+        }
+
+        // Decision 0014: the host buys through the supplier window's path and a remote client over UDP buys with a raw request;
+        // both packs land in the buyers' inventories, the shared company pays for both, a retried request is not charged
+        // twice, and the committed save agrees.
+        [UnityTest]
+        public IEnumerator HostAndRemoteBuyFromTheSupplierWithCompanyCash()
+        {
+            yield return StartHost();
+            var hostId = _root.Authenticator.LocalPlayerId;
+            CreateRemote();
+            yield return ConnectRemote();
+            var remoteId = _remoteAuth.LocalPlayerId;
+            var interaction = UnityEngine.Object.FindAnyObjectByType<EquipmentInteraction>();
+            var hud = UnityEngine.Object.FindAnyObjectByType<PlayerHud>();
+            int Dough(GoodsSnapshot site, string player) =>
+                site.Lots.Where(x => x.LocationId == GoodsWorld.InventoryLocationId(player) && x.ItemId == DevWorld.DoughItemId).Sum(x => x.Quantity);
+
+            yield return Until(() => { if (interaction.Screen == InteractionScreen.None) interaction.ToggleInventory(); return interaction.Screen == InteractionScreen.Inventory; }, "inventory screen");
+            yield return null;
+            Assert.That(hud.ScreenRoot.Q<Button>("hud-offer-supplier-dough-5"), Is.Not.Null, "The supplier window lists the dough offer.");
+            hud.ClickOffer("supplier-dough-5");
+            yield return Until(() => Dough(_root.ClientSite, hostId) == DevWorld.StarterDough + 5 && !interaction.HasPendingRequests, "host's dough arrives");
+            Assert.That(interaction.LastRejection, Is.Null);
+
+            var remote = _remoteSite.Bridge;
+            remote.RequestPurchase("remote-buy", DevWorld.SiteId, "supplier-dough-5");
+            yield return Await("remote-buy");
+            Assert.That(_results["remote-buy"].Reason, Is.EqualTo("bought"));
+            _results.Remove("remote-buy");
+            remote.RequestPurchase("remote-buy", DevWorld.SiteId, "supplier-dough-5");
+            yield return Await("remote-buy");
+            Assert.That(_results["remote-buy"].Reason, Is.EqualTo("bought"), "A retry replays the first outcome.");
+
+            const long spent = 2 * 250;
+            yield return Until(() =>
+            {
+                _remoteSite.Tick();
+                return _remoteSite.Latest.Companies.Single().Cash == DevWorld.StartingCash - spent
+                    && Dough(_remoteSite.Latest, remoteId) == DevWorld.StarterDough + 5;
+            }, "remote sees its dough and the shared balance");
+            var saved = GoodsSnapshotStore.Load(_root.Options.WorldPath).Snapshot();
+            Assert.That((saved.Companies.Single().Cash, Dough(saved, hostId), Dough(saved, remoteId)),
+                Is.EqualTo((DevWorld.StartingCash - spent, DevWorld.StarterDough + 5, DevWorld.StarterDough + 5)));
             interaction.CloseScreen();
         }
 
@@ -552,7 +638,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
             yield return Until(() => _root.ServerBridge != null, "server-only restart");
             var oven = Oven(_root.ServerWorld.Snapshot());
             Assert.That((oven.State, oven.CellX, oven.CellZ, oven.Rotation), Is.EqualTo((EquipmentState.Placed, 3, 8, 2)));
-            Assert.That(_root.ServerWorld.Snapshot().Equipment.Count, Is.EqualTo(1), "The seed is not re-applied to an existing save.");
+            Assert.That(_root.ServerWorld.Snapshot().Equipment.Select(x => x.Kind), Is.EquivalentTo(new[] { "oven", DevWorld.CounterKind }), "The seed is not re-applied to an existing save.");
         }
     }
 }

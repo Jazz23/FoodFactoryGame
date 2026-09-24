@@ -22,3 +22,4 @@ MonoBehaviour:
   outputItemId: bread
   outputQuantity: 1
   outputSpoilAfterSeconds: 3600
+  saleCents: 0

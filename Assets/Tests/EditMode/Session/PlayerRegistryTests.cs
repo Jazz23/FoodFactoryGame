@@ -39,9 +39,7 @@ namespace FoodFactoryGame.Session.Tests
             if (Directory.Exists(_directory)) Directory.Delete(_directory, true);
         }
 
-        // The dev seed counts its goods in slots, so it needs the real item content (max stacks) just as the server has.
-        private static ItemDefinition[] ContentItems() => AssetDatabase.FindAssets("t:ItemDefinition", new[] { "Assets/Content/Items" })
-            .Select(x => AssetDatabase.LoadAssetAtPath<ItemDefinition>(AssetDatabase.GUIDToAssetPath(x))).ToArray();
+        private static ItemDefinition[] ContentItems() => SessionTestFiles.ContentItems();
 
         private SessionAdmission Open(out GoodsWorld world)
         {
@@ -230,10 +228,8 @@ namespace FoodFactoryGame.Session.Tests
         {
             var seeded = DevWorld.LoadOrCreate(Path.Combine(_directory, "seed.db"), items: ContentItems());
             var payload = JsonUtility.ToJson(seeded.Snapshot());
-            string digest;
-            using (var sha = SHA256.Create()) digest = Convert.ToBase64String(sha.ComputeHash(Encoding.UTF8.GetBytes(payload)));
             var legacy = Path.Combine(_directory, SessionOptions.LegacyWorldFileName);
-            File.WriteAllText(legacy, "{\"Payload\":" + JsonString(payload) + ",\"Sha256\":\"" + digest + "\"}");
+            var digest = SessionTestFiles.WriteLegacyWorld(legacy, payload);
             var imported = DevWorld.LoadOrCreate(WorldPath, items: ContentItems(), legacyWorldPath: legacy);
             Assert.That(JsonUtility.ToJson(imported.Snapshot()), Is.EqualTo(payload));
             Assert.That(JsonUtility.ToJson(GoodsSnapshotStore.Load(WorldPath).Snapshot()), Is.EqualTo(payload));
@@ -243,8 +239,6 @@ namespace FoodFactoryGame.Session.Tests
             var reopened = DevWorld.LoadOrCreate(WorldPath, items: ContentItems(), legacyWorldPath: legacy);
             Assert.That(reopened.Snapshot().ClockSeconds, Is.EqualTo(1), "An existing database is never re-imported.");
         }
-
-        private static string JsonString(string value) => "\"" + value.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
 
         [Test]
         public void CommandLineSelectsModeAndIsolatedPaths()

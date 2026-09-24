@@ -1,7 +1,8 @@
 // Station jobs share GoodsWorld's lock and snapshot so input consumption, output creation and refunds commit atomically with goods.
 // A job keeps copies of its consumed inputs and its recipe output, so recovery and pickup never depend on registered recipe content.
 // Stations are created and removed only with placed equipment (GoodsWorld.Equipment.cs). Jobs start on request, or by
-// themselves when the server turns AutomaticJobs on.
+// themselves when the server turns AutomaticJobs on. A sale recipe (decision 0013) is a job whose result is cash for the
+// site's company instead of goods: its inputs leave the world and the company is paid in the same commit.
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -25,6 +26,11 @@ namespace FoodFactoryGame.Goods
         public string OutputItemId;
         public int OutputQuantity;
         public long OutputSpoilAfterSeconds;
+        // A sale (decision 0013): when above zero the recipe produces no goods; completing it pays this many cents to the
+        // company that owns the station's site. Output fields are then empty/zero.
+        public long SaleCents;
+
+        public bool IsSale => SaleCents > 0;
     }
 
     [Serializable] public sealed class GoodsStation
@@ -55,10 +61,14 @@ namespace FoodFactoryGame.Goods
         public string OutputItemId;
         public int OutputQuantity;
         public long OutputSpoilAfterSeconds;
+        // Copied from a sale recipe: cents paid to the site's company on completion. A sale job has no goods output and is
+        // never blocked; picking the station up mid-sale refunds its inputs and pays nothing.
+        public long SaleCents;
         // Work in progress: consumed input slices with their exposure frozen at start. LocationId is empty until refunded.
         public List<GoodsLot> Inputs = new();
 
         public string OutputLotId => Id + ":out";
+        public bool IsSale => SaleCents > 0;
     }
 
     public sealed partial class GoodsWorld
@@ -85,8 +95,12 @@ namespace FoodFactoryGame.Goods
                     || recipe.DurationSeconds < 1 || recipe.Inputs == null || recipe.Inputs.Count == 0
                     || recipe.Inputs.Any(x => x == null || string.IsNullOrWhiteSpace(x.ItemId) || x.Quantity < 1)
                     || recipe.Inputs.GroupBy(x => x.ItemId).Any(x => x.Count() != 1)
-                    || string.IsNullOrWhiteSpace(recipe.OutputItemId) || recipe.OutputQuantity < 1
-                    || recipe.OutputSpoilAfterSeconds < 1 || _recipes.ContainsKey(recipe.Id))
+                    || recipe.SaleCents < 0
+                    // Exactly one result: goods, or a sale with no goods output.
+                    || (recipe.IsSale
+                        ? !string.IsNullOrEmpty(recipe.OutputItemId) || recipe.OutputQuantity != 0 || recipe.OutputSpoilAfterSeconds != 0
+                        : string.IsNullOrWhiteSpace(recipe.OutputItemId) || recipe.OutputQuantity < 1 || recipe.OutputSpoilAfterSeconds < 1)
+                    || _recipes.ContainsKey(recipe.Id))
                     throw new ArgumentException("Invalid or duplicate recipe.");
                 _recipes.Add(recipe.Id, JsonUtility.FromJson<RecipeDefinition>(JsonUtility.ToJson(recipe)));
             }
@@ -108,6 +122,8 @@ namespace FoodFactoryGame.Goods
                     return Record(requestId, playerId, false, "invalid-recipe", null);
                 if (_state.Jobs.Any(x => x.StationId == station.Id))
                     return Record(requestId, playerId, false, "station-busy", null);
+                if (recipe.IsSale && CompanyOfSiteLocked(station.SiteId) is null)
+                    return Record(requestId, playerId, false, "no-company", null);
                 var plan = InputPlan(station, recipe);
                 if (plan == null) return Record(requestId, playerId, false, "missing-inputs", null);
 
@@ -155,8 +171,8 @@ namespace FoodFactoryGame.Goods
                 Id = Guid.NewGuid().ToString("N"), StationId = station.Id, RecipeId = recipe.Id, StartedBy = startedBy,
                 StartedAtSeconds = _state.ClockSeconds, DurationSeconds = recipe.DurationSeconds,
                 RemainingSeconds = recipe.DurationSeconds, State = StationJobState.Running,
-                OutputItemId = recipe.OutputItemId, OutputQuantity = recipe.OutputQuantity,
-                OutputSpoilAfterSeconds = recipe.OutputSpoilAfterSeconds
+                OutputItemId = recipe.OutputItemId ?? "", OutputQuantity = recipe.OutputQuantity,
+                OutputSpoilAfterSeconds = recipe.OutputSpoilAfterSeconds, SaleCents = recipe.SaleCents
             };
             foreach (var (lot, take) in plan)
             {
@@ -178,18 +194,35 @@ namespace FoodFactoryGame.Goods
         private void StartReadyJobs()
         {
             if (!_automaticJobs) return;
-            foreach (var station in _state.Stations)
+            foreach (var station in _state.Stations) StartReadyJob(station);
+        }
+
+        // Starts the first ready recipe on an idle station, or returns null.
+        private StationJob StartReadyJob(GoodsStation station)
+        {
+            if (_state.Jobs.Any(x => x.StationId == station.Id)) return null;
+            foreach (var recipe in _recipes.Values.Where(x => x.StationKind == station.Kind).OrderBy(x => x.Id, StringComparer.Ordinal))
             {
-                if (_state.Jobs.Any(x => x.StationId == station.Id)) continue;
-                foreach (var recipe in _recipes.Values.Where(x => x.StationKind == station.Kind).OrderBy(x => x.Id, StringComparer.Ordinal))
-                {
-                    if (!Fits(station.OutputLocationId, recipe.OutputItemId, false, recipe.OutputQuantity)) continue;
-                    var plan = InputPlan(station, recipe);
-                    if (plan == null) continue;
-                    AddJob(station, recipe, plan, AutomaticStarter);
-                    break;
-                }
+                // A sale needs a company to pay; goods need room for their output.
+                if (recipe.IsSale ? CompanyOfSiteLocked(station.SiteId) is null
+                        : !Fits(station.OutputLocationId, recipe.OutputItemId, false, recipe.OutputQuantity)) continue;
+                var plan = InputPlan(station, recipe);
+                if (plan == null) continue;
+                return AddJob(station, recipe, plan, AutomaticStarter);
             }
+            return null;
+        }
+
+        // A sale completes by paying the site's company and removing the job; its inputs already left the world. If the
+        // balance has no headroom for the price, the job waits at zero remaining (goods kept, nothing thrown) and is retried
+        // on the next step. Validate guarantees the site has a company while a sale job exists.
+        private bool TryCompleteSale(StationJob job, GoodsStation station)
+        {
+            var company = _state.Companies.First(x => x.SiteIds.Contains(station.SiteId));
+            if (company.Cash > long.MaxValue - job.SaleCents) return false;
+            TryCredit(company.Id, job.SaleCents);
+            _state.Jobs.Remove(job);
+            return true;
         }
 
         private void EmitBlockedOutputs()
@@ -210,10 +243,30 @@ namespace FoodFactoryGame.Goods
         {
             foreach (var job in _state.Jobs.Where(x => x.State == StationJobState.Running).ToList())
             {
+                // Sale jobs started while catching up earlier in this loop are not in the list; a waiting sale (no headroom)
+                // is retried here with zero remaining.
+                if (!_state.Jobs.Contains(job)) continue;
                 var worked = Math.Min(seconds, job.RemainingSeconds);
                 job.RemainingSeconds -= worked;
                 if (job.RemainingSeconds > 0) continue;
                 var station = _state.Stations.First(x => x.Id == job.StationId);
+                if (job.IsSale)
+                {
+                    // Paid in this same commit. The rest of the step serves the next customers, so revenue does not depend
+                    // on how the server divides time: one long step sells what many short ones would.
+                    var left = seconds - worked;
+                    var sale = job;
+                    while (TryCompleteSale(sale, station) && left > 0 && _automaticJobs)
+                    {
+                        sale = StartReadyJob(station);
+                        if (sale is null || !sale.IsSale) break;
+                        var served = Math.Min(left, sale.RemainingSeconds);
+                        sale.RemainingSeconds -= served;
+                        left -= served;
+                        if (sale.RemainingSeconds > 0) break;
+                    }
+                    continue;
+                }
                 var output = _state.Locations.First(x => x.Id == station.OutputLocationId);
                 var lot = OutputLot(job, station, output.Id, output.Refrigerated ? 0 : seconds - worked);
                 if (!Fits(output.Id, lot.ItemId, lot.Spoiled, lot.Quantity))
@@ -250,7 +303,11 @@ namespace FoodFactoryGame.Goods
                     || x.DurationSeconds < 1 || x.RemainingSeconds < 0 || x.RemainingSeconds > x.DurationSeconds
                     || (x.State == StationJobState.Blocked && x.RemainingSeconds != 0)
                     || (x.State != StationJobState.Running && x.State != StationJobState.Blocked)
-                    || string.IsNullOrWhiteSpace(x.OutputItemId) || x.OutputQuantity < 1 || x.OutputSpoilAfterSeconds < 1
+                    || x.SaleCents < 0
+                    || (x.IsSale
+                        ? !string.IsNullOrEmpty(x.OutputItemId) || x.OutputQuantity != 0 || x.OutputSpoilAfterSeconds != 0
+                            || x.State != StationJobState.Running
+                        : string.IsNullOrWhiteSpace(x.OutputItemId) || x.OutputQuantity < 1 || x.OutputSpoilAfterSeconds < 1)
                     || lotIds.Contains(x.OutputLotId)
                     || x.Inputs == null || x.Inputs.Count == 0
                     || x.Inputs.Any(y => y == null || string.IsNullOrWhiteSpace(y.Id) || string.IsNullOrWhiteSpace(y.ItemId)

@@ -1,6 +1,7 @@
 // Commits verified versioned goods snapshots to a SQLite database in one transaction and recovers the newest valid one.
 // The newest row and the prior valid row are kept, so a damaged latest payload falls back to the previous commit.
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
@@ -23,19 +24,29 @@ namespace FoodFactoryGame.Goods
 
         private static readonly object SaveGate = new();
 
+        // Cost of every commit in this process, from snapshot serialization to the end of the transaction.
+        public static GoodsCommitStats Stats { get; } = new();
+
         public static void Save(GoodsWorld world, string path)
         {
             if (world == null || string.IsNullOrWhiteSpace(path)) throw new ArgumentException("World and explicit save path required.");
             var full = Path.GetFullPath(path);
             if (!Directory.Exists(Path.GetDirectoryName(full))) throw new DirectoryNotFoundException("Create an isolated save directory first.");
+            var timer = Stopwatch.StartNew();
             var state = world.Snapshot();
             GoodsWorld.Validate(state);
             var payload = JsonUtility.ToJson(state);
+            timer.Stop();
+            var wrote = false;
             lock (SaveGate)
             {
+                timer.Start();
                 using var db = Open(full, true);
                 // IMMEDIATE takes the write lock before the revision check, so another process cannot commit in between.
+                // Waiting for another writer is contention, not commit cost, so it is left out of the measurement.
+                timer.Stop();
                 db.Execute("BEGIN IMMEDIATE");
+                timer.Start();
                 try
                 {
                     var prior = LatestValid(db, true);
@@ -50,6 +61,7 @@ namespace FoodFactoryGame.Goods
                         db.Execute("INSERT INTO snapshots (revision, world_id, schema_version, payload, sha256, saved_utc) VALUES (?, ?, ?, ?, ?, ?)",
                             state.Revision, state.WorldId, state.SchemaVersion, payload, Digest(payload), DateTimeOffset.UtcNow.ToUnixTimeSeconds());
                         if (prior != null) db.Execute("DELETE FROM snapshots WHERE revision < ?", prior.Revision);
+                        wrote = true;
                     }
                     db.Execute("COMMIT");
                 }
@@ -59,6 +71,7 @@ namespace FoodFactoryGame.Goods
                     throw;
                 }
             }
+            if (wrote) Stats.Record(timer.Elapsed.TotalMilliseconds, Encoding.UTF8.GetByteCount(payload));
         }
 
         public static GoodsWorld Load(string path)
@@ -190,6 +203,15 @@ namespace FoodFactoryGame.Goods
                 state.Belts ??= new();
                 state.SchemaVersion = 4;
             }
+            // v4 had no companies; the server's seed owner adds one before serving (DevWorld.EnsureCompany).
+            if (state != null && state.SchemaVersion == 4)
+            {
+                state.Companies ??= new();
+                state.SchemaVersion = 5;
+            }
+            // v5 had no sale jobs; every job's SaleCents reads 0 (a goods job). The version still changes so an older build
+            // refuses a v6 save instead of quarantining its sale jobs as invalid.
+            if (state != null && state.SchemaVersion == 5) state.SchemaVersion = 6;
             GoodsWorld.Validate(state);
             return state;
         }

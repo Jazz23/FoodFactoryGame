@@ -45,10 +45,15 @@ public static class BuildDevSite
     private const string BeltMaterialFolder = "Assets/Materials/Belt";
     private const string BeltPrefabFolder = "Assets/Prefabs/Belts";
     private const string BeltItemSpritePath = "Assets/Materials/BeltItemSprite.mat";
+    private const string CounterPrefabPath = "Assets/Prefabs/Equipment/Counter.prefab";
+    private const string CounterDefinitionPath = "Assets/Content/Equipment/Counter.asset";
+    private const string CounterMaterialFolder = "Assets/Materials/Counter";
+    private const string SellBreadRecipePath = "Assets/Content/Recipes/SellBread.asset";
+    private const string OfferFolder = "Assets/Content/Offers";
 
     public static string Run()
     {
-        foreach (var folder in new[] { "Assets/UI", "Assets/Prefabs/Network", "Assets/Prefabs/Player", "Assets/Network", "Assets/Content/Equipment", "Assets/Content/Recipes", "Assets/Content/Items", "Assets/Materials", BeltMaterialFolder, BeltPrefabFolder })
+        foreach (var folder in new[] { "Assets/UI", "Assets/Prefabs/Network", "Assets/Prefabs/Player", "Assets/Network", "Assets/Content/Equipment", "Assets/Content/Recipes", "Assets/Content/Items", "Assets/Materials", BeltMaterialFolder, BeltPrefabFolder, CounterMaterialFolder, "Assets/Prefabs/Equipment", OfferFolder })
             Directory.CreateDirectory(folder);
         AssetDatabase.Refresh();
         var panelSettings = BuildPanelSettings();
@@ -57,6 +62,14 @@ public static class BuildDevSite
         var catalog = BuildCatalog(bridge, player);
         var oven = BuildOvenDefinition(ImportIcon("Oven"));
         var bread = BuildBreadRecipe();
+        var counter = BuildEquipmentDefinition(CounterDefinitionPath, DevWorld.CounterKind, 2, 1, 2, 1, BuildCounterPrefab(), ImportIcon("Counter"));
+        var sellBread = BuildSellBreadRecipe();
+        // PROTOTYPE supplier prices (decision 0014): dough at 50 cents a unit leaves $2.00 margin on a $2.50 bread.
+        var offers = new[]
+        {
+            BuildOffer("Dough5", "supplier-dough-5", DevWorld.DoughItemId, 5, 250, DevWorld.DoughSpoilAfterSeconds),
+            BuildOffer("Belt10", "supplier-belt-10", GoodsWorld.BeltItemId, 10, 500, GoodsWorld.NonPerishableSeconds)
+        };
         // PROTOTYPE stack sizes: dough and bread 20, belts 100 (Factorio's belt stack).
         var items = new[] { BuildItem(DevWorld.DoughItemId, "Dough", 20), BuildItem("bread", "Bread", 20), BuildItem(GoodsWorld.BeltItemId, "Belt", 100) };
         var ghostMaterial = BuildGhostMaterial();
@@ -64,7 +77,8 @@ public static class BuildDevSite
         var tread = BuildBeltMaterials();
         var beltPrefabs = new[] { BuildBeltPrefab("Conveyor_Straight_1m", "BeltStraight"), BuildBeltPrefab("Conveyor_Corner_Left_90", "BeltCornerLeft"), BuildBeltPrefab("Conveyor_Corner_Right_90", "BeltCornerRight") };
         var itemSprite = BuildItemSpriteMaterial();
-        BuildScene(catalog, bridge, player, panelSettings, oven, bread, items, ghostMaterial, ghostModelMaterial, beltPrefabs, tread, itemSprite);
+        BuildScene(catalog, bridge, player, panelSettings, new[] { oven, counter }, new[] { bread, sellBread }, offers, items, ghostMaterial,
+            ghostModelMaterial, beltPrefabs, tread, itemSprite);
         EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
         AssetDatabase.SaveAssets();
         return "DevSite authored";
@@ -91,24 +105,30 @@ public static class BuildDevSite
 
     // DEVELOPMENT content: the oven measures about 2.6 x 2.2 m, so it takes a 3x3-cell footprint with clearance.
     // Buffer capacities are placeholders until recipe content exists.
+    // Capacity counts slots (decision 0009): one input stack and one output stack, like a Factorio furnace.
     private static EquipmentDefinition BuildOvenDefinition(Sprite icon)
     {
-        var definition = AssetDatabase.LoadAssetAtPath<EquipmentDefinition>(OvenDefinitionPath);
+        var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(OvenPrefabPath);
+        if (prefab == null) throw new System.InvalidOperationException($"Missing {OvenPrefabPath}.");
+        return BuildEquipmentDefinition(OvenDefinitionPath, "oven", 3, 3, 1, 1, prefab, icon);
+    }
+
+    private static EquipmentDefinition BuildEquipmentDefinition(string path, string kind, int width, int depth, int inputCapacity,
+        int outputCapacity, GameObject prefab, Sprite icon)
+    {
+        var definition = AssetDatabase.LoadAssetAtPath<EquipmentDefinition>(path);
         if (definition == null)
         {
             definition = ScriptableObject.CreateInstance<EquipmentDefinition>();
-            AssetDatabase.CreateAsset(definition, OvenDefinitionPath);
+            AssetDatabase.CreateAsset(definition, path);
         }
-        var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(OvenPrefabPath);
-        if (prefab == null) throw new System.InvalidOperationException($"Missing {OvenPrefabPath}.");
         using (var serialized = new SerializedObject(definition))
         {
-            serialized.FindProperty("kind").stringValue = "oven";
-            serialized.FindProperty("width").intValue = 3;
-            serialized.FindProperty("depth").intValue = 3;
-            // Capacity counts slots (decision 0009): one input stack and one output stack, like a Factorio furnace.
-            serialized.FindProperty("inputCapacity").intValue = 1;
-            serialized.FindProperty("outputCapacity").intValue = 1;
+            serialized.FindProperty("kind").stringValue = kind;
+            serialized.FindProperty("width").intValue = width;
+            serialized.FindProperty("depth").intValue = depth;
+            serialized.FindProperty("inputCapacity").intValue = inputCapacity;
+            serialized.FindProperty("outputCapacity").intValue = outputCapacity;
             serialized.FindProperty("outputRefrigerated").boolValue = false;
             serialized.FindProperty("visualPrefab").objectReferenceValue = prefab;
             serialized.FindProperty("icon").objectReferenceValue = icon;
@@ -116,6 +136,68 @@ public static class BuildDevSite
         }
         EditorUtility.SetDirty(definition);
         return definition;
+    }
+
+    // DEVELOPMENT placeholder art for the decision-0013 sell counter: a 2 x 1 m wooden counter with a cream top and a teal
+    // register, built from primitives. One box collider on the root lets aim rays name it and keeps players out of it.
+    // The equipment has a 2-slot input and an unused 1-slot output (equipment always has both buffers).
+    private static GameObject BuildCounterPrefab()
+    {
+        var wood = LitMaterial(CounterMaterialFolder, "CounterWood", new Color(0.55f, 0.33f, 0.16f), 0f, 0.35f);
+        var top = LitMaterial(CounterMaterialFolder, "CounterTop", new Color(0.95f, 0.93f, 0.86f), 0f, 0.6f);
+        var register = LitMaterial(CounterMaterialFolder, "CounterRegister", new Color(0.18f, 0.5f, 0.53f), 0.2f, 0.5f);
+        var screen = LitMaterial(CounterMaterialFolder, "CounterScreen", new Color(0.6f, 0.9f, 0.77f), 0f, 0.8f);
+        var root = new GameObject("Counter");
+        try
+        {
+            Block(root, "Body", wood, new Vector3(0f, 0.45f, 0f), new Vector3(1.9f, 0.9f, 0.8f));
+            Block(root, "Top", top, new Vector3(0f, 0.93f, 0f), new Vector3(2f, 0.06f, 0.9f));
+            Block(root, "Register", register, new Vector3(0.5f, 1.08f, 0f), new Vector3(0.45f, 0.24f, 0.35f));
+            Block(root, "Screen", screen, new Vector3(0.5f, 1.27f, 0.08f), new Vector3(0.32f, 0.14f, 0.04f));
+            var box = root.AddComponent<BoxCollider>();
+            box.center = new Vector3(0f, 0.6f, 0f);
+            box.size = new Vector3(2f, 1.2f, 0.9f);
+            return PrefabUtility.SaveAsPrefabAsset(root, CounterPrefabPath);
+        }
+        finally { Object.DestroyImmediate(root); }
+    }
+
+    private static void Block(GameObject parent, string name, Material material, Vector3 position, Vector3 scale)
+    {
+        var block = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        block.name = name;
+        Object.DestroyImmediate(block.GetComponent<BoxCollider>());
+        block.transform.SetParent(parent.transform, false);
+        block.transform.localPosition = position;
+        block.transform.localScale = scale;
+        block.GetComponent<MeshRenderer>().sharedMaterial = material;
+    }
+
+    // DEVELOPMENT content (decision 0013): the counter serves one customer every 5 s, each buying one edible bread for $2.50.
+    private static RecipeAsset BuildSellBreadRecipe()
+    {
+        var recipe = AssetDatabase.LoadAssetAtPath<RecipeAsset>(SellBreadRecipePath);
+        if (recipe == null)
+        {
+            recipe = ScriptableObject.CreateInstance<RecipeAsset>();
+            AssetDatabase.CreateAsset(recipe, SellBreadRecipePath);
+        }
+        using (var serialized = new SerializedObject(recipe))
+        {
+            serialized.FindProperty("id").stringValue = "counter-sell-bread";
+            serialized.FindProperty("displayName").stringValue = "Sell bread";
+            serialized.FindProperty("stationKind").stringValue = DevWorld.CounterKind;
+            serialized.FindProperty("durationSeconds").intValue = 5;
+            var inputs = serialized.FindProperty("inputs");
+            inputs.arraySize = 1;
+            inputs.GetArrayElementAtIndex(0).FindPropertyRelative("itemId").stringValue = "bread";
+            inputs.GetArrayElementAtIndex(0).FindPropertyRelative("quantity").intValue = 1;
+            serialized.FindProperty("outputItemId").stringValue = "";
+            serialized.FindProperty("saleCents").intValue = 250;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+        EditorUtility.SetDirty(recipe);
+        return recipe;
     }
 
     // DEVELOPMENT content: the owner's first oven recipe, one dough to one bread in 10 s. Bread spoils after an hour ambient.
@@ -144,6 +226,28 @@ public static class BuildDevSite
         }
         EditorUtility.SetDirty(recipe);
         return recipe;
+    }
+
+    private static OfferAsset BuildOffer(string asset, string id, string itemId, int quantity, int priceCents, long spoilAfterSeconds)
+    {
+        var path = $"{OfferFolder}/{asset}.asset";
+        var offer = AssetDatabase.LoadAssetAtPath<OfferAsset>(path);
+        if (offer == null)
+        {
+            offer = ScriptableObject.CreateInstance<OfferAsset>();
+            AssetDatabase.CreateAsset(offer, path);
+        }
+        using (var serialized = new SerializedObject(offer))
+        {
+            serialized.FindProperty("id").stringValue = id;
+            serialized.FindProperty("itemId").stringValue = itemId;
+            serialized.FindProperty("quantity").intValue = quantity;
+            serialized.FindProperty("priceCents").intValue = priceCents;
+            serialized.FindProperty("spoilAfterSeconds").longValue = spoilAfterSeconds;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+        EditorUtility.SetDirty(offer);
+        return offer;
     }
 
     // DEVELOPMENT icons drawn by AgentScripts/DrawItemIcons.ps1, imported as UI sprites.
@@ -221,9 +325,12 @@ public static class BuildDevSite
         return tread;
     }
 
-    private static Material BeltMaterial(string name, Color color, float metallic, float smoothness)
+    private static Material BeltMaterial(string name, Color color, float metallic, float smoothness) =>
+        LitMaterial(BeltMaterialFolder, name, color, metallic, smoothness);
+
+    private static Material LitMaterial(string folder, string name, Color color, float metallic, float smoothness)
     {
-        var path = $"{BeltMaterialFolder}/{name}.mat";
+        var path = $"{folder}/{name}.mat";
         var material = AssetDatabase.LoadAssetAtPath<Material>(path);
         if (material == null)
         {
@@ -417,7 +524,7 @@ public static class BuildDevSite
     }
 
     private static void BuildScene(SinglePrefabObjects catalog, NetworkObject bridge, NetworkObject player, PanelSettings panelSettings,
-        EquipmentDefinition oven, RecipeAsset bread, ItemDefinition[] items, Material ghostMaterial, Material ghostModelMaterial,
+        EquipmentDefinition[] equipment, RecipeAsset[] recipeAssets, OfferAsset[] offerAssets, ItemDefinition[] items, Material ghostMaterial, Material ghostModelMaterial,
         GameObject[] beltPrefabs, Material tread, Material itemSprite)
     {
         var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
@@ -483,11 +590,17 @@ public static class BuildDevSite
             for (var index = 0; index < spawns.Length; index++)
                 spawnProperty.GetArrayElementAtIndex(index).objectReferenceValue = spawns[index];
             var definitions = serialized.FindProperty("equipmentDefinitions");
-            definitions.arraySize = 1;
-            definitions.GetArrayElementAtIndex(0).objectReferenceValue = oven;
+            definitions.arraySize = equipment.Length;
+            for (var index = 0; index < equipment.Length; index++)
+                definitions.GetArrayElementAtIndex(index).objectReferenceValue = equipment[index];
             var recipes = serialized.FindProperty("recipes");
-            recipes.arraySize = 1;
-            recipes.GetArrayElementAtIndex(0).objectReferenceValue = bread;
+            recipes.arraySize = recipeAssets.Length;
+            for (var index = 0; index < recipeAssets.Length; index++)
+                recipes.GetArrayElementAtIndex(index).objectReferenceValue = recipeAssets[index];
+            var offersProperty = serialized.FindProperty("offers");
+            offersProperty.arraySize = offerAssets.Length;
+            for (var index = 0; index < offerAssets.Length; index++)
+                offersProperty.GetArrayElementAtIndex(index).objectReferenceValue = offerAssets[index];
             var itemsProperty = serialized.FindProperty("items");
             itemsProperty.arraySize = items.Length;
             for (var index = 0; index < items.Length; index++)

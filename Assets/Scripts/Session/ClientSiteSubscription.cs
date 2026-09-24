@@ -23,6 +23,8 @@ namespace FoodFactoryGame.Session
         public GoodsSnapshot Latest { get; private set; }
         // Null until subscribed; requests sent through it are resolved to this connection's player by the server.
         public GoodsNetworkBridge Bridge => _bridge;
+        // The site this client subscribes to; requests that name a site (purchases) use it.
+        public string SiteId => _siteId;
         public event Action<GoodsOutcome> ResultReceived;
         public string LastRejection { get; private set; }
 
