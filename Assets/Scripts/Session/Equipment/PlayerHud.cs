@@ -482,7 +482,8 @@ namespace FoodFactoryGame.Session.Equipment
                 label.style.marginLeft = 6;
                 row.Add(label);
                 var id = offer.Id;
-                var buy = new Button(() => ClickOffer(id)) { name = $"hud-offer-{id}", text = "Buy" };
+                // Not focusable: a focused button would buy again on every keyboard Submit (Enter/Space) after the click.
+                var buy = new Button(() => ClickOffer(id)) { name = $"hud-offer-{id}", text = "Buy", focusable = false };
                 buy.style.minWidth = 48;
                 row.Add(buy);
                 window.Add(row);

@@ -93,6 +93,7 @@ namespace FoodFactoryGame.Session.Equipment
         private int _releasedFrame = -1;
         private GameObject _ghostModel;
         private string _ghostKind;
+        private bool _openMachineSells;
         private Renderer[] _ghostRenderers = Array.Empty<Renderer>();
 
         public InteractionScreen Screen { get; private set; }
@@ -235,8 +236,7 @@ namespace FoodFactoryGame.Session.Equipment
                 {
                     InteractionScreen.Inventory => "Inventory: click a slot to pick up or put down, shift+click to move a stack across, 1-9 over a stack or dropping it on the hotbar assigns it there, Buy spends company cash at the supplier; E or Esc closes" + suffix,
                     // A sale station (decision 0013) has no results to take: it sells its input for the company.
-                    InteractionScreen.Machine when session.Recipes.Any(x => x != null && x.IsSale
-                        && x.StationKind == site.Equipment.FirstOrDefault(y => y.Id == OpenMachineId)?.Kind) =>
+                    InteractionScreen.Machine when _openMachineSells =>
                         "Counter: put edible goods in the input; customers buy them one at a time for the company (shift+click moves a stack); E or Esc closes" + suffix,
                     InteractionScreen.Machine => "Machine: put ingredients in the input, take results from the output (shift+click moves a stack); E or Esc closes" + suffix,
                     _ => _released ? "Cursor released: click to resume" + suffix
@@ -403,6 +403,9 @@ namespace FoodFactoryGame.Session.Equipment
                 return;
             Screen = InteractionScreen.Machine;
             OpenMachineId = equipmentId;
+            // Decided once per opening rather than every frame: a sale station (decision 0013) gets the counter hint.
+            var kind = session.ClientSite.Equipment.First(x => x.Id == equipmentId).Kind;
+            _openMachineSells = session.Recipes.Any(x => x != null && x.IsSale && x.StationKind == kind);
             _awaitingRelease = true;
         }
 
@@ -448,7 +451,8 @@ namespace FoodFactoryGame.Session.Equipment
             var bridge = _subscription?.Bridge;
             if (bridge == null || string.IsNullOrEmpty(offerId)) return;
             LastRejection = null;
-            bridge.RequestPurchase(Track(), DevWorld.SiteId, offerId);
+            // The subscribed site: the one whose balance and inventory this client shows.
+            bridge.RequestPurchase(Track(), _subscription.SiteId, offerId);
         }
 
         private void OnPlace(InputAction.CallbackContext _)

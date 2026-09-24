@@ -33,6 +33,8 @@ played for money now and replaced by real customers later.
 - Presentation: the machine screen shows a counter's prices instead of an output grid, the progress line reads
   "Serving a customer: …", and the readout hint says what a counter does.
 
+A long server step serves successive customers with its leftover time (one long step sells what many short ones would), and a sale whose credit would overflow the balance waits unpaid instead of stopping the clock (review fixes, 2026-09-24).
+
 Payload schema v6. v5 upgrades with no data change (every existing job is a goods job); the version changes so an older
 build refuses a v6 save rather than quarantining its sale jobs as invalid.
 

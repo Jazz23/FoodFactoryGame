@@ -20,8 +20,8 @@ from farms, factories and truck logistics (GDD sections 8–10); this is a **pro
   (`no-inventory`); room for the pack (`capacity`); the company's cash (`insufficient-funds`). Only then does it debit the
   company and add one fresh lot (exposure 0, owned by the site, ID `buy:<player>:<request>`) to the player's inventory, in
   one commit.
-- The terminal outcome is stored per player and request ID, so a retried request (lost reply, reconnect, restart)
-  replays the first result and is never charged twice. A failed commit records nothing and changes nothing, so the same
+- Only the accepted outcome is stored per player and request ID, so a retried request (lost reply, reconnect, restart)
+  replays it and is never charged twice. Rejections are answered but not recorded or committed (they change nothing, and repeated failing clicks must not grow the save); a rejected request retried later is evaluated afresh and is charged at most once. A failed commit records nothing and changes nothing, so the same
   request can be retried.
 - Offers are content, like recipes: `PurchaseOffer { Id, ItemId, Quantity, PriceCents, SpoilAfterSeconds }`, authored as
   `OfferAsset`, registered on every server start and never saved. No payload schema change.

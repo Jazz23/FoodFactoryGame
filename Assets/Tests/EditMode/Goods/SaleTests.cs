@@ -93,6 +93,43 @@ namespace FoodFactoryGame.Goods.Tests
         }
 
         [Test]
+        public void OneLongStepSellsWhatManyShortStepsWould()
+        {
+            var shortSteps = CreateWorld();
+            foreach (var world in new[] { _world, shortSteps })
+                world.Bootstrap(new GoodsLot { Id = "stock", ItemId = "bread", OwnerId = "restaurant", LocationId = "counter-1:in", Quantity = 5, SpoilAfterSeconds = 100 });
+            _world.Advance(1);
+            _world.Advance(13);
+            for (var second = 0; second < 14; second++) shortSteps.Advance(1);
+            string Summary(GoodsWorld world)
+            {
+                var state = world.Snapshot();
+                return $"{state.Companies.Single().Cash} {state.Lots.Where(x => x.ItemId == "bread").Sum(x => x.Quantity)} {state.Jobs.Single().RemainingSeconds}";
+            }
+            Assert.That(Summary(_world), Is.EqualTo(Summary(shortSteps)), "A server hitch must not lose sales.");
+            Assert.That(_world.Snapshot().Companies.Single().Cash, Is.EqualTo(1000 + 3 * 250), "Sales at 5, 9 and 13 s.");
+        }
+
+        [Test]
+        public void SaleThatWouldOverflowTheBalanceWaitsWithoutStoppingTheClock()
+        {
+            Stock("bread-a", 1);
+            _world.Advance(1);
+            GoodsSnapshotStore.Save(_world, PathForSave);
+            Assert.That(_world.AdjustCashDurably("co", long.MaxValue - 1000 - 100, PathForSave), Is.Null);
+            Assert.DoesNotThrow(() => _world.Advance(10));
+            var state = _world.Snapshot();
+            Assert.That((state.Companies.Single().Cash, state.Jobs.Single().RemainingSeconds), Is.EqualTo((long.MaxValue - 100, 0L)),
+                "The sale waits unpaid; the bread is not lost.");
+            Assert.DoesNotThrow(() => GoodsWorld.Validate(state));
+            Assert.That(_world.TryAdvanceDurably(1, PathForSave), Is.True, "The world keeps ticking and committing.");
+            Assert.That(_world.AdjustCashDurably("co", -1000, PathForSave), Is.Null);
+            _world.Advance(1);
+            Assert.That((_world.Snapshot().Companies.Single().Cash, _world.Snapshot().Jobs.Count), Is.EqualTo((long.MaxValue - 850, 0)),
+                "Paid once there is room.");
+        }
+
+        [Test]
         public void SpoiledGoodsNeverSell()
         {
             Stock("stale", 2, exposure: 100);

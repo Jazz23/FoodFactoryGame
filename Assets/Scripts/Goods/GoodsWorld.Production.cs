@@ -194,20 +194,35 @@ namespace FoodFactoryGame.Goods
         private void StartReadyJobs()
         {
             if (!_automaticJobs) return;
-            foreach (var station in _state.Stations)
+            foreach (var station in _state.Stations) StartReadyJob(station);
+        }
+
+        // Starts the first ready recipe on an idle station, or returns null.
+        private StationJob StartReadyJob(GoodsStation station)
+        {
+            if (_state.Jobs.Any(x => x.StationId == station.Id)) return null;
+            foreach (var recipe in _recipes.Values.Where(x => x.StationKind == station.Kind).OrderBy(x => x.Id, StringComparer.Ordinal))
             {
-                if (_state.Jobs.Any(x => x.StationId == station.Id)) continue;
-                foreach (var recipe in _recipes.Values.Where(x => x.StationKind == station.Kind).OrderBy(x => x.Id, StringComparer.Ordinal))
-                {
-                    // A sale needs a company to pay; goods need room for their output.
-                    if (recipe.IsSale ? CompanyOfSiteLocked(station.SiteId) is null
-                            : !Fits(station.OutputLocationId, recipe.OutputItemId, false, recipe.OutputQuantity)) continue;
-                    var plan = InputPlan(station, recipe);
-                    if (plan == null) continue;
-                    AddJob(station, recipe, plan, AutomaticStarter);
-                    break;
-                }
+                // A sale needs a company to pay; goods need room for their output.
+                if (recipe.IsSale ? CompanyOfSiteLocked(station.SiteId) is null
+                        : !Fits(station.OutputLocationId, recipe.OutputItemId, false, recipe.OutputQuantity)) continue;
+                var plan = InputPlan(station, recipe);
+                if (plan == null) continue;
+                return AddJob(station, recipe, plan, AutomaticStarter);
             }
+            return null;
+        }
+
+        // A sale completes by paying the site's company and removing the job; its inputs already left the world. If the
+        // balance has no headroom for the price, the job waits at zero remaining (goods kept, nothing thrown) and is retried
+        // on the next step. Validate guarantees the site has a company while a sale job exists.
+        private bool TryCompleteSale(StationJob job, GoodsStation station)
+        {
+            var company = _state.Companies.First(x => x.SiteIds.Contains(station.SiteId));
+            if (company.Cash > long.MaxValue - job.SaleCents) return false;
+            TryCredit(company.Id, job.SaleCents);
+            _state.Jobs.Remove(job);
+            return true;
         }
 
         private void EmitBlockedOutputs()
@@ -228,17 +243,28 @@ namespace FoodFactoryGame.Goods
         {
             foreach (var job in _state.Jobs.Where(x => x.State == StationJobState.Running).ToList())
             {
+                // Sale jobs started while catching up earlier in this loop are not in the list; a waiting sale (no headroom)
+                // is retried here with zero remaining.
+                if (!_state.Jobs.Contains(job)) continue;
                 var worked = Math.Min(seconds, job.RemainingSeconds);
                 job.RemainingSeconds -= worked;
                 if (job.RemainingSeconds > 0) continue;
                 var station = _state.Stations.First(x => x.Id == job.StationId);
                 if (job.IsSale)
                 {
-                    // The consumed goods leave the world and the company is paid in this same commit. Validate guarantees
-                    // the site has a company while a sale job exists, so a refused credit is a broken invariant.
-                    if (!TryCredit(CompanyOfSiteLocked(station.SiteId), job.SaleCents))
-                        throw new InvalidOperationException($"Sale job {job.Id} has no company to pay.");
-                    _state.Jobs.Remove(job);
+                    // Paid in this same commit. The rest of the step serves the next customers, so revenue does not depend
+                    // on how the server divides time: one long step sells what many short ones would.
+                    var left = seconds - worked;
+                    var sale = job;
+                    while (TryCompleteSale(sale, station) && left > 0 && _automaticJobs)
+                    {
+                        sale = StartReadyJob(station);
+                        if (sale is null || !sale.IsSale) break;
+                        var served = Math.Min(left, sale.RemainingSeconds);
+                        sale.RemainingSeconds -= served;
+                        left -= served;
+                        if (sale.RemainingSeconds > 0) break;
+                    }
                     continue;
                 }
                 var output = _state.Locations.First(x => x.Id == station.OutputLocationId);

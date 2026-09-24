@@ -1,6 +1,6 @@
 // Verifies supplier purchases (decision 0014): the company pays and fresh goods arrive in the buyer's inventory in one commit;
-// a retried request is never charged twice; every rejection (grant, offer, company, inventory, room, funds) changes
-// nothing; a failed commit rolls back cash and goods together; a purchase survives reload. Isolated saves only.
+// a retried request is never charged twice; every rejection (grant, offer, company, inventory, room, funds) changes nothing,
+// not even the revision; a failed commit rolls back cash and goods together; a purchase survives reload. Isolated saves only.
 using System;
 using System.IO;
 using System.Linq;
@@ -80,21 +80,36 @@ namespace FoodFactoryGame.Goods.Tests
         [Test]
         public void RejectionsChangeNothing()
         {
-            var before = JsonUtility.ToJson(_world.Snapshot().Companies) + JsonUtility.ToJson(_world.Snapshot().Lots.Count);
+            _world.Grant("guest", "restaurant");
+            // The whole world, revision and outcomes included: a rejection records nothing, so it costs no commit.
+            var before = JsonUtility.ToJson(_world.Snapshot());
             string Reason(string player, string request, string site, string offer) => _world.Buy(player, request, site, offer).Reason;
             Assert.That(Reason("chef", "a", "stall", "dough-5"), Is.EqualTo("forbidden"), "no grant for the site");
             Assert.That(Reason("chef", "b", "restaurant", "caviar"), Is.EqualTo("invalid-offer"));
             Assert.That(Reason("vendor", "c", "stall", "dough-5"), Is.EqualTo("no-company"));
+            Assert.That(Reason("guest", "g", "restaurant", "dough-5"), Is.EqualTo("no-inventory"), "granted, but no inventory on the site");
             Assert.That(Reason("chef", "d", "restaurant", "crate"), Is.EqualTo("insufficient-funds"));
             Assert.That(Reason("", "e", "restaurant", "dough-5"), Is.EqualTo("invalid-identity"));
-            Assert.That(JsonUtility.ToJson(_world.Snapshot().Companies) + JsonUtility.ToJson(_world.Snapshot().Lots.Count), Is.EqualTo(before));
+            Assert.That(JsonUtility.ToJson(_world.Snapshot()), Is.EqualTo(before));
 
             // Three slots of 10 dough: after six packs (30 dough) a seventh does not fit. Enough cash for all seven first.
             Assert.That(_world.AdjustCashDurably("co", 1000, PathForSave), Is.Null);
             for (var index = 0; index < 6; index++) Assert.That(_world.Buy("chef", $"fill-{index}", "restaurant", "dough-5").Accepted, Is.True);
-            var cash = Cash();
+            var full = JsonUtility.ToJson(_world.Snapshot());
             Assert.That(Reason("chef", "full", "restaurant", "dough-5"), Is.EqualTo("capacity"));
-            Assert.That((Cash(), Dough()), Is.EqualTo((cash, 30)));
+            Assert.That(JsonUtility.ToJson(_world.Snapshot()), Is.EqualTo(full));
+            Assert.That(Dough(), Is.EqualTo(30));
+        }
+
+        [Test]
+        public void RejectedRequestRetriedLaterIsChargedAtMostOnce()
+        {
+            Assert.That(_world.BuyDurably("chef", "crate-1", "restaurant", "crate", PathForSave).Reason, Is.EqualTo("insufficient-funds"));
+            Assert.That(_world.AdjustCashDurably("co", 1000, PathForSave), Is.Null);
+            Assert.That(_world.BuyDurably("chef", "crate-1", "restaurant", "crate", PathForSave).Reason, Is.EqualTo("bought"),
+                "A rejection was not recorded, so the retry is evaluated afresh.");
+            Assert.That(_world.BuyDurably("chef", "crate-1", "restaurant", "crate", PathForSave).Reason, Is.EqualTo("bought"));
+            Assert.That(Cash(), Is.EqualTo(0), "Charged once.");
         }
 
         [Test]
