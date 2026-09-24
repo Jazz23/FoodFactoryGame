@@ -15,7 +15,9 @@ namespace FoodFactoryGame.Goods.Network
         private Func<NetworkConnection, string> _resolvePlayer;
         private readonly Dictionary<NetworkConnection, string> _subscriptions = new();
         private readonly Dictionary<string, long> _clientRevisions = new();
+        private const float StatsIntervalSeconds = 60f;
         private float _clockRemainder;
+        private float _statsRemainder;
         private string _savePath;
         private bool _persistenceFailed;
 
@@ -42,6 +44,7 @@ namespace FoodFactoryGame.Goods.Network
             _resolvePlayer = null;
             _savePath = null;
             _clockRemainder = 0;
+            _statsRemainder = 0;
             _persistenceFailed = false;
         }
 
@@ -50,6 +53,13 @@ namespace FoodFactoryGame.Goods.Network
         private void Update()
         {
             if (!IsServerStarted || _world == null) return;
+            // Decision 0012 measurement: one summary line a minute of what world commits cost.
+            _statsRemainder += Time.unscaledDeltaTime;
+            if (_statsRemainder >= StatsIntervalSeconds)
+            {
+                _statsRemainder = 0;
+                Debug.Log(GoodsSnapshotStore.Stats.Summary());
+            }
             _clockRemainder += Time.unscaledDeltaTime;
             if (_clockRemainder < 1f) return;
             var seconds = (long)_clockRemainder;

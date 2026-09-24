@@ -6,6 +6,7 @@
 // there, and shift+click sends it straight to the other open container, both with ordinary server-checked transfers.
 // On a screen a hotbar key over a stack, or clicking a hotbar slot with a stack on the cursor, assigns that stack's machine
 // or item to the hotbar slot (the cursor stack goes back where it was); an empty cursor takes up the slot's machine or item.
+// The site company's cash is shown top right, read from the latest baseline.
 // Presentation only: slot positions are this client's arrangement of the replicated stacks, never saved or sent, and
 // progress is interpolated for at most one clock step past the latest baseline.
 using System;
@@ -64,6 +65,7 @@ namespace FoodFactoryGame.Session.Equipment
         private readonly Dictionary<string, List<SlotContent>> _grids = new();
         private VisualElement _crosshair;
         private VisualElement _hotbar;
+        private Label _cash;
         private VisualElement _screen;
         private VisualElement _cursor;
         private VisualElement _progressFill;
@@ -112,7 +114,16 @@ namespace FoodFactoryGame.Session.Equipment
             _cursor = new VisualElement { name = "hud-cursor", pickingMode = PickingMode.Ignore };
             _cursor.style.position = Position.Absolute;
             _cursor.style.width = _cursor.style.height = IconSize;
+            // Company cash (decision 0012): display only, from the latest site baseline.
+            _cash = Caption("", 18, Heading);
+            _cash.name = "hud-cash";
+            _cash.style.position = Position.Absolute;
+            _cash.style.top = 12;
+            _cash.style.right = 16;
+            _cash.style.unityFontStyleAndWeight = FontStyle.Bold;
+            _cash.style.textShadow = new TextShadow { offset = new Vector2(1f, 1f), color = Color.black };
             layer.Add(_crosshair);
+            layer.Add(_cash);
             layer.Add(_hotbar);
             layer.Add(_screen);
             layer.Add(_cursor);
@@ -133,6 +144,9 @@ namespace FoodFactoryGame.Session.Equipment
             var screenOpen = active && interaction.Screen != InteractionScreen.None;
             _crosshair.style.display = active && interaction.PointerLocked ? DisplayStyle.Flex : DisplayStyle.None;
             _hotbar.style.display = active ? DisplayStyle.Flex : DisplayStyle.None;
+            var company = active ? site.Companies?.FirstOrDefault() : null;
+            _cash.style.display = company != null ? DisplayStyle.Flex : DisplayStyle.None;
+            if (company != null) _cash.text = FormatCash(company.Cash);
             _screen.style.display = screenOpen ? DisplayStyle.Flex : DisplayStyle.None;
             if (!active)
             {
@@ -681,6 +695,10 @@ namespace FoodFactoryGame.Session.Equipment
             }
             return icon;
         }
+
+        // Whole cents as dollars, e.g. 50000 -> "$500.00".
+        public static string FormatCash(long cents) =>
+            (cents < 0 ? "-$" : "$") + (Math.Abs((decimal)cents) / 100m).ToString("N2", CultureInfo.InvariantCulture);
 
         private static Label Count(int count)
         {

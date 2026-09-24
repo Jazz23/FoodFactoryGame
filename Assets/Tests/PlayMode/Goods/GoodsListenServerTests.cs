@@ -85,6 +85,11 @@ namespace FoodFactoryGame.Goods.PlayModeTests
             world.Bootstrap(new GoodsLocation { Id = "kitchen", SiteId = "restaurant", Kind = "machine-buffer", Capacity = 6 });
             world.Bootstrap(new GoodsLot { Id = "lot-1", ItemId = "ingredient", OwnerId = "restaurant", LocationId = "storage", Quantity = 10, SpoilAfterSeconds = 2 });
             world.Grant("host-player", "restaurant");
+            // TEST-ONLY: a second site the remote player may see, each site with its own company (decision 0012).
+            world.Bootstrap(new GoodsLocation { Id = "rival-storage", SiteId = "rival", Kind = "storage", Capacity = 20 });
+            world.Bootstrap(new GoodsCompany { Id = "host-co", Cash = 1000, SiteIds = new List<string> { "restaurant" } });
+            world.Bootstrap(new GoodsCompany { Id = "rival-co", Cash = 250, SiteIds = new List<string> { "rival" } });
+            world.Grant("ungranted-player", "rival");
             GoodsSnapshotStore.Save(world, path);
             NetworkManager host = null;
             NetworkManager remote = null;
@@ -134,8 +139,15 @@ namespace FoodFactoryGame.Goods.PlayModeTests
                 serverBridge.RequestSite("restaurant");
                 yield return Until(() => baselines.Count > 0, "granted site baseline");
                 Assert.That(baselines[0].Locations.All(x => x.SiteId == "restaurant"), Is.True);
+                Assert.That(baselines[0].Companies.Select(x => (x.Id, x.Cash)), Is.EqualTo(new[] { ("host-co", 1000L) }));
                 remoteBridge.RequestSite("restaurant");
                 yield return Until(() => remoteResults.Any(x => x.Reason == "subscription-forbidden"), "denied remote subscription");
+                // Company cash reaches a remote client over UDP in its site baseline, and only the site owner's.
+                var remoteBaselines = new List<GoodsSnapshot>();
+                remoteBridge.SiteReceived += remoteBaselines.Add;
+                remoteBridge.RequestSite("rival");
+                yield return Until(() => remoteBaselines.Count > 0, "remote baseline with company cash");
+                Assert.That(remoteBaselines[0].Companies.Select(x => (x.Id, x.Cash)), Is.EqualTo(new[] { ("rival-co", 250L) }));
                 remoteBridge.RequestTransfer("remote-transfer", "lot-1", "kitchen", 2);
                 yield return Until(() => remoteResults.Any(x => x.RequestId == "remote-transfer"), "unauthorized remote rejection");
                 Assert.That(remoteResults.Single(x => x.RequestId == "remote-transfer").Reason, Is.EqualTo("forbidden"));

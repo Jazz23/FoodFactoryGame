@@ -1,6 +1,7 @@
 // Loads the committed world save or creates the DEVELOPMENT seed; the seed is placeholder content, not design data.
 // The seed is applied only to a brand-new world: an existing save never gains the layout, oven or storage dough retroactively.
-// Belts are the one exception: a save from before belts existed gets the dev belt stock once (EnsureBeltStock).
+// Belts and the company are the exceptions: a save from before either existed gets the dev belt stock (EnsureBeltStock) or
+// the dev company with its starting cash (EnsureCompany) once.
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -33,6 +34,9 @@ namespace FoodFactoryGame.Session
         public const string StorageBeltsLotId = "dev-storage-belts";
         public const int StorageBelts = 200;
         public const int StarterBelts = 50;
+        // PROTOTYPE starting capital (whole cents) of the one company that owns the dev site (decision 0012).
+        public const string CompanyId = "dev-company";
+        public const long StartingCash = 50000;
 
         public static IReadOnlyList<GoodsLot> StarterGoods => new[]
         {
@@ -59,6 +63,7 @@ namespace FoodFactoryGame.Session
                 var loaded = GoodsSnapshotStore.Load(worldPath);
                 Register(loaded, items);
                 EnsureBeltStock(loaded, worldPath);
+                EnsureCompany(loaded, worldPath);
                 return loaded;
             }
             var world = new GoodsWorld(WorldId);
@@ -70,6 +75,7 @@ namespace FoodFactoryGame.Session
                 Quantity = StorageDough, SpoilAfterSeconds = DoughSpoilAfterSeconds
             });
             world.Bootstrap(BeltStock());
+            world.Bootstrap(Company());
             world.Bootstrap(new SiteLayout { SiteId = SiteId, Width = GridWidth, Depth = GridDepth });
             if (oven != null) world.Bootstrap(oven.CreatePlaced(OvenId, SiteId, OvenCellX, OvenCellZ, 0));
             GoodsSnapshotStore.Save(world, worldPath);
@@ -104,6 +110,20 @@ namespace FoodFactoryGame.Session
             }
             GoodsSnapshotStore.Save(world, worldPath);
             Debug.Log($"[Session] Added {StorageBelts} dev belts to the storage of this older save.");
+        }
+
+        private static GoodsCompany Company() => new() { Id = CompanyId, Cash = StartingCash, SiteIds = new List<string> { SiteId } };
+
+        // One-time for saves from before companies (payload v4 and older): the dev site gets its company and starting cash,
+        // committed before serving. A site that already has a company is never given cash again.
+        private static void EnsureCompany(GoodsWorld world, string worldPath)
+        {
+            var state = world.Snapshot();
+            if (world.CompanyOfSite(SiteId) != null || state.Companies.Any(x => x.Id == CompanyId)
+                || state.Locations.All(x => x.SiteId != SiteId)) return;
+            world.Bootstrap(Company());
+            GoodsSnapshotStore.Save(world, worldPath);
+            Debug.Log($"[Session] Added {CompanyId} with {StartingCash} cents to this older save.");
         }
     }
 }

@@ -3,7 +3,11 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using UnityEngine;
+
+[assembly: InternalsVisibleTo("FoodFactoryGame.Goods.EditModeTests")]
+[assembly: InternalsVisibleTo("FoodFactoryGame.Session.EditModeTests")]
 
 namespace FoodFactoryGame.Goods
 {
@@ -68,7 +72,7 @@ namespace FoodFactoryGame.Goods
 
     [Serializable] public sealed class GoodsSnapshot
     {
-        public const int CurrentSchema = 4;
+        public const int CurrentSchema = 5;
         public int SchemaVersion = CurrentSchema;
         public string WorldId;
         public long ClockSeconds;
@@ -83,6 +87,7 @@ namespace FoodFactoryGame.Goods
         public List<GoodsEquipment> Equipment = new();
         public List<SiteLayout> SiteLayouts = new();
         public List<GoodsBelt> Belts = new();
+        public List<GoodsCompany> Companies = new();
     }
 
     public sealed partial class GoodsWorld
@@ -228,6 +233,7 @@ namespace FoodFactoryGame.Goods
                 view.Equipment = view.Equipment.Where(x => x.SiteId == siteId).ToList();
                 view.SiteLayouts = view.SiteLayouts.Where(x => x.SiteId == siteId).ToList();
                 view.Belts = view.Belts.Where(x => x.SiteId == siteId).ToList();
+                view.Companies = view.Companies.Where(x => x.SiteIds.Contains(siteId)).ToList();
                 view.Reservations.Clear();
                 view.Outcomes.Clear();
                 view.Grants.Clear();
@@ -504,7 +510,8 @@ namespace FoodFactoryGame.Goods
             if (state == null || state.SchemaVersion != GoodsSnapshot.CurrentSchema || string.IsNullOrWhiteSpace(state.WorldId)
                 || state.ClockSeconds < 0 || state.Revision < 0 || state.Locations == null || state.Lots == null
                 || state.Grants == null || state.Reservations == null || state.Outcomes == null
-                || state.Stations == null || state.Jobs == null || state.Equipment == null || state.SiteLayouts == null || state.Belts == null)
+                || state.Stations == null || state.Jobs == null || state.Equipment == null || state.SiteLayouts == null || state.Belts == null
+                || state.Companies == null)
                 throw new InvalidOperationException("Unsupported or invalid goods snapshot schema.");
             if (state.Locations.Any(x => x == null || string.IsNullOrWhiteSpace(x.Id) || string.IsNullOrWhiteSpace(x.SiteId) || x.Capacity < 1)
                 || state.Locations.GroupBy(x => x.Id).Any(x => x.Count() != 1)
@@ -526,6 +533,7 @@ namespace FoodFactoryGame.Goods
             ValidateProduction(state);
             ValidateEquipment(state);
             ValidateBelts(state);
+            ValidateCompanies(state);
         }
     }
 }
