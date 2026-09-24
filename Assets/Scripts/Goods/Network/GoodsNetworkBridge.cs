@@ -282,6 +282,38 @@ namespace FoodFactoryGame.Goods.Network
             if (result.Accepted) Broadcast();
         }
 
+        // Server-only: true once InitializeServer has handed this bridge its world and commands are not paused by a failing save.
+        public bool IsServing => IsServerStarted && _world != null && !_persistenceFailed;
+
+        // Server-only: whether the player behind a connection may command things on a site (a site grant, as for viewing).
+        public bool CanCommand(NetworkConnection connection, string siteId)
+        {
+            if (!IsServing || connection == null) return false;
+            var player = _resolvePlayer(connection);
+            return !string.IsNullOrWhiteSpace(player) && _world.CanView(player, siteId);
+        }
+
+        // Server-only actors that are not connections (PROTOTYPE employees): the worker gets a site grant and a carried
+        // inventory of at least inventorySlots slots, committed like a player's admission. Returns false if not serving or
+        // the commit fails.
+        public bool EnsureWorker(string workerId, string siteId, int inventorySlots)
+        {
+            if (!IsServing) return false;
+            return _world.TryGrantDurably(workerId, siteId, _savePath, inventorySlots);
+        }
+
+        // Server-only: the worker's authorized view of a site (null if it has no grant or the bridge is not serving).
+        public GoodsSnapshot WorkerView(string workerId, string siteId) => IsServing ? _world.View(workerId, siteId) : null;
+
+        // Server-only: a worker's transfer takes the same durable, validated path as a player's request and is broadcast.
+        public GoodsOutcome WorkerTransfer(string workerId, TransferIntent intent)
+        {
+            if (!IsServing) return new GoodsOutcome { Accepted = false, Reason = "persistence-unavailable" };
+            var result = _world.TransferDurably(workerId, intent, _savePath);
+            if (result.Accepted) Broadcast();
+            return result;
+        }
+
         // A subscriber gets a complete revisioned baseline, never unauthorized state or inferred deltas.
         private void Broadcast()
         {

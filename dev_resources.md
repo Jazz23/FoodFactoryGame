@@ -22,7 +22,7 @@ Repository declarations below were inspected; successful installation and runtim
 | Test Framework | `1.7.0`, declared dependency |
 | uGUI | `2.5.0`, declared dependency; final UI approach TBD |
 | SQLite | `com.gilzoide.sqlite-net`, Git reference `1.3.2`; intended persistence role TBD |
-| MoonSharp | Git reference `upm/beta/v3.0`; scripting/modding requirement TBD |
+| MoonSharp | Git reference `upm/beta/v3.0`; runs PROTOTYPE employee Lua scripts (`EmployeeScript`, soft sandbox); wider scripting/modding requirement TBD |
 | FishNet | Vendored `Assets/FishNet` version `4.7.3`, including metadata, license, and third-party notices; root ignore removed. The snapshot contains 2,014 FishNet files. Original upstream commit/channel is unknown; do not claim byte identity beyond this repository snapshot |
 | FishNet configuration | `Assets/FishNet.Config.XML` is retained as project authoring/configuration and its `.meta` is present |
 | Package resolution | `Packages/packages-lock.json` is tracked; an isolated source snapshot resolved packages and passed the baseline EditMode suite |

@@ -1,1 +1,1 @@
-{"name":"FoodFactoryGame.Session","rootNamespace":"FoodFactoryGame.Session","references":["FoodFactoryGame.Goods","FoodFactoryGame.Goods.Network","FishNet.Runtime","Gilzoide.SqliteNet","Unity.InputSystem"],"autoReferenced":true}
+{"name":"FoodFactoryGame.Session","rootNamespace":"FoodFactoryGame.Session","references":["FoodFactoryGame.Goods","FoodFactoryGame.Goods.Network","FishNet.Runtime","Gilzoide.SqliteNet","Unity.InputSystem","MoonSharp.Interpreter"],"autoReferenced":true}

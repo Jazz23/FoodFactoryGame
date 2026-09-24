@@ -153,7 +153,8 @@ namespace FoodFactoryGame.Session.Equipment
                 _siteSeenAt = Time.unscaledTime;
             }
             var active = site != null && interaction.Session.IsRunning;
-            var screenOpen = active && interaction.Screen != InteractionScreen.None;
+            // The employee script screen is EmployeeScriptPanel's, not a slot screen.
+            var screenOpen = active && interaction.Screen is InteractionScreen.Inventory or InteractionScreen.Machine;
             _crosshair.style.display = active && interaction.PointerLocked ? DisplayStyle.Flex : DisplayStyle.None;
             _hotbar.style.display = active ? DisplayStyle.Flex : DisplayStyle.None;
             var hasCompany = active && site.Companies is { Count: > 0 };
@@ -462,7 +463,7 @@ namespace FoodFactoryGame.Session.Equipment
             _timers.Clear();
             _hovered = null;
             var inventoryId = interaction.InventoryId;
-            if (interaction.Screen == InteractionScreen.None || inventoryId == null) return;
+            if (interaction.Screen is InteractionScreen.None or InteractionScreen.Employee || inventoryId == null) return;
             var inventory = Window("hud-inventory", $"Inventory  {Units(site, inventoryId)}");
             inventory.Add(GridView(InventoryGrid));
             // One line at the grid's width: a longer hover line must never resize the centred screen under the pointer.

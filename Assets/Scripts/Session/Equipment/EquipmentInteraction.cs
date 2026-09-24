@@ -25,7 +25,9 @@ namespace FoodFactoryGame.Session.Equipment
     {
         None,
         Inventory,
-        Machine
+        Machine,
+        // An employee's script screen (EquipmentInteraction.Employees.cs, EmployeeScriptPanel).
+        Employee
     }
 
     // One slot's goods stack (item and spoiled state, up to the item's max stack) in one container, carried on the cursor.
@@ -188,6 +190,7 @@ namespace FoodFactoryGame.Session.Equipment
             hotbarAction.action.performed -= OnHotbar;
             placeItemAction.action.performed -= OnPlaceItem;
             takeItemAction.action.performed -= OnTakeItem;
+            CloseEmployeeScreen();
             foreach (var action in Actions) action.action.Disable();
             Subscribe(null);
             ApplyPointerLock(false);
@@ -227,6 +230,8 @@ namespace FoodFactoryGame.Session.Equipment
             // The top-down view does not orbit, so it aims with a free pointer instead of the centre crosshair.
             ApplyPointerLock(_camera != null && Screen == InteractionScreen.None && !_released && !_rig.TopDown);
             if (_rig != null) _rig.OrbitEnabled = PointerLocked;
+            if (Screen == InteractionScreen.Employee && OpenEmployee == null) CloseScreen();
+            UpdateEmployeeHover();
 
             var layout = site?.SiteLayouts.FirstOrDefault(x => x.SiteId == DevWorld.SiteId);
             var suffix = HasPendingRequests ? " (waiting for server)" : !string.IsNullOrEmpty(LastRejection) ? $" (rejected: {LastRejection})" : "";
@@ -248,9 +253,10 @@ namespace FoodFactoryGame.Session.Equipment
                         "Counter: put edible goods in the input; customers buy them one at a time for the company (shift+click moves a stack); E or Esc closes" + suffix,
                     InteractionScreen.Machine when _openMachineStores =>
                         "Storage: click or shift+click to move goods in and out; hover a stack to see when it spoils; E or Esc closes" + suffix,
+                    InteractionScreen.Employee => "Employee: paste a Lua script and press Run; Stop halts it; Esc closes" + suffix,
                     InteractionScreen.Machine => "Machine: put ingredients in the input, take results from the output (shift+click moves a stack); E or Esc closes" + suffix,
                     _ => _released ? "Cursor released: click to resume" + suffix
-                        : ElevatorHint() + "E: inventory (pick belts or goods to carry them out), 1-9: hotbar, left click: open machine, right click: pick up, R: turn belt, F: take an item off a belt" + suffix
+                        : ElevatorHint() + (_hoveredEmployee != null ? "Left click: give this employee a script. " : "") + "E: inventory (pick belts or goods to carry them out), 1-9: hotbar, left click: open machine, right click: pick up, R: turn belt, F: take an item off a belt" + suffix
                 };
                 return;
             }
@@ -428,6 +434,7 @@ namespace FoodFactoryGame.Session.Equipment
         {
             Screen = InteractionScreen.None;
             OpenMachineId = null;
+            CloseEmployeeScreen();
             if (CursorGoods != null && CursorGoods.LocationId != InventoryId) CursorGoods = null;
         }
 
@@ -477,6 +484,11 @@ namespace FoodFactoryGame.Session.Equipment
                 return;
             }
             var bridge = _subscription?.Bridge;
+            if (_held == null && _hoveredEmployee != null)
+            {
+                OpenEmployeeScreen(_hoveredEmployee);
+                return;
+            }
             if (bridge == null || StartBeltDrag()) return;
             if (_held == null)
             {
