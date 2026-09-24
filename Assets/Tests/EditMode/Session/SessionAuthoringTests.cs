@@ -27,6 +27,9 @@ namespace FoodFactoryGame.Session.Tests
         private const string OvenPrefabPath = "Assets/Prefabs/Equipment/Oven.prefab";
         private const string OvenDefinitionPath = "Assets/Content/Equipment/Oven.asset";
         private const string BreadRecipePath = "Assets/Content/Recipes/Bread.asset";
+        private const string CounterPrefabPath = "Assets/Prefabs/Equipment/Counter.prefab";
+        private const string CounterDefinitionPath = "Assets/Content/Equipment/Counter.asset";
+        private const string SellBreadRecipePath = "Assets/Content/Recipes/SellBread.asset";
 
         private static void AssertAssigned(Object component, params string[] fields)
         {
@@ -75,10 +78,9 @@ namespace FoodFactoryGame.Session.Tests
                     Assert.That(serialized.FindProperty("authenticator").objectReferenceValue, Is.SameAs(server.GetAuthenticator()));
                     Assert.That(AssetDatabase.GetAssetPath(serialized.FindProperty("playerPrefab").objectReferenceValue), Is.EqualTo(PlayerPath));
                     Assert.That(AssetDatabase.GetAssetPath(serialized.FindProperty("bridgePrefab").objectReferenceValue), Is.EqualTo(BridgePath));
-                    Assert.That(AssetDatabase.GetAssetPath(serialized.FindProperty("equipmentDefinitions").GetArrayElementAtIndex(0).objectReferenceValue),
-                        Is.EqualTo(OvenDefinitionPath));
-                    Assert.That(AssetDatabase.GetAssetPath(serialized.FindProperty("recipes").GetArrayElementAtIndex(0).objectReferenceValue),
-                        Is.EqualTo(BreadRecipePath));
+                    Assert.That(roots[0].EquipmentDefinitions.Select(AssetDatabase.GetAssetPath),
+                        Is.EqualTo(new[] { OvenDefinitionPath, CounterDefinitionPath }));
+                    Assert.That(roots[0].Recipes.Select(AssetDatabase.GetAssetPath), Is.EqualTo(new[] { BreadRecipePath, SellBreadRecipePath }));
                 }
                 var panels = objects.SelectMany(x => x.GetComponents<SessionPanel>()).ToArray();
                 Assert.That(panels.Length, Is.EqualTo(1));
@@ -174,6 +176,44 @@ namespace FoodFactoryGame.Session.Tests
                     .All(x => x != null && AssetDatabase.GetAssetPath(x).StartsWith("Assets/Materials/Belt/")), Is.True, "Every slot uses a project belt material.");
             }
             finally { Object.DestroyImmediate(instance); }
+        }
+
+        // Decision 0013: the sell counter is local presentation with one collider for aim rays, and fits its 2x1 footprint.
+        [Test]
+        public void CounterDefinitionHasFootprintIconAndServerFreeVisual()
+        {
+            var definition = AssetDatabase.LoadAssetAtPath<EquipmentDefinition>(CounterDefinitionPath);
+            Assert.That(definition, Is.Not.Null);
+            Assert.That(definition.Kind, Is.EqualTo(DevWorld.CounterKind));
+            Assert.That((definition.Width, definition.Depth), Is.EqualTo((2, 1)));
+            Assert.That((definition.InputCapacity, definition.OutputCapacity), Is.EqualTo((2, 1)));
+            Assert.That(definition.Icon, Is.Not.Null);
+            Assert.That(AssetDatabase.GetAssetPath(definition.VisualPrefab), Is.EqualTo(CounterPrefabPath));
+            Assert.That(definition.VisualPrefab.GetComponentsInChildren<Component>(true).Any(x => x is NetworkObject), Is.False);
+            Assert.That(definition.VisualPrefab.GetComponentsInChildren<Collider>(true).Length, Is.EqualTo(1), "One collider for aim rays.");
+            var instance = (GameObject)PrefabUtility.InstantiatePrefab(definition.VisualPrefab);
+            try
+            {
+                var renderers = instance.GetComponentsInChildren<Renderer>();
+                var bounds = renderers[0].bounds;
+                foreach (var item in renderers.Skip(1)) bounds.Encapsulate(item.bounds);
+                Assert.That(bounds.size.x, Is.LessThanOrEqualTo(definition.Width * FoodFactoryGame.Goods.SiteGrid.CellSize));
+                Assert.That(bounds.size.z, Is.LessThanOrEqualTo(definition.Depth * FoodFactoryGame.Goods.SiteGrid.CellSize));
+            }
+            finally { Object.DestroyImmediate(instance); }
+        }
+
+        [Test]
+        public void SellBreadRecipeSellsOneBreadAtTheCounter()
+        {
+            var recipe = AssetDatabase.LoadAssetAtPath<RecipeAsset>(SellBreadRecipePath);
+            Assert.That(recipe, Is.Not.Null);
+            Assert.That(recipe.IsSale, Is.True);
+            var definition = recipe.ToDefinition();
+            Assert.That((definition.StationKind, definition.DurationSeconds, definition.SaleCents, definition.OutputItemId, definition.OutputQuantity),
+                Is.EqualTo((DevWorld.CounterKind, 5L, 250L, "", 0)));
+            Assert.That(definition.Inputs.Select(x => (x.ItemId, x.Quantity)), Is.EqualTo(new[] { ("bread", 1) }));
+            Assert.DoesNotThrow(() => new FoodFactoryGame.Goods.GoodsWorld("authoring-check").RegisterRecipe(definition));
         }
 
         [Test]

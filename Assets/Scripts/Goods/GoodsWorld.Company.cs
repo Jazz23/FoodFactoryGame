@@ -37,8 +37,10 @@ namespace FoodFactoryGame.Goods
         // The ID of the company that owns the site, or null.
         public string CompanyOfSite(string siteId)
         {
-            lock (_gate) return _state.Companies.FirstOrDefault(x => x.SiteIds.Contains(siteId))?.Id;
+            lock (_gate) return CompanyOfSiteLocked(siteId);
         }
+
+        private string CompanyOfSiteLocked(string siteId) => _state.Companies.FirstOrDefault(x => x.SiteIds.Contains(siteId))?.Id;
 
         // Server-only cash change committed on its own, for dev/admin use and tests. Returns null when committed, otherwise
         // the reason nothing changed: unknown-company, invalid-amount, insufficient-funds or persistence-unavailable.
@@ -81,7 +83,9 @@ namespace FoodFactoryGame.Goods
             if (state.Companies.Any(x => x is null || string.IsNullOrWhiteSpace(x.Id) || x.Cash < 0 || x.SiteIds is null
                     || x.SiteIds.Any(y => string.IsNullOrWhiteSpace(y) || state.Locations.All(z => z.SiteId != y)))
                 || state.Companies.GroupBy(x => x.Id).Any(x => x.Count() != 1)
-                || owned.Distinct().Count() != owned.Count)
+                || owned.Distinct().Count() != owned.Count
+                // A sale in progress must have a company to pay when it completes.
+                || state.Jobs.Where(x => x.IsSale).Any(x => !owned.Contains(state.Stations.First(y => y.Id == x.StationId).SiteId)))
                 throw new InvalidOperationException("Goods snapshot violates company invariants.");
         }
     }

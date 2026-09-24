@@ -149,7 +149,7 @@ namespace FoodFactoryGame.Session
             // Max stacks are content: capacity counts slots, so they are registered (inside LoadOrCreate, before the seed)
             // ahead of any request.
             ServerWorld = DevWorld.LoadOrCreate(_options.WorldPath, equipmentDefinitions.FirstOrDefault(x => x != null && x.Kind == "oven"), items,
-                _options.LegacyWorldPath);
+                _options.LegacyWorldPath, equipmentDefinitions.FirstOrDefault(x => x != null && x.Kind == DevWorld.CounterKind));
             // Machine buffer slot counts follow content, so a saved machine created with older counts is brought up to date.
             foreach (var definition in equipmentDefinitions.Where(x => x != null))
                 ServerWorld.ApplyEquipmentCapacitiesDurably(definition.Kind, definition.InputCapacity, definition.OutputCapacity, _options.WorldPath);

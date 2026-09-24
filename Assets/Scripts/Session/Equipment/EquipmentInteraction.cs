@@ -234,6 +234,10 @@ namespace FoodFactoryGame.Session.Equipment
                 Status = site == null ? "" : Screen switch
                 {
                     InteractionScreen.Inventory => "Inventory: click a slot to pick up or put down, shift+click to move a stack across, 1-9 over a stack or dropping it on the hotbar assigns it there; E or Esc closes" + suffix,
+                    // A sale station (decision 0013) has no results to take: it sells its input for the company.
+                    InteractionScreen.Machine when session.Recipes.Any(x => x != null && x.IsSale
+                        && x.StationKind == site.Equipment.FirstOrDefault(y => y.Id == OpenMachineId)?.Kind) =>
+                        "Counter: put edible goods in the input; customers buy them one at a time for the company (shift+click moves a stack); E or Esc closes" + suffix,
                     InteractionScreen.Machine => "Machine: put ingredients in the input, take results from the output (shift+click moves a stack); E or Esc closes" + suffix,
                     _ => _released ? "Cursor released: click to resume" + suffix
                         : "E: inventory (pick belts or goods to carry them out), 1-9: hotbar, left click: open machine, right click: pick up, R: turn belt, F: take an item off a belt" + suffix

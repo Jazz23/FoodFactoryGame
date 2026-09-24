@@ -209,6 +209,9 @@ namespace FoodFactoryGame.Goods
                 state.Companies ??= new();
                 state.SchemaVersion = 5;
             }
+            // v5 had no sale jobs; every job's SaleCents reads 0 (a goods job). The version still changes so an older build
+            // refuses a v6 save instead of quarantining its sale jobs as invalid.
+            if (state != null && state.SchemaVersion == 5) state.SchemaVersion = 6;
             GoodsWorld.Validate(state);
             return state;
         }

@@ -342,7 +342,7 @@ namespace FoodFactoryGame.Goods.Tests
         public void SchemaV3SaveLoadsAsCurrentWithoutBelts()
         {
             var current = JsonUtility.ToJson(_world.Snapshot());
-            var v3 = current.Replace("\"SchemaVersion\":5", "\"SchemaVersion\":3").Replace(",\"BeltPosition\":0", "").Replace(",\"Belts\":[],\"Companies\":[]", "");
+            var v3 = current.Replace($"\"SchemaVersion\":{GoodsSnapshot.CurrentSchema}", "\"SchemaVersion\":3").Replace(",\"BeltPosition\":0", "").Replace(",\"Belts\":[],\"Companies\":[]", "");
             Assert.That(v3, Does.Not.Contain("Belt\""));
             var legacyPath = Path.Combine(_saveDirectory, "legacy.snapshot");
             SnapshotDatabase.WriteLegacy(legacyPath, v3);
@@ -354,7 +354,7 @@ namespace FoodFactoryGame.Goods.Tests
             Assert.That(loaded.Snapshot().SchemaVersion, Is.EqualTo(GoodsSnapshot.CurrentSchema));
             Assert.That(loaded.Snapshot().Belts, Is.Empty);
             Assert.That(loaded.TryAdvanceDurably(1, PathForSave), Is.True);
-            Assert.That(SnapshotDatabase.LatestPayload(PathForSave), Does.Contain("\"SchemaVersion\":5"));
+            Assert.That(SnapshotDatabase.LatestPayload(PathForSave), Does.Contain($"\"SchemaVersion\":{GoodsSnapshot.CurrentSchema}"));
         }
 
         [Test]

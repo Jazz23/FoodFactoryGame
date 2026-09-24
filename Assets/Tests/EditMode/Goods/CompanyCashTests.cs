@@ -61,7 +61,7 @@ namespace FoodFactoryGame.Goods.Tests
         {
             Assert.That(_world.AdjustCashDurably("co", 234, PathForSave), Is.Null);
             var loaded = GoodsSnapshotStore.Load(PathForSave).Snapshot();
-            Assert.That(loaded.SchemaVersion, Is.EqualTo(5));
+            Assert.That(loaded.SchemaVersion, Is.EqualTo(GoodsSnapshot.CurrentSchema));
             var company = loaded.Companies.Single();
             Assert.That((company.Id, company.Cash, company.SiteIds.Single()), Is.EqualTo(("co", 1234L, "restaurant")));
         }
@@ -72,7 +72,7 @@ namespace FoodFactoryGame.Goods.Tests
             var legacy = new GoodsWorld("legacy-world");
             legacy.Bootstrap(new GoodsLocation { Id = "storage", SiteId = "restaurant", Kind = "storage", Capacity = 20 });
             GoodsSnapshotStore.Save(legacy, PathForSave);
-            var v4 = JsonUtility.ToJson(legacy.Snapshot()).Replace("\"SchemaVersion\":5", "\"SchemaVersion\":4").Replace(",\"Companies\":[]", "");
+            var v4 = JsonUtility.ToJson(legacy.Snapshot()).Replace($"\"SchemaVersion\":{GoodsSnapshot.CurrentSchema}", "\"SchemaVersion\":4").Replace(",\"Companies\":[]", "");
             Assert.That(v4, Does.Not.Contain("Companies"));
             SnapshotDatabase.WritePayload(PathForSave, v4);
             Assert.That(SnapshotDatabase.LatestSchemaColumn(PathForSave), Is.EqualTo(4), "The row looks like a real v4 commit.");
@@ -82,8 +82,8 @@ namespace FoodFactoryGame.Goods.Tests
             Assert.That(loaded.Snapshot().Companies, Is.Empty);
             loaded.Bootstrap(Company("co", 50, "restaurant"));
             GoodsSnapshotStore.Save(loaded, PathForSave);
-            Assert.That(SnapshotDatabase.LatestPayload(PathForSave), Does.Contain("\"SchemaVersion\":5"));
-            Assert.That(SnapshotDatabase.LatestSchemaColumn(PathForSave), Is.EqualTo(5));
+            Assert.That(SnapshotDatabase.LatestPayload(PathForSave), Does.Contain($"\"SchemaVersion\":{GoodsSnapshot.CurrentSchema}"));
+            Assert.That(SnapshotDatabase.LatestSchemaColumn(PathForSave), Is.EqualTo(GoodsSnapshot.CurrentSchema));
             Assert.That(GoodsSnapshotStore.Load(PathForSave).Snapshot().Companies.Single().Cash, Is.EqualTo(50));
         }
 

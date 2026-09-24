@@ -10,16 +10,16 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d4e37b4a452b766479bd60f792bb872a, type: 3}
-  m_Name: Bread
+  m_Name: SellBread
   m_EditorClassIdentifier: FoodFactoryGame.Session::FoodFactoryGame.Session.Equipment.RecipeAsset
-  id: oven-bread
-  displayName: Bread
-  stationKind: oven
-  durationSeconds: 10
+  id: counter-sell-bread
+  displayName: Sell bread
+  stationKind: counter
+  durationSeconds: 5
   inputs:
-  - itemId: dough
+  - itemId: bread
     quantity: 1
-  outputItemId: bread
+  outputItemId: 
   outputQuantity: 1
-  outputSpoilAfterSeconds: 3600
-  saleCents: 0
+  outputSpoilAfterSeconds: 1
+  saleCents: 250

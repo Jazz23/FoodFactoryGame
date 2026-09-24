@@ -488,7 +488,18 @@ namespace FoodFactoryGame.Session.Equipment
             _progressFill.style.backgroundColor = Highlight;
             arrow.Add(_progressFill);
             body.Add(arrow);
-            body.Add(Labelled(GridView(OutputGrid), $"Output {Units(site, equipment.OutputLocationId)}"));
+            // A sale station (decision 0013) turns its input into company cash, so it shows prices instead of an output grid.
+            var sales = SaleRecipes(equipment.Kind);
+            if (sales.Count == 0) body.Add(Labelled(GridView(OutputGrid), $"Output {Units(site, equipment.OutputLocationId)}"));
+            else
+            {
+                var prices = new VisualElement { name = "hud-sale-prices" };
+                prices.style.minWidth = 96;
+                prices.Add(Caption("Sells", 12, Heading));
+                foreach (var sale in sales)
+                    prices.Add(Caption($"{string.Join(" + ", sale.Inputs.Select(x => $"{x.quantity} {ItemName(x.itemId)}"))}  {FormatCash(sale.SaleCents)}", 12, Color.white, 4));
+                body.Add(prices);
+            }
             window.Add(body);
             _progressLabel = Caption("", 12, Muted, 6);
             _progressLabel.name = "hud-progress-label";
@@ -595,10 +606,14 @@ namespace FoodFactoryGame.Session.Equipment
                 var recipes = interaction.Session.Recipes.Where(x => x != null && x.StationKind == equipment?.Kind).ToList();
                 var ingredients = recipes.SelectMany(x => x.Inputs).Select(x => ItemName(x.itemId)).Distinct().ToList();
                 var output = site.Locations.FirstOrDefault(x => x.Id == equipment?.OutputLocationId);
+                var makes = recipes.Where(x => !x.IsSale).ToList();
                 // The server starts nothing while the output cannot take a batch (decision 0008), so say why it waits.
-                if (output != null && recipes.Count > 0
-                    && recipes.All(x => GoodsSlots.FreeUnits(site, output.Id, x.OutputItemId, false, interaction.Session.MaxStack) < x.OutputQuantity))
+                if (output != null && makes.Count > 0 && makes.Count == recipes.Count
+                    && makes.All(x => GoodsSlots.FreeUnits(site, output.Id, x.OutputItemId, false, interaction.Session.MaxStack) < x.OutputQuantity))
                     _progressLabel.text = "Stopped: output full, take the results out";
+                // A sale needs a company to pay (decision 0013); the baseline carries the site's company, if any.
+                else if (recipes.Count > 0 && recipes.All(x => x.IsSale) && site.Companies is not { Count: > 0 })
+                    _progressLabel.text = "Idle: this site has no company to sell for";
                 else _progressLabel.text = ingredients.Count == 0 ? "Idle: no recipes for this machine" : $"Idle: put {string.Join(" or ", ingredients)} in the input";
             }
             else if (job.State == StationJobState.Blocked)
@@ -610,7 +625,10 @@ namespace FoodFactoryGame.Session.Equipment
             {
                 var elapsed = job.DurationSeconds - job.RemainingSeconds + Mathf.Min(Time.unscaledTime - _siteSeenAt, 1f);
                 fraction = Mathf.Clamp01((float)(elapsed / job.DurationSeconds));
-                _progressLabel.text = $"Making {ItemName(job.OutputItemId)}: {job.DurationSeconds - job.RemainingSeconds}/{job.DurationSeconds} s";
+                var what = job.IsSale
+                    ? $"Serving a customer: {string.Join(" + ", job.Inputs.Select(x => ItemName(x.ItemId)).Distinct())} for {FormatCash(job.SaleCents)}"
+                    : $"Making {ItemName(job.OutputItemId)}";
+                _progressLabel.text = $"{what}: {job.DurationSeconds - job.RemainingSeconds}/{job.DurationSeconds} s";
             }
             _progressFill.style.width = new Length(fraction * 100f, LengthUnit.Percent);
         }
@@ -622,6 +640,9 @@ namespace FoodFactoryGame.Session.Equipment
             return location == null ? ""
                 : $"{GoodsSlots.SlotsUsed(site.Lots.Where(x => x.LocationId == locationId), interaction.Session.MaxStack)}/{location.Capacity}";
         }
+
+        private List<RecipeAsset> SaleRecipes(string kind) =>
+            interaction.Session.Recipes.Where(x => x != null && x.IsSale && x.StationKind == kind).ToList();
 
         private ItemDefinition Item(string itemId) => Items.FirstOrDefault(x => x != null && x.Id == itemId);
         private string ItemName(string itemId) => Item(itemId)?.DisplayName ?? Title(itemId);

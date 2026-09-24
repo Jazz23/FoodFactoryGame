@@ -50,7 +50,7 @@ namespace FoodFactoryGame.Session.Tests
             // Companies entry is removed, so the fixture stays valid whatever fields later schemas add.
             var seeded = DevWorld.LoadOrCreate(Path.Combine(_directory, "seed.db"), items: SessionTestFiles.ContentItems()).Snapshot();
             seeded.Companies.Clear();
-            var v4 = JsonUtility.ToJson(seeded).Replace("\"SchemaVersion\":5", "\"SchemaVersion\":4").Replace(",\"Companies\":[]", "");
+            var v4 = JsonUtility.ToJson(seeded).Replace($"\"SchemaVersion\":{GoodsSnapshot.CurrentSchema}", "\"SchemaVersion\":4").Replace(",\"Companies\":[]", "");
             Assert.That(v4, Does.Not.Contain("Companies"));
             Assert.That(v4, Does.Contain("\"SchemaVersion\":4"));
             var legacy = Path.Combine(_directory, SessionOptions.LegacyWorldFileName);
