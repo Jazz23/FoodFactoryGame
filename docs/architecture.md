@@ -176,7 +176,7 @@ Decision: [0014](decisions/0014-supplier-purchases.md). Step 3 of the sell loop:
 - Network: `GoodsNetworkBridge.RequestPurchase(request, site, offer)` → `ServerPurchase` (connection-resolved player, broadcast on accept).
 - Content: `OfferAsset` (`Assets/Content/Offers/Dough5.asset` 5 dough $2.50, `Belt10.asset` 10 belts $5.00), authored by `BuildDevSite`; `SessionRoot.offers` registers them on every server start and exposes `Offers`.
 - Presentation: `EquipmentInteraction.Buy(offer)`; the inventory screen's Supplier window (`hud-supplier`, `hud-offer-<id>` buttons, `PlayerHud.ClickOffer`).
-- The dev starter goods and storage stock are kept (open question in decision 0014).
+- The dev starter goods and storage stock are kept alongside purchases (owner decision, 2026-09-24; decision 0014).
 Open: member spending permissions, bulk quantities, supplier stock, delivery times, buying equipment.
 
 ## Required Constraints for Future Implementation

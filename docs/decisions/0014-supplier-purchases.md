@@ -42,6 +42,6 @@ from farms, factories and truck logistics (GDD sections 8–10); this is a **pro
 
 - The dev starter goods (5 dough and 50 belts per new player) and the dev storage stock are **kept**. The earlier plan said
   purchases would replace them; removing them now would strand new players with no way to bake before their first
-  purchase and would change the existing seed tests. Whether to remove them is open for the owner.
+  purchase and would change the existing seed tests. The owner decided on 2026-09-24 to keep them; purchases supplement the free starter goods rather than replace them.
 - Open: member spending permissions, bulk quantities, dynamic or player-negotiated prices, supplier stock limits, delivery
   times and logistics, and buying equipment (GDD section 12).
