@@ -265,6 +265,20 @@ Decision: [0022](decisions/0022-trucks.md). GDD section 9 trucks between two own
 
 Prototype: map positions, dock and truck sizes, speed and rate, dock price, L key, placeholder models, redirect from the last site. Open: see decision 0022.
 
+## Implemented: truck routes and fleet (2026-09-24)
+
+Decision: [0023](decisions/0023-truck-routes-and-fleet.md). Supersedes the per-truck route of 0022 above. Goods snapshot schema **v12**.
+
+- Domain (`GoodsWorld.Trucks.cs`): `GoodsRoute { Id, CompanyId, PickupDockId, DropoffDockId, AllowedItemIds }` in `GoodsSnapshot.Routes`; `GoodsTruck.RouteId` (empty exactly while `Parked`) replaces the truck's route fields. Commands, all durable, rejections unrecorded, accepted ones replay: `CreateRouteDurably(player, request, pickupDock, dropoffDock, items)` (ID `GoodsWorld.RouteIdFor(player, request)`), `SetRouteDurably(..., route, ...)` (re-dispatches the route's trucks), `DeleteRouteDurably(player, request, route)` (parks its trucks, cargo aboard), `AssignTruckDurably(player, request, truck, route)` (empty route parks; same route is a no-op). Reasons: `forbidden`, `invalid-dock`, `same-site`, `no-road`, `invalid-cargo`. Server-only `Bootstrap(GoodsRoute)`. `GoodsWorld.RouteOf(state, truck)` for presentation. `View` adds the company's routes. `Validate` checks routes (company owns both docks, filter) and that a routed truck's route exists in its company.
+- Purchases (`GoodsWorld.Supply.cs`): `TruckOffer { Id, PriceCents, Name, CargoSlots, SpeedMetresPerSecond, LoadUnitsPerSecond }`, `RegisterTruckOffer`; `Buy` with a truck offer needs no inventory, refuses an unmapped site (`no-road`), charges once and parks truck `buy:<player>:<request>` ("<Name> <n>") at the site; the outcome's `EquipmentId` is the truck ID.
+- Schema: `GoodsSnapshotStore` upgrades v11 by turning each routed truck into route `route:<truck id>` with that truck on it.
+- Network (`GoodsNetworkBridge`): `RequestCreateRoute`, `RequestSetRoute`, `RequestDeleteRoute`, `RequestAssignTruck` replace `RequestSetTruckRoute`; trucks are bought with `RequestPurchase`.
+- Session and content: `DevWorld` seeds route `dev-route-1` with `dev-truck-1` on it. `TruckDefinition` (`Assets/Content/Vehicles/Truck.asset`: 4 slots, 15 m/s, 5 units/s) and `OfferAsset.truck`; offer `Assets/Content/Offers/Truck1.asset` (`supplier-truck`, $250.00) is on `SessionRoot.offers` in `DevSite` and `SampleScene` and authored by `BuildDevSite.cs`.
+- Presentation: `LogisticsPanel` has Routes (choosers, Apply, Delete, trucks on it), a New route draft with Create, and Trucks (status, cargo, route chooser with Assign/Park, Buy per truck offer). The supplier window leaves truck offers out. `PlayerHud`'s dock note and `TruckPresenter` read docks through the route.
+- Evidence (2026-09-24, Editor 6000.5.9f1, isolated temp saves): EditMode `FoodFactoryGame.Goods.EditModeTests` 150/150 (20 `TruckTests`, new: several trucks per route, route deletion, parking, buying, v11 upgrade), `FoodFactoryGame.Session.EditModeTests` 64/64 (new `SupplierTruckOfferSellsTheDevTruckModel`), `FoodFactoryGame.Baseline.EditModeTests` 4/4; PlayMode `FoodFactoryGame.Session.PlayModeTests` 18/18 (`LogisticsPanelTests.PanelShipsStockEditsRoutesAndManagesTheFleet` buys, creates, assigns, parks and deletes through the panel) and `FoodFactoryGame.Goods.PlayModeTests` 1/1. No running-game visual capture of the new logistics screen and no separate-process multiplayer check were made.
+
+Prototype: truck price, parking a driving truck at the site it left, panel layout. Open: see decision 0023.
+
 ## Required Constraints for Future Implementation
 
 - The server owns gameplay state; clients request validated actions through the command contract in decision 0002.
@@ -273,7 +287,7 @@ Prototype: map positions, dock and truck sizes, speed and rate, dock price, L ke
 - Player and employee operational rules should be shared; input and AI choose actions through those rules.
 - Visual objects must not become the sole owners of authoritative simulation state.
 
-These remain accepted contracts; only the bounded goods slice, its station jobs, equipment placement, the working oven, conveyor belts, company cash, the sell counter, supplier purchases, equipment purchases, spoilage timing/refrigeration, building shells, factory floors, conveyor lifts and trucks with loading docks above have a runtime interface. Sales credit cash inside the clock tick; supplier purchases and floor orders are the player payment commands. Trucks move goods between sites only inside the clock tick, through their own cargo locations.
+These remain accepted contracts; only the bounded goods slice, its station jobs, equipment placement, the working oven, conveyor belts, company cash, the sell counter, supplier purchases, equipment purchases, spoilage timing/refrigeration, building shells, factory floors, conveyor lifts, trucks with loading docks, and truck routes and fleet above have a runtime interface. Sales credit cash inside the clock tick; supplier purchases and floor orders are the player payment commands. Trucks move goods between sites only inside the clock tick, through their own cargo locations.
 
 ## Planned / Undecided
 

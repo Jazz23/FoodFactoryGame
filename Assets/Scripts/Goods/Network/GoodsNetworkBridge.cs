@@ -179,7 +179,8 @@ namespace FoodFactoryGame.Goods.Network
             if (IsClientStarted) ServerPlaceOnBelt(requestId, lotId, beltId);
         }
 
-        // Buys one pack of a supplier offer with the site company's cash into the requester's inventory (BuyDurably).
+        // Buys one supplier offer with the site company's cash: goods or a machine into the requester's inventory, or a truck
+        // parked at the site (BuyDurably).
         public void RequestPurchase(string requestId, string siteId, string offerId)
         {
             if (IsClientStarted) ServerPurchase(requestId, siteId, offerId);
@@ -194,18 +195,64 @@ namespace FoodFactoryGame.Goods.Network
             if (result.Accepted) Broadcast();
         }
 
-        // Gives a company truck a route between two docks, with the items it may load (empty for any) (SetTruckRouteDurably).
-        public void RequestSetTruckRoute(string requestId, string truckId, string pickupDockId, string dropoffDockId, string[] allowedItemIds)
+        // Makes a company route between two docks, with the items its trucks may load (empty for any) (CreateRouteDurably).
+        public void RequestCreateRoute(string requestId, string pickupDockId, string dropoffDockId, string[] allowedItemIds)
         {
-            if (IsClientStarted) ServerSetTruckRoute(requestId, truckId, pickupDockId, dropoffDockId, allowedItemIds ?? Array.Empty<string>());
+            if (IsClientStarted) ServerCreateRoute(requestId, pickupDockId, dropoffDockId, allowedItemIds ?? Array.Empty<string>());
         }
 
         [ServerRpc(RequireOwnership = false)]
-        private void ServerSetTruckRoute(string requestId, string truckId, string pickupDockId, string dropoffDockId, string[] allowedItemIds,
+        private void ServerCreateRoute(string requestId, string pickupDockId, string dropoffDockId, string[] allowedItemIds,
             NetworkConnection sender = null)
         {
             if (!TryIdentify(sender, requestId, out var player)) return;
-            var result = _world.SetTruckRouteDurably(player, requestId, truckId, pickupDockId, dropoffDockId, allowedItemIds, _savePath);
+            var result = _world.CreateRouteDurably(player, requestId, pickupDockId, dropoffDockId, allowedItemIds, _savePath);
+            Reply(sender, result);
+            if (result.Accepted) Broadcast();
+        }
+
+        // Changes a route's docks and cargo; its trucks follow the new route (SetRouteDurably).
+        public void RequestSetRoute(string requestId, string routeId, string pickupDockId, string dropoffDockId, string[] allowedItemIds)
+        {
+            if (IsClientStarted) ServerSetRoute(requestId, routeId, pickupDockId, dropoffDockId, allowedItemIds ?? Array.Empty<string>());
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        private void ServerSetRoute(string requestId, string routeId, string pickupDockId, string dropoffDockId, string[] allowedItemIds,
+            NetworkConnection sender = null)
+        {
+            if (!TryIdentify(sender, requestId, out var player)) return;
+            var result = _world.SetRouteDurably(player, requestId, routeId, pickupDockId, dropoffDockId, allowedItemIds, _savePath);
+            Reply(sender, result);
+            if (result.Accepted) Broadcast();
+        }
+
+        // Removes a route and parks its trucks (DeleteRouteDurably).
+        public void RequestDeleteRoute(string requestId, string routeId)
+        {
+            if (IsClientStarted) ServerDeleteRoute(requestId, routeId);
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        private void ServerDeleteRoute(string requestId, string routeId, NetworkConnection sender = null)
+        {
+            if (!TryIdentify(sender, requestId, out var player)) return;
+            var result = _world.DeleteRouteDurably(player, requestId, routeId, _savePath);
+            Reply(sender, result);
+            if (result.Accepted) Broadcast();
+        }
+
+        // Puts a truck on a route, or parks it with an empty route (AssignTruckDurably).
+        public void RequestAssignTruck(string requestId, string truckId, string routeId)
+        {
+            if (IsClientStarted) ServerAssignTruck(requestId, truckId, routeId ?? "");
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        private void ServerAssignTruck(string requestId, string truckId, string routeId, NetworkConnection sender = null)
+        {
+            if (!TryIdentify(sender, requestId, out var player)) return;
+            var result = _world.AssignTruckDurably(player, requestId, truckId, routeId, _savePath);
             Reply(sender, result);
             if (result.Accepted) Broadcast();
         }

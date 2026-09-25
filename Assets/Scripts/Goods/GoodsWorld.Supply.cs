@@ -1,6 +1,6 @@
-// Supplier purchases (decisions 0014, 0017): a player spends the site company's cash on a content offer and the goods, or a
-// new machine held by the buyer, arrive in the player's inventory, debit and delivery in one commit. Offers are content like
-// recipes (registered, never saved); goods and equipment offers share one ID space. The accepted outcome is keyed by player
+// Supplier purchases (decisions 0014, 0017, 0023): a player spends the site company's cash on a content offer and the goods, a
+// new machine held by the buyer, or a new parked truck arrive, debit and delivery in one commit. Offers are content like
+// recipes (registered, never saved); goods, equipment and truck offers share one ID space. The accepted outcome is keyed by player
 // and request ID, so a retried request replays it and is never charged twice.
 // PROTOTYPE: delivery is immediate, standing in for supplier logistics (GDD section 9).
 using System;
@@ -35,6 +35,7 @@ namespace FoodFactoryGame.Goods
     {
         private readonly Dictionary<string, PurchaseOffer> _offers = new();
         private readonly Dictionary<string, EquipmentOffer> _equipmentOffers = new();
+        private readonly Dictionary<string, TruckOffer> _truckOffers = new();
 
         public void RegisterOffer(PurchaseOffer offer)
         {
@@ -60,7 +61,19 @@ namespace FoodFactoryGame.Goods
             }
         }
 
-        private bool OfferExistsLocked(string offerId) => _offers.ContainsKey(offerId) || _equipmentOffers.ContainsKey(offerId);
+        public void RegisterTruckOffer(TruckOffer offer)
+        {
+            lock (_gate)
+            {
+                if (offer is null || string.IsNullOrWhiteSpace(offer.Id) || offer.PriceCents < 1 || string.IsNullOrWhiteSpace(offer.Name)
+                    || offer.CargoSlots < 1 || offer.SpeedMetresPerSecond < 1 || offer.LoadUnitsPerSecond < 1 || OfferExistsLocked(offer.Id))
+                    throw new ArgumentException("Invalid or duplicate truck offer.");
+                _truckOffers.Add(offer.Id, JsonUtility.FromJson<TruckOffer>(JsonUtility.ToJson(offer)));
+            }
+        }
+
+        private bool OfferExistsLocked(string offerId) =>
+            _offers.ContainsKey(offerId) || _equipmentOffers.ContainsKey(offerId) || _truckOffers.ContainsKey(offerId);
 
         // Volatile primitive for tests. Live request handlers must call BuyDurably.
         public GoodsOutcome Buy(string playerId, string requestId, string siteId, string offerId)
@@ -81,21 +94,39 @@ namespace FoodFactoryGame.Goods
                 if (!_state.Grants.Any(x => x.PlayerId == playerId && x.SiteId == siteId)) return Reject("forbidden");
                 PurchaseOffer offer = null;
                 EquipmentOffer machine = null;
-                if (offerId is null || (!_offers.TryGetValue(offerId, out offer) && !_equipmentOffers.TryGetValue(offerId, out machine)))
+                TruckOffer vehicle = null;
+                if (offerId is null || (!_offers.TryGetValue(offerId, out offer) && !_equipmentOffers.TryGetValue(offerId, out machine)
+                        && !_truckOffers.TryGetValue(offerId, out vehicle)))
                     return Reject("invalid-offer");
                 var company = CompanyOfSiteLocked(siteId);
                 if (company is null) return Reject("no-company");
+                // A truck enters no inventory; it is parked at the site, which needs a map record for it to drive anywhere.
                 var inventory = _state.Locations.FirstOrDefault(x => x.Id == InventoryLocationId(playerId) && x.SiteId == siteId);
-                if (inventory is null) return Reject("no-inventory");
+                if (vehicle is null && inventory is null) return Reject("no-inventory");
+                if (vehicle is not null && _state.Sites.All(x => x.Id != siteId)) return Reject("no-road");
                 // A held machine takes no inventory slot (decision 0006), but its site needs a grid for it to be placed on.
                 if (machine is not null && !_state.SiteLayouts.Any(x => x.SiteId == siteId)) return Reject("no-layout");
                 if (offer is not null && !Fits(inventory.Id, offer.ItemId, false, offer.Quantity)) return Reject("capacity");
-                if (_state.Companies.First(x => x.Id == company).Cash < (offer?.PriceCents ?? machine.PriceCents))
+                if (_state.Companies.First(x => x.Id == company).Cash < (offer?.PriceCents ?? machine?.PriceCents ?? vehicle.PriceCents))
                     return Reject("insufficient-funds");
 
                 // All checks precede this single locked mutation: pay, then deliver under a request-derived ID, which is unique
                 // because an accepted request replays instead of running again.
                 var deliveredId = $"buy:{playerId}:{requestId}";
+                if (vehicle is not null)
+                {
+                    TryDebit(company, vehicle.PriceCents);
+                    AddTruck(new GoodsTruck
+                    {
+                        Id = deliveredId, CompanyId = company, Name = $"{vehicle.Name} {_state.Trucks.Count(x => x.CompanyId == company) + 1}",
+                        CargoSlots = vehicle.CargoSlots, SpeedMetresPerSecond = vehicle.SpeedMetresPerSecond,
+                        LoadUnitsPerSecond = vehicle.LoadUnitsPerSecond, State = TruckState.Parked, SiteId = siteId
+                    });
+                    var bought = Record(requestId, playerId, true, "bought", null);
+                    bought.EquipmentId = deliveredId;
+                    _state.Outcomes[_state.Outcomes.Count - 1].EquipmentId = deliveredId;
+                    return bought;
+                }
                 if (machine is not null)
                 {
                     TryDebit(company, machine.PriceCents);

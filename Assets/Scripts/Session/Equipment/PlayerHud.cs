@@ -493,7 +493,8 @@ namespace FoodFactoryGame.Session.Equipment
         private VisualElement SupplierWindow()
         {
             var window = Window("hud-supplier", "Supplier");
-            foreach (var offer in interaction.Session.Offers.Where(x => x != null))
+            // Truck offers are bought on the logistics screen (decision 0023).
+            foreach (var offer in interaction.Session.Offers.Where(x => x != null && x.Truck == null))
             {
                 var row = new VisualElement { name = $"hud-offer-row-{offer.Id}" };
                 row.style.flexDirection = FlexDirection.Row;
@@ -614,9 +615,10 @@ namespace FoodFactoryGame.Session.Equipment
             body.Add(outgoing);
             body.Add(Labelled(GridView(OutputGrid), $"Incoming: trucks unload {Units(site, equipment.OutputLocationId)}"));
             window.Add(body);
-            var trucks = site.Trucks.Where(x => x.PickupDockId == equipment.Id || x.DropoffDockId == equipment.Id).ToList();
-            var note = Caption(trucks.Count == 0 ? "No truck serves this dock; press L to give one a route."
-                : string.Join("\n", trucks.Select(x => $"{x.Name}: {(x.PickupDockId == equipment.Id ? "picks up here" : "delivers here")}")), 12, Muted, 6);
+            var trucks = site.Trucks.Select(x => (Truck: x, Route: GoodsWorld.RouteOf(site, x)))
+                .Where(x => x.Route?.PickupDockId == equipment.Id || x.Route?.DropoffDockId == equipment.Id).ToList();
+            var note = Caption(trucks.Count == 0 ? "No truck serves this dock; press L to set up a route."
+                : string.Join("\n", trucks.Select(x => $"{x.Truck.Name}: {(x.Route.PickupDockId == equipment.Id ? "picks up here" : "delivers here")}")), 12, Muted, 6);
             note.name = "hud-dock-trucks";
             window.Add(note);
             return window;

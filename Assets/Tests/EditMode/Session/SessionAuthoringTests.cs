@@ -88,7 +88,7 @@ namespace FoodFactoryGame.Session.Tests
                         Is.EqualTo(new[] { OvenDefinitionPath, CounterDefinitionPath, FridgeDefinitionPath, DockDefinitionPath }));
                     Assert.That(roots[0].Recipes.Select(AssetDatabase.GetAssetPath), Is.EqualTo(new[] { BreadRecipePath, SellBreadRecipePath }));
                     Assert.That(roots[0].Offers.Select(AssetDatabase.GetAssetPath),
-                        Is.EqualTo(new[] { "Assets/Content/Offers/Dough5.asset", "Assets/Content/Offers/Belt10.asset", "Assets/Content/Offers/Oven1.asset", "Assets/Content/Offers/Fridge1.asset", "Assets/Content/Offers/Dock1.asset" }));
+                        Is.EqualTo(new[] { "Assets/Content/Offers/Dough5.asset", "Assets/Content/Offers/Belt10.asset", "Assets/Content/Offers/Oven1.asset", "Assets/Content/Offers/Fridge1.asset", "Assets/Content/Offers/Dock1.asset", "Assets/Content/Offers/Truck1.asset" }));
                 }
                 var panels = objects.SelectMany(x => x.GetComponents<SessionPanel>()).ToArray();
                 Assert.That(panels.Length, Is.EqualTo(1));
@@ -318,6 +318,20 @@ namespace FoodFactoryGame.Session.Tests
             var truck = AssetDatabase.LoadAssetAtPath<GameObject>(TruckPrefabPath);
             Assert.That(truck, Is.Not.Null);
             Assert.That(truck.GetComponentsInChildren<Collider>(true), Is.Empty, "A parked truck never blocks aim rays or walking.");
+        }
+
+        // Decision 0023: the truck offer sells the dev truck's model as valid server content.
+        [Test]
+        public void SupplierTruckOfferSellsTheDevTruckModel()
+        {
+            var offer = AssetDatabase.LoadAssetAtPath<OfferAsset>("Assets/Content/Offers/Truck1.asset");
+            Assert.That(offer, Is.Not.Null);
+            Assert.That((AssetDatabase.GetAssetPath(offer.Truck), offer.Equipment, offer.Quantity, offer.PriceCents),
+                Is.EqualTo(("Assets/Content/Vehicles/Truck.asset", (EquipmentDefinition)null, 1, 25000L)));
+            var model = offer.ToTruckOffer();
+            Assert.That((model.Name, model.CargoSlots, model.SpeedMetresPerSecond, model.LoadUnitsPerSecond),
+                Is.EqualTo(("Truck", DevWorld.TruckCargoSlots, DevWorld.TruckSpeedMetresPerSecond, DevWorld.TruckLoadUnitsPerSecond)));
+            Assert.DoesNotThrow(() => offer.RegisterWith(new GoodsWorld("authoring-check")));
         }
 
         [TestCase(0, true, "0s")]

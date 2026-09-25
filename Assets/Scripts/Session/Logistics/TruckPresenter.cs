@@ -34,7 +34,8 @@ namespace FoodFactoryGame.Session.Logistics
             if (layout != null)
                 foreach (var truck in site.Trucks.Where(x => x.SiteId == siteId && x.State is TruckState.Loading or TruckState.Unloading))
                 {
-                    var dockId = truck.State == TruckState.Loading ? truck.PickupDockId : truck.DropoffDockId;
+                    var route = GoodsWorld.RouteOf(site, truck);
+                    var dockId = truck.State == TruckState.Loading ? route?.PickupDockId : route?.DropoffDockId;
                     var dock = site.Equipment.FirstOrDefault(x => x.Id == dockId && x.State == EquipmentState.Placed && x.SiteId == siteId);
                     if (dock != null) parked[truck.Id] = dock;
                 }

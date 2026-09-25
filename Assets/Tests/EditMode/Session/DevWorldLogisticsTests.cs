@@ -1,5 +1,5 @@
-// Verifies the dev seed's logistics (decision 0022): a new world has both sites mapped, the warehouse with dough and a dock,
-// the restaurant dock and one truck on the warehouse-to-restaurant route that delivers warehouse dough; an older save gains
+// Verifies the dev seed's logistics (decisions 0022, 0023): a new world has both sites mapped, the warehouse with dough and a dock,
+// the restaurant dock and one truck on the warehouse-to-restaurant route record that delivers warehouse dough; an older save gains
 // them exactly once; admission grants the warehouse without an inventory there. Isolated saves only.
 using System;
 using System.IO;
@@ -42,8 +42,10 @@ namespace FoodFactoryGame.Session.Tests
             Assert.That(state.Sites.Select(x => x.Id), Is.EquivalentTo(new[] { DevWorld.SiteId, DevWorld.WarehouseSiteId }));
             Assert.That(state.Companies.Single().SiteIds, Is.EquivalentTo(new[] { DevWorld.SiteId, DevWorld.WarehouseSiteId }));
             var truck = state.Trucks.Single();
-            Assert.That((truck.Id, truck.State, truck.PickupDockId, truck.DropoffDockId),
-                Is.EqualTo((DevWorld.TruckId, TruckState.Loading, DevWorld.WarehouseDockId, DevWorld.DockId)));
+            var route = state.Routes.Single();
+            Assert.That((route.Id, route.CompanyId, route.PickupDockId, route.DropoffDockId, route.AllowedItemIds.Count),
+                Is.EqualTo((DevWorld.RouteId, DevWorld.CompanyId, DevWorld.WarehouseDockId, DevWorld.DockId, 0)));
+            Assert.That((truck.Id, truck.State, truck.RouteId), Is.EqualTo((DevWorld.TruckId, TruckState.Loading, DevWorld.RouteId)));
             Assert.That(GoodsWorld.RoadSeconds(state, DevWorld.WarehouseSiteId, DevWorld.SiteId, truck.SpeedMetresPerSecond), Is.EqualTo(10));
 
             // Someone stages 20 warehouse dough at the warehouse dock; the truck brings it to the restaurant.

@@ -77,7 +77,7 @@ namespace FoodFactoryGame.Session
         // dough stock and a dock stands 100 m east and 50 m north, 150 m by road, so a truck at 15 m/s drives 10 s each way.
         // Each site has a dock (2x1, 8 outgoing and 8 incoming slots); the restaurant's stands at the west edge of the grid, clear
         // of the seed, the spawn points and the PlayMode test cells. One 4-slot truck loading 5 units a second starts at the
-        // warehouse on the warehouse-to-restaurant route with any cargo.
+        // warehouse on the warehouse-to-restaurant route (any cargo; decision 0023 made routes records).
         public const string SiteName = "Restaurant";
         public const string DockId = "dev-dock-1";
         public const int DockCellX = 0;
@@ -96,6 +96,7 @@ namespace FoodFactoryGame.Session
         public const int WarehouseMapX = 100;
         public const int WarehouseMapZ = 50;
         public const string TruckId = "dev-truck-1";
+        public const string RouteId = "dev-route-1";
         public const int TruckCargoSlots = 4;
         public const int TruckSpeedMetresPerSecond = 15;
         public const int TruckLoadUnitsPerSecond = 5;
@@ -206,12 +207,13 @@ namespace FoodFactoryGame.Session
             {
                 var docks = world.Snapshot().Equipment;
                 var routed = docks.Any(x => x.Id == WarehouseDockId) && docks.Any(x => x.Id == DockId);
+                if (routed && world.Snapshot().Routes.All(x => x.Id != RouteId))
+                    world.Bootstrap(new GoodsRoute { Id = RouteId, CompanyId = CompanyId, PickupDockId = WarehouseDockId, DropoffDockId = DockId });
                 world.Bootstrap(new GoodsTruck
                 {
                     Id = TruckId, CompanyId = CompanyId, Name = "Truck 1", CargoSlots = TruckCargoSlots,
                     SpeedMetresPerSecond = TruckSpeedMetresPerSecond, LoadUnitsPerSecond = TruckLoadUnitsPerSecond,
-                    PickupDockId = routed ? WarehouseDockId : "", DropoffDockId = routed ? DockId : "",
-                    State = routed ? TruckState.Loading : TruckState.Parked, SiteId = WarehouseSiteId
+                    RouteId = routed ? RouteId : "", State = routed ? TruckState.Loading : TruckState.Parked, SiteId = WarehouseSiteId
                 });
             }
             return world.Snapshot().Revision != revision;

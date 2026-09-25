@@ -87,6 +87,6 @@ cross-site movement, and supplier purchases arrive instantly (decision 0014, "re
 
 ## Open
 
-Buying and selling trucks, several vehicles per route and route scheduling, visible roads and driving trucks,
+Selling trucks and route scheduling (buying trucks, several vehicles per route and parking: decision 0023), visible roads and driving trucks,
 congestion, truck running costs, supplier deliveries by truck (decision 0014), refrigerated trucks, belts or employees
-feeding docks, travelling between sites, clearing a route (parking a truck), and the GDD's open player/ownership questions.
+feeding docks, travelling between sites, and the GDD's open player/ownership questions.

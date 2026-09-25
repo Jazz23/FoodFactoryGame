@@ -52,7 +52,7 @@ namespace FoodFactoryGame.Goods
         public string MovedLotId;
         public string ReservationId;
         public string JobId;
-        // Machine created by the request (an equipment purchase, decision 0017); empty otherwise.
+        // Machine or truck created by the request (an equipment or truck purchase, decisions 0017, 0023); empty otherwise.
         public string EquipmentId;
         public long Revision;
     }
@@ -74,7 +74,7 @@ namespace FoodFactoryGame.Goods
 
     [Serializable] public sealed class GoodsSnapshot
     {
-        public const int CurrentSchema = 11;
+        public const int CurrentSchema = 12;
         public int SchemaVersion = CurrentSchema;
         public string WorldId;
         public long ClockSeconds;
@@ -94,6 +94,7 @@ namespace FoodFactoryGame.Goods
         public List<GoodsEmployee> Employees = new();
         public List<GoodsSite> Sites = new();
         public List<GoodsTruck> Trucks = new();
+        public List<GoodsRoute> Routes = new();
     }
 
     public sealed partial class GoodsWorld
@@ -575,7 +576,8 @@ namespace FoodFactoryGame.Goods
                 || state.ClockSeconds < 0 || state.Revision < 0 || state.Locations == null || state.Lots == null
                 || state.Grants == null || state.Reservations == null || state.Outcomes == null
                 || state.Stations == null || state.Jobs == null || state.Equipment == null || state.SiteLayouts == null || state.Belts == null
-                || state.Companies == null || state.Buildings == null || state.Employees == null || state.Sites == null || state.Trucks == null)
+                || state.Companies == null || state.Buildings == null || state.Employees == null || state.Sites == null || state.Trucks == null
+                || state.Routes == null)
                 throw new InvalidOperationException("Unsupported or invalid goods snapshot schema.");
             if (state.Locations.Any(x => x == null || string.IsNullOrWhiteSpace(x.Id) || string.IsNullOrWhiteSpace(x.SiteId) || x.Capacity < 1)
                 || state.Locations.GroupBy(x => x.Id).Any(x => x.Count() != 1)

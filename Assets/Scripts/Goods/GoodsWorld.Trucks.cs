@@ -1,5 +1,6 @@
-// Trucks (decision 0022): company vehicles that repeat a player-set route between two loading docks on different sites of
-// the same company, over the public road network. Roads are abstract: each site has a map position and a trip takes the
+// Trucks (decisions 0022, 0023): company vehicles that repeat a player-made route between two loading docks on different
+// sites of the same company, over the public road network. A route is its own record; any number of the company's trucks
+// may be assigned to it, and a truck with no route is parked. Roads are abstract: each site has a map position and a trip takes the
 // Manhattan distance between the two sites divided by the truck's speed. A truck loads at the pickup dock's outgoing buffer
 // (its input, <id>:in) and unloads into the dropoff dock's incoming buffer (its output, <id>:out), a few units a second, so
 // dock throughput is a real bottleneck. It leaves as soon as the dock has nothing more it may or can load and it has cargo,
@@ -44,11 +45,8 @@ namespace FoodFactoryGame.Goods
         public int CargoSlots;
         public int SpeedMetresPerSecond;
         public int LoadUnitsPerSecond;
-        // Route: equipment IDs of two docks on different sites of the truck's company; both empty while Parked.
-        public string PickupDockId = "";
-        public string DropoffDockId = "";
-        // Items the truck may load at the pickup dock; empty means any.
-        public List<string> AllowedItemIds = new();
+        // A route of the truck's company; empty exactly while Parked.
+        public string RouteId = "";
         public TruckState State;
         // The site the truck stands at or, while driving, the one it left.
         public string SiteId;
@@ -59,6 +57,30 @@ namespace FoodFactoryGame.Goods
 
         public string CargoLocationId => Id + ":cargo";
         public bool Driving => State is TruckState.ToPickup or TruckState.ToDropoff;
+    }
+
+    // What the trucks assigned to it repeat: load at one dock, deliver to a dock on another site of the same company.
+    [Serializable] public sealed class GoodsRoute
+    {
+        public string Id;
+        public string CompanyId;
+        public string PickupDockId;
+        public string DropoffDockId;
+        // Items the trucks may load at the pickup dock; empty means any.
+        public List<string> AllowedItemIds = new();
+    }
+
+    // Content, not state: one truck model at the supplier (decision 0023). A bought truck keeps copies of the stats.
+    [Serializable] public sealed class TruckOffer
+    {
+        public string Id;
+        // Whole cents for one truck.
+        public long PriceCents;
+        // Bought trucks are called "<Name> <n>".
+        public string Name;
+        public int CargoSlots;
+        public int SpeedMetresPerSecond;
+        public int LoadUnitsPerSecond;
     }
 
     public sealed partial class GoodsWorld
@@ -82,8 +104,8 @@ namespace FoodFactoryGame.Goods
             }
         }
 
-        // Server-only: adds a truck and its empty cargo location. A truck may start parked (no route) or on a valid route; the
-        // result must satisfy Validate or nothing changes.
+        // Server-only: adds a truck and its empty cargo location. A truck may start parked (no route) or on an existing route;
+        // the result must satisfy Validate or nothing changes.
         public void Bootstrap(GoodsTruck truck)
         {
             lock (_gate)
@@ -93,18 +115,43 @@ namespace FoodFactoryGame.Goods
                     || _state.Locations.Any(x => x.Id == copy.CargoLocationId) || copy.CargoSlots < 1)
                     throw new ArgumentException("Invalid or duplicate truck.");
                 var before = Snapshot();
-                _state.Trucks.Add(copy);
-                _state.Locations.Add(new GoodsLocation
-                {
-                    Id = copy.CargoLocationId, SiteId = RoadSiteId, Kind = VehicleLocationKind, Capacity = copy.CargoSlots
-                });
+                AddTruck(copy);
                 _state.Revision++;
-                try { Validate(_state); }
-                catch (InvalidOperationException error)
-                {
-                    _state = before;
-                    throw new ArgumentException("Invalid truck: " + error.Message, error);
-                }
+                ValidateOrRestore(before, "truck");
+            }
+        }
+
+        // Server-only: adds a route of the company that owns both docks, with no trucks yet (the dev seed's route).
+        public void Bootstrap(GoodsRoute route)
+        {
+            lock (_gate)
+            {
+                var copy = route is null ? null : JsonUtility.FromJson<GoodsRoute>(JsonUtility.ToJson(route));
+                if (copy is null || string.IsNullOrWhiteSpace(copy.Id) || _state.Routes.Any(x => x.Id == copy.Id))
+                    throw new ArgumentException("Invalid or duplicate route.");
+                var before = Snapshot();
+                _state.Routes.Add(copy);
+                _state.Revision++;
+                ValidateOrRestore(before, "route");
+            }
+        }
+
+        private void AddTruck(GoodsTruck truck)
+        {
+            _state.Trucks.Add(truck);
+            _state.Locations.Add(new GoodsLocation
+            {
+                Id = truck.CargoLocationId, SiteId = RoadSiteId, Kind = VehicleLocationKind, Capacity = truck.CargoSlots
+            });
+        }
+
+        private void ValidateOrRestore(GoodsSnapshot before, string what)
+        {
+            try { Validate(_state); }
+            catch (InvalidOperationException error)
+            {
+                _state = before;
+                throw new ArgumentException($"Invalid {what}: " + error.Message, error);
             }
         }
 
@@ -161,13 +208,122 @@ namespace FoodFactoryGame.Goods
             return Math.Max(1, (metres + speedMetresPerSecond - 1) / Math.Max(1, speedMetresPerSecond));
         }
 
-        // Volatile primitive for tests. Live request handlers must call SetTruckRouteDurably.
-        // Checks, in order: identity and replay; the truck (forbidden); both docks (invalid-dock); the player's grants on both
-        // dock sites and the truck's company owning both (forbidden); different sites (same-site); the cargo filter
-        // (invalid-cargo); map records for both sites (no-road). Then the truck heads for the dropoff if it carries anything,
-        // otherwise for the pickup, from the site it stands at or last left.
-        public GoodsOutcome SetTruckRoute(string playerId, string requestId, string truckId, string pickupDockId, string dropoffDockId,
+        // Volatile primitive for tests. Live request handlers must call CreateRouteDurably.
+        // A new route with no trucks, ID route:<player>:<request>, for the company that owns both docks. Checks, in order:
+        // identity and replay; both docks (invalid-dock); the player's grants on both dock sites and one company owning both
+        // (forbidden); different sites (same-site); map records for both sites (no-road); the cargo filter (invalid-cargo).
+        public GoodsOutcome CreateRoute(string playerId, string requestId, string pickupDockId, string dropoffDockId,
             IReadOnlyList<string> allowedItemIds)
+        {
+            return RouteCommand(playerId, requestId, reject =>
+            {
+                var items = allowedItemIds?.ToList() ?? new List<string>();
+                var pickup = _state.Equipment.FirstOrDefault(x => x.Id == pickupDockId && x.Kind == DockKind);
+                var companyId = pickup is null ? null : CompanyOfSiteLocked(pickup.SiteId);
+                var problem = RouteRequestProblem(playerId, companyId, pickupDockId, dropoffDockId, items);
+                if (problem is not null) return reject(problem);
+                _state.Routes.Add(new GoodsRoute
+                {
+                    Id = RouteIdFor(playerId, requestId), CompanyId = companyId, PickupDockId = pickupDockId, DropoffDockId = dropoffDockId,
+                    AllowedItemIds = items
+                });
+                return Record(requestId, playerId, true, "route-created", null);
+            });
+        }
+
+        public GoodsOutcome CreateRouteDurably(string playerId, string requestId, string pickupDockId, string dropoffDockId,
+            IReadOnlyList<string> allowedItemIds, string savePath)
+        {
+            return Commit(playerId, requestId, savePath, () => CreateRoute(playerId, requestId, pickupDockId, dropoffDockId, allowedItemIds));
+        }
+
+        // The ID an accepted CreateRoute gives its route: unique, because an accepted request replays instead of running again.
+        public static string RouteIdFor(string playerId, string requestId) => $"route:{playerId}:{requestId}";
+
+        // Volatile primitive for tests. Live request handlers must call SetRouteDurably.
+        // Edits a route (forbidden if unknown, then CreateRoute's checks against the route's company). Every truck on it is
+        // sent on: to the new dropoff if it carries anything, otherwise to the new pickup, from the site it stands at or last left.
+        public GoodsOutcome SetRoute(string playerId, string requestId, string routeId, string pickupDockId, string dropoffDockId,
+            IReadOnlyList<string> allowedItemIds)
+        {
+            return RouteCommand(playerId, requestId, reject =>
+            {
+                var route = _state.Routes.FirstOrDefault(x => x.Id == routeId);
+                if (route is null) return reject("forbidden");
+                var items = allowedItemIds?.ToList() ?? new List<string>();
+                var problem = RouteRequestProblem(playerId, route.CompanyId, pickupDockId, dropoffDockId, items);
+                if (problem is not null) return reject(problem);
+                route.PickupDockId = pickupDockId;
+                route.DropoffDockId = dropoffDockId;
+                route.AllowedItemIds = items;
+                foreach (var truck in _state.Trucks.Where(x => x.RouteId == route.Id)) Dispatch(truck);
+                return Record(requestId, playerId, true, "route-set", null);
+            });
+        }
+
+        public GoodsOutcome SetRouteDurably(string playerId, string requestId, string routeId, string pickupDockId, string dropoffDockId,
+            IReadOnlyList<string> allowedItemIds, string savePath)
+        {
+            return Commit(playerId, requestId, savePath, () => SetRoute(playerId, requestId, routeId, pickupDockId, dropoffDockId, allowedItemIds));
+        }
+
+        // Volatile primitive for tests. Live request handlers must call DeleteRouteDurably.
+        // Parks every truck on the route, cargo aboard, and removes it. Needs grants on both of its dock sites (forbidden).
+        public GoodsOutcome DeleteRoute(string playerId, string requestId, string routeId)
+        {
+            return RouteCommand(playerId, requestId, reject =>
+            {
+                var route = _state.Routes.FirstOrDefault(x => x.Id == routeId);
+                if (route is null || !CanView(playerId, DockSite(route.PickupDockId)) || !CanView(playerId, DockSite(route.DropoffDockId)))
+                    return reject("forbidden");
+                foreach (var truck in _state.Trucks.Where(x => x.RouteId == route.Id)) Park(truck);
+                _state.Routes.Remove(route);
+                return Record(requestId, playerId, true, "route-deleted", null);
+            });
+        }
+
+        public GoodsOutcome DeleteRouteDurably(string playerId, string requestId, string routeId, string savePath)
+        {
+            return Commit(playerId, requestId, savePath, () => DeleteRoute(playerId, requestId, routeId));
+        }
+
+        // Volatile primitive for tests. Live request handlers must call AssignTruckDurably.
+        // Puts a truck on a route of its company (grants on both dock sites, or forbidden) and sends it on; a truck already on
+        // that route is left as it is. An empty route parks the truck, which needs a grant on any site of its company.
+        public GoodsOutcome AssignTruck(string playerId, string requestId, string truckId, string routeId)
+        {
+            return RouteCommand(playerId, requestId, reject =>
+            {
+                var truck = _state.Trucks.FirstOrDefault(x => x.Id == truckId);
+                if (truck is null) return reject("forbidden");
+                if (string.IsNullOrEmpty(routeId))
+                {
+                    var company = _state.Companies.FirstOrDefault(x => x.Id == truck.CompanyId);
+                    if (company is null || !company.SiteIds.Any(x => CanView(playerId, x))) return reject("forbidden");
+                    Park(truck);
+                    return Record(requestId, playerId, true, "parked", null);
+                }
+                var route = _state.Routes.FirstOrDefault(x => x.Id == routeId);
+                if (route is null || route.CompanyId != truck.CompanyId
+                    || !CanView(playerId, DockSite(route.PickupDockId)) || !CanView(playerId, DockSite(route.DropoffDockId)))
+                    return reject("forbidden");
+                if (truck.RouteId != route.Id)
+                {
+                    truck.RouteId = route.Id;
+                    Dispatch(truck);
+                }
+                return Record(requestId, playerId, true, "assigned", null);
+            });
+        }
+
+        public GoodsOutcome AssignTruckDurably(string playerId, string requestId, string truckId, string routeId, string savePath)
+        {
+            return Commit(playerId, requestId, savePath, () => AssignTruck(playerId, requestId, truckId, routeId));
+        }
+
+        // Shared frame of the route commands: identity and replay first. Like purchases, rejections change nothing and are not
+        // recorded; only the accepted change replays.
+        private GoodsOutcome RouteCommand(string playerId, string requestId, Func<Func<string, GoodsOutcome>, GoodsOutcome> body)
         {
             lock (_gate)
             {
@@ -175,34 +331,38 @@ namespace FoodFactoryGame.Goods
                     return new GoodsOutcome { Accepted = false, Reason = "invalid-identity" };
                 var replay = Replay(playerId, requestId);
                 if (replay is not null) return replay;
-                // Like purchases, rejections change nothing and are not recorded; only the accepted change replays.
-                GoodsOutcome Reject(string reason) => new()
+                return body(reason => new GoodsOutcome
                 {
                     RequestId = requestId, PlayerId = playerId, Accepted = false, Reason = reason, Revision = _state.Revision
-                };
-                var truck = _state.Trucks.FirstOrDefault(x => x.Id == truckId);
-                if (truck is null) return Reject("forbidden");
-                var pickup = _state.Equipment.FirstOrDefault(x => x.Id == pickupDockId && x.Kind == DockKind);
-                var dropoff = _state.Equipment.FirstOrDefault(x => x.Id == dropoffDockId && x.Kind == DockKind);
-                if (pickup is null || dropoff is null) return Reject("invalid-dock");
-                if (!CanView(playerId, pickup.SiteId) || !CanView(playerId, dropoff.SiteId)) return Reject("forbidden");
-                var items = allowedItemIds?.ToList() ?? new List<string>();
-                var problem = RouteProblem(_state, truck.CompanyId, pickup.Id, dropoff.Id) ?? CargoFilterProblem(items);
-                if (problem is not null) return Reject(problem);
-
-                truck.PickupDockId = pickup.Id;
-                truck.DropoffDockId = dropoff.Id;
-                truck.AllowedItemIds = items;
-                Dispatch(truck);
-                return Record(requestId, playerId, true, "route-set", null);
+                });
             }
         }
 
-        public GoodsOutcome SetTruckRouteDurably(string playerId, string requestId, string truckId, string pickupDockId, string dropoffDockId,
-            IReadOnlyList<string> allowedItemIds, string savePath)
+        // Null when the player may make the two docks a route of the company; otherwise the first problem in command order.
+        private string RouteRequestProblem(string playerId, string companyId, string pickupDockId, string dropoffDockId,
+            IReadOnlyCollection<string> items)
         {
-            return Commit(playerId, requestId, savePath, () => SetTruckRoute(playerId, requestId, truckId, pickupDockId, dropoffDockId, allowedItemIds));
+            var pickup = _state.Equipment.FirstOrDefault(x => x.Id == pickupDockId && x.Kind == DockKind);
+            var dropoff = _state.Equipment.FirstOrDefault(x => x.Id == dropoffDockId && x.Kind == DockKind);
+            if (pickup is null || dropoff is null) return "invalid-dock";
+            if (!CanView(playerId, pickup.SiteId) || !CanView(playerId, dropoff.SiteId)) return "forbidden";
+            return RouteProblem(_state, companyId, pickup.Id, dropoff.Id) ?? CargoFilterProblem(items);
         }
+
+        // The route a truck repeats, or null while parked. For presentation as well as the simulation.
+        public static GoodsRoute RouteOf(GoodsSnapshot state, GoodsTruck truck) =>
+            string.IsNullOrEmpty(truck?.RouteId) ? null : state.Routes?.FirstOrDefault(x => x.Id == truck.RouteId);
+
+        // A parked truck stands where it is or, if it was driving, at the site it left (PROTOTYPE, like a redirect). Cargo
+        // stays aboard.
+        private static void Park(GoodsTruck truck)
+        {
+            truck.RouteId = "";
+            truck.State = TruckState.Parked;
+            truck.DestinationSiteId = "";
+            truck.RemainingSeconds = 0;
+        }
+
 
         // Null when two docks form a route for a company's truck; otherwise invalid-dock, forbidden, same-site or no-road.
         private static string RouteProblem(GoodsSnapshot state, string companyId, string pickupDockId, string dropoffDockId)
@@ -224,11 +384,13 @@ namespace FoodFactoryGame.Goods
 
         private bool HasCargo(GoodsTruck truck) => _state.Lots.Any(x => x.LocationId == truck.CargoLocationId);
 
+        private GoodsRoute Route(GoodsTruck truck) => _state.Routes.First(x => x.Id == truck.RouteId);
+
         // Sends a routed truck on: loaded to the dropoff, empty to the pickup.
         private void Dispatch(GoodsTruck truck)
         {
-            if (HasCargo(truck)) Drive(truck, DockSite(truck.DropoffDockId), TruckState.ToDropoff, TruckState.Unloading);
-            else Drive(truck, DockSite(truck.PickupDockId), TruckState.ToPickup, TruckState.Loading);
+            if (HasCargo(truck)) Drive(truck, DockSite(Route(truck).DropoffDockId), TruckState.ToDropoff, TruckState.Unloading);
+            else Drive(truck, DockSite(Route(truck).PickupDockId), TruckState.ToPickup, TruckState.Loading);
         }
 
         // A redirected truck restarts from the site it left (PROTOTYPE: no position between sites is kept).
@@ -278,12 +440,13 @@ namespace FoodFactoryGame.Goods
         // buffer, most exposed first. With nothing loaded and cargo aboard it leaves for the dropoff. False when it waits.
         private bool LoadSecond(GoodsTruck truck)
         {
-            var dock = PlacedDock(truck.PickupDockId);
+            var route = Route(truck);
+            var dock = PlacedDock(route.PickupDockId);
             if (dock is null) return false;
             var budget = truck.LoadUnitsPerSecond;
             var candidates = _state.Lots
                 .Where(x => x.LocationId == dock.InputLocationId && x.OwnerId == dock.SiteId
-                    && (truck.AllowedItemIds.Count == 0 || truck.AllowedItemIds.Contains(x.ItemId)) && Available(x) > 0)
+                    && (route.AllowedItemIds.Count == 0 || route.AllowedItemIds.Contains(x.ItemId)) && Available(x) > 0)
                 .OrderByDescending(x => x.ExposureSeconds).ThenBy(x => x.Id, StringComparer.Ordinal).ToList();
             foreach (var lot in candidates)
             {
@@ -295,7 +458,7 @@ namespace FoodFactoryGame.Goods
             }
             if (budget < truck.LoadUnitsPerSecond) return true;
             if (!HasCargo(truck)) return false;
-            Drive(truck, DockSite(truck.DropoffDockId), TruckState.ToDropoff, TruckState.Unloading);
+            Drive(truck, DockSite(route.DropoffDockId), TruckState.ToDropoff, TruckState.Unloading);
             return true;
         }
 
@@ -303,12 +466,13 @@ namespace FoodFactoryGame.Goods
         // site, most exposed first. Once empty it heads back to the pickup. False when it waits (full buffer, no dock).
         private bool UnloadSecond(GoodsTruck truck)
         {
+            var route = Route(truck);
             if (!HasCargo(truck))
             {
-                Drive(truck, DockSite(truck.PickupDockId), TruckState.ToPickup, TruckState.Loading);
+                Drive(truck, DockSite(route.PickupDockId), TruckState.ToPickup, TruckState.Loading);
                 return true;
             }
-            var dock = PlacedDock(truck.DropoffDockId);
+            var dock = PlacedDock(route.DropoffDockId);
             if (dock is null) return false;
             var budget = truck.LoadUnitsPerSecond;
             var cargo = _state.Lots.Where(x => x.LocationId == truck.CargoLocationId)
@@ -322,7 +486,7 @@ namespace FoodFactoryGame.Goods
                 if (budget == 0) break;
             }
             if (budget == truck.LoadUnitsPerSecond) return false;
-            if (!HasCargo(truck)) Drive(truck, DockSite(truck.PickupDockId), TruckState.ToPickup, TruckState.Loading);
+            if (!HasCargo(truck)) Drive(truck, DockSite(route.PickupDockId), TruckState.ToPickup, TruckState.Loading);
             return true;
         }
 
@@ -349,13 +513,15 @@ namespace FoodFactoryGame.Goods
             });
         }
 
-        // A site's baseline carries its company's fleet (with each truck's cargo), and the map records of the company's sites,
-        // so the route screen can show every truck wherever it is.
+        // A site's baseline carries its company's routes and fleet (with each truck's cargo), and the map records of the
+        // company's sites, so the route screen can show every truck wherever it is.
         private void ViewLogistics(GoodsSnapshot view, string siteId)
         {
             var company = _state.Companies.FirstOrDefault(x => x.SiteIds.Contains(siteId));
             view.Sites = _state.Sites.Where(x => x.Id == siteId || company?.SiteIds.Contains(x.Id) == true)
                 .Select(x => JsonUtility.FromJson<GoodsSite>(JsonUtility.ToJson(x))).ToList();
+            view.Routes = company is null ? new List<GoodsRoute>()
+                : _state.Routes.Where(x => x.CompanyId == company.Id).Select(x => JsonUtility.FromJson<GoodsRoute>(JsonUtility.ToJson(x))).ToList();
             view.Trucks = company is null ? new List<GoodsTruck>()
                 : _state.Trucks.Where(x => x.CompanyId == company.Id).Select(x => JsonUtility.FromJson<GoodsTruck>(JsonUtility.ToJson(x))).ToList();
             // Appended after the site's own locations: a baseline names its site by its first location.
@@ -373,22 +539,27 @@ namespace FoodFactoryGame.Goods
                 || state.Grants.Any(x => x.SiteId == RoadSiteId)
                 || state.Companies.Any(x => x.SiteIds.Contains(RoadSiteId))
                 || state.Trucks.Any(x => x is null || string.IsNullOrWhiteSpace(x.Id))
-                || state.Trucks.GroupBy(x => x.Id).Any(x => x.Count() != 1))
-                throw new InvalidOperationException("Goods snapshot violates site or truck identity invariants.");
+                || state.Trucks.GroupBy(x => x.Id).Any(x => x.Count() != 1)
+                || state.Routes.Any(x => x is null || string.IsNullOrWhiteSpace(x.Id))
+                || state.Routes.GroupBy(x => x.Id).Any(x => x.Count() != 1))
+                throw new InvalidOperationException("Goods snapshot violates site, route or truck identity invariants.");
+            foreach (var route in state.Routes)
+                if (route.AllowedItemIds is null || CargoFilterProblem(route.AllowedItemIds) is not null
+                    || RouteProblem(state, route.CompanyId, route.PickupDockId, route.DropoffDockId) is not null)
+                    throw new InvalidOperationException($"Route {route.Id} is inconsistent.");
             foreach (var truck in state.Trucks)
             {
                 var cargo = state.Locations.FirstOrDefault(x => x.Id == truck.CargoLocationId);
-                var items = truck.AllowedItemIds;
+                var route = RouteOf(state, truck);
                 var valid = state.Companies.Any(x => x.Id == truck.CompanyId) && truck.Name is not null
                     && truck.CargoSlots >= 1 && truck.SpeedMetresPerSecond >= 1 && truck.LoadUnitsPerSecond >= 1
-                    && items is not null && CargoFilterProblem(items) is null
                     && cargo is not null && cargo.Kind == VehicleLocationKind && cargo.SiteId == RoadSiteId && cargo.Capacity == truck.CargoSlots
                     && !cargo.Refrigerated
                     && siteIds.Contains(truck.SiteId)
                     && truck.State is TruckState.Parked or TruckState.ToPickup or TruckState.Loading or TruckState.ToDropoff or TruckState.Unloading
                     && (truck.State == TruckState.Parked
-                        ? string.IsNullOrEmpty(truck.PickupDockId) && string.IsNullOrEmpty(truck.DropoffDockId)
-                        : RouteProblem(state, truck.CompanyId, truck.PickupDockId, truck.DropoffDockId) is null)
+                        ? string.IsNullOrEmpty(truck.RouteId)
+                        : route is not null && route.CompanyId == truck.CompanyId)
                     && (truck.Driving
                         ? siteIds.Contains(truck.DestinationSiteId) && truck.RemainingSeconds >= 1
                         : string.IsNullOrEmpty(truck.DestinationSiteId) && truck.RemainingSeconds == 0);

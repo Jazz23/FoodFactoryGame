@@ -1,6 +1,7 @@
-// Drives the logistics screen and the dock screen (decision 0022) through the real DevSite host: the panel watches the remote
+// Drives the logistics screen and the dock screen (decisions 0022, 0023) through the real DevSite host: the panel watches the remote
 // warehouse, ships warehouse dough to its dock with ordinary transfers the seeded truck then loads, and applies a cargo
-// filter to the truck; the restaurant dock's screen names the truck that delivers there. Every save and identity path is a
+// filter to the seeded route, buys a truck, creates a route, assigns and parks the new truck and deletes the route; the
+// restaurant dock's screen names the truck that delivers there. Every save and identity path is a
 // unique temporary directory.
 using System;
 using System.Collections;
@@ -72,7 +73,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
             _root.ServerWorld.Snapshot().Lots.Where(x => x.LocationId == locationId).Sum(x => x.Quantity);
 
         [UnityTest]
-        public IEnumerator PanelShipsRemoteStockAndSetsTheTruckCargo()
+        public IEnumerator PanelShipsStockEditsRoutesAndManagesTheFleet()
         {
             var panel = UnityEngine.Object.FindAnyObjectByType<LogisticsPanel>();
             var interaction = UnityEngine.Object.FindAnyObjectByType<EquipmentInteraction>();
@@ -101,13 +102,55 @@ namespace FoodFactoryGame.Session.PlayModeTests
             yield return Until(() => ServerUnits(cargo) == 20, "the truck loaded it", 8f);
             yield return Until(() => panel.Window.Q<Label>($"logistics-truck-cargo-{DevWorld.TruckId}").text.Contains("20 Dough"), "cargo shown");
 
-            // Cargo: Any -> the first item (dough), applied.
-            panel.CycleDraft(DevWorld.TruckId, LogisticsPanel.CargoField, 1);
-            panel.ApplyRoute(DevWorld.TruckId);
+            // Cargo: Any -> the first item (dough), applied to the seeded route.
+            panel.CycleDraft(DevWorld.RouteId, LogisticsPanel.CargoField, 1);
+            panel.ApplyRoute(DevWorld.RouteId);
             yield return Until(() => !panel.HasPendingRequests, "route answered");
+            Assert.That(panel.LastRejection, Is.Null);
             var truck = _root.ServerWorld.Snapshot().Trucks.Single();
-            Assert.That((truck.AllowedItemIds.Single(), truck.State), Is.EqualTo((DevWorld.DoughItemId, TruckState.ToDropoff)),
-                "Loaded, so the new route sends it on to the restaurant.");
+            Assert.That((_root.ServerWorld.Snapshot().Routes.Single().AllowedItemIds.Single(), truck.State),
+                Is.EqualTo((DevWorld.DoughItemId, TruckState.ToDropoff)), "Loaded, so the edited route sends it on to the restaurant.");
+
+            // Buy a truck: it arrives parked at the restaurant.
+            var offer = _root.Offers.Single(x => x != null && x.Truck != null);
+            panel.BuyTruck(offer.Id);
+            yield return Until(() => !panel.HasPendingRequests, "truck purchase answered");
+            Assert.That(panel.LastRejection, Is.Null);
+            var bought = _root.ServerWorld.Snapshot().Trucks.Single(x => x.Id != DevWorld.TruckId);
+            Assert.That((bought.Name, bought.State, bought.SiteId), Is.EqualTo(("Truck 2", TruckState.Parked, DevWorld.SiteId)));
+            yield return Until(() => panel.Window.Q<Label>($"logistics-truck-status-{bought.Id}")?.text == "Parked at Restaurant: no route",
+                "bought truck shown");
+
+            // A new route from the restaurant dock (first option) to the warehouse dock (second).
+            panel.CycleDraft(LogisticsPanel.NewRouteKey, LogisticsPanel.PickupField, 1);
+            panel.CycleDraft(LogisticsPanel.NewRouteKey, LogisticsPanel.DropoffField, 1);
+            panel.CycleDraft(LogisticsPanel.NewRouteKey, LogisticsPanel.DropoffField, 1);
+            panel.CreateRoute();
+            yield return Until(() => !panel.HasPendingRequests, "route created");
+            Assert.That(panel.LastRejection, Is.Null);
+            var created = _root.ServerWorld.Snapshot().Routes.Single(x => x.Id != DevWorld.RouteId);
+            Assert.That((created.PickupDockId, created.DropoffDockId), Is.EqualTo((DevWorld.DockId, DevWorld.WarehouseDockId)));
+            yield return Until(() => _root.ClientSite.Routes.Count == 2 && panel.Window.Q($"logistics-route-{created.Id}") != null, "route shown");
+
+            // Assign the bought truck to it (options: Parked, the seeded route, the new one), then park it again.
+            panel.CycleTruckRoute(bought.Id, 1);
+            panel.CycleTruckRoute(bought.Id, 1);
+            panel.AssignTruck(bought.Id);
+            yield return Until(() => !panel.HasPendingRequests, "truck assigned");
+            Assert.That(panel.LastRejection, Is.Null);
+            bought = _root.ServerWorld.Snapshot().Trucks.Single(x => x.Id == bought.Id);
+            Assert.That((bought.RouteId, bought.State), Is.EqualTo((created.Id, TruckState.Loading)), "Empty and already at the pickup.");
+            yield return Until(() => _root.ClientSite.Trucks.Single(x => x.Id == bought.Id).RouteId == created.Id, "assignment shown");
+            panel.CycleTruckRoute(bought.Id, -1);
+            panel.CycleTruckRoute(bought.Id, -1);
+            panel.AssignTruck(bought.Id);
+            yield return Until(() => !panel.HasPendingRequests, "truck parked");
+            Assert.That(_root.ServerWorld.Snapshot().Trucks.Single(x => x.Id == bought.Id).State, Is.EqualTo(TruckState.Parked));
+
+            // Deleting the new route leaves the seeded one.
+            panel.DeleteRoute(created.Id);
+            yield return Until(() => !panel.HasPendingRequests, "route deleted");
+            Assert.That(_root.ServerWorld.Snapshot().Routes.Single().Id, Is.EqualTo(DevWorld.RouteId));
 
             // The restaurant dock's screen names its truck.
             interaction.CloseScreen();

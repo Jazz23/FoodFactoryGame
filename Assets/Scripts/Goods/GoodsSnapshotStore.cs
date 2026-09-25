@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using SQLite;
@@ -18,6 +19,20 @@ namespace FoodFactoryGame.Goods
     {
         public string Payload;
         public string Sha256;
+    }
+
+    // The route fields of a v11 truck, read only to upgrade it (decision 0023).
+    [Serializable] internal sealed class V11Trucks
+    {
+        [Serializable] internal sealed class Truck
+        {
+            public string Id;
+            public string PickupDockId;
+            public string DropoffDockId;
+            public List<string> AllowedItemIds;
+        }
+
+        public List<Truck> Trucks;
     }
 
     public static class GoodsSnapshotStore
@@ -299,6 +314,25 @@ namespace FoodFactoryGame.Goods
                 state.Sites ??= new();
                 state.Trucks ??= new();
                 state.SchemaVersion = 11;
+            }
+            // v11 kept each truck's route on the truck (decision 0023): a routed truck becomes the only truck of route
+            // route:<truck id> with the same docks and cargo filter; a parked one stays parked.
+            if (state != null && state.SchemaVersion == 11)
+            {
+                state.Routes ??= new();
+                var legacy = JsonUtility.FromJson<V11Trucks>(payload);
+                foreach (var truck in state.Trucks ?? new())
+                {
+                    var old = legacy?.Trucks?.FirstOrDefault(x => x != null && x.Id == truck?.Id);
+                    if (old == null || string.IsNullOrEmpty(old.PickupDockId)) continue;
+                    truck.RouteId = "route:" + truck.Id;
+                    state.Routes.Add(new GoodsRoute
+                    {
+                        Id = truck.RouteId, CompanyId = truck.CompanyId, PickupDockId = old.PickupDockId, DropoffDockId = old.DropoffDockId,
+                        AllowedItemIds = old.AllowedItemIds ?? new()
+                    });
+                }
+                state.SchemaVersion = 12;
             }
             GoodsWorld.Validate(state);
             return state;

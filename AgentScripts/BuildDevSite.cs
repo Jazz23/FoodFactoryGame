@@ -55,6 +55,7 @@ public static class BuildDevSite
     private const string FridgeDefinitionPath = "Assets/Content/Equipment/Fridge.asset";
     private const string FridgeMaterialFolder = "Assets/Materials/Fridge";
     private const string OfferFolder = "Assets/Content/Offers";
+    private const string TruckDefinitionPath = "Assets/Content/Vehicles/Truck.asset";
     private const string BuildingMaterialFolder = "Assets/Materials/Building";
     private const string DockPrefabPath = "Assets/Prefabs/Equipment/Dock.prefab";
     private const string DockDefinitionPath = "Assets/Content/Equipment/Dock.asset";
@@ -82,14 +83,15 @@ public static class BuildDevSite
         var dock = BuildEquipmentDefinition(DockDefinitionPath, GoodsWorld.DockKind, 2, 1, 8, 8, BuildDockPrefab(), ImportIcon("Dock"));
         // PROTOTYPE supplier prices (decision 0014): dough at 50 cents a unit leaves $2.00 margin on a $2.50 bread. An oven
         // (decision 0017) costs $150.00, 75 breads of margin, so the $500.00 start can afford one while keeping ingredient money.
-        // A fridge costs $80.00 and a loading dock $60.00.
+        // A fridge costs $80.00, a loading dock $60.00 and a truck (decision 0023) $250.00.
         var offers = new[]
         {
             BuildOffer("Dough5", "supplier-dough-5", DevWorld.DoughItemId, 5, 250, DevWorld.DoughSpoilAfterSeconds),
             BuildOffer("Belt10", "supplier-belt-10", GoodsWorld.BeltItemId, 10, 500, GoodsWorld.NonPerishableSeconds),
             BuildOffer("Oven1", "supplier-oven", "", 1, 15000, 1, oven),
             BuildOffer("Fridge1", "supplier-fridge", "", 1, 8000, 1, fridge),
-            BuildOffer("Dock1", "supplier-dock", "", 1, 6000, 1, dock)
+            BuildOffer("Dock1", "supplier-dock", "", 1, 6000, 1, dock),
+            BuildOffer("Truck1", "supplier-truck", "", 1, 25000, 1, truck: BuildTruckDefinition())
         };
         // PROTOTYPE stack sizes: dough and bread 20, belts 100 (Factorio's belt stack), lifts 50 (decision 0021).
         var items = new[]
@@ -143,6 +145,28 @@ public static class BuildDevSite
         var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(OvenPrefabPath);
         if (prefab == null) throw new System.InvalidOperationException($"Missing {OvenPrefabPath}.");
         return BuildEquipmentDefinition(OvenDefinitionPath, "oven", 3, 3, 1, 1, prefab, icon);
+    }
+
+    // PROTOTYPE truck model (decision 0023): the dev truck's stats, 4 cargo slots, 15 m/s, 5 units a second.
+    private static TruckDefinition BuildTruckDefinition()
+    {
+        if (!AssetDatabase.IsValidFolder("Assets/Content/Vehicles")) AssetDatabase.CreateFolder("Assets/Content", "Vehicles");
+        var definition = AssetDatabase.LoadAssetAtPath<TruckDefinition>(TruckDefinitionPath);
+        if (definition == null)
+        {
+            definition = ScriptableObject.CreateInstance<TruckDefinition>();
+            AssetDatabase.CreateAsset(definition, TruckDefinitionPath);
+        }
+        using (var serialized = new SerializedObject(definition))
+        {
+            serialized.FindProperty("displayName").stringValue = "Truck";
+            serialized.FindProperty("cargoSlots").intValue = DevWorld.TruckCargoSlots;
+            serialized.FindProperty("speedMetresPerSecond").intValue = DevWorld.TruckSpeedMetresPerSecond;
+            serialized.FindProperty("loadUnitsPerSecond").intValue = DevWorld.TruckLoadUnitsPerSecond;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+        EditorUtility.SetDirty(definition);
+        return definition;
     }
 
     private static EquipmentDefinition BuildEquipmentDefinition(string path, string kind, int width, int depth, int inputCapacity,
@@ -337,7 +361,7 @@ public static class BuildDevSite
     }
 
     private static OfferAsset BuildOffer(string asset, string id, string itemId, int quantity, int priceCents, long spoilAfterSeconds,
-        EquipmentDefinition equipment = null)
+        EquipmentDefinition equipment = null, TruckDefinition truck = null)
     {
         var path = $"{OfferFolder}/{asset}.asset";
         var offer = AssetDatabase.LoadAssetAtPath<OfferAsset>(path);
@@ -350,6 +374,7 @@ public static class BuildDevSite
         {
             serialized.FindProperty("id").stringValue = id;
             serialized.FindProperty("equipment").objectReferenceValue = equipment;
+            serialized.FindProperty("truck").objectReferenceValue = truck;
             serialized.FindProperty("itemId").stringValue = itemId;
             serialized.FindProperty("quantity").intValue = quantity;
             serialized.FindProperty("priceCents").intValue = priceCents;
