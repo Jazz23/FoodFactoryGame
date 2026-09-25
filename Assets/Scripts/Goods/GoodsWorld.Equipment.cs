@@ -210,6 +210,34 @@ namespace FoodFactoryGame.Goods
             return Commit(playerId, requestId, savePath, () => Place(playerId, requestId, equipmentId, cellX, cellZ, rotation, level));
         }
 
+        // Volatile primitive for tests. Live request handlers must call GiveDurably.
+        // Hands a held piece to an employee on its site (PROTOTYPE: employees place machines by script), keeping its ID.
+        public GoodsOutcome Give(string playerId, string requestId, string equipmentId, string employeeId)
+        {
+            lock (_gate)
+            {
+                if (string.IsNullOrWhiteSpace(playerId) || string.IsNullOrWhiteSpace(requestId))
+                    return new GoodsOutcome { Accepted = false, Reason = "invalid-identity" };
+                var replay = Replay(playerId, requestId);
+                if (replay != null) return replay;
+                var equipment = _state.Equipment.FirstOrDefault(x => x.Id == equipmentId);
+                if (equipment == null || !_state.Grants.Any(x => x.PlayerId == playerId && x.SiteId == equipment.SiteId))
+                    return Record(requestId, playerId, false, "forbidden", null);
+                if (equipment.State != EquipmentState.Held || equipment.HolderId != playerId)
+                    return Record(requestId, playerId, false, "not-held", null);
+                if (employeeId == playerId || !_state.Employees.Any(x => x.Id == employeeId && x.SiteId == equipment.SiteId))
+                    return Record(requestId, playerId, false, "unknown-employee", null);
+
+                equipment.HolderId = employeeId;
+                return Record(requestId, playerId, true, "given", null);
+            }
+        }
+
+        public GoodsOutcome GiveDurably(string playerId, string requestId, string equipmentId, string employeeId, string savePath)
+        {
+            return Commit(playerId, requestId, savePath, () => Give(playerId, requestId, equipmentId, employeeId));
+        }
+
         private void AddPlacedParts(GoodsEquipment equipment)
         {
             _state.Locations.Add(new GoodsLocation

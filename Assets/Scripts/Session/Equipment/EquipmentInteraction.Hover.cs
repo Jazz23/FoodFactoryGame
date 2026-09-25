@@ -1,5 +1,5 @@
 // What the crosshair is on that has a screen: an employee, a placed machine or the dev storage, within interactReach of
-// the avatar on its floor. That target is outlined (HoverOutline) while no screen is open, and E opens its screen; E on nothing opens the
+// the avatar on its floor. That target is outlined (HoverOutline) while no screen is open, and E (or left click with an empty cursor) opens its screen; E on nothing opens the
 // inventory. Local presentation only: opening a screen never changes gameplay state.
 using System.Linq;
 using FoodFactoryGame.Session.Employees;

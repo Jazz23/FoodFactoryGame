@@ -134,6 +134,21 @@ namespace FoodFactoryGame.Goods.Network
             if (IsClientStarted) ServerPlace(requestId, equipmentId, cellX, cellZ, rotation, level);
         }
 
+        // Hands a machine the player holds to an employee on its site, so the employee's script can place it (GiveDurably).
+        public void RequestGive(string requestId, string equipmentId, string employeeId)
+        {
+            if (IsClientStarted) ServerGive(requestId, equipmentId, employeeId);
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        private void ServerGive(string requestId, string equipmentId, string employeeId, NetworkConnection sender = null)
+        {
+            if (!TryIdentify(sender, requestId, out var player)) return;
+            var result = _world.GiveDurably(player, requestId, equipmentId, employeeId, _savePath);
+            Reply(sender, result);
+            if (result.Accepted) Broadcast();
+        }
+
         // Pays for one more floor of a factory; the first one puts the elevator at the given interior cell (AddFloorDurably).
         public void RequestAddFloor(string requestId, string buildingId, int elevatorX, int elevatorZ)
         {
@@ -399,6 +414,25 @@ namespace FoodFactoryGame.Goods.Network
         {
             if (!IsServing) return new GoodsOutcome { Accepted = false, Reason = "persistence-unavailable" };
             var result = _world.TransferDurably(workerId, intent, _savePath);
+            if (result.Accepted) Broadcast();
+            return result;
+        }
+
+        // Server-only: a worker places a machine it holds, picks one up, or lays a belt from its hands, through the same durable,
+        // validated paths as a player's requests; accepted changes are broadcast. Ground floor only (the NavMesh covers it).
+        public GoodsOutcome WorkerPlace(string workerId, string equipmentId, int cellX, int cellZ, int rotation) =>
+            Worker(requestId => _world.PlaceDurably(workerId, requestId, equipmentId, cellX, cellZ, rotation, _savePath));
+
+        public GoodsOutcome WorkerPickUp(string workerId, string equipmentId) =>
+            Worker(requestId => _world.PickUpDurably(workerId, requestId, equipmentId, _savePath));
+
+        public GoodsOutcome WorkerPlaceBelt(string workerId, string siteId, int cellX, int cellZ, int direction) =>
+            Worker(requestId => _world.PlaceBeltDurably(workerId, requestId, siteId, cellX, cellZ, direction, _savePath));
+
+        private GoodsOutcome Worker(Func<string, GoodsOutcome> request)
+        {
+            if (!IsServing) return new GoodsOutcome { Accepted = false, Reason = "persistence-unavailable" };
+            var result = request(Guid.NewGuid().ToString("N"));
             if (result.Accepted) Broadcast();
             return result;
         }

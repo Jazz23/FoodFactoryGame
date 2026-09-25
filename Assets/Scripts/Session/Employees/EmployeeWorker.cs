@@ -32,6 +32,9 @@ namespace FoodFactoryGame.Session.Employees
         [SerializeField] private Animator animator;
         // The box model parts, shown while the employee's hands hold goods.
         [SerializeField] private Renderer[] carriedBox = Array.Empty<Renderer>();
+        // How close (metres, horizontally) a cell waypoint counts as reached.
+        private const float StandTolerance = 0.2f;
+
         // How close (metres, horizontally) to a place's footprint the employee must stand to use it.
         [SerializeField] private float reach = 1.3f;
         [SerializeField] private float walkTimeoutSeconds = 60f;
@@ -256,9 +259,13 @@ namespace FoodFactoryGame.Session.Employees
         private Dictionary<string, EmployeeScript.Operation> Operations() => new()
         {
             ["move_to"] = MoveTo,
+            ["path"] = FollowPath,
             ["take"] = Take,
             ["put"] = Put,
-            ["wait"] = Wait
+            ["wait"] = Wait,
+            ["place"] = PlaceMachine,
+            ["pick_up"] = PickUpMachine,
+            ["place_belt"] = PlaceBelt
         };
 
         private Dictionary<string, Func<Script, CallbackArguments, DynValue>> Queries() => new()
@@ -266,6 +273,8 @@ namespace FoodFactoryGame.Session.Employees
             ["count"] = Count,
             ["find"] = Find,
             ["carrying"] = (_, _) => DynValue.NewNumber(View()?.Lots.Where(x => x.LocationId == HandsId).Sum(x => x.Quantity) ?? 0),
+            ["holding"] = Holding,
+            ["position"] = Position,
             ["say"] = (_, args) =>
             {
                 Say(string.Join(" ", args.GetArray().Select(x => x.ToPrintString())));
@@ -275,10 +284,11 @@ namespace FoodFactoryGame.Session.Employees
 
         private GoodsSnapshot View() => Bridge?.WorkerView(_employeeId, _siteId);
 
-        // move_to(place): walks next to a place. Returns true, or false and a reason.
+        // move_to(place) or move_to(x, z): walks next to a place, or onto a ground cell ({x, z} or two numbers). Returns true,
+        // or false and a reason.
         private IEnumerator MoveTo(CallbackArguments args, EmployeeScript.Result result)
         {
-            var place = Resolve(OptionalString(args, 0), View());
+            var place = TryCell(args, 0, out var x, out var z, out _) ? Cell(x, z, View(), true) : Resolve(args[0], View());
             if (place.Problem != null)
             {
                 result.Set(DynValue.False, DynValue.NewString(place.Problem));
@@ -290,14 +300,42 @@ namespace FoodFactoryGame.Session.Employees
             if (result.Value.IsNil()) result.Set(DynValue.True);
         }
 
+        // path(a, b, ...) or path({a, b, ...}): walks through each waypoint in turn (cells {x, z} or places) without stopping
+        // between cells. Returns true, or false, a reason and the number of the waypoint it could not reach.
+        private IEnumerator FollowPath(CallbackArguments args, EmployeeScript.Result result)
+        {
+            var waypoints = args.GetArray().ToList();
+            if (waypoints.Count == 1 && waypoints[0].Type == DataType.Table && !IsCell(waypoints[0]))
+                waypoints = waypoints[0].Table.Values.ToList();
+            if (waypoints.Count == 0)
+            {
+                result.Set(DynValue.False, DynValue.NewString("no waypoints given"));
+                yield break;
+            }
+            for (var index = 0; index < waypoints.Count; index++)
+            {
+                var place = Resolve(waypoints[index], View());
+                if (place.Problem == null)
+                {
+                    _status.Value = $"Running: walking to {place.Name} ({index + 1}/{waypoints.Count})";
+                    var walk = Walk(place, result);
+                    while (walk.MoveNext()) yield return null;
+                    if (result.Value.IsNil()) continue;
+                }
+                var reason = place.Problem ?? result.Value.Tuple?.ElementAtOrDefault(1)?.CastToString() ?? "could not reach it";
+                result.Set(DynValue.False, DynValue.NewString($"waypoint {index + 1}: {reason}"), DynValue.NewNumber(index + 1));
+                yield break;
+            }
+            result.Set(DynValue.True);
+        }
+
         // take(place, item, amount): walks to a place and picks up to amount units of an item (any item if nil; as many as fit if
         // amount is nil). Unspoiled goods only. Returns the number taken, and a reason when it is 0.
         private IEnumerator Take(CallbackArguments args, EmployeeScript.Result result)
         {
-            var target = OptionalString(args, 0) ?? "storage";
             var item = OptionalString(args, 1);
             var amount = OptionalAmount(args, 2);
-            var place = Resolve(target, View());
+            var place = Container(args[0]);
             if (place.Problem != null)
             {
                 result.Set(DynValue.NewNumber(0), DynValue.NewString(place.Problem));
@@ -315,10 +353,9 @@ namespace FoodFactoryGame.Session.Employees
         // Returns the number put, and a reason when it is 0.
         private IEnumerator Put(CallbackArguments args, EmployeeScript.Result result)
         {
-            var target = OptionalString(args, 0) ?? "storage";
             var item = OptionalString(args, 1);
             var amount = OptionalAmount(args, 2);
-            var place = Resolve(target, View());
+            var place = Container(args[0]);
             if (place.Problem != null)
             {
                 result.Set(DynValue.NewNumber(0), DynValue.NewString(place.Problem));
@@ -331,6 +368,97 @@ namespace FoodFactoryGame.Session.Employees
             var (moved, reason) = MoveGoods(new[] { HandsId }, place.PutInto, item, amount, true);
             result.Set(DynValue.NewNumber(moved), moved > 0 ? DynValue.Nil : DynValue.NewString(reason));
         }
+
+        // place(machine, cell, rotation) or place(machine, x, z, rotation): walks beside the footprint and places a machine the
+        // employee holds (an ID, or a kind for any held one of it; see holding()). The cell is the footprint's lowest x and z
+        // corner and rotation counts quarter turns (0-3, default 0). Ground floor only. Returns true, or false and a reason.
+        private IEnumerator PlaceMachine(CallbackArguments args, EmployeeScript.Result result)
+        {
+            var what = OptionalString(args, 0);
+            var view = View();
+            var layout = view?.SiteLayouts.FirstOrDefault(x => x.SiteId == _siteId);
+            if (!TryCell(args, 1, out var cellX, out var cellZ, out var next))
+            {
+                result.Set(DynValue.False, DynValue.NewString("place(machine, {x, z}, rotation) needs a cell"));
+                yield break;
+            }
+            var rotation = OptionalInteger(args, next, 0);
+            var machine = view?.Equipment
+                .Where(x => x.State == EquipmentState.Held && x.HolderId == _employeeId && (x.Id == what || x.Kind == what))
+                .OrderBy(x => x.Id == what ? 0 : 1).ThenBy(x => x.Id, StringComparer.Ordinal).FirstOrDefault();
+            var problem = layout == null ? "the world is not available"
+                : machine == null ? $"not holding {(what == null ? "a machine" : $"'{what}'")} (give one on the script screen)"
+                : rotation < 0 || rotation > 3 ? "rotation must be 0, 1, 2 or 3"
+                : SiteGrid.PlacementProblem(view, machine, cellX, cellZ, rotation, 0);
+            if (problem != null)
+            {
+                result.Set(DynValue.False, DynValue.NewString(problem));
+                yield break;
+            }
+            var (width, depth) = SiteGrid.Footprint(machine.Width, machine.Depth, rotation);
+            var center = SiteGridSpace.FootprintCenter(layout, cellX, cellZ, width, depth);
+            var size = new Vector2(width * SiteGrid.CellSize, depth * SiteGrid.CellSize);
+            var place = new Place
+            {
+                Name = $"({cellX}, {cellZ})", Area = new Rect(center.x - size.x * 0.5f, center.z - size.y * 0.5f, size.x, size.y)
+            };
+            _status.Value = $"Running: placing {machine.Kind} at {place.Name}";
+            var walk = Walk(place, result);
+            while (walk.MoveNext()) yield return null;
+            if (!result.Value.IsNil()) yield break;
+            var outcome = Bridge?.WorkerPlace(_employeeId, machine.Id, cellX, cellZ, rotation);
+            Debug.Log($"[Employee] {_employeeId} placing {machine.Id} at ({cellX}, {cellZ}) rotation {rotation}: {outcome?.Reason ?? "unavailable"}.");
+            result.Set(outcome?.Accepted == true ? DynValue.True : DynValue.False, Reason(outcome));
+        }
+
+        // pick_up(machine): walks to a placed ground-floor machine (ID or nearest of a kind) and picks it up; whatever its buffers
+        // hold goes into the employee's hands, which must have room. Returns true, or false and a reason.
+        private IEnumerator PickUpMachine(CallbackArguments args, EmployeeScript.Result result)
+        {
+            var place = Resolve(args[0], View());
+            if (place.Problem == null && place.EquipmentId == null) place.Problem = $"{place.Name} is not a machine";
+            if (place.Problem != null)
+            {
+                result.Set(DynValue.False, DynValue.NewString(place.Problem));
+                yield break;
+            }
+            _status.Value = $"Running: picking up {place.Name}";
+            var walk = Walk(place, result);
+            while (walk.MoveNext()) yield return null;
+            if (!result.Value.IsNil()) yield break;
+            var outcome = Bridge?.WorkerPickUp(_employeeId, place.EquipmentId);
+            RefreshCarrying(View());
+            result.Set(outcome?.Accepted == true ? DynValue.True : DynValue.False, Reason(outcome));
+        }
+
+        // place_belt(cell, direction) or place_belt(x, z, direction): lays a belt carried in the employee's hands (take one from
+        // the storage first) on a ground cell, or turns the belt already there. Direction counts quarter turns (0-3, default 0).
+        private IEnumerator PlaceBelt(CallbackArguments args, EmployeeScript.Result result)
+        {
+            if (!TryCell(args, 0, out var cellX, out var cellZ, out var next))
+            {
+                result.Set(DynValue.False, DynValue.NewString("place_belt({x, z}, direction) needs a cell"));
+                yield break;
+            }
+            var direction = OptionalInteger(args, next, 0);
+            var place = Cell(cellX, cellZ, View(), false);
+            if (place.Problem == null && (direction < 0 || direction > 3)) place.Problem = "direction must be 0, 1, 2 or 3";
+            if (place.Problem != null)
+            {
+                result.Set(DynValue.False, DynValue.NewString(place.Problem));
+                yield break;
+            }
+            _status.Value = $"Running: laying a belt at {place.Name}";
+            var walk = Walk(place, result);
+            while (walk.MoveNext()) yield return null;
+            if (!result.Value.IsNil()) yield break;
+            var outcome = Bridge?.WorkerPlaceBelt(_employeeId, _siteId, cellX, cellZ, direction);
+            RefreshCarrying(View());
+            result.Set(outcome?.Accepted == true ? DynValue.True : DynValue.False, Reason(outcome));
+        }
+
+        private static DynValue Reason(GoodsOutcome outcome) => outcome == null ? DynValue.NewString("the world is not available")
+            : outcome.Accepted ? DynValue.Nil : DynValue.NewString(outcome.Reason);
 
         // wait(seconds), at most an hour.
         private IEnumerator Wait(CallbackArguments args, EmployeeScript.Result result)
@@ -354,6 +482,29 @@ namespace FoodFactoryGame.Session.Employees
                 .Sum(x => x.Quantity));
         }
 
+        // holding(kind): IDs of the machines the employee holds (of a kind, or all), ready for place().
+        private DynValue Holding(Script lua, CallbackArguments args)
+        {
+            var kind = OptionalString(args, 0);
+            var table = new Table(lua);
+            var view = View();
+            if (view == null) return DynValue.NewTable(table);
+            foreach (var machine in view.Equipment
+                         .Where(x => x.State == EquipmentState.Held && x.HolderId == _employeeId && (kind == null || x.Kind == kind))
+                         .OrderBy(x => x.Id, StringComparer.Ordinal))
+                table.Append(DynValue.NewString(machine.Id));
+            return DynValue.NewTable(table);
+        }
+
+        // position(): the ground cell the employee stands on, as {x, z} (nil if the world is not available).
+        private DynValue Position(Script lua, CallbackArguments args)
+        {
+            var layout = View()?.SiteLayouts.FirstOrDefault(x => x.SiteId == _siteId);
+            if (layout == null) return DynValue.Nil;
+            var (x, z) = SiteGridSpace.AnchorAt(layout, transform.position, 1, 1);
+            return DynValue.NewTable(new Table(lua, DynValue.NewNumber(x), DynValue.NewNumber(z)));
+        }
+
         // find(kind): IDs of placed ground-floor machines of a kind, nearest first.
         private DynValue Find(Script lua, CallbackArguments args)
         {
@@ -375,6 +526,45 @@ namespace FoodFactoryGame.Session.Employees
             return value.IsNil() ? null : value.CastToString();
         }
 
+        private static int OptionalInteger(CallbackArguments args, int index, int fallback)
+        {
+            var value = args[index];
+            if (value.IsNil()) return fallback;
+            var number = value.CastToNumber() ?? throw new ScriptRuntimeException($"argument {index + 1} must be a number");
+            return (int)Math.Round(number);
+        }
+
+        // A cell is a table {x, z} (or {x = .., z = ..}) at index, or two numbers at index and index + 1; next is the index after it.
+        private static bool TryCell(CallbackArguments args, int index, out int x, out int z, out int next)
+        {
+            next = index + 1;
+            if (TryCell(args[index], out x, out z)) return true;
+            next = index + 2;
+            if (args[index].Type != DataType.Number || args[index + 1].Type != DataType.Number) return false;
+            x = (int)Math.Round(args[index].Number);
+            z = (int)Math.Round(args[index + 1].Number);
+            return true;
+        }
+
+        private static bool TryCell(DynValue value, out int x, out int z)
+        {
+            x = z = 0;
+            if (value.Type != DataType.Table) return false;
+            var first = value.Table.Get(1);
+            var second = value.Table.Get(2);
+            if (first.Type != DataType.Number || second.Type != DataType.Number)
+            {
+                first = value.Table.Get("x");
+                second = value.Table.Get("z");
+            }
+            if (first.Type != DataType.Number || second.Type != DataType.Number) return false;
+            x = (int)Math.Round(first.Number);
+            z = (int)Math.Round(second.Number);
+            return true;
+        }
+
+        private static bool IsCell(DynValue value) => TryCell(value, out _, out _);
+
         private static int OptionalAmount(CallbackArguments args, int index)
         {
             var value = args[index];
@@ -390,9 +580,43 @@ namespace FoodFactoryGame.Session.Employees
             public string Name;
             public string Problem;
             public Rect Area;
+            // A cell to stand on (Area is then the point StandPoint), rather than a thing to stand beside.
+            public bool Stand;
+            public Vector3 StandPoint;
+            // Set for a placed machine.
+            public string EquipmentId;
             // Locations take() empties, in order, and the one put() fills.
             public string[] TakeFrom = Array.Empty<string>();
             public string PutInto;
+        }
+
+        // A place given as a Lua value: a cell {x, z} to stand on, or a place name (below).
+        private Place Resolve(DynValue target, GoodsSnapshot view) =>
+            TryCell(target, out var x, out var z) ? Cell(x, z, view, true) : Resolve(target.IsNil() ? null : target.CastToString(), view);
+
+        // A place goods can be taken from or put into (a cell cannot); "storage" when none is given.
+        private Place Container(DynValue target)
+        {
+            var place = Resolve(target.IsNil() ? DynValue.NewString("storage") : target, View());
+            if (place.Problem == null && place.PutInto == null)
+                place.Problem = $"{place.Name} holds no goods (give a container such as \"storage\")";
+            return place;
+        }
+
+        // A ground cell to stand on (the nearest walkable point within half a cell of its centre) or, when stand is false, to
+        // stand beside like a machine footprint.
+        private Place Cell(int x, int z, GoodsSnapshot view, bool stand)
+        {
+            var name = $"({x}, {z})";
+            var layout = view?.SiteLayouts.FirstOrDefault(l => l.SiteId == _siteId);
+            if (layout == null) return new Place { Name = name, Problem = "the world is not available" };
+            if (x < 0 || z < 0 || x >= layout.Width || z >= layout.Depth) return new Place { Name = name, Problem = $"cell {name} is off the site" };
+            var center = SiteGridSpace.FootprintCenter(layout, x, z, 1, 1);
+            var half = SiteGrid.CellSize * 0.5f;
+            if (!stand) return new Place { Name = name, Area = new Rect(center.x - half, center.z - half, SiteGrid.CellSize, SiteGrid.CellSize) };
+            if (!NavMesh.SamplePosition(center, out var hit, half, NavMesh.AllAreas))
+                return new Place { Name = name, Problem = $"cell {name} is not walkable" };
+            return new Place { Name = name, Stand = true, StandPoint = hit.position, Area = new Rect(hit.position.x, hit.position.z, 0f, 0f) };
         }
 
         // A place is "hands", a marked location's alias or ID ("storage"), a machine ID, a machine kind (the nearest one), or
@@ -429,6 +653,7 @@ namespace FoodFactoryGame.Session.Employees
             return new Place
             {
                 Name = machine.Id,
+                EquipmentId = machine.Id,
                 Area = new Rect(center.x - size.x * 0.5f, center.z - size.y * 0.5f, size.x, size.y),
                 TakeFrom = buffer ? new[] { target } : new[] { output, input },
                 PutInto = buffer ? target : input
@@ -450,7 +675,8 @@ namespace FoodFactoryGame.Session.Employees
         {
             var deadline = Time.time + walkTimeoutSeconds;
             var nextPath = 0f;
-            while (DistanceTo(place.Area) > reach)
+            var within = place.Stand ? StandTolerance : reach;
+            while (DistanceTo(place.Area) > within)
             {
                 if (!agent.isOnNavMesh || Time.time > deadline)
                 {
@@ -461,7 +687,8 @@ namespace FoodFactoryGame.Session.Employees
                 if (Time.time >= nextPath)
                 {
                     nextPath = Time.time + 0.5f;
-                    if (!TryApproachPoint(place.Area, out var point) || !agent.SetDestination(point))
+                    var point = place.StandPoint;
+                    if ((!place.Stand && !TryApproachPoint(place.Area, out point)) || !agent.SetDestination(point))
                     {
                         result.Set(DynValue.False, DynValue.NewString($"no path to {place.Name}"));
                         yield break;
@@ -476,6 +703,8 @@ namespace FoodFactoryGame.Session.Employees
                 }
                 yield return null;
             }
+            // Walking on through a cell keeps a path of cells smooth; the next waypoint (or the script's end) replaces the path.
+            if (place.Stand) yield break;
             agent.ResetPath();
             // Face the place before using it.
             var look = new Vector3(place.Area.center.x, transform.position.y, place.Area.center.y) - transform.position;
@@ -488,40 +717,41 @@ namespace FoodFactoryGame.Session.Employees
             }
         }
 
-        // A walkable point just outside the footprint, on the side facing the employee.
+        // A walkable point within reach of the footprint that the employee can actually walk to, the shortest walk first. Tries
+        // the side facing the employee, then every side and corner, so a place behind a wall (inside a building) is approached
+        // through its door rather than from the wrong side of the wall.
         private bool TryApproachPoint(Rect area, out Vector3 point)
         {
             var margin = agent.radius + 0.3f;
             var outer = new Rect(area.xMin - margin, area.yMin - margin, area.width + margin * 2f, area.height + margin * 2f);
             var position = transform.position;
-            var x = Mathf.Clamp(position.x, outer.xMin, outer.xMax);
-            var z = Mathf.Clamp(position.z, outer.yMin, outer.yMax);
-            if (area.Contains(new Vector2(x, z)))
+            var facing = new Vector2(Mathf.Clamp(position.x, outer.xMin, outer.xMax), Mathf.Clamp(position.z, outer.yMin, outer.yMax));
+            var candidates = new[]
             {
-                // Inside the footprint: step out through the nearest edge.
-                var toLeft = x - outer.xMin;
-                var toRight = outer.xMax - x;
-                var toBottom = z - outer.yMin;
-                var toTop = outer.yMax - z;
-                var least = Mathf.Min(Mathf.Min(toLeft, toRight), Mathf.Min(toBottom, toTop));
-                if (least == toLeft) x = outer.xMin;
-                else if (least == toRight) x = outer.xMax;
-                else if (least == toBottom) z = outer.yMin;
-                else z = outer.yMax;
-            }
-            if (NavMesh.SamplePosition(new Vector3(x, position.y, z), out var hit, reach, NavMesh.AllAreas))
-            {
-                point = hit.position;
-                return true;
-            }
-            var center = new Vector3(area.center.x, position.y, area.center.y);
-            if (NavMesh.SamplePosition(center, out hit, Mathf.Max(area.width, area.height) * 0.5f + reach, NavMesh.AllAreas))
-            {
-                point = hit.position;
-                return true;
-            }
+                facing, new(outer.xMin, area.center.y), new(outer.xMax, area.center.y), new(area.center.x, outer.yMin),
+                new(area.center.x, outer.yMax), new(outer.xMin, outer.yMin), new(outer.xMin, outer.yMax), new(outer.xMax, outer.yMin),
+                new(outer.xMax, outer.yMax)
+            };
+            var path = new NavMeshPath();
+            var best = float.MaxValue;
             point = default;
-            return false;
+            foreach (var candidate in candidates)
+            {
+                // Inside the footprint (the employee stands on it) is not a place to use it from.
+                if (area.Contains(candidate)) continue;
+                if (!NavMesh.SamplePosition(new Vector3(candidate.x, position.y, candidate.y), out var hit, margin, NavMesh.AllAreas)) continue;
+                var at = new Vector2(hit.position.x, hit.position.z);
+                var nearest = new Vector2(Mathf.Clamp(at.x, area.xMin, area.xMax), Mathf.Clamp(at.y, area.yMin, area.yMax));
+                if (Vector2.Distance(at, nearest) > reach - 0.1f) continue;
+                if (!NavMesh.CalculatePath(position, hit.position, NavMesh.AllAreas, path) || path.status != NavMeshPathStatus.PathComplete) continue;
+                var length = 0f;
+                var corners = path.corners;
+                for (var index = 1; index < corners.Length; index++) length += Vector3.Distance(corners[index - 1], corners[index]);
+                if (length >= best) continue;
+                best = length;
+                point = hit.position;
+            }
+            return best < float.MaxValue;
         }
 
         // ---- Goods ----

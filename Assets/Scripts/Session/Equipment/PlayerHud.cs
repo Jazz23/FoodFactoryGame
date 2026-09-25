@@ -464,7 +464,8 @@ namespace FoodFactoryGame.Session.Equipment
             _timers.Clear();
             _hovered = null;
             var inventoryId = interaction.InventoryId;
-            if (interaction.Screen is InteractionScreen.None or InteractionScreen.Employee or InteractionScreen.Logistics || inventoryId == null) return;
+            if (interaction.Screen is InteractionScreen.None or InteractionScreen.Employee or InteractionScreen.PickPosition or InteractionScreen.Logistics
+                || inventoryId == null) return;
             var inventory = Window("hud-inventory", $"Inventory  {Units(site, inventoryId)}");
             inventory.Add(GridView(InventoryGrid));
             // One line at the grid's width: a longer hover line must never resize the centred screen under the pointer.

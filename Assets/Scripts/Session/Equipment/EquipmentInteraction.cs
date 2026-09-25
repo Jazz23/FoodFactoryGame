@@ -5,7 +5,7 @@
 // machine kind or an item, assigned on a screen (a hotbar key over a stack, or dropping the cursor on a hotbar slot); this
 // client's arrangement only, never saved or sent. Hotbar keys (or picking a machine out of the inventory grid) put a held
 // machine kind or the inventory's stack of an item on the cursor; a machine shows a see-through ghost of the machine
-// on its footprint; left click places it (or opens the machine under the crosshair when the cursor is empty) and right click
+// on its footprint; left click places it (or opens the highlighted machine or storage when the cursor is empty) and right click
 // picks the machine under the crosshair back into the inventory. On a screen the cursor can instead carry a goods stack
 // (CursorGoods), which is only a pointer to lots still in their container until it is dropped on another one. Capacity
 // counts slots (decision 0009): moves are previewed against the destination's free slots with the items' max stacks.
@@ -29,6 +29,9 @@ namespace FoodFactoryGame.Session.Equipment
         Machine,
         // An employee's script screen (EquipmentInteraction.Employees.cs, EmployeeScriptPanel).
         Employee,
+        // The employee script screen hidden while the player picks a cell or machine in the world to insert into the script
+        // (EquipmentInteraction.Employees.cs); the avatar can walk and look, and a click or Esc returns to the script.
+        PickPosition,
         // Trucks, routes and the company's remote sites (decision 0022, LogisticsPanel).
         Logistics
     }
@@ -245,10 +248,11 @@ namespace FoodFactoryGame.Session.Equipment
             if (CursorGoods != null && (site == null || !CursorLots(site).Any())) CursorGoods = null;
 
             // The top-down view does not orbit, so it aims with a free pointer instead of the centre crosshair.
-            ApplyPointerLock(_camera != null && Screen == InteractionScreen.None && !_released && !_rig.TopDown);
+            ApplyPointerLock(_camera != null && Screen is InteractionScreen.None or InteractionScreen.PickPosition && !_released && !_rig.TopDown);
             if (_rig != null) _rig.OrbitEnabled = PointerLocked;
-            if (Screen == InteractionScreen.Employee && OpenEmployee == null) CloseScreen();
+            if (Screen is InteractionScreen.Employee or InteractionScreen.PickPosition && OpenEmployee == null) CloseScreen();
             UpdateHover();
+            UpdatePick(site);
 
             var layout = site?.SiteLayouts.FirstOrDefault(x => x.SiteId == DevWorld.SiteId);
             var suffix = HasPendingRequests ? " (waiting for server)" : !string.IsNullOrEmpty(LastRejection) ? $" (rejected: {LastRejection})" : "";
@@ -274,6 +278,8 @@ namespace FoodFactoryGame.Session.Equipment
                         "Storage: click or shift+click to move goods in and out; hover a stack to see when it spoils; E or Esc closes" + suffix,
                     InteractionScreen.Logistics => "Logistics: set each truck's route and cargo, and move stock at remote sites; L or Esc closes" + suffix,
                     InteractionScreen.Employee => "Employee: paste a Lua script and press Run; Stop halts it; Esc closes" + suffix,
+                    InteractionScreen.PickPosition => "Select world pos: look at a cell or a machine (red) and click to insert it into the script; Esc returns"
+                        + (PickText != null ? $" [{PickText}]" : ""),
                     InteractionScreen.Machine => "Machine: put ingredients in the input, take results from the output (shift+click moves a stack); E or Esc closes" + suffix,
                     _ => _released ? "Cursor released: click to resume" + suffix
                         : ElevatorHint() + HoverHint() + "E: inventory (pick belts or goods to carry them out), L: trucks, 1-9: hotbar, left click: open machine, right click: pick up, R: turn belt, F: take an item off a belt" + suffix
@@ -518,6 +524,11 @@ namespace FoodFactoryGame.Session.Equipment
 
         private void OnPlace(InputAction.CallbackContext _)
         {
+            if (Screen == InteractionScreen.PickPosition)
+            {
+                FinishPick();
+                return;
+            }
             if (Screen != InteractionScreen.None || _camera == null) return;
             if (_released)
             {
@@ -533,8 +544,9 @@ namespace FoodFactoryGame.Session.Equipment
             if (bridge == null || StartBeltDrag()) return;
             if (_held == null)
             {
-                // Only a machine within reach (the hover target) opens.
+                // Only the highlighted hover target (a machine or the storage within reach) opens.
                 if (_hovered is EquipmentVisual visual && visual != null) OpenMachine(visual.EquipmentId);
+                else if (_hovered is Employees.SiteLocationMarker marker && marker != null) OpenStorage();
                 return;
             }
             if (!ghost.gameObject.activeSelf || HasPendingRequests) return;
@@ -593,7 +605,8 @@ namespace FoodFactoryGame.Session.Equipment
         // left) until the next click.
         private void OnCloseScreen(InputAction.CallbackContext _)
         {
-            if (Screen != InteractionScreen.None) CloseScreen();
+            if (Screen == InteractionScreen.PickPosition) CancelPick();
+            else if (Screen != InteractionScreen.None) CloseScreen();
             else if (CursorKind != null || CursorGoods != null) ClearCursor();
             else if (_camera != null) _released = !_released;
         }

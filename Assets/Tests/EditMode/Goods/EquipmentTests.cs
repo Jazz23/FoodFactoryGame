@@ -247,5 +247,38 @@ namespace FoodFactoryGame.Goods.Tests
             Assert.DoesNotThrow(() => GoodsWorld.Restore(_world.Snapshot()));
             Assert.Throws<InvalidOperationException>(() => GoodsWorld.Restore(Mutate(s => s.Equipment.Single(x => x.Id == "oven-1").HolderId = "")), "held without a holder");
         }
+
+        [Test]
+        public void GivenMachineIsPlacedByTheEmployeeUnderTheSameId()
+        {
+            _world.Bootstrap(new GoodsEmployee { Id = "employee-a", SiteId = "restaurant", Name = "A" }, 4);
+            Assert.That(_world.PickUp("chef", "pick", "oven-1").Accepted, Is.True);
+            var before = Layout(_world);
+            Assert.That(_world.Give("sous", "g0", "oven-1", "employee-a").Reason, Is.EqualTo("not-held"));
+            Assert.That(_world.Give("chef", "g1", "oven-1", "employee-b").Reason, Is.EqualTo("unknown-employee"));
+            Assert.That(_world.Give("chef", "g2", "oven-1", "chef").Reason, Is.EqualTo("unknown-employee"));
+            Assert.That(Layout(_world), Is.EqualTo(before), "refused gifts change nothing");
+
+            var given = _world.Give("chef", "g3", "oven-1", "employee-a");
+            Assert.That((given.Accepted, given.Reason), Is.EqualTo((true, "given")));
+            Assert.That(Oven(_world).HolderId, Is.EqualTo("employee-a"));
+            Assert.That(_world.Place("chef", "p1", "oven-1", 0, 2, 0).Reason, Is.EqualTo("not-held"), "the giver no longer holds it");
+            var placed = _world.Place("employee-a", "p2", "oven-1", 0, 2, 0);
+            Assert.That(placed.Accepted, Is.True, placed.Reason);
+            Assert.That((Oven(_world).State, Oven(_world).CellZ), Is.EqualTo((EquipmentState.Placed, 2)));
+            Assert.That(_world.PickUp("employee-a", "p3", "oven-1").Accepted, Is.True, "an employee can move a machine too");
+            Assert.DoesNotThrow(() => GoodsWorld.Restore(_world.Snapshot()));
+        }
+
+        [Test]
+        public void GiveIsDurable()
+        {
+            _world.Bootstrap(new GoodsEmployee { Id = "employee-a", SiteId = "restaurant", Name = "A" }, 4);
+            Assert.That(_world.PickUp("chef", "pick", "oven-1").Accepted, Is.True);
+            Assert.That(_world.GiveDurably("chef", "g1", "oven-1", "employee-a", BadPath).Reason, Is.EqualTo("persistence-unavailable"));
+            Assert.That(Oven(_world).HolderId, Is.EqualTo("chef"), "a failed save restores the holder");
+            Assert.That(_world.GiveDurably("chef", "g2", "oven-1", "employee-a", PathForSave).Accepted, Is.True);
+            Assert.That(Oven(_world).HolderId, Is.EqualTo("employee-a"));
+        }
     }
 }

@@ -30,12 +30,18 @@ namespace FoodFactoryGame.Session
             return outline;
         }
 
+        private Material _shown;
+
         private void OnDisable() => SetHighlighted(false);
 
-        public void SetHighlighted(bool highlighted)
+        // Material overrides the target's own outline (the red one used while picking a world position).
+        public void SetHighlighted(bool highlighted, Material material = null)
         {
-            if (highlighted == _highlighted || (highlighted && outlineMaterial == null)) return;
+            material = material != null ? material : outlineMaterial;
+            if (highlighted && _highlighted && material != _shown) SetHighlighted(false);
+            if (highlighted == _highlighted || (highlighted && material == null)) return;
             _highlighted = highlighted;
+            _shown = highlighted ? material : null;
             if (!highlighted)
             {
                 for (var index = 0; index < _renderers.Length; index++)
@@ -53,7 +59,7 @@ namespace FoodFactoryGame.Session
                 renderer.GetPropertyBlock(_block);
                 _block.SetVector(OutlineCenter, mesh.bounds.center);
                 renderer.SetPropertyBlock(_block);
-                renderer.sharedMaterials = renderer.sharedMaterials.Append(outlineMaterial).ToArray();
+                renderer.sharedMaterials = renderer.sharedMaterials.Append(material).ToArray();
             }
         }
     }
