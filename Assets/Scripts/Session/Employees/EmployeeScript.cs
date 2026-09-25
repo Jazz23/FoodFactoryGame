@@ -65,6 +65,31 @@ namespace FoodFactoryGame.Session.Employees
             _coroutine.Coroutine.AutoYieldCounter = InstructionBudget;
         }
 
+        // A cell as scripts see it: {x, z} that also answers .x and .z, since scripts (and the script assistant) use both.
+        public static DynValue Cell(Script lua, double x, double z)
+        {
+            var table = new Table(lua, DynValue.NewNumber(x), DynValue.NewNumber(z));
+            table["x"] = x;
+            table["z"] = z;
+            return DynValue.NewTable(table);
+        }
+
+        // Parses a program without running it, with the same limits as the constructor. Returns null when it would load, or the
+        // error the constructor would throw (with the line). Undefined globals are not errors: Lua resolves them at run time.
+        public static string CheckSyntax(string source)
+        {
+            if (source == null || source.Length > MaxSourceLength) return $"A script is at most {MaxSourceLength} characters.";
+            try
+            {
+                new Script(CoreModules.None).LoadString(source, null, "script");
+                return null;
+            }
+            catch (SyntaxErrorException error)
+            {
+                return error.DecoratedMessage ?? error.Message;
+            }
+        }
+
         // Advances the running operation, or resumes Lua once when none is running. Returns false once the script has ended.
         public bool Step()
         {

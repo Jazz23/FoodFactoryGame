@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "ai.undream.llm": "https://github.com/undreamai/LLMUnity.git#v3.0.3",
     "com.coplaydev.unity-mcp": "https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity#main",
     "com.gilzoide.sqlite-net": "https://github.com/gilzoide/unity-sqlite-net.git#1.3.2",
     "com.unity.ai.navigation": "2.0.14",

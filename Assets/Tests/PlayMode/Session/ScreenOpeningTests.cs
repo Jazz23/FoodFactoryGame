@@ -1,14 +1,18 @@
 // Opening screens from the world through the real SampleScene host (the scene with the employee prefab): the employee script
 // screen opens without focusing its text box, so the E press that opened it is never typed into the script, and the hidden
-// text box gives up focus once closed, and the left click that opened it does not focus it either; E closes it unless the text box has focus; a left click opens the storage only while it is the highlighted hover target. Every
-// save and identity path is a unique temporary directory.
+// text box gives up focus once closed, and the left click that opened it does not focus it either; E closes it unless the
+// text box has focus; a left click opens the storage only while it is the highlighted hover target; the Assistant tab writes
+// a parsing reply into the script text box or shows the error after three bad replies (a fake model; the real one is an
+// Explicit test since it loads 1.1 GB). Every save and identity path is a unique temporary directory.
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
+using System.Threading.Tasks;
 using FoodFactoryGame.Session.Employees;
 using FoodFactoryGame.Session.Equipment;
 using FoodFactoryGame.Session.Player;
@@ -140,6 +144,84 @@ namespace FoodFactoryGame.Session.PlayModeTests
             Assert.That(_interaction.Screen, Is.EqualTo(InteractionScreen.None));
             yield return Frames(2);
             Assert.That(panel.SourceField.focusController?.focusedElement, Is.Null, "The hidden text box kept focus.");
+        }
+
+        private sealed class FakeModel : IScriptModel
+        {
+            private readonly Queue<string> _replies;
+            public int Asked;
+            public FakeModel(params string[] replies) => _replies = new Queue<string>(replies);
+            public Task Reset() => Task.CompletedTask;
+
+            public async Task<string> Ask(string message)
+            {
+                Asked++;
+                await Task.Yield();
+                return _replies.Dequeue();
+            }
+        }
+
+        private IEnumerator OpenEmployee(EmployeeScriptPanel panel)
+        {
+            EmployeeWorker employee = null;
+            yield return Until(() => (employee = UnityEngine.Object.FindAnyObjectByType<EmployeeWorker>()) != null
+                && !string.IsNullOrEmpty(employee.EmployeeId), "dev employee spawned");
+            _interaction.OpenEmployeeScreen(employee);
+            yield return Frames(2);
+        }
+
+        [UnityTest]
+        public IEnumerator AssistantTabWritesTheCorrectedScriptIntoTheScriptTab()
+        {
+            var panel = UnityEngine.Object.FindAnyObjectByType<EmployeeScriptPanel>();
+            var model = new FakeModel("```lua\nwhile true do\n```", "```lua\nsay(\"hi\")\n```");
+            panel.UseModel(model);
+            yield return OpenEmployee(panel);
+            panel.ShowAssistant(true);
+            yield return null;
+            Assert.That(panel.PromptField.resolvedStyle.display, Is.EqualTo(DisplayStyle.Flex));
+            Assert.That(panel.SourceField.resolvedStyle.display, Is.EqualTo(DisplayStyle.None));
+            panel.PromptField.value = "say hi";
+            panel.ClickGenerate();
+            yield return Until(() => !panel.Generating, "generation finished");
+            Assert.That(model.Asked, Is.EqualTo(2), "The syntax error was sent back once.");
+            Assert.That(panel.SourceField.value, Is.EqualTo("say(\"hi\")\n"));
+            Assert.That(panel.AssistantShown, Is.False, "The Script tab shows the new program.");
+            Assert.That(panel.AssistantStatus, Does.Contain("2 attempts"));
+        }
+
+        [UnityTest]
+        public IEnumerator AssistantTabShowsTheErrorAndKeepsTheDraftAfterThreeBadReplies()
+        {
+            var panel = UnityEngine.Object.FindAnyObjectByType<EmployeeScriptPanel>();
+            var model = new FakeModel("end", "end", "end", "say(1)");
+            panel.UseModel(model);
+            yield return OpenEmployee(panel);
+            var draft = panel.SourceField.value;
+            panel.ShowAssistant(true);
+            panel.PromptField.value = "anything";
+            panel.ClickGenerate();
+            yield return Until(() => !panel.Generating, "generation finished");
+            Assert.That(model.Asked, Is.EqualTo(3));
+            Assert.That(panel.SourceField.value, Is.EqualTo(draft));
+            Assert.That(panel.AssistantShown, Is.True);
+            Assert.That(panel.AssistantStatus, Does.Contain("could not write a working script in 3 attempts"));
+        }
+
+        // Loads the shipped model (about 1.1 GB, seconds to minutes on CPU), so it runs only when selected by name.
+        [UnityTest, Explicit("Loads the local language model")]
+        public IEnumerator LocalModelWritesAParsingScript()
+        {
+            Assume.That(LocalScriptModel.Default.Installed, "Model not installed: FoodFactory > Download Script Assistant Model.");
+            var panel = UnityEngine.Object.FindAnyObjectByType<EmployeeScriptPanel>();
+            yield return OpenEmployee(panel);
+            panel.ShowAssistant(true);
+            panel.PromptField.value = "Repeat forever: carry 2 dough from the storage to the fridge, say how many you moved, then wait 3 seconds.";
+            panel.ClickGenerate();
+            yield return Until(() => !panel.Generating, "generation finished", 600f);
+            Debug.Log($"Assistant: {panel.AssistantStatus}\n{panel.SourceField.value}");
+            Assert.That(panel.AssistantShown, Is.False, panel.AssistantStatus);
+            Assert.That(ScriptDryRun.Check(panel.SourceField.value), Is.Null);
         }
 
         [UnityTest]

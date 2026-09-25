@@ -496,13 +496,13 @@ namespace FoodFactoryGame.Session.Employees
             return DynValue.NewTable(table);
         }
 
-        // position(): the ground cell the employee stands on, as {x, z} (nil if the world is not available).
+        // position(): the ground cell the employee stands on, as {x, z} with .x/.z too (nil if the world is not available).
         private DynValue Position(Script lua, CallbackArguments args)
         {
             var layout = View()?.SiteLayouts.FirstOrDefault(x => x.SiteId == _siteId);
             if (layout == null) return DynValue.Nil;
             var (x, z) = SiteGridSpace.AnchorAt(layout, transform.position, 1, 1);
-            return DynValue.NewTable(new Table(lua, DynValue.NewNumber(x), DynValue.NewNumber(z)));
+            return EmployeeScript.Cell(lua, x, z);
         }
 
         // find(kind): IDs of placed ground-floor machines of a kind, nearest first.

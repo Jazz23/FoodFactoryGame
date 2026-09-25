@@ -119,3 +119,13 @@ InitTestScene*.unity*
 /[Aa]ssets/[Ss]ceneDependencyCache*
 
 /[Aa]ssets/FishNet*
+
+# Local LLM runtime and weights (LLMUnity): LlamaLib is downloaded by the package on Editor load, the model by
+# FoodFactory > Download Script Assistant Model. Neither is tracked.
+/[Aa]ssets/StreamingAssets/LlamaLib-*
+/[Aa]ssets/StreamingAssets/LlamaLib-*.meta
+/[Aa]ssets/StreamingAssets/Models/
+/[Aa]ssets/StreamingAssets/Models.meta
+/[Aa]ssets/StreamingAssets/LLMManager.json*
+*.gguf
+*.gguf.meta

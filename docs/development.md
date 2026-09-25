@@ -5,7 +5,8 @@
 1. Install Unity `6000.5.9f1` with Windows x86-64 player build support and an active Editor license. Git must be available for the declared Git packages.
 2. Obtain the project source, including `Assets/FishNet`, all relevant `.meta` files, `Packages/manifest.json`, `Packages/packages-lock.json`, and `ProjectSettings`.
 3. Open the project and let Unity import assets and resolve packages. Do not copy another checkout's `Library`, `Temp`, or generated `.csproj` files.
-4. For live automation, install Unity CLI and use the project's declared `com.unity.pipeline` package (`0.7.0-exp.1`). Confirm the actual Editor connection before mutations.
+4. For the employee script assistant, run **FoodFactory > Download Script Assistant Model** once. It fetches `qwen2.5-coder-1.5b-instruct-q4_k_m.gguf` (about 1.1 GB, SHA-256 checked) into `Assets/StreamingAssets/Models/`. LLMUnity downloads its LlamaLib runtime (about 3.9 GB, every platform and GPU backend) into `Assets/StreamingAssets/LlamaLib-v2.0.5/` by itself on the first Editor load. Git ignores both. Without the model the game runs normally and the Assistant tab shows an error.
+5. For live automation, install Unity CLI and use the project's declared `com.unity.pipeline` package (`0.7.0-exp.1`). Confirm the actual Editor connection before mutations.
 
 FishNet is installed by the source checkout itself; do not also import a second Asset Store/UPM copy. Its version is `4.7.3`. The reason for retaining the existing installation is in [decision 0001](decisions/0001-reproducible-baseline.md).
 
