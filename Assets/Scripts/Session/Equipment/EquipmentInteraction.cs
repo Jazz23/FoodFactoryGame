@@ -27,7 +27,9 @@ namespace FoodFactoryGame.Session.Equipment
         Inventory,
         Machine,
         // An employee's script screen (EquipmentInteraction.Employees.cs, EmployeeScriptPanel).
-        Employee
+        Employee,
+        // Trucks, routes and the company's remote sites (decision 0022, LogisticsPanel).
+        Logistics
     }
 
     // One slot's goods stack (item and spoiled state, up to the item's max stack) in one container, carried on the cursor.
@@ -76,6 +78,8 @@ namespace FoodFactoryGame.Session.Equipment
         [SerializeField] private InputActionReference hotbarAction;
         // Held while clicking a slot to send its stack to the other open container instead of picking it up.
         [SerializeField] private InputActionReference quickTransferAction;
+        // Opens and closes the logistics screen (trucks and remote sites, decision 0022).
+        [SerializeField] private InputActionReference logisticsAction;
         [SerializeField] private Color validColor = new(0.2f, 0.85f, 0.3f, 1f);
         [SerializeField] private Color invalidColor = new(0.9f, 0.2f, 0.15f, 1f);
         [SerializeField] private float maximumRayDistance = 100f;
@@ -101,6 +105,7 @@ namespace FoodFactoryGame.Session.Equipment
         private string _ghostKind;
         private bool _openMachineSells;
         private bool _openMachineStores;
+        private bool _openMachineDock;
         private Renderer[] _ghostRenderers = Array.Empty<Renderer>();
 
         public InteractionScreen Screen { get; private set; }
@@ -160,7 +165,7 @@ namespace FoodFactoryGame.Session.Equipment
         private IEnumerable<InputActionReference> Actions => new[]
         {
             placeAction, removeAction, rotateAction, pointAction, inventoryAction, clearCursorAction, closeScreenAction, hotbarAction,
-            quickTransferAction, placeItemAction, takeItemAction
+            quickTransferAction, placeItemAction, takeItemAction, logisticsAction
         };
 
         private void OnEnable()
@@ -170,6 +175,7 @@ namespace FoodFactoryGame.Session.Equipment
             removeAction.action.performed += OnRemove;
             rotateAction.action.performed += OnRotate;
             inventoryAction.action.performed += OnInventory;
+            logisticsAction.action.performed += OnLogistics;
             clearCursorAction.action.performed += OnClearCursor;
             closeScreenAction.action.performed += OnCloseScreen;
             hotbarAction.action.performed += OnHotbar;
@@ -186,6 +192,7 @@ namespace FoodFactoryGame.Session.Equipment
             removeAction.action.performed -= OnRemove;
             rotateAction.action.performed -= OnRotate;
             inventoryAction.action.performed -= OnInventory;
+            logisticsAction.action.performed -= OnLogistics;
             clearCursorAction.action.performed -= OnClearCursor;
             closeScreenAction.action.performed -= OnCloseScreen;
             hotbarAction.action.performed -= OnHotbar;
@@ -253,12 +260,15 @@ namespace FoodFactoryGame.Session.Equipment
                     // A sale station (decision 0013) has no results to take: it sells its input for the company.
                     InteractionScreen.Machine when _openMachineSells =>
                         "Counter: put edible goods in the input; customers buy them one at a time for the company (shift+click moves a stack); E or Esc closes" + suffix,
+                    InteractionScreen.Machine when _openMachineDock =>
+                        "Dock: put goods in Outgoing for trucks to load; take deliveries from Incoming (shift+click moves a stack); L: trucks and routes; E or Esc closes" + suffix,
                     InteractionScreen.Machine when _openMachineStores =>
                         "Storage: click or shift+click to move goods in and out; hover a stack to see when it spoils; E or Esc closes" + suffix,
+                    InteractionScreen.Logistics => "Logistics: set each truck's route and cargo, and move stock at remote sites; L or Esc closes" + suffix,
                     InteractionScreen.Employee => "Employee: paste a Lua script and press Run; Stop halts it; Esc closes" + suffix,
                     InteractionScreen.Machine => "Machine: put ingredients in the input, take results from the output (shift+click moves a stack); E or Esc closes" + suffix,
                     _ => _released ? "Cursor released: click to resume" + suffix
-                        : ElevatorHint() + (_hoveredEmployee != null ? "Left click: give this employee a script. " : "") + "E: inventory (pick belts or goods to carry them out), 1-9: hotbar, left click: open machine, right click: pick up, R: turn belt, F: take an item off a belt" + suffix
+                        : ElevatorHint() + (_hoveredEmployee != null ? "Left click: give this employee a script. " : "") + "E: inventory (pick belts or goods to carry them out), L: trucks, 1-9: hotbar, left click: open machine, right click: pick up, R: turn belt, F: take an item off a belt" + suffix
                 };
                 return;
             }
@@ -416,6 +426,17 @@ namespace FoodFactoryGame.Session.Equipment
             else CloseScreen();
         }
 
+        // The logistics screen (decision 0022) opens from the world like the inventory and closes with L or Esc.
+        public void ToggleLogistics()
+        {
+            if (Screen == InteractionScreen.None && _camera != null && session.ClientSite != null)
+            {
+                Screen = InteractionScreen.Logistics;
+                _awaitingRelease = true;
+            }
+            else if (Screen == InteractionScreen.Logistics) CloseScreen();
+        }
+
         public void OpenMachine(string equipmentId)
         {
             if (_camera == null || session.ClientSite?.Equipment.Any(x => x.Id == equipmentId && x.State == EquipmentState.Placed) != true)
@@ -427,6 +448,7 @@ namespace FoodFactoryGame.Session.Equipment
             _openMachineSells = session.Recipes.Any(x => x != null && x.IsSale && x.StationKind == kind);
             // A machine with no recipes is storage (the fridge, decision 0018) and gets the storage hint.
             _openMachineStores = !session.Recipes.Any(x => x != null && x.StationKind == kind);
+            _openMachineDock = kind == GoodsWorld.DockKind;
             _awaitingRelease = true;
         }
 
@@ -545,6 +567,8 @@ namespace FoodFactoryGame.Session.Equipment
         }
 
         private void OnInventory(InputAction.CallbackContext _) => ToggleInventory();
+
+        private void OnLogistics(InputAction.CallbackContext _) => ToggleLogistics();
 
         private void OnClearCursor(InputAction.CallbackContext _) => ClearCursor();
 

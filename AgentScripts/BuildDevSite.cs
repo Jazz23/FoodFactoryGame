@@ -19,6 +19,7 @@ using FoodFactoryGame.Session;
 using FoodFactoryGame.Session.Belts;
 using FoodFactoryGame.Session.Buildings;
 using FoodFactoryGame.Session.Equipment;
+using FoodFactoryGame.Session.Logistics;
 using FoodFactoryGame.Session.Player;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -55,10 +56,15 @@ public static class BuildDevSite
     private const string FridgeMaterialFolder = "Assets/Materials/Fridge";
     private const string OfferFolder = "Assets/Content/Offers";
     private const string BuildingMaterialFolder = "Assets/Materials/Building";
+    private const string DockPrefabPath = "Assets/Prefabs/Equipment/Dock.prefab";
+    private const string DockDefinitionPath = "Assets/Content/Equipment/Dock.asset";
+    private const string DockMaterialFolder = "Assets/Materials/Dock";
+    private const string TruckPrefabPath = "Assets/Prefabs/Logistics/Truck.prefab";
+    private const string TruckMaterialFolder = "Assets/Materials/Truck";
 
     public static string Run()
     {
-        foreach (var folder in new[] { "Assets/UI", "Assets/Prefabs/Network", "Assets/Prefabs/Player", "Assets/Network", "Assets/Content/Equipment", "Assets/Content/Recipes", "Assets/Content/Items", "Assets/Materials", BeltMaterialFolder, BeltPrefabFolder, CounterMaterialFolder, FridgeMaterialFolder, BuildingMaterialFolder, "Assets/Prefabs/Equipment", OfferFolder })
+        foreach (var folder in new[] { "Assets/UI", "Assets/Prefabs/Network", "Assets/Prefabs/Player", "Assets/Network", "Assets/Content/Equipment", "Assets/Content/Recipes", "Assets/Content/Items", "Assets/Materials", BeltMaterialFolder, BeltPrefabFolder, CounterMaterialFolder, FridgeMaterialFolder, BuildingMaterialFolder, "Assets/Prefabs/Equipment", OfferFolder, DockMaterialFolder, TruckMaterialFolder, "Assets/Prefabs/Logistics" })
             Directory.CreateDirectory(folder);
         AssetDatabase.Refresh();
         var panelSettings = BuildPanelSettings();
@@ -72,15 +78,18 @@ public static class BuildDevSite
         // PROTOTYPE fridge (decision 0018): 1x1 m, 8 refrigerated storage slots where goods do not spoil, no recipes; the output
         // slot is unused (equipment always has both buffers).
         var fridge = BuildEquipmentDefinition(FridgeDefinitionPath, "fridge", 1, 1, 8, 1, BuildFridgePrefab(), ImportIcon("Fridge"), true);
+        // PROTOTYPE loading dock (decision 0022): 2x1 m, 8 outgoing slots trucks load from and 8 incoming slots they unload into.
+        var dock = BuildEquipmentDefinition(DockDefinitionPath, GoodsWorld.DockKind, 2, 1, 8, 8, BuildDockPrefab(), ImportIcon("Dock"));
         // PROTOTYPE supplier prices (decision 0014): dough at 50 cents a unit leaves $2.00 margin on a $2.50 bread. An oven
         // (decision 0017) costs $150.00, 75 breads of margin, so the $500.00 start can afford one while keeping ingredient money.
-        // A fridge costs $80.00.
+        // A fridge costs $80.00 and a loading dock $60.00.
         var offers = new[]
         {
             BuildOffer("Dough5", "supplier-dough-5", DevWorld.DoughItemId, 5, 250, DevWorld.DoughSpoilAfterSeconds),
             BuildOffer("Belt10", "supplier-belt-10", GoodsWorld.BeltItemId, 10, 500, GoodsWorld.NonPerishableSeconds),
             BuildOffer("Oven1", "supplier-oven", "", 1, 15000, 1, oven),
-            BuildOffer("Fridge1", "supplier-fridge", "", 1, 8000, 1, fridge)
+            BuildOffer("Fridge1", "supplier-fridge", "", 1, 8000, 1, fridge),
+            BuildOffer("Dock1", "supplier-dock", "", 1, 6000, 1, dock)
         };
         // PROTOTYPE stack sizes: dough and bread 20, belts 100 (Factorio's belt stack), lifts 50 (decision 0021).
         var items = new[]
@@ -100,8 +109,8 @@ public static class BuildDevSite
             LitMaterial(BuildingMaterialFolder, "BuildingFloor", new Color(0.7f, 0.72f, 0.74f), 0f, 0.55f),
             LitMaterial(BuildingMaterialFolder, "BuildingRoof", new Color(0.32f, 0.2f, 0.17f), 0f, 0.2f)
         };
-        BuildScene(catalog, bridge, player, panelSettings, new[] { oven, counter, fridge }, new[] { bread, sellBread }, offers, items, ghostMaterial,
-            ghostModelMaterial, beltPrefabs, tread, itemSprite, buildingMaterials);
+        BuildScene(catalog, bridge, player, panelSettings, new[] { oven, counter, fridge, dock }, new[] { bread, sellBread }, offers, items, ghostMaterial,
+            ghostModelMaterial, beltPrefabs, tread, itemSprite, buildingMaterials, BuildTruckPrefab());
         EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
         AssetDatabase.SaveAssets();
         return "DevSite authored";
@@ -208,6 +217,55 @@ public static class BuildDevSite
             box.center = new Vector3(0f, 0.95f, 0f);
             box.size = new Vector3(0.9f, 1.9f, 0.8f);
             return PrefabUtility.SaveAsPrefabAsset(root, FridgePrefabPath);
+        }
+        finally { Object.DestroyImmediate(root); }
+    }
+
+    // DEVELOPMENT placeholder art for the decision-0022 loading dock: a 2 x 1 m concrete platform with a blue roll-up door
+    // frame along its back (+Z, where trucks park), a yellow-and-black bumper there and a crate on the deck, built from
+    // primitives. One box collider on the root lets aim rays name it.
+    private static GameObject BuildDockPrefab()
+    {
+        var concrete = LitMaterial(DockMaterialFolder, "DockConcrete", new Color(0.62f, 0.64f, 0.66f), 0f, 0.2f);
+        var door = LitMaterial(DockMaterialFolder, "DockDoor", new Color(0.36f, 0.5f, 0.6f), 0.3f, 0.5f);
+        var bumper = LitMaterial(DockMaterialFolder, "DockBumper", new Color(0.95f, 0.76f, 0.19f), 0f, 0.4f);
+        var crate = LitMaterial(DockMaterialFolder, "DockCrate", new Color(0.76f, 0.54f, 0.29f), 0f, 0.3f);
+        var root = new GameObject("Dock");
+        try
+        {
+            Block(root, "Deck", concrete, new Vector3(0f, 0.3f, 0f), new Vector3(2f, 0.6f, 1f));
+            Block(root, "DoorFrame", concrete, new Vector3(0f, 1.5f, 0.45f), new Vector3(2f, 1.8f, 0.1f));
+            Block(root, "Door", door, new Vector3(0f, 1.4f, 0.39f), new Vector3(1.6f, 1.5f, 0.04f));
+            Block(root, "Bumper", bumper, new Vector3(0f, 0.45f, 0.52f), new Vector3(2f, 0.2f, 0.06f));
+            Block(root, "Crate", crate, new Vector3(-0.5f, 0.85f, -0.1f), new Vector3(0.5f, 0.5f, 0.5f));
+            var box = root.AddComponent<BoxCollider>();
+            box.center = new Vector3(0f, 1.2f, 0f);
+            box.size = new Vector3(2f, 2.4f, 1f);
+            return PrefabUtility.SaveAsPrefabAsset(root, DockPrefabPath);
+        }
+        finally { Object.DestroyImmediate(root); }
+    }
+
+    // DEVELOPMENT placeholder art for a decision-0022 truck parked at a dock: a 5 m box truck (length along X) with a red cab,
+    // a white cargo box, dark wheels and a windscreen, built from primitives. No collider: it is presentation only and must
+    // never block aim rays or walking.
+    private static GameObject BuildTruckPrefab()
+    {
+        var cab = LitMaterial(TruckMaterialFolder, "TruckCab", new Color(0.78f, 0.16f, 0.14f), 0.3f, 0.6f);
+        var box = LitMaterial(TruckMaterialFolder, "TruckBox", new Color(0.93f, 0.93f, 0.9f), 0f, 0.4f);
+        var tyre = LitMaterial(TruckMaterialFolder, "TruckTyre", new Color(0.08f, 0.08f, 0.09f), 0f, 0.2f);
+        var glass = LitMaterial(TruckMaterialFolder, "TruckGlass", new Color(0.35f, 0.55f, 0.65f), 0.6f, 0.9f);
+        var root = new GameObject("Truck");
+        try
+        {
+            Block(root, "CargoBox", box, new Vector3(-0.7f, 1.55f, 0f), new Vector3(3.4f, 2.3f, 2.1f));
+            Block(root, "Chassis", tyre, new Vector3(0f, 0.45f, 0f), new Vector3(5f, 0.25f, 1.8f));
+            Block(root, "Cab", cab, new Vector3(1.85f, 1.2f, 0f), new Vector3(1.3f, 1.6f, 2f));
+            Block(root, "Windscreen", glass, new Vector3(2.51f, 1.5f, 0f), new Vector3(0.04f, 0.7f, 1.7f));
+            foreach (var x in new[] { -1.7f, 0.2f, 1.9f })
+            foreach (var z in new[] { -0.85f, 0.85f })
+                Block(root, "Wheel", tyre, new Vector3(x, 0.4f, z), new Vector3(0.8f, 0.8f, 0.3f));
+            return PrefabUtility.SaveAsPrefabAsset(root, TruckPrefabPath);
         }
         finally { Object.DestroyImmediate(root); }
     }
@@ -577,7 +635,7 @@ public static class BuildDevSite
 
     private static void BuildScene(SinglePrefabObjects catalog, NetworkObject bridge, NetworkObject player, PanelSettings panelSettings,
         EquipmentDefinition[] equipment, RecipeAsset[] recipeAssets, OfferAsset[] offerAssets, ItemDefinition[] items, Material ghostMaterial, Material ghostModelMaterial,
-        GameObject[] beltPrefabs, Material tread, Material itemSprite, Material[] buildingMaterials)
+        GameObject[] beltPrefabs, Material tread, Material itemSprite, Material[] buildingMaterials, GameObject truckPrefab)
     {
         var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
@@ -731,6 +789,7 @@ public static class BuildDevSite
             serialized.FindProperty("quickTransferAction").objectReferenceValue = Action("QuickTransfer");
             serialized.FindProperty("placeItemAction").objectReferenceValue = Action("PlaceItem");
             serialized.FindProperty("takeItemAction").objectReferenceValue = Action("TakeItem");
+            serialized.FindProperty("logisticsAction").objectReferenceValue = Action("Logistics");
             serialized.FindProperty("belts").objectReferenceValue = belts;
             serialized.FindProperty("buildings").objectReferenceValue = buildings;
             serialized.ApplyModifiedPropertiesWithoutUndo();
@@ -766,6 +825,31 @@ public static class BuildDevSite
         using (var serialized = new SerializedObject(hud))
         {
             serialized.FindProperty("document").objectReferenceValue = hudDocument;
+            serialized.FindProperty("interaction").objectReferenceValue = interaction;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        // Trucks parked at local docks, and the logistics screen (decision 0022) on its own document above the HUD.
+        var truckObject = new GameObject("TruckPresenter");
+        var trucks = truckObject.AddComponent<TruckPresenter>();
+        using (var serialized = new SerializedObject(trucks))
+        {
+            serialized.FindProperty("session").objectReferenceValue = session;
+            serialized.FindProperty("truckPrefab").objectReferenceValue = truckPrefab;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+        var logisticsObject = new GameObject("LogisticsPanel");
+        var logisticsDocument = logisticsObject.AddComponent<UIDocument>();
+        using (var serialized = new SerializedObject(logisticsDocument))
+        {
+            serialized.FindProperty("m_PanelSettings").objectReferenceValue = panelSettings;
+            serialized.FindProperty("m_SortingOrder").floatValue = 2f;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+        var logistics = logisticsObject.AddComponent<LogisticsPanel>();
+        using (var serialized = new SerializedObject(logistics))
+        {
+            serialized.FindProperty("document").objectReferenceValue = logisticsDocument;
             serialized.FindProperty("interaction").objectReferenceValue = interaction;
             serialized.ApplyModifiedPropertiesWithoutUndo();
         }

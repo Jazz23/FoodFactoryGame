@@ -9,6 +9,7 @@ using FoodFactoryGame.Goods.Network;
 using FoodFactoryGame.Session.Belts;
 using FoodFactoryGame.Session.Buildings;
 using FoodFactoryGame.Session.Equipment;
+using FoodFactoryGame.Session.Logistics;
 using FoodFactoryGame.Session.Player;
 using NUnit.Framework;
 using UnityEditor;
@@ -33,6 +34,8 @@ namespace FoodFactoryGame.Session.Tests
         private const string SellBreadRecipePath = "Assets/Content/Recipes/SellBread.asset";
         private const string FridgePrefabPath = "Assets/Prefabs/Equipment/Fridge.prefab";
         private const string FridgeDefinitionPath = "Assets/Content/Equipment/Fridge.asset";
+        private const string DockDefinitionPath = "Assets/Content/Equipment/Dock.asset";
+        private const string TruckPrefabPath = "Assets/Prefabs/Logistics/Truck.prefab";
 
         private static void AssertAssigned(Object component, params string[] fields)
         {
@@ -82,10 +85,10 @@ namespace FoodFactoryGame.Session.Tests
                     Assert.That(AssetDatabase.GetAssetPath(serialized.FindProperty("playerPrefab").objectReferenceValue), Is.EqualTo(PlayerPath));
                     Assert.That(AssetDatabase.GetAssetPath(serialized.FindProperty("bridgePrefab").objectReferenceValue), Is.EqualTo(BridgePath));
                     Assert.That(roots[0].EquipmentDefinitions.Select(AssetDatabase.GetAssetPath),
-                        Is.EqualTo(new[] { OvenDefinitionPath, CounterDefinitionPath, FridgeDefinitionPath }));
+                        Is.EqualTo(new[] { OvenDefinitionPath, CounterDefinitionPath, FridgeDefinitionPath, DockDefinitionPath }));
                     Assert.That(roots[0].Recipes.Select(AssetDatabase.GetAssetPath), Is.EqualTo(new[] { BreadRecipePath, SellBreadRecipePath }));
                     Assert.That(roots[0].Offers.Select(AssetDatabase.GetAssetPath),
-                        Is.EqualTo(new[] { "Assets/Content/Offers/Dough5.asset", "Assets/Content/Offers/Belt10.asset", "Assets/Content/Offers/Oven1.asset", "Assets/Content/Offers/Fridge1.asset" }));
+                        Is.EqualTo(new[] { "Assets/Content/Offers/Dough5.asset", "Assets/Content/Offers/Belt10.asset", "Assets/Content/Offers/Oven1.asset", "Assets/Content/Offers/Fridge1.asset", "Assets/Content/Offers/Dock1.asset" }));
                 }
                 var panels = objects.SelectMany(x => x.GetComponents<SessionPanel>()).ToArray();
                 Assert.That(panels.Length, Is.EqualTo(1));
@@ -98,7 +101,7 @@ namespace FoodFactoryGame.Session.Tests
                 var interactions = objects.SelectMany(x => x.GetComponents<EquipmentInteraction>()).ToArray();
                 Assert.That(interactions.Length, Is.EqualTo(1));
                 AssertAssigned(interactions[0], "session", "ghost", "ghostModelMaterial", "placeAction", "removeAction", "rotateAction", "pointAction",
-                    "inventoryAction", "clearCursorAction", "closeScreenAction", "hotbarAction", "quickTransferAction", "placeItemAction", "takeItemAction", "belts");
+                    "inventoryAction", "clearCursorAction", "closeScreenAction", "hotbarAction", "quickTransferAction", "placeItemAction", "takeItemAction", "logisticsAction", "belts");
                 var beltPresenters = objects.SelectMany(x => x.GetComponents<BeltPresenter>()).ToArray();
                 Assert.That(beltPresenters.Length, Is.EqualTo(1));
                 AssertAssigned(beltPresenters[0], "session", "straightPrefab", "leftCornerPrefab", "rightCornerPrefab", "treadMaterial", "itemMaterial");
@@ -118,6 +121,15 @@ namespace FoodFactoryGame.Session.Tests
                 var huds = objects.SelectMany(x => x.GetComponents<PlayerHud>()).ToArray();
                 Assert.That(huds.Length, Is.EqualTo(1));
                 AssertAssigned(huds[0], "document", "interaction");
+                // Logistics (decision 0022): trucks shown at local docks, and the route screen above the HUD.
+                var trucks = objects.SelectMany(x => x.GetComponents<TruckPresenter>()).ToArray();
+                Assert.That(trucks.Length, Is.EqualTo(1));
+                AssertAssigned(trucks[0], "session", "truckPrefab");
+                var logistics = objects.SelectMany(x => x.GetComponents<LogisticsPanel>()).ToArray();
+                Assert.That(logistics.Length, Is.EqualTo(1));
+                AssertAssigned(logistics[0], "document", "interaction");
+                Assert.That(logistics[0].GetComponent<UnityEngine.UIElements.UIDocument>().sortingOrder,
+                    Is.GreaterThan(huds[0].GetComponent<UnityEngine.UIElements.UIDocument>().sortingOrder));
                 using (var serialized = new SerializedObject(interactions[0]))
                 {
                     var ghostModel = (Material)serialized.FindProperty("ghostModelMaterial").objectReferenceValue;
@@ -291,6 +303,23 @@ namespace FoodFactoryGame.Session.Tests
             Assert.DoesNotThrow(() => offer.RegisterWith(new FoodFactoryGame.Goods.GoodsWorld("authoring-check")));
         }
 
+        [Test]
+        public void DockDefinitionIsABuyableTwoBufferMachineAndTheTruckHasNoCollider()
+        {
+            var definition = AssetDatabase.LoadAssetAtPath<EquipmentDefinition>(DockDefinitionPath);
+            Assert.That(definition, Is.Not.Null);
+            Assert.That((definition.Kind, definition.Width, definition.Depth, definition.InputCapacity, definition.OutputCapacity, definition.InputRefrigerated),
+                Is.EqualTo((GoodsWorld.DockKind, 2, 1, 8, 8, false)));
+            Assert.That(definition.Icon, Is.Not.Null);
+            Assert.That(definition.VisualPrefab.GetComponentsInChildren<Collider>(true).Length, Is.EqualTo(1), "One collider for aim rays.");
+            var offer = AssetDatabase.LoadAssetAtPath<OfferAsset>("Assets/Content/Offers/Dock1.asset");
+            Assert.That((AssetDatabase.GetAssetPath(offer.Equipment), offer.Quantity, offer.PriceCents), Is.EqualTo((DockDefinitionPath, 1, 6000L)));
+            Assert.DoesNotThrow(() => offer.RegisterWith(new GoodsWorld("authoring-check")));
+            var truck = AssetDatabase.LoadAssetAtPath<GameObject>(TruckPrefabPath);
+            Assert.That(truck, Is.Not.Null);
+            Assert.That(truck.GetComponentsInChildren<Collider>(true), Is.Empty, "A parked truck never blocks aim rays or walking.");
+        }
+
         [TestCase(0, true, "0s")]
         [TestCase(59, true, "59s")]
         [TestCase(754, true, "12m")]
@@ -372,7 +401,8 @@ namespace FoodFactoryGame.Session.Tests
             Assert.That(player.FindAction("TakeItem").bindings.Any(x => x.path == "<Keyboard>/f"), Is.True, "F takes an item off a belt.");
             Assert.That(player.FindAction("FloorUp").bindings.Any(x => x.path == "<Keyboard>/pageUp"), Is.True, "PgUp rides the elevator up.");
             Assert.That(player.FindAction("FloorDown").bindings.Any(x => x.path == "<Keyboard>/pageDown"), Is.True, "PgDn rides the elevator down.");
-            foreach (var name in new[] { "Place", "Remove", "Inventory", "ClearCursor", "CloseScreen", "PlaceItem", "TakeItem", "FloorUp", "FloorDown" })
+            Assert.That(player.FindAction("Logistics").bindings.Any(x => x.path == "<Keyboard>/l"), Is.True, "L opens the logistics screen.");
+            foreach (var name in new[] { "Place", "Remove", "Inventory", "ClearCursor", "CloseScreen", "PlaceItem", "TakeItem", "FloorUp", "FloorDown", "Logistics" })
                 Assert.That(player.FindAction(name).interactions, Is.Empty, $"{name} is a press, not a hold.");
             // Each hotbar key reads as its slot number through a scale processor.
             var hotbar = player.FindAction("Hotbar");

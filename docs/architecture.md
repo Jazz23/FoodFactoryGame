@@ -252,6 +252,19 @@ Decision: [0021](decisions/0021-conveyor-lifts.md). GDD section 27 conveyor lift
 
 Prototype: lift stack size, dev stock, V key, runtime model, climb at belt speed. Open: buying lifts, lift shafts as construction (GDD 29.1), a gamepad FlipLift binding, openings in upper slabs, employees using lifts.
 
+## Implemented: trucks and loading docks (2026-09-24)
+
+Decision: [0022](decisions/0022-trucks.md). GDD section 9 trucks between two owned sites over abstract public roads. Goods snapshot schema **v11**.
+
+- Domain (`GoodsWorld.Trucks.cs`): `GoodsSite { Id, Name, MapX, MapZ }` and `GoodsTruck` (states `Parked`, `ToPickup`, `Loading`, `ToDropoff`, `Unloading`) in `GoodsSnapshot.Sites`/`Trucks`. Server-only `Bootstrap(GoodsSite)`, `Bootstrap(GoodsTruck)` (creates `<id>:cargo`, kind `vehicle`, on the reserved site `road`; the whole snapshot must validate or nothing changes), `AddCompanySite`, `HasSite`. `RoadMetres` (Manhattan) and `RoadSeconds`. `SetTruckRoute`/`SetTruckRouteDurably(player, request, truck, pickupDock, dropoffDock, items)`: `forbidden`, `invalid-dock`, `same-site`, `invalid-cargo`, `no-road`; rejections unrecorded, accepted route replays. `Advance` calls `MoveTrucks` (per-second loading/unloading at `LoadUnitsPerSecond`, most exposed first, owner becomes the dropoff site; skip-ahead while all active trucks drive). `Transfer` refuses vehicle locations (`invalid-route`); `Grant`/`TryGrantDurably` refuse the road site. `View` adds the company's trucks, their cargo locations and lots (after the site's own locations) and its sites' map records. `Validate` checks sites, trucks, routes, cargo locations and that nothing else is on the road. v10 saves upgrade with no sites or trucks.
+- Network (`GoodsNetworkBridge`): `RequestSetTruckRoute(request, truck, pickupDock, dropoffDock, items[])`; a connection may subscribe to several granted sites (full baselines per site). `ClientSiteSubscription.Watch(site)`/`Remote(site)` keep remote baselines apart from the primary one.
+- Session: `SessionAdmission` also grants `DevWorld.RemoteSiteIds` that exist, without an inventory. `DevWorld.LoadOrCreate(..., dock)` seeds, or adds once to older saves (`AddLogistics`), the map records, the `dev-warehouse` site (storage with 200 dough, 10x10 layout, owned by `dev-company`), the warehouse dock, the restaurant dock at (0, 18) and `dev-truck-1` routed warehouse → restaurant. `SessionRoot` passes the `dock` definition.
+- Content (`BuildDevSite.cs`): `Assets/Content/Equipment/Dock.asset` (kind `dock`, 2x1, 8 in, 8 out), `Assets/Prefabs/Equipment/Dock.prefab`, `Assets/Art/Icons/Dock.png` (`DrawItemIcons.ps1`), `Assets/Content/Offers/Dock1.asset` ($60.00), `Assets/Prefabs/Logistics/Truck.prefab` (no collider), materials under `Assets/Materials/Dock` and `Assets/Materials/Truck`. `SessionRoot` lists `[oven, counter, fridge, dock]`. `Player/Logistics` is bound to L.
+- Presentation (`Assets/Scripts/Session/Logistics`, in `DevSite` and the rebuilt `SampleScene`): `LogisticsPanel` (own UIDocument, sorting order 2) opened by `InteractionScreen.Logistics` (`EquipmentInteraction.ToggleLogistics`); trucks with live status and cargo, a route editor (one cargo item or Any) and remote-site stock with Ship/Unstage/Store. `PlayerHud` opens a dock as Outgoing and Incoming grids with the trucks serving it. `TruckPresenter` stands a placeholder truck behind a local dock while one loads or unloads there.
+- Evidence (2026-09-24, Editor 6000.5.9f1, isolated temp saves): EditMode `FoodFactoryGame.Goods.EditModeTests` 145/145 (15 new `TruckTests`), `FoodFactoryGame.Session.EditModeTests` 62/62 (new `DevWorldLogisticsTests` ×3 and a dock/truck authoring test), `FoodFactoryGame.Baseline.EditModeTests` 4/4; PlayMode `FoodFactoryGame.Session.PlayModeTests` 18/18 (new `LogisticsPanelTests.PanelShipsRemoteStockAndSetsTheTruckCargo`; two existing assertions updated for the new seed docks and the baseline's cargo locations) and `FoodFactoryGame.Goods.PlayModeTests` 1/1. No running-game visual capture of the dock, truck or logistics screen and no separate-process multiplayer check were made.
+
+Prototype: map positions, dock and truck sizes, speed and rate, dock price, L key, placeholder models, redirect from the last site. Open: see decision 0022.
+
 ## Required Constraints for Future Implementation
 
 - The server owns gameplay state; clients request validated actions through the command contract in decision 0002.
@@ -260,7 +273,7 @@ Prototype: lift stack size, dev stock, V key, runtime model, climb at belt speed
 - Player and employee operational rules should be shared; input and AI choose actions through those rules.
 - Visual objects must not become the sole owners of authoritative simulation state.
 
-These remain accepted contracts; only the bounded goods slice, its station jobs, equipment placement, the working oven, conveyor belts, company cash, the sell counter, supplier purchases, equipment purchases, spoilage timing/refrigeration, building shells, factory floors and conveyor lifts above have a runtime interface. Sales credit cash inside the clock tick; supplier purchases and floor orders are the player payment commands.
+These remain accepted contracts; only the bounded goods slice, its station jobs, equipment placement, the working oven, conveyor belts, company cash, the sell counter, supplier purchases, equipment purchases, spoilage timing/refrigeration, building shells, factory floors, conveyor lifts and trucks with loading docks above have a runtime interface. Sales credit cash inside the clock tick; supplier purchases and floor orders are the player payment commands. Trucks move goods between sites only inside the clock tick, through their own cargo locations.
 
 ## Planned / Undecided
 

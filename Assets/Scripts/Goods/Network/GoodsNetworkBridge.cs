@@ -13,7 +13,8 @@ namespace FoodFactoryGame.Goods.Network
     {
         private GoodsWorld _world;
         private Func<NetworkConnection, string> _resolvePlayer;
-        private readonly Dictionary<NetworkConnection, string> _subscriptions = new();
+        // A connection may watch several granted sites (its own and, for remote management, the company's other sites).
+        private readonly Dictionary<NetworkConnection, HashSet<string>> _subscriptions = new();
         private readonly Dictionary<string, long> _clientRevisions = new();
         private const float StatsIntervalSeconds = 60f;
         // Decision 0016: clock ticks run in memory and are saved this often (player commands still save at once), so a
@@ -193,6 +194,22 @@ namespace FoodFactoryGame.Goods.Network
             if (result.Accepted) Broadcast();
         }
 
+        // Gives a company truck a route between two docks, with the items it may load (empty for any) (SetTruckRouteDurably).
+        public void RequestSetTruckRoute(string requestId, string truckId, string pickupDockId, string dropoffDockId, string[] allowedItemIds)
+        {
+            if (IsClientStarted) ServerSetTruckRoute(requestId, truckId, pickupDockId, dropoffDockId, allowedItemIds ?? Array.Empty<string>());
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        private void ServerSetTruckRoute(string requestId, string truckId, string pickupDockId, string dropoffDockId, string[] allowedItemIds,
+            NetworkConnection sender = null)
+        {
+            if (!TryIdentify(sender, requestId, out var player)) return;
+            var result = _world.SetTruckRouteDurably(player, requestId, truckId, pickupDockId, dropoffDockId, allowedItemIds, _savePath);
+            Reply(sender, result);
+            if (result.Accepted) Broadcast();
+        }
+
         [ServerRpc(RequireOwnership = false)]
         private void ServerPlaceBelt(string requestId, string siteId, int cellX, int cellZ, int direction, int level, NetworkConnection sender = null)
         {
@@ -339,13 +356,15 @@ namespace FoodFactoryGame.Goods.Network
             return result;
         }
 
-        // A subscriber gets a complete revisioned baseline, never unauthorized state or inferred deltas.
+        // A subscriber gets a complete revisioned baseline of each site it watches, never unauthorized state or inferred deltas.
         private void Broadcast()
         {
-            foreach (var pair in new List<KeyValuePair<NetworkConnection, string>>(_subscriptions))
-                SendSite(pair.Key, pair.Value);
+            foreach (var pair in new List<KeyValuePair<NetworkConnection, HashSet<string>>>(_subscriptions))
+            foreach (var siteId in new List<string>(pair.Value))
+                SendSite(pair.Key, siteId);
         }
 
+        // Adds a site to the connection's watched sites; a refused site is dropped from them and the others stay.
         [ServerRpc(RequireOwnership = false)]
         private void ServerSubscribe(string siteId, NetworkConnection sender = null)
         {
@@ -353,19 +372,32 @@ namespace FoodFactoryGame.Goods.Network
             var player = _resolvePlayer(sender);
             if (string.IsNullOrWhiteSpace(player) || !_world.CanView(player, siteId))
             {
-                _subscriptions.Remove(sender);
+                Unsubscribe(sender, siteId);
                 TargetResult(sender, "", false, "subscription-forbidden", "", "", 0);
                 return;
             }
-            _subscriptions[sender] = siteId;
+            if (!_subscriptions.TryGetValue(sender, out var sites)) _subscriptions[sender] = sites = new HashSet<string>();
+            sites.Add(siteId);
             SendSite(sender, siteId);
+        }
+
+        private void Unsubscribe(NetworkConnection connection, string siteId)
+        {
+            if (connection == null || !_subscriptions.TryGetValue(connection, out var sites)) return;
+            sites.Remove(siteId);
+            if (sites.Count == 0) _subscriptions.Remove(connection);
         }
 
         private void SendSite(NetworkConnection connection, string siteId)
         {
-            if (connection == null || !connection.IsActive || !_world.CanView(_resolvePlayer(connection), siteId))
+            if (connection == null || !connection.IsActive)
             {
-                _subscriptions.Remove(connection);
+                if (connection != null) _subscriptions.Remove(connection);
+                return;
+            }
+            if (!_world.CanView(_resolvePlayer(connection), siteId))
+            {
+                Unsubscribe(connection, siteId);
                 return;
             }
             var view = _world.View(_resolvePlayer(connection), siteId);

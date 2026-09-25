@@ -1,6 +1,8 @@
 // Client side: once authenticated and the bridge is visible, subscribes once to a site, keeps its latest baseline,
-// and forwards this client's command results so presentation can send requests through the same bridge.
+// and forwards this client's command results so presentation can send requests through the same bridge. It can also watch
+// the company's other sites for remote management (decision 0022); their baselines are kept apart from the primary one.
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using FishNet.Managing;
 using FoodFactoryGame.Goods;
@@ -12,6 +14,8 @@ namespace FoodFactoryGame.Session
     {
         private readonly NetworkManager _manager;
         private readonly string _siteId;
+        private readonly HashSet<string> _watched = new();
+        private readonly Dictionary<string, GoodsSnapshot> _remote = new();
         private GoodsNetworkBridge _bridge;
 
         public ClientSiteSubscription(NetworkManager manager, string siteId)
@@ -40,7 +44,18 @@ namespace FoodFactoryGame.Session
             _bridge.SiteReceived += OnSite;
             _bridge.ResultReceived += OnResult;
             _bridge.RequestSite(_siteId);
+            foreach (var site in _watched) _bridge.RequestSite(site);
         }
+
+        // Also subscribes to another site (the server refuses one this player has no grant for). Kept across reconnects.
+        public void Watch(string siteId)
+        {
+            if (string.IsNullOrWhiteSpace(siteId) || siteId == _siteId || !_watched.Add(siteId)) return;
+            _bridge?.RequestSite(siteId);
+        }
+
+        // Latest baseline of a watched site; null until one arrives.
+        public GoodsSnapshot Remote(string siteId) => _remote.TryGetValue(siteId ?? "", out var site) ? site : null;
 
         public void Reset()
         {
@@ -51,12 +66,16 @@ namespace FoodFactoryGame.Session
             }
             _bridge = null;
             Latest = null;
+            _remote.Clear();
             LastRejection = null;
         }
 
         private void OnSite(GoodsSnapshot site)
         {
-            if (site.Locations.Count > 0 && site.Locations[0].SiteId == _siteId) Latest = site;
+            if (site.Locations.Count == 0) return;
+            var siteId = site.Locations[0].SiteId;
+            if (siteId == _siteId) Latest = site;
+            else if (_watched.Contains(siteId)) _remote[siteId] = site;
         }
 
         private void OnResult(GoodsOutcome outcome)

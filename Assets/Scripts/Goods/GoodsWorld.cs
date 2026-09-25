@@ -74,7 +74,7 @@ namespace FoodFactoryGame.Goods
 
     [Serializable] public sealed class GoodsSnapshot
     {
-        public const int CurrentSchema = 10;
+        public const int CurrentSchema = 11;
         public int SchemaVersion = CurrentSchema;
         public string WorldId;
         public long ClockSeconds;
@@ -92,6 +92,8 @@ namespace FoodFactoryGame.Goods
         public List<GoodsCompany> Companies = new();
         public List<GoodsBuilding> Buildings = new();
         public List<GoodsEmployee> Employees = new();
+        public List<GoodsSite> Sites = new();
+        public List<GoodsTruck> Trucks = new();
     }
 
     public sealed partial class GoodsWorld
@@ -165,7 +167,7 @@ namespace FoodFactoryGame.Goods
         {
             lock (_gate)
             {
-                if (string.IsNullOrWhiteSpace(playerId) || !_state.Locations.Any(x => x.SiteId == siteId))
+                if (string.IsNullOrWhiteSpace(playerId) || siteId == RoadSiteId || !_state.Locations.Any(x => x.SiteId == siteId))
                     throw new ArgumentException("Invalid grant.");
                 if (_state.Grants.All(x => x.PlayerId != playerId || x.SiteId != siteId))
                 {
@@ -186,7 +188,7 @@ namespace FoodFactoryGame.Goods
             lock (_gate)
             {
                 // Invalid grants throw here, before any mutation, rather than masquerading as I/O failure.
-                if (string.IsNullOrWhiteSpace(playerId) || !_state.Locations.Any(x => x.SiteId == siteId))
+                if (string.IsNullOrWhiteSpace(playerId) || siteId == RoadSiteId || !_state.Locations.Any(x => x.SiteId == siteId))
                     throw new ArgumentException("Invalid grant.");
                 starterGoods ??= Array.Empty<GoodsLot>();
                 if (starterGoods.Any(x => x == null || string.IsNullOrWhiteSpace(x.ItemId) || x.Quantity < 1 || x.SpoilAfterSeconds < 1)
@@ -250,6 +252,7 @@ namespace FoodFactoryGame.Goods
                 // Scripts reach clients through the employee object, not with every baseline.
                 view.Employees = view.Employees.Where(x => x.SiteId == siteId).ToList();
                 foreach (var employee in view.Employees) employee.Script = "";
+                ViewLogistics(view, siteId);
                 view.Reservations.Clear();
                 view.Outcomes.Clear();
                 view.Grants.Clear();
@@ -277,6 +280,7 @@ namespace FoodFactoryGame.Goods
                 ProgressJobs(seconds);
                 StartReadyJobs();
                 MoveBeltItems(seconds);
+                MoveTrucks(seconds);
                 _state.Revision++;
             }
         }
@@ -329,8 +333,9 @@ namespace FoodFactoryGame.Goods
                 if (!Allowed(playerId, source.Id) || lot.OwnerId != source.SiteId)
                     return Record(intent.RequestId, playerId, false, "forbidden", null);
                 // Goods ride belts only through PlaceOnBelt and leave them only through TakeFromBelt or with the belt (RemoveBelt).
+                // Truck cargo is loaded and unloaded only by the truck at a dock (decision 0022).
                 if (destination == null || lot.LocationId == destination.Id || source.Kind == BeltLocationKind
-                    || destination.Kind == BeltLocationKind)
+                    || destination.Kind == BeltLocationKind || source.Kind == VehicleLocationKind || destination.Kind == VehicleLocationKind)
                     return Record(intent.RequestId, playerId, false, "invalid-route", null);
                 if (source.SiteId != destination.SiteId || !Allowed(playerId, destination.Id))
                     return Record(intent.RequestId, playerId, false, "forbidden", null);
@@ -570,7 +575,7 @@ namespace FoodFactoryGame.Goods
                 || state.ClockSeconds < 0 || state.Revision < 0 || state.Locations == null || state.Lots == null
                 || state.Grants == null || state.Reservations == null || state.Outcomes == null
                 || state.Stations == null || state.Jobs == null || state.Equipment == null || state.SiteLayouts == null || state.Belts == null
-                || state.Companies == null || state.Buildings == null || state.Employees == null)
+                || state.Companies == null || state.Buildings == null || state.Employees == null || state.Sites == null || state.Trucks == null)
                 throw new InvalidOperationException("Unsupported or invalid goods snapshot schema.");
             if (state.Locations.Any(x => x == null || string.IsNullOrWhiteSpace(x.Id) || string.IsNullOrWhiteSpace(x.SiteId) || x.Capacity < 1)
                 || state.Locations.GroupBy(x => x.Id).Any(x => x.Count() != 1)
@@ -595,6 +600,7 @@ namespace FoodFactoryGame.Goods
             ValidateCompanies(state);
             ValidateBuildings(state);
             ValidateEmployees(state);
+            ValidateTrucks(state);
         }
     }
 }

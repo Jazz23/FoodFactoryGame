@@ -292,6 +292,14 @@ namespace FoodFactoryGame.Goods
             // v9 had no conveyor lifts (decision 0021); every belt's Lift reads 0 (flat). The version still changes so an older
             // build refuses a v10 save instead of reading its lifts as flat belts.
             if (state != null && state.SchemaVersion == 9) state.SchemaVersion = 10;
+            // v10 had no site map records or trucks (decision 0022); the server's seed owner adds the dev ones before serving
+            // (DevWorld.EnsureLogistics).
+            if (state != null && state.SchemaVersion == 10)
+            {
+                state.Sites ??= new();
+                state.Trucks ??= new();
+                state.SchemaVersion = 11;
+            }
             GoodsWorld.Validate(state);
             return state;
         }

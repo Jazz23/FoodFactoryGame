@@ -150,7 +150,10 @@ namespace FoodFactoryGame.Session.PlayModeTests
             var remoteSite = new ClientSiteSubscription(_remote, DevWorld.SiteId);
             yield return Until(() => { remoteSite.Tick(); return remoteSite.Latest != null; }, "remote dev-site baseline");
             yield return Until(() => _root.ClientSite != null, "host dev-site baseline");
-            Assert.That(remoteSite.Latest.Locations.All(x => x.SiteId == DevWorld.SiteId), Is.True);
+            // The site's own locations, plus the company trucks' cargo on the reserved road site (decision 0022).
+            Assert.That(remoteSite.Latest.Locations.All(x => x.SiteId == DevWorld.SiteId
+                || (x.SiteId == GoodsWorld.RoadSiteId && x.Kind == GoodsWorld.VehicleLocationKind)), Is.True);
+            Assert.That(remoteSite.Latest.Locations[0].SiteId, Is.EqualTo(DevWorld.SiteId));
             Assert.That(remoteSite.Latest.Grants, Is.Empty);
             var committed = GoodsSnapshotStore.Load(_root.Options.WorldPath);
             Assert.That(committed.CanView(hostId, DevWorld.SiteId) && committed.CanView(remoteId, DevWorld.SiteId), Is.True);

@@ -229,6 +229,15 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
+                },
+                {
+                    "name": "Logistics",
+                    "type": "Button",
+                    "id": "3b9e6c1a-5d2f-4e87-9a41-c7d08f2e6b15",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -955,6 +964,17 @@
                     "processors": "",
                     "groups": ";Keyboard&Mouse",
                     "action": "FlipLift",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "8c4f2a7e-1b63-4d95-b0e8-5a7d3c9f1e24",
+                    "path": "<Keyboard>/l",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Keyboard&Mouse",
+                    "action": "Logistics",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

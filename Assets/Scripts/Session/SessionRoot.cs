@@ -158,7 +158,7 @@ namespace FoodFactoryGame.Session
             // ahead of any request.
             ServerWorld = DevWorld.LoadOrCreate(_options.WorldPath, equipmentDefinitions.FirstOrDefault(x => x != null && x.Kind == "oven"), items,
                 _options.LegacyWorldPath, equipmentDefinitions.FirstOrDefault(x => x != null && x.Kind == DevWorld.CounterKind),
-                employeePrefab != null);
+                employeePrefab != null, equipmentDefinitions.FirstOrDefault(x => x != null && x.Kind == GoodsWorld.DockKind));
             // Machine buffer slot counts follow content, so a saved machine created with older counts is brought up to date.
             foreach (var definition in equipmentDefinitions.Where(x => x != null))
                 ServerWorld.ApplyEquipmentCapacitiesDurably(definition.Kind, definition.InputCapacity, definition.OutputCapacity, _options.WorldPath);
@@ -170,7 +170,7 @@ namespace FoodFactoryGame.Session
             ServerWorld.AutomaticJobs = true;
             _registry = new PlayerRegistry(_options.RegistryPath);
             authenticator.ConfigureServer(new SessionAdmission(_registry, ServerWorld, DevWorld.SiteId, _options.WorldPath,
-                DevWorld.InventoryCapacity, DevWorld.StarterGoods));
+                DevWorld.InventoryCapacity, DevWorld.StarterGoods, DevWorld.RemoteSiteIds));
             SetStatus("Starting server...");
             if (!networkManager.ServerManager.StartConnection()) throw new InvalidOperationException("Transport refused to start the server.");
         }

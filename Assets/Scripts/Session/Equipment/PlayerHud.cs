@@ -8,8 +8,8 @@
 // or item to the hotbar slot (the cursor stack goes back where it was); an empty cursor takes up the slot's machine or item.
 // The site company's cash is shown top right, read from the latest baseline. Edible goods slots show the ambient time left
 // before their first lot spoils, frozen (blue) while refrigerated because refrigeration pauses spoilage (decision 0018), and
-// the hover line gives the full time; a machine with no recipes (the fridge) opens as plain storage. Inside a factory the
-// inventory screen also offers its next floor (decision 0020).
+// the hover line gives the full time; a machine with no recipes (the fridge) opens as plain storage, and a loading dock as its
+// outgoing and incoming grids (decision 0022). Inside a factory the inventory screen also offers its next floor (decision 0020).
 // Presentation only: slot positions are this client's arrangement of the replicated stacks, never saved or sent, and
 // progress is interpolated for at most one clock step past the latest baseline.
 using System;
@@ -463,7 +463,7 @@ namespace FoodFactoryGame.Session.Equipment
             _timers.Clear();
             _hovered = null;
             var inventoryId = interaction.InventoryId;
-            if (interaction.Screen is InteractionScreen.None or InteractionScreen.Employee || inventoryId == null) return;
+            if (interaction.Screen is InteractionScreen.None or InteractionScreen.Employee or InteractionScreen.Logistics || inventoryId == null) return;
             var inventory = Window("hud-inventory", $"Inventory  {Units(site, inventoryId)}");
             inventory.Add(GridView(InventoryGrid));
             // One line at the grid's width: a longer hover line must never resize the centred screen under the pointer.
@@ -557,6 +557,7 @@ namespace FoodFactoryGame.Session.Equipment
         // A machine with no recipes is storage (the fridge, decision 0018): just its input grid.
         private VisualElement MachineWindow(GoodsSnapshot site, GoodsEquipment equipment)
         {
+            if (equipment.Kind == GoodsWorld.DockKind) return DockWindow(site, equipment);
             if (!interaction.Session.Recipes.Any(x => x != null && x.StationKind == equipment.Kind)) return StorageMachineWindow(site, equipment);
             var window = Window("hud-machine", Title(equipment.Kind));
             window.style.minWidth = 300;
@@ -595,6 +596,29 @@ namespace FoodFactoryGame.Session.Equipment
             _progressLabel = Caption("", 12, Muted, 6);
             _progressLabel.name = "hud-progress-label";
             window.Add(_progressLabel);
+            return window;
+        }
+
+        // A loading dock (decision 0022): trucks load from Outgoing (its input) and unload into Incoming (its output), which
+        // only gives. The trucks at this dock are listed under it.
+        private VisualElement DockWindow(GoodsSnapshot site, GoodsEquipment equipment)
+        {
+            var window = Window("hud-machine", "Loading dock");
+            var body = new VisualElement();
+            body.style.flexDirection = FlexDirection.Row;
+            body.style.alignItems = Align.FlexStart;
+            body.style.backgroundColor = Inset;
+            Pad(body, 12);
+            var outgoing = Labelled(GridView(InputGrid), $"Outgoing: trucks load {Units(site, equipment.InputLocationId)}");
+            outgoing.style.marginRight = 16;
+            body.Add(outgoing);
+            body.Add(Labelled(GridView(OutputGrid), $"Incoming: trucks unload {Units(site, equipment.OutputLocationId)}"));
+            window.Add(body);
+            var trucks = site.Trucks.Where(x => x.PickupDockId == equipment.Id || x.DropoffDockId == equipment.Id).ToList();
+            var note = Caption(trucks.Count == 0 ? "No truck serves this dock; press L to give one a route."
+                : string.Join("\n", trucks.Select(x => $"{x.Name}: {(x.PickupDockId == equipment.Id ? "picks up here" : "delivers here")}")), 12, Muted, 6);
+            note.name = "hud-dock-trucks";
+            window.Add(note);
             return window;
         }
 

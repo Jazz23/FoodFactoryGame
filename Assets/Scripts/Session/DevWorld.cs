@@ -2,8 +2,8 @@
 // The seed is applied only to a brand-new world: an existing save never gains the layout, oven or storage dough retroactively.
 // Belts, lifts, the company, the sell counter and the building shells are the exceptions: a save from before each existed
 // gets the dev belt stock (EnsureBeltStock), the dev lift stock (EnsureLiftStock), the dev company with its starting cash (EnsureCompany), the dev counter (EnsureCounter),
-// the dev restaurant shell (EnsureBuilding), the dev factory shell (EnsureFactory) or, where the server spawns employees,
-// the dev employee (EnsureEmployee) once.
+// the dev restaurant shell (EnsureBuilding), the dev factory shell (EnsureFactory), the dev logistics (AddLogistics) or, where
+// the server spawns employees, the dev employee (EnsureEmployee) once.
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -73,6 +73,36 @@ namespace FoodFactoryGame.Session
         public const string EmployeeId = GoodsWorld.EmployeePrefix + "1";
         public const int EmployeeHandSlots = 4;
 
+        // PROTOTYPE logistics (decision 0022). The dev site is the "Restaurant" at the map origin; a remote "Warehouse" site with
+        // dough stock and a dock stands 600 m east and 300 m north, 900 m by road, so a truck at 15 m/s drives 60 s each way.
+        // Each site has a dock (2x1, 8 outgoing and 8 incoming slots); the restaurant's stands at the west edge of the grid, clear
+        // of the seed, the spawn points and the PlayMode test cells. One 4-slot truck loading 5 units a second starts at the
+        // warehouse on the warehouse-to-restaurant route with any cargo.
+        public const string SiteName = "Restaurant";
+        public const string DockId = "dev-dock-1";
+        public const int DockCellX = 0;
+        public const int DockCellZ = 18;
+        public const string WarehouseSiteId = "dev-warehouse";
+        public const string WarehouseName = "Warehouse";
+        public const string WarehouseStorageId = "dev-warehouse-storage";
+        public const string WarehouseDoughLotId = "dev-warehouse-dough";
+        public const int WarehouseStorageCapacity = 30;
+        public const int WarehouseDough = 200;
+        public const int WarehouseGridWidth = 10;
+        public const int WarehouseGridDepth = 10;
+        public const string WarehouseDockId = "dev-warehouse-dock";
+        public const int WarehouseDockCellX = 4;
+        public const int WarehouseDockCellZ = 4;
+        public const int WarehouseMapX = 600;
+        public const int WarehouseMapZ = 300;
+        public const string TruckId = "dev-truck-1";
+        public const int TruckCargoSlots = 4;
+        public const int TruckSpeedMetresPerSecond = 15;
+        public const int TruckLoadUnitsPerSecond = 5;
+
+        // Sites other than the dev site that every player is granted, for remote management (no inventory there).
+        public static IReadOnlyList<string> RemoteSiteIds => new[] { WarehouseSiteId };
+
         public static GoodsEmployee Employee() => new() { Id = EmployeeId, SiteId = SiteId, Name = "Employee", X = -5f, Z = 3f, Yaw = 90f };
 
         public static FloorOffer FloorOffer => new() { CentsPerCell = FloorCentsPerCell, MaxFloors = MaxFloors };
@@ -89,9 +119,9 @@ namespace FoodFactoryGame.Session
         // before the seed, because the seed's goods are counted in slots.
         // A pre-SQLite snapshot at legacyWorldPath is imported once, after a dry run, when no database exists yet.
         // Without a counter definition no counter is seeded or added. seedEmployee (a server that spawns employees) adds the
-        // dev employee.
+        // dev employee. Without a dock definition no logistics (map records, warehouse, docks, truck) are seeded or added.
         public static GoodsWorld LoadOrCreate(string worldPath, EquipmentDefinition oven = null, IEnumerable<ItemDefinition> items = null,
-            string legacyWorldPath = null, EquipmentDefinition counter = null, bool seedEmployee = false)
+            string legacyWorldPath = null, EquipmentDefinition counter = null, bool seedEmployee = false, EquipmentDefinition dock = null)
         {
             if (!File.Exists(worldPath) && !string.IsNullOrWhiteSpace(legacyWorldPath)
                 && (File.Exists(legacyWorldPath) || File.Exists(legacyWorldPath + ".previous")))
@@ -111,6 +141,11 @@ namespace FoodFactoryGame.Session
                 EnsureBuilding(loaded, worldPath);
                 EnsureFactory(loaded, worldPath);
                 if (seedEmployee) EnsureEmployee(loaded, worldPath);
+                if (dock != null && AddLogistics(loaded, dock))
+                {
+                    GoodsSnapshotStore.Save(loaded, worldPath);
+                    Debug.Log("[Session] Added the dev logistics (map, warehouse, docks, truck) this save was missing.");
+                }
                 return loaded;
             }
             var world = new GoodsWorld(WorldId);
@@ -130,8 +165,62 @@ namespace FoodFactoryGame.Session
             if (oven != null) world.Bootstrap(oven.CreatePlaced(OvenId, SiteId, OvenCellX, OvenCellZ, 0));
             if (counter != null) world.Bootstrap(counter.CreatePlaced(CounterId, SiteId, CounterCellX, CounterCellZ, 0));
             if (seedEmployee) world.Bootstrap(Employee(), EmployeeHandSlots);
+            if (dock != null) AddLogistics(world, dock);
             GoodsSnapshotStore.Save(world, worldPath);
             return world;
+        }
+
+        // PROTOTYPE, one-time per part (decision 0022): adds whatever of the dev logistics the world lacks, keyed by ID, and
+        // returns whether anything changed; the caller commits it before serving. Sites, docks and trucks are never removed, so
+        // a missing one has never existed. A dock whose cells are taken is skipped with a warning; the truck then starts parked.
+        private static bool AddLogistics(GoodsWorld world, EquipmentDefinition dock)
+        {
+            var state = world.Snapshot();
+            var revision = state.Revision;
+            if (state.Locations.All(x => x.SiteId != SiteId)) return false;
+            if (state.Sites.All(x => x.Id != SiteId)) world.Bootstrap(new GoodsSite { Id = SiteId, Name = SiteName });
+            if (state.Locations.All(x => x.SiteId != WarehouseSiteId))
+            {
+                world.Bootstrap(new GoodsLocation { Id = WarehouseStorageId, SiteId = WarehouseSiteId, Kind = "storage", Capacity = WarehouseStorageCapacity });
+                world.Bootstrap(new GoodsLot
+                {
+                    Id = WarehouseDoughLotId, ItemId = DoughItemId, OwnerId = WarehouseSiteId, LocationId = WarehouseStorageId,
+                    Quantity = WarehouseDough, SpoilAfterSeconds = DoughSpoilAfterSeconds
+                });
+            }
+            if (state.SiteLayouts.All(x => x.SiteId != WarehouseSiteId))
+                world.Bootstrap(new SiteLayout { SiteId = WarehouseSiteId, Width = WarehouseGridWidth, Depth = WarehouseGridDepth });
+            if (state.Sites.All(x => x.Id != WarehouseSiteId))
+                world.Bootstrap(new GoodsSite { Id = WarehouseSiteId, Name = WarehouseName, MapX = WarehouseMapX, MapZ = WarehouseMapZ });
+            if (world.CompanyOfSite(WarehouseSiteId) == null && state.Companies.Any(x => x.Id == CompanyId))
+                world.AddCompanySite(CompanyId, WarehouseSiteId);
+            if (state.Equipment.All(x => x.Id != WarehouseDockId))
+                TryPlace(world, dock.CreatePlaced(WarehouseDockId, WarehouseSiteId, WarehouseDockCellX, WarehouseDockCellZ, 0));
+            // Keyed by kind as well: a save whose player already bought and placed a dock keeps that one instead.
+            if (state.Equipment.All(x => x.Id != DockId && !(x.Kind == dock.Kind && x.SiteId == SiteId)))
+                TryPlace(world, dock.CreatePlaced(DockId, SiteId, DockCellX, DockCellZ, 0));
+            if (state.Trucks.All(x => x.Id != TruckId) && world.CompanyOfSite(SiteId) == CompanyId)
+            {
+                var docks = world.Snapshot().Equipment;
+                var routed = docks.Any(x => x.Id == WarehouseDockId) && docks.Any(x => x.Id == DockId);
+                world.Bootstrap(new GoodsTruck
+                {
+                    Id = TruckId, CompanyId = CompanyId, Name = "Truck 1", CargoSlots = TruckCargoSlots,
+                    SpeedMetresPerSecond = TruckSpeedMetresPerSecond, LoadUnitsPerSecond = TruckLoadUnitsPerSecond,
+                    PickupDockId = routed ? WarehouseDockId : "", DropoffDockId = routed ? DockId : "",
+                    State = routed ? TruckState.Loading : TruckState.Parked, SiteId = WarehouseSiteId
+                });
+            }
+            return world.Snapshot().Revision != revision;
+        }
+
+        private static void TryPlace(GoodsWorld world, GoodsEquipment equipment)
+        {
+            try { world.Bootstrap(equipment); }
+            catch (System.ArgumentException)
+            {
+                Debug.LogWarning($"[Session] Cells at ({equipment.CellX}, {equipment.CellZ}) on {equipment.SiteId} are taken, so this save gets no {equipment.Id}; clear them and restart the server.");
+            }
         }
 
         private static void Register(GoodsWorld world, IEnumerable<ItemDefinition> items)

@@ -657,7 +657,8 @@ namespace FoodFactoryGame.Session.PlayModeTests
             yield return Until(() => _root.ServerBridge != null, "server-only restart");
             var oven = Oven(_root.ServerWorld.Snapshot());
             Assert.That((oven.State, oven.CellX, oven.CellZ, oven.Rotation), Is.EqualTo((EquipmentState.Placed, 3, 8, 2)));
-            Assert.That(_root.ServerWorld.Snapshot().Equipment.Select(x => x.Kind), Is.EquivalentTo(new[] { "oven", DevWorld.CounterKind }), "The seed is not re-applied to an existing save.");
+            Assert.That(_root.ServerWorld.Snapshot().Equipment.Select(x => x.Kind), Is.EquivalentTo(new[] { "oven", DevWorld.CounterKind, GoodsWorld.DockKind, GoodsWorld.DockKind }),
+                "The seed (with one dock per dev site, decision 0022) is not re-applied to an existing save.");
         }
     }
 }

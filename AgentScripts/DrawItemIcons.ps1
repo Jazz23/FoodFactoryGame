@@ -1,4 +1,4 @@
-# Draws the DEVELOPMENT 2D item icons (dough, bread, oven, belt, lift, counter) as 128x128 transparent PNGs with GDI+.
+# Draws the DEVELOPMENT 2D item icons (dough, bread, oven, belt, lift, counter, fridge, dock) as 128x128 transparent PNGs with GDI+.
 # Re-run to regenerate: powershell -ExecutionPolicy Bypass -File AgentScripts/DrawItemIcons.ps1
 # Unity imports them as sprites (AgentScripts/BuildDevSite.cs sets the import settings).
 Add-Type -AssemblyName System.Drawing
@@ -223,4 +223,34 @@ foreach ($angle in 0, 60, 120) {
     $g.DrawLine($flake, 56 - $dx, 80 - $dy, 56 + $dx, 80 + $dy)
 }
 Save-Icon $bitmap $g 'Fridge'
+
+# --- Dock: a loading dock with a roll-up door, a yellow-and-black bumper edge and a crate waiting to ship (decision 0022) ---
+$bitmap, $g = New-Icon
+Shadow $g 8 108 112 14
+$dark = New-Object System.Drawing.Pen (Color '#1f2a2e'), 4
+$dark.LineJoin = [System.Drawing.Drawing2D.LineJoin]::Round
+$wall = New-Object System.Drawing.RectangleF 10, 12, 108, 70
+$concrete = New-Object System.Drawing.Drawing2D.LinearGradientBrush $wall, (Color '#b9bec2'), (Color '#8c9296'), 90
+$g.FillRectangle($concrete, $wall)
+$g.DrawRectangle($dark, 10, 12, 108, 70)
+$door = New-Object System.Drawing.SolidBrush (Color '#5d7f99')
+$g.FillRectangle($door, 26, 24, 76, 58)
+$slat = New-Object System.Drawing.Pen (Color '#3f5a70'), 2
+foreach ($y in 32, 40, 48, 56, 64, 72) { $g.DrawLine($slat, 26, $y, 102, $y) }
+$g.DrawRectangle($dark, 26, 24, 76, 58)
+$deck = New-Object System.Drawing.SolidBrush (Color '#6f7478')
+$g.FillRectangle($deck, 4, 82, 120, 26)
+$g.DrawRectangle($dark, 4, 82, 120, 26)
+$yellow = New-Object System.Drawing.SolidBrush (Color '#f2c230')
+$black = New-Object System.Drawing.SolidBrush (Color '#1f2a2e')
+for ($x = 6; $x -lt 122; $x += 16) {
+    $g.FillRectangle($yellow, $x, 100, 8, 7)
+    $g.FillRectangle($black, $x + 8, 100, 8, 7)
+}
+$crate = New-Object System.Drawing.SolidBrush (Color '#c28a4a')
+$g.FillRectangle($crate, 72, 58, 28, 26)
+$g.DrawRectangle($dark, 72, 58, 28, 26)
+$brace = New-Object System.Drawing.Pen (Color '#7a4a22'), 3
+$g.DrawLine($brace, 72, 58, 100, 84)
+Save-Icon $bitmap $g 'Dock'
 "Icons written to $out"
