@@ -219,7 +219,7 @@ Decision: [0020](decisions/0020-factory-floors-and-elevator.md). First construct
 - Dev seed (`DevWorld`): PROTOTYPE `dev-factory`, 5x10 at (15, 10), doors (16, 10) and (17, 10), in new worlds and once in existing saves (`EnsureFactory`); `FloorOffer` 500 cents per interior cell, 3 storeys, registered by `SessionRoot`. `EnsureBuilding` keys on the restaurant's ID.
 - Presentation: `SiteGridSpace.LevelHeight` = 3 m per storey; `LevelAt` maps an avatar's height to a level. `BuildingPresenter` builds a storey object per level (ground: doorway, floor tint, lintels; upper: solid interior slab and a closed wall ring; each with an elevator pad), rebuilds a shell when its floors change, exposes `LocalLevel`, `LocalCell`, `LocalBuilding` and `HidesLevel`, and in the local avatar's building hides storeys above its level and other players there. `EquipmentPresenter` and `BeltPresenter` hide machines, belts and riding goods on hidden storeys; `BeltPresenter` computes shapes per level. `EquipmentInteraction` aims at the plane of the avatar's level and places equipment and belts there, shows an elevator hint on the shaft, and `AddFloor()` orders the next floor with the elevator on the avatar's cell. `ElevatorRider` (on the `BuildingPresenter` object) rides one storey with `Player/FloorUp` (PgUp) and `Player/FloorDown` (PgDn) by teleporting the owned avatar (`PlayerAvatar.Teleport`). `PlayerHud` adds a Factory window with floors, price and a Build button to the inventory screen inside a factory.
 
-Prototype: floor price, height limit, storey height, the dev factory's size and position, elevator placed where the player stands, instant construction. Open: conveyor lifts, build time/cancellation/disruption (GDD 29.2, 29.3, 29.7), buying buildings, employees using the elevator, a gamepad elevator binding, and moving a shaft.
+Prototype: floor price, height limit, storey height, the dev factory's size and position, elevator placed where the player stands, instant construction. Open: build time/cancellation/disruption (GDD 29.2, 29.3, 29.7), buying buildings, employees using the elevator, a gamepad elevator binding, and moving a shaft.
 
 ## Implemented: prototype scriptable employee (2026-09-24)
 
@@ -240,6 +240,18 @@ PROTOTYPE, no decision record yet. Owner requests (2026-09-24): employees run Lu
 
 Open: hiring, wages, firing and more employees; which players may command an employee (any site grant can now); memory limits on scripts; resuming a script where it stopped rather than from the top; spawning that does not depend on the scene (a server scene without the prefab keeps employees idle and unspawned); employees on upper floors or elevators; storage placement on the grid; obstacles that do not depend on the server running presenters.
 
+## Implemented: conveyor lifts (2026-09-24)
+
+Decision: [0021](decisions/0021-conveyor-lifts.md). GDD section 27 conveyor lifts between factory floors. Goods snapshot schema **v10**.
+
+- Domain (`GoodsWorld.Belts.cs`, `BeltRules.cs`, `SiteGrid.cs`): `GoodsBelt.Lift` (0 flat, +1 up, -1 down) and `ExitLevel`. `PlaceLift`/`PlaceLiftDurably(player, request, site, x, z, direction, level, lift)` consume one `lift` item (`no-lifts`, `invalid-lift`); the same lift at the same cell and level turns for free. `RemoveBelt` returns a lift item for a lift. `CellProblem` counts a lift on both levels; `Validate` checks `Lift` is -1..1 and both cells. `BeltRules.ByCell` keys a site's belts by `(X, Z, Level)` with lifts at both ends; `Shape` takes a level and counts only neighbours whose exit is on it (a lift is always straight); `Link` looks in front on the exit level and never enters a lift's exit end. `MoveBeltItems` links a whole site at once. v9 saves upgrade with flat belts.
+- Network (`GoodsNetworkBridge`): `RequestPlaceLift(request, site, x, z, direction, level, lift)`.
+- Dev content: `Assets/Content/Items/Lift.asset` (stack 50, `Assets/Art/Icons/Lift.png` from `DrawItemIcons.ps1`) in `SessionRoot.items` (also in `BuildDevSite.cs`); `DevWorld` puts 20 in the storage (new worlds; once in older saves via `EnsureLiftStock`) and 10 in new inventories.
+- Presentation: `BeltPresenter.LiftModel(lift)` builds an up and a down model from the straight belt prefab (two half belts and four frame posts, trigger colliders) and hides a lift's upper end with its storey; `BeltPath` draws a lift's path in, up/down and out, and `LevelAt` gives a riding item's storey. `EquipmentInteraction`: `LiftCursor`, `LiftDirection`, `FlipLift()` (`Player/FlipLift`, V, looked up in the Player map), a lift ghost, `PlaceLift`; R with an empty cursor turns an aimed lift; belt drags skip lifts; ghost shapes include lift ends.
+- Evidence (2026-09-24, Editor 6000.5.9f1, isolated temp saves): EditMode all assemblies 192/192, including 7 new `LiftTests` (placement and occupancy, floor/shaft/direction refusals, items riding up and down, exit shapes and no feeding from an exit end, removal, save/recovery, v9 upgrade). PlayMode `FoodFactoryGame.Session.PlayModeTests` 16/17 with the new `BeltPlacementTests.ALiftCarriesAnItemUpToTheNextFloor` (host session: floor bought, lift carried on the cursor, V flips, lift placed and drawn with its top on the second floor, dough rides to the upper belt's end and is drawn above the second floor, removal returns the lift) passing; `HotbarKeysOverAStackAndDropsOnTheHotbarAssignSlots` and `SlotButtonsTakeShiftClicksAndPlainClicks` fail identically on unmodified HEAD (re-checked with the changes stashed). No running-game visual capture and no separate-process multiplayer check were made.
+
+Prototype: lift stack size, dev stock, V key, runtime model, climb at belt speed. Open: buying lifts, lift shafts as construction (GDD 29.1), a gamepad FlipLift binding, openings in upper slabs, employees using lifts.
+
 ## Required Constraints for Future Implementation
 
 - The server owns gameplay state; clients request validated actions through the command contract in decision 0002.
@@ -248,7 +260,7 @@ Open: hiring, wages, firing and more employees; which players may command an emp
 - Player and employee operational rules should be shared; input and AI choose actions through those rules.
 - Visual objects must not become the sole owners of authoritative simulation state.
 
-These remain accepted contracts; only the bounded goods slice, its station jobs, equipment placement, the working oven, conveyor belts, company cash, the sell counter, supplier purchases, equipment purchases, spoilage timing/refrigeration, building shells and factory floors above have a runtime interface. Sales credit cash inside the clock tick; supplier purchases and floor orders are the player payment commands.
+These remain accepted contracts; only the bounded goods slice, its station jobs, equipment placement, the working oven, conveyor belts, company cash, the sell counter, supplier purchases, equipment purchases, spoilage timing/refrigeration, building shells, factory floors and conveyor lifts above have a runtime interface. Sales credit cash inside the clock tick; supplier purchases and floor orders are the player payment commands.
 
 ## Planned / Undecided
 

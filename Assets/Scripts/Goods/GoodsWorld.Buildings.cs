@@ -161,7 +161,8 @@ namespace FoodFactoryGame.Goods
                     || SiteGrid.CoversShaft(building, equipment.CellX, equipment.CellZ, width, depth, equipment.Level)) return "blocked";
             }
             if (state.Belts.Any(x => x.SiteId == building.SiteId
-                    && (SiteGrid.CoversWall(building, x.CellX, x.CellZ, 1, 1) || SiteGrid.CoversShaft(building, x.CellX, x.CellZ, 1, 1, x.Level))))
+                    && (SiteGrid.CoversWall(building, x.CellX, x.CellZ, 1, 1) || SiteGrid.CoversShaft(building, x.CellX, x.CellZ, 1, 1, x.Level)
+                        || SiteGrid.CoversShaft(building, x.CellX, x.CellZ, 1, 1, x.ExitLevel))))
                 return "blocked";
             return null;
         }

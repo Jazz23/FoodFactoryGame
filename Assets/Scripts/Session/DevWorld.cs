@@ -1,7 +1,7 @@
 // Loads the committed world save or creates the DEVELOPMENT seed; the seed is placeholder content, not design data.
 // The seed is applied only to a brand-new world: an existing save never gains the layout, oven or storage dough retroactively.
-// Belts, the company, the sell counter and the building shells are the exceptions: a save from before each existed gets the
-// dev belt stock (EnsureBeltStock), the dev company with its starting cash (EnsureCompany), the dev counter (EnsureCounter),
+// Belts, lifts, the company, the sell counter and the building shells are the exceptions: a save from before each existed
+// gets the dev belt stock (EnsureBeltStock), the dev lift stock (EnsureLiftStock), the dev company with its starting cash (EnsureCompany), the dev counter (EnsureCounter),
 // the dev restaurant shell (EnsureBuilding), the dev factory shell (EnsureFactory) or, where the server spawns employees,
 // the dev employee (EnsureEmployee) once.
 using System.Collections.Generic;
@@ -36,6 +36,10 @@ namespace FoodFactoryGame.Session
         public const string StorageBeltsLotId = "dev-storage-belts";
         public const int StorageBelts = 200;
         public const int StarterBelts = 50;
+        // PROTOTYPE conveyor lifts (decision 0021) until they can be bought: stock in the dev storage and some for each new player.
+        public const string StorageLiftsLotId = "dev-storage-lifts";
+        public const int StorageLifts = 20;
+        public const int StarterLifts = 10;
         // PROTOTYPE starting capital (whole cents) of the one company that owns the dev site (decision 0012).
         public const string CompanyId = "dev-company";
         public const long StartingCash = 50000;
@@ -76,7 +80,8 @@ namespace FoodFactoryGame.Session
         public static IReadOnlyList<GoodsLot> StarterGoods => new[]
         {
             new GoodsLot { ItemId = DoughItemId, Quantity = StarterDough, SpoilAfterSeconds = DoughSpoilAfterSeconds },
-            new GoodsLot { ItemId = GoodsWorld.BeltItemId, Quantity = StarterBelts, SpoilAfterSeconds = GoodsWorld.NonPerishableSeconds }
+            new GoodsLot { ItemId = GoodsWorld.BeltItemId, Quantity = StarterBelts, SpoilAfterSeconds = GoodsWorld.NonPerishableSeconds },
+            new GoodsLot { ItemId = GoodsWorld.LiftItemId, Quantity = StarterLifts, SpoilAfterSeconds = GoodsWorld.NonPerishableSeconds }
         };
 
         // Returns a world that matches its committed snapshot, as GoodsNetworkBridge.InitializeServer requires.
@@ -100,6 +105,7 @@ namespace FoodFactoryGame.Session
                 var loaded = GoodsSnapshotStore.Load(worldPath);
                 Register(loaded, items);
                 EnsureBeltStock(loaded, worldPath);
+                EnsureLiftStock(loaded, worldPath);
                 EnsureCompany(loaded, worldPath);
                 EnsureCounter(loaded, worldPath, counter);
                 EnsureBuilding(loaded, worldPath);
@@ -116,6 +122,7 @@ namespace FoodFactoryGame.Session
                 Quantity = StorageDough, SpoilAfterSeconds = DoughSpoilAfterSeconds
             });
             world.Bootstrap(BeltStock());
+            world.Bootstrap(LiftStock());
             world.Bootstrap(Company());
             world.Bootstrap(new SiteLayout { SiteId = SiteId, Width = GridWidth, Depth = GridDepth });
             world.Bootstrap(Restaurant());
@@ -155,6 +162,30 @@ namespace FoodFactoryGame.Session
             }
             GoodsSnapshotStore.Save(world, worldPath);
             Debug.Log($"[Session] Added {StorageBelts} dev belts to the storage of this older save.");
+        }
+
+        private static GoodsLot LiftStock() => new()
+        {
+            Id = StorageLiftsLotId, ItemId = GoodsWorld.LiftItemId, OwnerId = SiteId, LocationId = StorageId,
+            Quantity = StorageLifts, SpoilAfterSeconds = GoodsWorld.NonPerishableSeconds
+        };
+
+        // PROTOTYPE, one-time, like EnsureBeltStock: lifts are never destroyed, so a world with no lift items and no placed
+        // lifts has never had them. Such a save gets the dev storage lift stock, committed before serving; if the storage has
+        // no room it is left alone.
+        private static void EnsureLiftStock(GoodsWorld world, string worldPath)
+        {
+            var state = world.Snapshot();
+            if (state.Belts.Any(x => x.Lift != 0) || state.Lots.Any(x => x.ItemId == GoodsWorld.LiftItemId)
+                || state.Lots.Any(x => x.Id == StorageLiftsLotId) || state.Locations.All(x => x.Id != StorageId)) return;
+            try { world.Bootstrap(LiftStock()); }
+            catch (System.ArgumentException)
+            {
+                Debug.LogWarning("[Session] The dev storage is too full for the lift stock; free a slot and restart the server.");
+                return;
+            }
+            GoodsSnapshotStore.Save(world, worldPath);
+            Debug.Log($"[Session] Added {StorageLifts} dev lifts to the storage of this older save.");
         }
 
         private static GoodsCompany Company() => new() { Id = CompanyId, Cash = StartingCash, SiteIds = new List<string> { SiteId } };

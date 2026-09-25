@@ -1,7 +1,8 @@
 // Drives belts through the real DevSite host session with virtual mouse and keyboard input: a belt stack carried out of
 // the inventory, a Factorio-style drag with R making a corner mid-drag, synchronised tread scrolling, one item put on a
 // belt with Z, carried to the end of the line and taken back off with F, and right-click removal returning belt and
-// item. Saves and identities live in a unique temporary directory.
+// item, and a conveyor lift (decision 0021) carrying an item up to a factory's second floor. Saves and identities live in a
+// unique temporary directory.
 using System;
 using System.Collections;
 using System.IO;
@@ -292,6 +293,68 @@ namespace FoodFactoryGame.Session.PlayModeTests
             Assert.That(BeltAt(2, 2).Direction, Is.EqualTo(1), "(2,2) east");
             foreach (var z in new[] { 2, 3, 4 }) Assert.That(BeltAt(3, z).Direction, Is.EqualTo(0), $"(3,{z}) north");
             Assert.That(Carried(GoodsWorld.BeltItemId), Is.EqualTo(DevWorld.StarterBelts - 4));
+        }
+
+        [UnityTest]
+        public IEnumerator ALiftCarriesAnItemUpToTheNextFloor()
+        {
+            Assert.That(_root.Begin(SessionMode.Host), Is.True);
+            yield return Until(() => _root.ClientSite != null && _root.ClientSubscription.Bridge != null && _interaction.InventoryId != null, "host baseline");
+            // Dev seed: lifts in the storage and in each new player's inventory.
+            Assert.That(Server.Lots.Where(x => x.LocationId == DevWorld.StorageId && x.ItemId == GoodsWorld.LiftItemId).Sum(x => x.Quantity), Is.EqualTo(DevWorld.StorageLifts));
+            Assert.That(Carried(GoodsWorld.LiftItemId), Is.EqualTo(DevWorld.StarterLifts));
+            var bridge = _root.ClientSubscription.Bridge;
+            string Request() => Guid.NewGuid().ToString("N");
+            // A second storey for the dev factory (interior x 16..18, z 11..18), its elevator in the far corner.
+            bridge.RequestAddFloor(Request(), DevWorld.FactoryId, 18, 18);
+            yield return Until(() => Server.Buildings.Single(x => x.Id == DevWorld.FactoryId).Floors == 2, "second floor");
+            yield return SteepCamera();
+
+            yield return CarryFromInventory(GoodsWorld.LiftItemId);
+            Assert.That((_interaction.LiftCursor, _interaction.BeltCursor, _interaction.ItemCursor), Is.EqualTo((true, false, false)));
+            Assert.That(_interaction.LiftDirection, Is.EqualTo(1), "Lifts start going up.");
+            yield return Key(UnityEngine.InputSystem.Key.V);
+            Assert.That(_interaction.LiftDirection, Is.EqualTo(-1), "V flips the cursor's lifts to going down.");
+            yield return Key(UnityEngine.InputSystem.Key.V);
+            Assert.That(_interaction.LiftDirection, Is.EqualTo(1));
+            Assert.That(_interaction.Rotation, Is.EqualTo(0));
+
+            // Ground belt north into an up-lift at (16,13), which hands to a belt north on the second floor.
+            bridge.RequestPlaceBelt(Request(), DevWorld.SiteId, 16, 12, 0);
+            _interaction.PlaceLift(_root.ClientSite, (16, 13));
+            bridge.RequestPlaceBelt(Request(), DevWorld.SiteId, 16, 14, 0, 1);
+            yield return Until(() => Server.Belts.Count == 3, "belt, lift and upper belt");
+            var lift = Server.Belts.Single(x => x.Lift != 0);
+            Assert.That((lift.CellX, lift.CellZ, lift.Level, lift.Lift, lift.Direction), Is.EqualTo((16, 13, 0, 1, 0)));
+            Assert.That(Carried(GoodsWorld.LiftItemId), Is.EqualTo(DevWorld.StarterLifts - 1));
+            yield return Until(() => _belts.Belts.ContainsKey(lift.Id), "lift visual");
+            var upper = _belts.Belts[lift.Id].transform.Find("Upper");
+            Assert.That(upper != null && upper.gameObject.activeInHierarchy, Is.True, "The lift's top shows from outside the factory.");
+            Assert.That(upper.GetComponentsInChildren<Renderer>().Max(x => x.bounds.max.y), Is.GreaterThan(SiteGridSpace.LevelHeight),
+                "The lift's top stands on the second floor.");
+
+            // An item put on the ground belt rides up the lift to the end of the upper belt, drawn climbing on the way.
+            var dough = Server.Lots.First(x => x.LocationId == _interaction.InventoryId && x.ItemId == DevWorld.DoughItemId);
+            bridge.RequestPlaceOnBelt(Request(), dough.Id, Server.Belts.Single(x => x.CellZ == 12).Id);
+            var top = Server.Belts.Single(x => x.CellZ == 14);
+            var highest = 0f;
+            var end = Time.realtimeSinceStartup + 15f;
+            while (Time.realtimeSinceStartup < end && !Server.Lots.Any(x => x.LocationId == top.LocationId && x.BeltPosition == BeltRules.EndRest))
+            {
+                foreach (var renderer in _belts.GetComponentsInChildren<SpriteRenderer>()) highest = Mathf.Max(highest, renderer.transform.position.y);
+                yield return null;
+            }
+            Assert.That(Server.Lots.Any(x => x.LocationId == top.LocationId && x.BeltPosition == BeltRules.EndRest), Is.True, "item at the end of the upper belt");
+            yield return Until(() =>
+            {
+                foreach (var renderer in _belts.GetComponentsInChildren<SpriteRenderer>()) highest = Mathf.Max(highest, renderer.transform.position.y);
+                return highest > SiteGridSpace.LevelHeight + BeltPath.SurfaceHeight;
+            }, "item drawn on the second floor");
+
+            // Removing the lift returns its item.
+            bridge.RequestRemoveBelt(Request(), lift.Id);
+            yield return Until(() => Server.Belts.All(x => x.Id != lift.Id), "lift removed");
+            Assert.That(Carried(GoodsWorld.LiftItemId), Is.EqualTo(DevWorld.StarterLifts));
         }
     }
 }

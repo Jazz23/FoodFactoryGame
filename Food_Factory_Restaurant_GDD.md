@@ -740,7 +740,9 @@ Selected by the project owner on 2026-09-24 for the first floors slice:
   development floor switch.)
 - Timing: a paid floor exists immediately. [SELECTED] (Alternatives: build time; build time with a rush payment.) This
   applies to floors only; general construction timing (29.2) remains open.
-- Conveyor lifts: in a later slice. [SELECTED] Until then, goods reach upper floors by being carried in the elevator.
+- Conveyor lifts: in a later slice. [SELECTED] Implemented 2026-09-24: owner selected lifts as belt-like items placed by
+  players (not construction orders), each spanning one storey (`docs/decisions/0021-conveyor-lifts.md`). Whether lift shafts
+  become construction remains part of 29.1.
 
 Status: selected and implemented (`docs/decisions/0020-factory-floors-and-elevator.md`). Where the elevator goes, floor
 prices, the height limit, and storey height are implementation prototype values, not design decisions.

@@ -1,7 +1,7 @@
 // Pure grid rules shared by the server's placement check and the client's placement preview; the server always re-checks.
 // Placed equipment, belts and building walls share the grid: nothing may overlap anything else on the same level. Level 0 is
 // the ground; a higher level exists only over the interior of a building with that many floors (decision 0020), and a
-// building's elevator cell is kept clear on every one of its floors.
+// building's elevator cell is kept clear on every one of its floors. A conveyor lift occupies its cell on both of its levels.
 using System.Linq;
 
 namespace FoodFactoryGame.Goods
@@ -40,7 +40,8 @@ namespace FoodFactoryGame.Goods
                 var (otherWidth, otherDepth) = Footprint(other.Width, other.Depth, other.Rotation);
                 if (Overlaps(cellX, cellZ, width, depth, other.CellX, other.CellZ, otherWidth, otherDepth)) return "blocked";
             }
-            if (state.Belts != null && state.Belts.Any(x => x.Id != ignoreId && x.SiteId == siteId && x.Level == level
+            // A lift stands on both of its levels.
+            if (state.Belts != null && state.Belts.Any(x => x.Id != ignoreId && x.SiteId == siteId && (x.Level == level || x.ExitLevel == level)
                     && Overlaps(cellX, cellZ, width, depth, x.CellX, x.CellZ, 1, 1)))
                 return "blocked";
             if (state.Buildings != null && state.Buildings.Any(x => x.SiteId == siteId

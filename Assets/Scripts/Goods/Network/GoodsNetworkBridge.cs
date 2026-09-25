@@ -160,6 +160,13 @@ namespace FoodFactoryGame.Goods.Network
             if (IsClientStarted) ServerPlaceBelt(requestId, siteId, cellX, cellZ, direction, level);
         }
 
+        // Places a conveyor lift (lift +1 up, -1 down) from the player's inventory, or turns the lift already there
+        // (PlaceLiftDurably). Level is the floor it takes items on.
+        public void RequestPlaceLift(string requestId, string siteId, int cellX, int cellZ, int direction, int level, int lift)
+        {
+            if (IsClientStarted) ServerPlaceLift(requestId, siteId, cellX, cellZ, direction, level, lift);
+        }
+
         public void RequestRemoveBelt(string requestId, string beltId)
         {
             if (IsClientStarted) ServerRemoveBelt(requestId, beltId);
@@ -191,6 +198,16 @@ namespace FoodFactoryGame.Goods.Network
         {
             if (!TryIdentify(sender, requestId, out var player)) return;
             var result = _world.PlaceBeltDurably(player, requestId, siteId, cellX, cellZ, direction, _savePath, level);
+            Reply(sender, result);
+            if (result.Accepted) Broadcast();
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        private void ServerPlaceLift(string requestId, string siteId, int cellX, int cellZ, int direction, int level, int lift,
+            NetworkConnection sender = null)
+        {
+            if (!TryIdentify(sender, requestId, out var player)) return;
+            var result = _world.PlaceLiftDurably(player, requestId, siteId, cellX, cellZ, direction, level, lift, _savePath);
             Reply(sender, result);
             if (result.Accepted) Broadcast();
         }

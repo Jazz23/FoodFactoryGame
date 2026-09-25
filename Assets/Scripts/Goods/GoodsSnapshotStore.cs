@@ -289,6 +289,9 @@ namespace FoodFactoryGame.Goods
                 state.Employees ??= new();
                 state.SchemaVersion = 9;
             }
+            // v9 had no conveyor lifts (decision 0021); every belt's Lift reads 0 (flat). The version still changes so an older
+            // build refuses a v10 save instead of reading its lifts as flat belts.
+            if (state != null && state.SchemaVersion == 9) state.SchemaVersion = 10;
             GoodsWorld.Validate(state);
             return state;
         }

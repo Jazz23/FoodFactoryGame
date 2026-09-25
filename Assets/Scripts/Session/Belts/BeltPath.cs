@@ -1,6 +1,7 @@
 // Presentation geometry of a belt's item path: a straight belt runs from its back edge to its front edge; a curved belt runs
 // a quarter circle of radius 0.5 around the tile corner between its entry side and its front, matching the corner models.
-// Positions are the server's BeltRules units, so an item drawn here is where the simulation says it is.
+// Positions are the server's BeltRules units, so an item drawn here is where the simulation says it is. A conveyor lift's
+// path runs in to the middle of the tile, straight up or down one storey, and out to its front edge on the other floor.
 using FoodFactoryGame.Goods;
 using FoodFactoryGame.Session.Equipment;
 using UnityEngine;
@@ -13,8 +14,15 @@ namespace FoodFactoryGame.Session.Belts
         public const float SurfaceHeight = 0.8f;
 
         // Point on the path of a tile centred on the origin that travels +Z; t runs 0..1 along the path.
-        public static Vector3 LocalPoint(BeltShape shape, float t)
+        public static Vector3 LocalPoint(BeltShape shape, float t, int lift = 0)
         {
+            if (lift != 0)
+            {
+                // A quarter of the path in, half of it vertical, a quarter out.
+                var climb = Mathf.Clamp01((t - 0.25f) * 2f);
+                var along = Mathf.Clamp01(t) < 0.25f ? Mathf.Clamp01(t) * 2f - 0.5f : Mathf.Clamp01(t) > 0.75f ? (Mathf.Clamp01(t) - 0.75f) * 2f : 0f;
+                return new Vector3(0f, SurfaceHeight + lift * climb * SiteGridSpace.LevelHeight, along);
+            }
             var angle = Mathf.Clamp01(t) * Mathf.PI * 0.5f;
             return shape switch
             {
@@ -29,7 +37,10 @@ namespace FoodFactoryGame.Session.Belts
 
         public static Vector3 WorldPoint(SiteLayout layout, GoodsBelt belt, BeltShape shape, float position) =>
             CellCenter(layout, belt.CellX, belt.CellZ, belt.Level)
-            + SiteGridSpace.Rotation(belt.Direction) * LocalPoint(shape, position / BeltRules.UnitsPerTile) * SiteGrid.CellSize;
+            + SiteGridSpace.Rotation(belt.Direction) * LocalPoint(shape, position / BeltRules.UnitsPerTile, belt.Lift) * SiteGrid.CellSize;
+
+        // Floor a riding item is drawn on: a lift's second half is on its exit level.
+        public static int LevelAt(GoodsBelt belt, float position) => position < BeltRules.Middle ? belt.Level : belt.ExitLevel;
 
         // A curved belt is drawn with the corner model entering along the feeder's travel (see BeltPresenter).
         public static Quaternion ModelRotation(BeltShape shape, int direction) => SiteGridSpace.Rotation(shape switch

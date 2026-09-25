@@ -10,6 +10,9 @@
 // belt shows a ghost of the item where it would land and PlaceItem (Z) puts exactly one on the belt. TakeItem (F), whatever
 // the cursor holds, takes the riding item nearest the crosshair off the aimed belt into the inventory.
 // Each belt is its own request; pending ones are drawn as ghosts until the baseline shows them, and the server re-checks all.
+// With lifts on the cursor (decision 0021), a ghost lift shows the crosshair's cell going up or down one floor; Place puts
+// one there, R turns it, FlipLift (V) switches up and down. Belt drags never turn a lift; with an empty cursor R turns the
+// aimed lift like a belt, and Remove takes it up.
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -56,9 +59,17 @@ namespace FoodFactoryGame.Session.Equipment
         private SpriteRenderer _itemGhost;
         private string _itemGhostId;
         private Material _ghostTread;
+        private readonly Dictionary<int, (GameObject Root, Renderer[] Renderers)> _liftGhosts = new();
+        // Found in the Player map by name rather than serialized, so the authored scene needs no new reference.
+        private InputAction _flipLiftAction;
 
         public bool BeltCursor => CursorGoods != null && CursorGoods.ItemId == GoodsWorld.BeltItemId && Screen == InteractionScreen.None;
-        public bool ItemCursor => CursorGoods != null && CursorGoods.ItemId != GoodsWorld.BeltItemId && Screen == InteractionScreen.None;
+        public bool LiftCursor => CursorGoods != null && CursorGoods.ItemId == GoodsWorld.LiftItemId && Screen == InteractionScreen.None;
+        public bool ItemCursor => CursorGoods != null && CursorGoods.ItemId != GoodsWorld.BeltItemId && CursorGoods.ItemId != GoodsWorld.LiftItemId
+            && Screen == InteractionScreen.None;
+        // Way the next lift from the cursor goes: +1 up a floor, -1 down.
+        public int LiftDirection { get; private set; } = 1;
+        public bool LiftGhostVisible => _liftGhosts.Values.Any(x => x.Root.activeSelf);
         public bool Dragging => _dragging;
         public int PendingBeltCount => _pendingBelts.Count;
         public bool ItemGhostVisible => _itemGhost != null && _itemGhost.gameObject.activeSelf;
@@ -90,9 +101,24 @@ namespace FoodFactoryGame.Session.Equipment
             {
                 _dragging = false;
                 HideBeltGhosts();
+                HideLiftGhosts();
                 ShowItemGhost(null, default);
                 return false;
             }
+            if (LiftCursor)
+            {
+                _dragging = false;
+                ShowItemGhost(null, default);
+                HideBeltGhosts();
+                var problem = _aimCell == null ? null : LiftProblem(site, _aimCell.Value);
+                ShowLiftGhost(layout, _aimCell, problem == null);
+                var way = LiftDirection > 0 ? "up" : "down";
+                var flip = _flipLiftAction?.GetBindingDisplayString() ?? "FlipLift";
+                Status = $"Lifts ({LiftsCarried(site)}, {way}): click places a lift carrying items {way} a floor to the belt in front, "
+                    + $"{flip} flips up/down, R turns, right click removes, Q clears" + (problem == null ? "" : $" [{problem}]") + suffix;
+                return true;
+            }
+            HideLiftGhosts();
             if (BeltCursor)
             {
                 ShowItemGhost(null, default);
@@ -127,7 +153,7 @@ namespace FoodFactoryGame.Session.Equipment
             {
                 _aimPoint = point;
                 _aimCell = BeltPath.CellAt(layout, point);
-                _aimBelt = LevelBelts(site).FirstOrDefault(x => x.CellX == _aimCell.Value.X && x.CellZ == _aimCell.Value.Z);
+                _aimBelt = BeltPresenter.Touching(site.Belts, Level).FirstOrDefault(x => x.CellX == _aimCell.Value.X && x.CellZ == _aimCell.Value.Z);
             }
         }
 
@@ -147,13 +173,13 @@ namespace FoodFactoryGame.Session.Equipment
             var planned = PlannedBelts(site);
             var shown = new List<(BeltShape Shape, (int X, int Z) Cell, int Direction, bool Valid)>();
             foreach (var pair in _pendingBelts)
-                shown.Add((belts.ShapeAt(planned, pair.Key.X, pair.Key.Z, pair.Value.Direction), pair.Key, pair.Value.Direction, true));
+                shown.Add((belts.ShapeAt(planned, pair.Key.X, pair.Key.Z, _beltLevel, pair.Value.Direction), pair.Key, pair.Value.Direction, true));
             if (!_dragging && _aimCell != null && !_pendingBelts.ContainsKey(_aimCell.Value))
             {
                 var cell = _aimCell.Value;
                 var hypothetical = planned.Where(x => x.CellX != cell.X || x.CellZ != cell.Z)
-                    .Append(new GoodsBelt { CellX = cell.X, CellZ = cell.Z, Direction = _rotation }).ToList();
-                shown.Add((belts.ShapeAt(hypothetical, cell.X, cell.Z, _rotation), cell, _rotation, BeltProblem(site, cell) == null));
+                    .Append(new GoodsBelt { CellX = cell.X, CellZ = cell.Z, Direction = _rotation, Level = _beltLevel }).ToList();
+                shown.Add((belts.ShapeAt(hypothetical, cell.X, cell.Z, _beltLevel, _rotation), cell, _rotation, BeltProblem(site, cell) == null));
             }
             ShowBeltGhosts(layout, shown);
         }
@@ -171,15 +197,20 @@ namespace FoodFactoryGame.Session.Equipment
             }
         }
 
-        // Belts on the local avatar's floor: the only ones this client aims at, previews against or places.
-        private IEnumerable<GoodsBelt> LevelBelts(GoodsSnapshot site) => BeltPresenter.OnLevel(site.Belts, Level);
+        // The flat belt at a cell of the local avatar's floor: the only kind a belt drag places over or turns.
+        private GoodsBelt FlatBeltAt(GoodsSnapshot site, (int X, int Z) cell) =>
+            BeltPresenter.OnLevel(site.Belts, Level).FirstOrDefault(x => x.Lift == 0 && x.CellX == cell.X && x.CellZ == cell.Z);
 
-        // Existing belts on this floor with pending placements and turns applied, for ghost shapes.
+        // Existing belts and lifts standing on this floor with pending placements and turns applied, for ghost shapes.
         private List<GoodsBelt> PlannedBelts(GoodsSnapshot site)
         {
-            var planned = LevelBelts(site).Where(x => !_pendingBelts.ContainsKey((x.CellX, x.CellZ)))
-                .Select(x => new GoodsBelt { Id = x.Id, CellX = x.CellX, CellZ = x.CellZ, Direction = x.Direction }).ToList();
-            planned.AddRange(_pendingBelts.Select(x => new GoodsBelt { CellX = x.Key.X, CellZ = x.Key.Z, Direction = x.Value.Direction }));
+            var planned = BeltPresenter.Touching(site.Belts, _beltLevel).Where(x => x.Lift != 0 || !_pendingBelts.ContainsKey((x.CellX, x.CellZ)))
+                .Select(x => new GoodsBelt { Id = x.Id, CellX = x.CellX, CellZ = x.CellZ, Direction = x.Direction, Level = x.Level, Lift = x.Lift })
+                .ToList();
+            planned.AddRange(_pendingBelts.Select(x => new GoodsBelt
+            {
+                CellX = x.Key.X, CellZ = x.Key.Z, Direction = x.Value.Direction, Level = _beltLevel
+            }));
             return planned;
         }
 
@@ -190,7 +221,7 @@ namespace FoodFactoryGame.Session.Equipment
         private string BeltProblem(GoodsSnapshot site, (int X, int Z) cell)
         {
             if (_pendingBelts.ContainsKey(cell)) return null;
-            if (LevelBelts(site).Any(x => x.CellX == cell.X && x.CellZ == cell.Z)) return null;
+            if (FlatBeltAt(site, cell) != null) return null;
             var problem = SiteGrid.CellProblem(site, DevWorld.SiteId, cell.X, cell.Z, 1, 1, null, Level);
             if (problem != null) return problem;
             return BeltsCarried(site) - _pendingBelts.Count(x => x.Value.NewBelt) > 0 ? null : "no-belts";
@@ -204,7 +235,7 @@ namespace FoodFactoryGame.Session.Equipment
         {
             var bridge = _subscription?.Bridge;
             if (bridge == null) return;
-            var existing = LevelBelts(site).FirstOrDefault(x => x.CellX == cell.X && x.CellZ == cell.Z);
+            var existing = FlatBeltAt(site, cell);
             if (_pendingBelts.TryGetValue(cell, out var pending) ? pending.Direction == direction : existing?.Direction == direction) return;
             var problem = BeltProblem(site, cell);
             if (problem != null)
@@ -242,6 +273,11 @@ namespace FoodFactoryGame.Session.Equipment
 
         private bool StartBeltDrag()
         {
+            if (LiftCursor && _aimCell != null && session.ClientSite != null)
+            {
+                PlaceLift(session.ClientSite, _aimCell.Value);
+                return true;
+            }
             if (!BeltCursor || _aimCell == null || session.ClientSite == null) return false;
             _dragging = true;
             _dragHead = _aimCell.Value;
@@ -262,9 +298,16 @@ namespace FoodFactoryGame.Session.Equipment
                 if (belts.Layout != null) TurnDragTowardAim(site, belts.Layout);
                 return true;
             }
-            if (BeltCursor)
+            if (BeltCursor || LiftCursor)
             {
                 _rotation = BeltRules.RightOf(_rotation);
+                return true;
+            }
+            if (_held == null && _aimBelt != null && _aimBelt.Lift != 0)
+            {
+                // A lift turns in place, whichever end is aimed at; the server finds it by the floor it takes items on.
+                _subscription?.Bridge?.RequestPlaceLift(Track(), DevWorld.SiteId, _aimBelt.CellX, _aimBelt.CellZ,
+                    BeltRules.RightOf(_aimBelt.Direction), _aimBelt.Level, _aimBelt.Lift);
                 return true;
             }
             if (_held == null && _aimBelt != null)
@@ -314,7 +357,7 @@ namespace FoodFactoryGame.Session.Equipment
                 LastRejection = "aim at a belt";
                 return;
             }
-            var shape = BeltRules.Shape(BeltRules.ByCell(BeltPresenter.OnLevel(site.Belts, _aimBelt.Level)), _aimBelt);
+            var shape = BeltRules.Shape(BeltRules.ByCell(site.Belts), _aimBelt);
             var nearest = site.Lots.Where(x => x.LocationId == _aimBelt.LocationId)
                 .OrderBy(x => Vector3.ProjectOnPlane(BeltPath.WorldPoint(layout, _aimBelt, shape, x.BeltPosition) - _aimPoint, Vector3.up).sqrMagnitude)
                 .FirstOrDefault();
@@ -360,7 +403,7 @@ namespace FoodFactoryGame.Session.Equipment
                 return;
             }
             var position = BeltRules.FreePosition(RidingPositions(site, _aimBelt));
-            var shape = BeltRules.Shape(BeltRules.ByCell(BeltPresenter.OnLevel(site.Belts, _aimBelt.Level)), _aimBelt);
+            var shape = BeltRules.Shape(BeltRules.ByCell(site.Belts), _aimBelt);
             var point = BeltPath.WorldPoint(layout, _aimBelt, shape, position < 0 ? BeltRules.Middle : position)
                         + Vector3.up * (belts.ItemSize * 0.5f);
             ShowItemGhost(CursorGoods.ItemId, point);
@@ -424,17 +467,100 @@ namespace FoodFactoryGame.Session.Equipment
             if (!_beltGhosts.TryGetValue(shape, out var pool)) _beltGhosts[shape] = pool = new List<(GameObject, Renderer[])>();
             while (pool.Count <= index)
             {
-                if (_ghostTread == null)
-                {
-                    // The belt surface keeps its arrows in the ghost, so the direction reads at a glance.
-                    _ghostTread = new Material(ghostModelMaterial) { name = "Belt ghost tread" };
-                    _ghostTread.SetTexture("_BaseMap", belts.Tread.GetTexture("_BaseMap"));
-                }
                 var root = EquipmentModel.CreateGhost(belts.PrefabFor(shape), $"Belt ghost {shape}", transform, ghostModelMaterial, false,
-                    belts.IsTread, _ghostTread);
+                    belts.IsTread, GhostTread());
                 pool.Add((root, root.GetComponentsInChildren<Renderer>().Where(x => x.enabled).ToArray()));
             }
             return pool[index];
+        }
+
+        // Client preview of the server's lift rule at a cell for the cursor's direction: null when a lift may go (or the lift
+        // already there turn) there.
+        private string LiftProblem(GoodsSnapshot site, (int X, int Z) cell)
+        {
+            if (site.Belts.Any(x => x.Lift == LiftDirection && x.Level == Level && x.CellX == cell.X && x.CellZ == cell.Z)) return null;
+            var problem = SiteGrid.CellProblem(site, DevWorld.SiteId, cell.X, cell.Z, 1, 1, null, Level)
+                ?? SiteGrid.CellProblem(site, DevWorld.SiteId, cell.X, cell.Z, 1, 1, null, Level + LiftDirection);
+            if (problem != null) return problem;
+            return LiftsCarried(site) > 0 ? null : "no-lifts";
+        }
+
+        public int LiftsCarried(GoodsSnapshot site) => site == null || InventoryId == null ? 0
+            : site.Lots.Where(x => x.LocationId == InventoryId && x.ItemId == GoodsWorld.LiftItemId).Sum(x => x.Quantity);
+
+        // Sends one lift placement at the crosshair's cell in the cursor direction; the server re-checks everything.
+        public void PlaceLift(GoodsSnapshot site, (int X, int Z) cell)
+        {
+            var bridge = _subscription?.Bridge;
+            if (bridge == null) return;
+            var problem = LiftProblem(site, cell);
+            if (problem != null)
+            {
+                LastRejection = problem;
+                return;
+            }
+            bridge.RequestPlaceLift(Track(), DevWorld.SiteId, cell.X, cell.Z, _rotation, Level, LiftDirection);
+        }
+
+        // Switches the cursor's lifts between going up and going down a floor.
+        public void FlipLift() => LiftDirection = -LiftDirection;
+
+        private void OnFlipLift(InputAction.CallbackContext _)
+        {
+            if (LiftCursor) FlipLift();
+        }
+
+        private void EnableLiftInput()
+        {
+            _flipLiftAction ??= rotateAction.action.actionMap?.FindAction("FlipLift");
+            if (_flipLiftAction == null) return;
+            _flipLiftAction.performed += OnFlipLift;
+            _flipLiftAction.Enable();
+        }
+
+        private void DisableLiftInput()
+        {
+            if (_flipLiftAction == null) return;
+            _flipLiftAction.performed -= OnFlipLift;
+            _flipLiftAction.Disable();
+        }
+
+        private void ShowLiftGhost(SiteLayout layout, (int X, int Z)? cell, bool valid)
+        {
+            HideLiftGhosts();
+            if (cell == null) return;
+            if (!_liftGhosts.TryGetValue(LiftDirection, out var ghost))
+            {
+                var root = EquipmentModel.CreateGhost(belts.LiftModel(LiftDirection), $"Lift ghost {LiftDirection}", transform, ghostModelMaterial, false,
+                    belts.IsTread, GhostTread());
+                _liftGhosts[LiftDirection] = ghost = (root, root.GetComponentsInChildren<Renderer>().Where(x => x.enabled).ToArray());
+            }
+            ghost.Root.SetActive(true);
+            ghost.Root.transform.SetPositionAndRotation(BeltPath.CellCenter(layout, cell.Value.X, cell.Value.Z, Level), SiteGridSpace.Rotation(_rotation));
+            var color = valid ? validColor : invalidColor;
+            color.a = ghostAlpha;
+            foreach (var renderer in ghost.Renderers)
+            {
+                renderer.GetPropertyBlock(_block);
+                _block.SetColor(BaseColor, color);
+                renderer.SetPropertyBlock(_block);
+            }
+        }
+
+        private void HideLiftGhosts()
+        {
+            foreach (var ghost in _liftGhosts.Values) ghost.Root.SetActive(false);
+        }
+
+        // The belt surface keeps its arrows in belt and lift ghosts, so the direction reads at a glance.
+        private Material GhostTread()
+        {
+            if (_ghostTread == null)
+            {
+                _ghostTread = new Material(ghostModelMaterial) { name = "Belt ghost tread" };
+                _ghostTread.SetTexture("_BaseMap", belts.Tread.GetTexture("_BaseMap"));
+            }
+            return _ghostTread;
         }
 
         private void HideBeltGhosts()
@@ -450,6 +576,9 @@ namespace FoodFactoryGame.Session.Equipment
                 foreach (var ghost in pool)
                     if (ghost.Root != null) Destroy(ghost.Root);
             _beltGhosts.Clear();
+            foreach (var ghost in _liftGhosts.Values)
+                if (ghost.Root != null) Destroy(ghost.Root);
+            _liftGhosts.Clear();
             if (_itemGhost != null) Destroy(_itemGhost.gameObject);
             _itemGhost = null;
             _itemGhostId = null;

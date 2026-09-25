@@ -67,7 +67,7 @@ level in the shared grid rule and in the save.
 
 ## Consequences and open questions
 
-- Conveyor lifts (GDD section 27) are the next slice: goods moving between floors by belt.
+- Conveyor lifts (GDD section 27) are implemented by [decision 0021](0021-conveyor-lifts.md): goods move between floors by belt.
 - Employees, when they exist, will need the elevator as a route between levels.
 - Build time, cancellation and disruption for construction (GDD 29.2, 29.3, 29.7), buying buildings (29.5) and whether a
   factory can grow beyond its generated footprint remain open.

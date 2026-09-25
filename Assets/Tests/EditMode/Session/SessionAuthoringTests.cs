@@ -72,10 +72,10 @@ namespace FoodFactoryGame.Session.Tests
                 var roots = objects.SelectMany(x => x.GetComponents<SessionRoot>()).ToArray();
                 Assert.That(roots.Length, Is.EqualTo(1));
                 AssertAssigned(roots[0], "networkManager", "authenticator", "bridgePrefab", "playerPrefab", "spawnPoints", "equipmentDefinitions", "recipes", "items");
-                Assert.That(roots[0].Items.Select(x => x.Id), Is.EquivalentTo(new[] { DevWorld.DoughItemId, "bread", GoodsWorld.BeltItemId }));
+                Assert.That(roots[0].Items.Select(x => x.Id), Is.EquivalentTo(new[] { DevWorld.DoughItemId, "bread", GoodsWorld.BeltItemId, GoodsWorld.LiftItemId }));
                 Assert.That(roots[0].Items.All(x => x.Icon != null), Is.True, "Every dev item has an inventory icon.");
                 Assert.That(roots[0].Items.Select(x => (x.Id, x.MaxStack)),
-                    Is.EquivalentTo(new[] { (DevWorld.DoughItemId, 20), ("bread", 20), (GoodsWorld.BeltItemId, 100) }), "Dev dough and bread stack to 20, belts to 100.");
+                    Is.EquivalentTo(new[] { (DevWorld.DoughItemId, 20), ("bread", 20), (GoodsWorld.BeltItemId, 100), (GoodsWorld.LiftItemId, 50) }), "Dev dough and bread stack to 20, belts to 100, lifts to 50.");
                 using (var serialized = new SerializedObject(roots[0]))
                 {
                     Assert.That(serialized.FindProperty("authenticator").objectReferenceValue, Is.SameAs(server.GetAuthenticator()));

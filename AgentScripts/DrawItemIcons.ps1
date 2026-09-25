@@ -1,4 +1,4 @@
-# Draws the DEVELOPMENT 2D item icons (dough, bread, oven, belt, counter) as 128x128 transparent PNGs with GDI+.
+# Draws the DEVELOPMENT 2D item icons (dough, bread, oven, belt, lift, counter) as 128x128 transparent PNGs with GDI+.
 # Re-run to regenerate: powershell -ExecutionPolicy Bypass -File AgentScripts/DrawItemIcons.ps1
 # Unity imports them as sprites (AgentScripts/BuildDevSite.cs sets the import settings).
 Add-Type -AssemblyName System.Drawing
@@ -137,6 +137,32 @@ foreach ($y in 34, 64, 94) {
 }
 $g.DrawRectangle($dark, 26, 10, 76, 104)
 Save-Icon $bitmap $g 'Belt'
+
+# --- Lift: a conveyor tower rising through two floor slabs, with a double arrow for carrying goods up or down (decision 0021) ---
+$bitmap, $g = New-Icon
+Shadow $g 20 108 88 14
+$slab = New-Object System.Drawing.SolidBrush (Color '#9aa3ab')
+$g.FillRectangle($slab, 6, 30, 116, 9)
+$g.FillRectangle($slab, 6, 94, 116, 9)
+$frame = New-Object System.Drawing.SolidBrush (Color '#3b3f44')
+$g.FillRectangle($frame, 38, 8, 52, 106)
+$treadRect = New-Object System.Drawing.RectangleF 46, 8, 36, 106
+$tread = New-Object System.Drawing.Drawing2D.LinearGradientBrush $treadRect, (Color '#2a2b2e'), (Color '#4a4c50'), 0
+$g.FillRectangle($tread, $treadRect)
+$amber = New-Object System.Drawing.SolidBrush (Color '#f0a818')
+$g.FillRectangle($amber, 38, 8, 8, 106)
+$g.FillRectangle($amber, 82, 8, 8, 106)
+$arrow = New-Object System.Drawing.Pen (Color '#f6d25a'), 7
+$arrow.StartCap = $arrow.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+$arrow.LineJoin = [System.Drawing.Drawing2D.LineJoin]::Round
+$g.DrawLine($arrow, 64, 24, 64, 98)
+$g.DrawLines($arrow, [System.Drawing.PointF[]]@(
+    (New-Object System.Drawing.PointF 52, 36), (New-Object System.Drawing.PointF 64, 22), (New-Object System.Drawing.PointF 76, 36)))
+$g.DrawLines($arrow, [System.Drawing.PointF[]]@(
+    (New-Object System.Drawing.PointF 52, 86), (New-Object System.Drawing.PointF 64, 100), (New-Object System.Drawing.PointF 76, 86)))
+$outline = New-Object System.Drawing.Pen (Color '#1f2a2e'), 4
+$g.DrawRectangle($outline, 38, 8, 52, 106)
+Save-Icon $bitmap $g 'Lift'
 
 # --- Counter: a wooden shop counter with a teal cash register and a gold coin (decision 0013 sell counter) ---
 $bitmap, $g = New-Icon

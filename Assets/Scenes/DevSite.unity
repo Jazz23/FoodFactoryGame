@@ -810,6 +810,8 @@ MonoBehaviour:
   - {fileID: 11400000, guid: dfe5f458c01450b418ac8a5cc0bf9bb3, type: 2}
   - {fileID: 11400000, guid: d475718ff5e959f42afa709ea6a6f2fb, type: 2}
   - {fileID: 11400000, guid: 95674000aedac4a4c8b426b0ae974bc8, type: 2}
+  - {fileID: 11400000, guid: 2253f4f7713fb4f489e518720832924e, type: 2}
+  employeePrefab: {fileID: 0}
   readCommandLine: 1
 --- !u!4 &1409180071
 Transform:

@@ -1,6 +1,8 @@
 // Pure conveyor rules shared by the server simulation and client previews: which belt a belt feeds, the shape a belt takes
 // from its feeders (Factorio-style: a belt fed only from one side curves), where an item enters the next belt, and where a
-// new item fits. A belt is one grid cell; its items travel one lane, measured in integer units along its path.
+// new item fits. A belt is one grid cell; its items travel one lane, measured in integer units along its path. A conveyor
+// lift (decision 0021) is a straight belt whose front end is one storey up or down: it takes items on its own level and
+// hands them to the belt in front on its exit level, so the belt grid is keyed by cell and level, a lift at both of its ends.
 using System.Collections.Generic;
 using System.Linq;
 
@@ -53,40 +55,51 @@ namespace FoodFactoryGame.Goods
         public static int RightOf(int direction) => (direction + 1) & 3;
         public static int LeftOf(int direction) => (direction + 3) & 3;
 
-        public static Dictionary<(int, int), GoodsBelt> ByCell(IEnumerable<GoodsBelt> belts)
+        // Every belt of one site by cell and level; a lift is found at its cell on both the level it takes items on and its
+        // exit level.
+        public static Dictionary<(int X, int Z, int Level), GoodsBelt> ByCell(IEnumerable<GoodsBelt> belts)
         {
-            var cells = new Dictionary<(int, int), GoodsBelt>();
-            foreach (var belt in belts) cells[(belt.CellX, belt.CellZ)] = belt;
+            var cells = new Dictionary<(int, int, int), GoodsBelt>();
+            foreach (var belt in belts)
+            {
+                cells[(belt.CellX, belt.CellZ, belt.Level)] = belt;
+                if (belt.Lift != 0) cells[(belt.CellX, belt.CellZ, belt.ExitLevel)] = belt;
+            }
             return cells;
         }
 
-        private static GoodsBelt At(Dictionary<(int, int), GoodsBelt> cells, int x, int z, int direction)
+        private static GoodsBelt At(Dictionary<(int, int, int), GoodsBelt> cells, int x, int z, int level, int direction)
         {
             var (dx, dz) = Step(direction);
-            return cells.TryGetValue((x + dx, z + dz), out var belt) ? belt : null;
+            return cells.TryGetValue((x + dx, z + dz, level), out var belt) ? belt : null;
         }
 
-        // Straight when fed from behind, from both sides or from nowhere; curved when fed from exactly one side.
-        public static BeltShape Shape(Dictionary<(int, int), GoodsBelt> cells, int x, int z, int direction)
+        // True when a belt next to a cell on this level points into it and hands its items on at this level (a lift's
+        // entry end hands them to another level, so it feeds nothing here).
+        private static bool Feeds(GoodsBelt neighbour, int level, int direction) =>
+            neighbour != null && neighbour.ExitLevel == level && neighbour.Direction == direction;
+
+        // Straight when fed from behind, from both sides or from nowhere; curved when fed from exactly one side. A lift is
+        // always straight.
+        public static BeltShape Shape(Dictionary<(int, int, int), GoodsBelt> cells, int x, int z, int level, int direction, int lift = 0)
         {
-            var behind = At(cells, x, z, Opposite(direction));
-            if (behind != null && behind.Direction == direction) return BeltShape.Straight;
-            var left = At(cells, x, z, LeftOf(direction));
-            var right = At(cells, x, z, RightOf(direction));
-            var fromLeft = left != null && left.Direction == RightOf(direction);
-            var fromRight = right != null && right.Direction == LeftOf(direction);
+            if (lift != 0) return BeltShape.Straight;
+            if (Feeds(At(cells, x, z, level, Opposite(direction)), level, direction)) return BeltShape.Straight;
+            var fromLeft = Feeds(At(cells, x, z, level, LeftOf(direction)), level, RightOf(direction));
+            var fromRight = Feeds(At(cells, x, z, level, RightOf(direction)), level, LeftOf(direction));
             return fromLeft == fromRight ? BeltShape.Straight : fromLeft ? BeltShape.CurveFromLeft : BeltShape.CurveFromRight;
         }
 
-        public static BeltShape Shape(Dictionary<(int, int), GoodsBelt> cells, GoodsBelt belt) =>
-            Shape(cells, belt.CellX, belt.CellZ, belt.Direction);
+        public static BeltShape Shape(Dictionary<(int, int, int), GoodsBelt> cells, GoodsBelt belt) =>
+            Shape(cells, belt.CellX, belt.CellZ, belt.Level, belt.Direction, belt.Lift);
 
-        // The belt in front, unless it faces back into this one. Entering its back or its curve starts at 0; entering the
-        // side of a belt that does not curve from this side side-loads at its midpoint.
-        public static BeltLink Link(Dictionary<(int, int), GoodsBelt> cells, GoodsBelt belt)
+        // The belt in front on this belt's exit level, unless it faces back into this one or it is the exit end of a lift.
+        // Entering its back or its curve starts at 0; entering the side of a belt that does not curve from this side side-loads
+        // at its midpoint.
+        public static BeltLink Link(Dictionary<(int, int, int), GoodsBelt> cells, GoodsBelt belt)
         {
-            var next = At(cells, belt.CellX, belt.CellZ, belt.Direction);
-            if (next == null || next.Direction == Opposite(belt.Direction)) return default;
+            var next = At(cells, belt.CellX, belt.CellZ, belt.ExitLevel, belt.Direction);
+            if (next == null || next.Level != belt.ExitLevel || next.Direction == Opposite(belt.Direction)) return default;
             if (next.Direction == belt.Direction) return new BeltLink(next, 0);
             var shape = Shape(cells, next);
             // A belt turning left into the next one sits on that belt's left side.

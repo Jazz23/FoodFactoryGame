@@ -176,6 +176,7 @@ namespace FoodFactoryGame.Session.Equipment
             placeItemAction.action.performed += OnPlaceItem;
             takeItemAction.action.performed += OnTakeItem;
             foreach (var action in Actions) action.action.Enable();
+            EnableLiftInput();
             ghost.gameObject.SetActive(false);
         }
 
@@ -190,6 +191,7 @@ namespace FoodFactoryGame.Session.Equipment
             hotbarAction.action.performed -= OnHotbar;
             placeItemAction.action.performed -= OnPlaceItem;
             takeItemAction.action.performed -= OnTakeItem;
+            DisableLiftInput();
             CloseEmployeeScreen();
             foreach (var action in Actions) action.action.Disable();
             Subscribe(null);

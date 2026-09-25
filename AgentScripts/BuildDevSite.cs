@@ -82,8 +82,12 @@ public static class BuildDevSite
             BuildOffer("Oven1", "supplier-oven", "", 1, 15000, 1, oven),
             BuildOffer("Fridge1", "supplier-fridge", "", 1, 8000, 1, fridge)
         };
-        // PROTOTYPE stack sizes: dough and bread 20, belts 100 (Factorio's belt stack).
-        var items = new[] { BuildItem(DevWorld.DoughItemId, "Dough", 20), BuildItem("bread", "Bread", 20), BuildItem(GoodsWorld.BeltItemId, "Belt", 100) };
+        // PROTOTYPE stack sizes: dough and bread 20, belts 100 (Factorio's belt stack), lifts 50 (decision 0021).
+        var items = new[]
+        {
+            BuildItem(DevWorld.DoughItemId, "Dough", 20), BuildItem("bread", "Bread", 20), BuildItem(GoodsWorld.BeltItemId, "Belt", 100),
+            BuildItem(GoodsWorld.LiftItemId, "Lift", 50)
+        };
         var ghostMaterial = BuildGhostMaterial();
         var ghostModelMaterial = BuildGhostModelMaterial();
         var tread = BuildBeltMaterials();

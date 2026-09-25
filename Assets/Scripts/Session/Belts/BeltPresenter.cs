@@ -2,7 +2,9 @@
 // left/right corner from the same shape rule the server moves items by (BeltRules.Shape). Every belt shares one runtime
 // tread material whose texture offset follows one clock at the simulation's speed, so the arrows of all belts line up and
 // move with the items. An item is drawn trailing the server by up to one clock step: it glides along the belt path at belt
-// speed toward its latest replicated position, so it never jumps between the whole-second baselines. Presentation only.
+// speed toward its latest replicated position, so it never jumps between the whole-second baselines. A conveyor lift
+// (decision 0021) is drawn from the straight model: half a belt in on its own floor, an open frame one storey up or down,
+// and half a belt out on the other floor; each end is hidden with its own storey. Presentation only.
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -36,7 +38,17 @@ namespace FoodFactoryGame.Session.Belts
             public GameObject Root;
             public BeltShape Shape;
             public int Direction;
+            public int Lift;
+            // A lift's upper end, hidden with the upper storey; null for a flat belt.
+            public GameObject Upper;
         }
+
+        // Names of a lift model's parts, so the upper end can be found in an instance.
+        private const string LowerPart = "Lower";
+        private const string UpperPart = "Upper";
+        // Frame of a lift: four corner posts this far from the tile centre.
+        private const float PostInset = 0.38f;
+        private const float PostSize = 0.07f;
 
         private sealed class ItemView
         {
@@ -52,6 +64,8 @@ namespace FoodFactoryGame.Session.Belts
         private readonly Dictionary<string, BeltLink> _links = new();
         private readonly Dictionary<string, string> _beltOfLocation = new();
         private Material _tread;
+        private readonly Dictionary<int, GameObject> _liftModels = new();
+        private GameObject _liftModelHolder;
         private GoodsSnapshot _shown;
         private SiteLayout _layout;
 
@@ -73,6 +87,7 @@ namespace FoodFactoryGame.Session.Belts
         private void OnDestroy()
         {
             if (_tread != null) Destroy(_tread);
+            if (_liftModelHolder != null) Destroy(_liftModelHolder);
         }
 
         private void OnDisable() => Clear();
@@ -85,26 +100,89 @@ namespace FoodFactoryGame.Session.Belts
             if (!ReferenceEquals(site, _shown)) Refresh(site);
             UpdateItems(site);
             // Belts and riding goods on a storey the local view hides (decision 0020) are hidden with it, colliders included.
+            // A lift's lower end and frame go with its lower storey, its upper end with the upper one.
             foreach (var (id, view) in _belts)
             {
-                var shown = !Hidden(_beltById[id]);
+                var belt = _beltById[id];
+                var shown = !Hidden(belt, Math.Min(belt.Level, belt.ExitLevel));
                 if (view.Root.activeSelf != shown) view.Root.SetActive(shown);
+                var upperShown = shown && !Hidden(belt, Math.Max(belt.Level, belt.ExitLevel));
+                if (view.Upper != null && view.Upper.activeSelf != upperShown) view.Upper.SetActive(upperShown);
             }
             foreach (var view in _items.Values)
             {
-                var shown = !Hidden(_beltById[view.BeltId]);
+                var shown = !Hidden(_beltById[view.BeltId], BeltPath.LevelAt(_beltById[view.BeltId], view.Position));
                 if (view.Renderer.enabled != shown) view.Renderer.enabled = shown;
             }
         }
 
-        private bool Hidden(GoodsBelt belt) => buildings.HidesLevel(belt.CellX, belt.CellZ, belt.Level);
+        private bool Hidden(GoodsBelt belt, int level) => buildings.HidesLevel(belt.CellX, belt.CellZ, level);
 
-        // Belts on one floor, whose shapes and links depend only on each other.
+        // Belts that take items on one floor (a lift is on the floor it takes items on).
         public static IEnumerable<GoodsBelt> OnLevel(IEnumerable<GoodsBelt> belts, int level) => belts.Where(x => x.Level == level);
 
-        // Shape of a belt that exists, or would exist, at a cell: used by the placement ghost.
-        public BeltShape ShapeAt(IEnumerable<GoodsBelt> belts, int cellX, int cellZ, int direction) =>
-            BeltRules.Shape(BeltRules.ByCell(belts), cellX, cellZ, direction);
+        // Belts standing on one floor, including lifts whose other end is there.
+        public static IEnumerable<GoodsBelt> Touching(IEnumerable<GoodsBelt> belts, int level) =>
+            belts.Where(x => x.Level == level || x.ExitLevel == level);
+
+        // Shape of a belt that exists, or would exist, at a cell on a level: used by the placement ghost.
+        public BeltShape ShapeAt(IEnumerable<GoodsBelt> belts, int cellX, int cellZ, int level, int direction) =>
+            BeltRules.Shape(BeltRules.ByCell(belts), cellX, cellZ, level, direction);
+
+        // A tile-centred lift model travelling +Z from its own floor (local height 0) to one storey up (lift +1) or down (-1),
+        // built once per direction from the straight belt and kept inactive for instancing (placed lifts and ghosts).
+        public GameObject LiftModel(int lift)
+        {
+            if (_liftModels.TryGetValue(lift, out var model)) return model;
+            if (_liftModelHolder == null)
+            {
+                _liftModelHolder = new GameObject("Lift models");
+                _liftModelHolder.SetActive(false);
+                _liftModelHolder.transform.SetParent(transform, false);
+            }
+            model = new GameObject(lift > 0 ? "Lift up" : "Lift down");
+            model.transform.SetParent(_liftModelHolder.transform, false);
+            var height = lift * SiteGridSpace.LevelHeight;
+            // The lower part is on the lower storey (the entry of an up-lift, the exit of a down-lift) and carries the frame.
+            var lower = new GameObject(LowerPart).transform;
+            lower.SetParent(model.transform, false);
+            var upper = new GameObject(UpperPart).transform;
+            upper.SetParent(model.transform, false);
+            HalfBelt(lift > 0 ? lower : upper, 0f, -0.25f);
+            HalfBelt(lift > 0 ? upper : lower, height, 0.25f);
+            var frame = FrameMaterial();
+            var bottom = Mathf.Min(0f, height);
+            foreach (var (x, z) in new[] { (-1, -1), (-1, 1), (1, -1), (1, 1) })
+            {
+                var post = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                post.name = "Post";
+                post.transform.SetParent(lower, false);
+                post.transform.localPosition = new Vector3(x * PostInset, bottom + (SiteGridSpace.LevelHeight + BeltPath.SurfaceHeight) * 0.5f, z * PostInset);
+                post.transform.localScale = new Vector3(PostSize, SiteGridSpace.LevelHeight + BeltPath.SurfaceHeight, PostSize);
+                post.GetComponent<Renderer>().sharedMaterial = frame;
+                // Aim rays name the lift by its frame too; players walk through it, like belts.
+                post.GetComponent<Collider>().isTrigger = true;
+            }
+            _liftModels[lift] = model;
+            return model;
+        }
+
+        // Half a straight belt (its back or front half) at a height, travelling +Z.
+        private void HalfBelt(Transform parent, float height, float offset)
+        {
+            var half = Instantiate(straightPrefab, parent, false);
+            half.name = "Half belt";
+            half.transform.localPosition = new Vector3(0f, height, offset);
+            half.transform.localScale = new Vector3(1f, 1f, 0.5f);
+        }
+
+        // The straight model's frame material, so the lift's posts match the belts.
+        private Material FrameMaterial()
+        {
+            var materials = straightPrefab.GetComponentsInChildren<Renderer>(true).SelectMany(x => x.sharedMaterials)
+                .Where(x => x != null && !IsTread(x)).ToList();
+            return materials.FirstOrDefault(x => x.name.Contains("Frame")) ?? materials.FirstOrDefault();
+        }
 
         public GameObject PrefabFor(BeltShape shape) => shape switch
         {
@@ -120,8 +198,8 @@ namespace FoodFactoryGame.Session.Belts
             _shown = site;
             _layout = site?.SiteLayouts.FirstOrDefault(x => x.SiteId == DevWorld.SiteId);
             var belts = _layout == null ? new List<GoodsBelt>() : site.Belts.Where(x => x.SiteId == DevWorld.SiteId).ToList();
-            // Each floor is its own belt network (decision 0020).
-            var floors = belts.GroupBy(x => x.Level).ToDictionary(x => x.Key, x => BeltRules.ByCell(x));
+            // Each floor is its own belt network (decision 0020), joined only by lifts.
+            var cells = BeltRules.ByCell(belts);
             _beltById.Clear();
             _shapes.Clear();
             _links.Clear();
@@ -129,8 +207,8 @@ namespace FoodFactoryGame.Session.Belts
             foreach (var belt in belts)
             {
                 _beltById[belt.Id] = belt;
-                _shapes[belt.Id] = BeltRules.Shape(floors[belt.Level], belt);
-                _links[belt.Id] = BeltRules.Link(floors[belt.Level], belt);
+                _shapes[belt.Id] = BeltRules.Shape(cells, belt);
+                _links[belt.Id] = BeltRules.Link(cells, belt);
                 _beltOfLocation[belt.LocationId] = belt.Id;
             }
             foreach (var id in _belts.Keys.Where(x => !_beltById.ContainsKey(x)).ToList())
@@ -141,7 +219,7 @@ namespace FoodFactoryGame.Session.Belts
             foreach (var belt in belts)
             {
                 var shape = _shapes[belt.Id];
-                if (_belts.TryGetValue(belt.Id, out var view) && view.Shape != shape)
+                if (_belts.TryGetValue(belt.Id, out var view) && (view.Shape != shape || view.Lift != belt.Lift))
                 {
                     Destroy(view.Root);
                     _belts.Remove(belt.Id);
@@ -149,7 +227,8 @@ namespace FoodFactoryGame.Session.Belts
                 }
                 if (view == null)
                 {
-                    view = new BeltView { Root = CreateBelt(belt, shape), Shape = shape };
+                    var root = CreateBelt(belt, shape);
+                    view = new BeltView { Root = root, Shape = shape, Lift = belt.Lift, Upper = belt.Lift == 0 ? null : root.transform.Find(UpperPart)?.gameObject };
                     _belts.Add(belt.Id, view);
                 }
                 view.Direction = belt.Direction;
@@ -160,9 +239,9 @@ namespace FoodFactoryGame.Session.Belts
 
         private GameObject CreateBelt(GoodsBelt belt, BeltShape shape)
         {
-            var root = Instantiate(PrefabFor(shape), transform, false);
-            root.name = $"Belt {belt.Id} ({shape})";
-            foreach (var renderer in root.GetComponentsInChildren<Renderer>())
+            var root = Instantiate(belt.Lift == 0 ? PrefabFor(shape) : LiftModel(belt.Lift), transform, false);
+            root.name = belt.Lift == 0 ? $"Belt {belt.Id} ({shape})" : $"Lift {belt.Id} ({(belt.Lift > 0 ? "up" : "down")})";
+            foreach (var renderer in root.GetComponentsInChildren<Renderer>(true))
             {
                 var materials = renderer.sharedMaterials;
                 if (!materials.Any(IsTread)) continue;
