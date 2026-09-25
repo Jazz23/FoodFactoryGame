@@ -232,7 +232,8 @@ namespace FoodFactoryGame.Session.Equipment
             if (Screen == InteractionScreen.Machine
                 && site?.Equipment.Any(x => x.Id == OpenMachineId && x.State == EquipmentState.Placed) != true)
                 CloseScreen();
-            if (_awaitingRelease && !placeAction.action.IsPressed())
+            // Read the bound controls: the employee screen disables Place, and a disabled action never reports pressed.
+            if (_awaitingRelease && !placeAction.action.controls.Any(x => x.IsPressed()))
             {
                 _awaitingRelease = false;
                 _releasedFrame = Time.frameCount;

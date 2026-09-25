@@ -1,6 +1,6 @@
 // Opening screens from the world through the real SampleScene host (the scene with the employee prefab): the employee script
 // screen opens without focusing its text box, so the E press that opened it is never typed into the script, and the hidden
-// text box gives up focus once closed; a left click opens the storage only while it is the highlighted hover target. Every
+// text box gives up focus once closed, and the left click that opened it does not focus it either; E closes it unless the text box has focus; a left click opens the storage only while it is the highlighted hover target. Every
 // save and identity path is a unique temporary directory.
 using System;
 using System.Collections;
@@ -140,6 +140,71 @@ namespace FoodFactoryGame.Session.PlayModeTests
             Assert.That(_interaction.Screen, Is.EqualTo(InteractionScreen.None));
             yield return Frames(2);
             Assert.That(panel.SourceField.focusController?.focusedElement, Is.Null, "The hidden text box kept focus.");
+        }
+
+        [UnityTest]
+        public IEnumerator EClosesEmployeeScriptUnlessTypingInIt()
+        {
+            var panel = UnityEngine.Object.FindAnyObjectByType<EmployeeScriptPanel>();
+            EmployeeWorker employee = null;
+            yield return Until(() => (employee = UnityEngine.Object.FindAnyObjectByType<EmployeeWorker>()) != null
+                && !string.IsNullOrEmpty(employee.EmployeeId), "dev employee spawned");
+
+            _interaction.OpenEmployeeScreen(employee);
+            yield return Frames(2);
+            yield return Key(UnityEngine.InputSystem.Key.E);
+            Assert.That(_interaction.Screen, Is.EqualTo(InteractionScreen.None), "E did not close the unfocused script screen.");
+
+            // With the text box focused, E is text: the screen stays open.
+            _interaction.OpenEmployeeScreen(employee);
+            yield return Frames(2);
+            panel.SourceField.Focus();
+            yield return null;
+            yield return Key(UnityEngine.InputSystem.Key.E);
+            Assert.That(_interaction.Screen, Is.EqualTo(InteractionScreen.Employee), "E closed the screen while typing.");
+
+            // Once the text box loses focus, E closes it again.
+            panel.SourceField.Blur();
+            yield return null;
+            yield return Key(UnityEngine.InputSystem.Key.E);
+            Assert.That(_interaction.Screen, Is.EqualTo(InteractionScreen.None), "E did not close the screen after the text box lost focus.");
+        }
+
+        // A left press on the text box, as UI Toolkit delivers it from the pointer.
+        private static void PressTextBox(EmployeeScriptPanel panel)
+        {
+            var input = panel.SourceField.Q(TextField.textInputUssName);
+            var position = input.worldBound.center;
+            using var down = PointerDownEvent.GetPooled(new Event { type = EventType.MouseDown, button = 0, mousePosition = position });
+            input.SendEvent(down);
+            using var up = PointerUpEvent.GetPooled(new Event { type = EventType.MouseUp, button = 0, mousePosition = position });
+            input.SendEvent(up);
+        }
+
+        [UnityTest]
+        public IEnumerator EmployeeScriptOpenedByLeftClickIsNotFocusedByThatClick()
+        {
+            var panel = UnityEngine.Object.FindAnyObjectByType<EmployeeScriptPanel>();
+            EmployeeWorker employee = null;
+            yield return Until(() => (employee = UnityEngine.Object.FindAnyObjectByType<EmployeeWorker>()) != null
+                && !string.IsNullOrEmpty(employee.EmployeeId), "dev employee spawned");
+
+            // The opening press is still held when the screen appears under the pointer; it reaches the text box late.
+            InputSystem.QueueStateEvent(_mouse, new MouseState().WithButton(UnityEngine.InputSystem.LowLevel.MouseButton.Left));
+            yield return Frames(2);
+            _interaction.OpenEmployeeScreen(employee);
+            yield return Frames(3);
+            PressTextBox(panel);
+            yield return null;
+            Assert.That(panel.Window.resolvedStyle.display, Is.EqualTo(DisplayStyle.Flex));
+            Assert.That(panel.SourceField.focusController?.focusedElement, Is.Null, "The opening click focused the text box.");
+
+            // After that press is released, a click focuses the text box.
+            InputSystem.QueueStateEvent(_mouse, new MouseState());
+            yield return Frames(3);
+            PressTextBox(panel);
+            yield return null;
+            Assert.That(panel.SourceField.focusController?.focusedElement, Is.EqualTo(panel.SourceField), "A later click did not focus the text box.");
         }
 
         [UnityTest]

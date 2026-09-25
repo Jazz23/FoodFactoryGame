@@ -69,11 +69,13 @@ namespace FoodFactoryGame.Session.Equipment
             return Vector2.Distance(new Vector2(nearest.x, nearest.z), new Vector2(position.x, position.z)) <= interactReach;
         }
 
-        // E: closes an open screen; otherwise opens the hover target's screen, or the inventory when there is none.
+        // E: closes an open screen (not while typing in the script screen's text box); otherwise opens the hover target's
+        // screen, or the inventory when there is none.
         private void Interact()
         {
             if (Screen != InteractionScreen.None)
             {
+                if (Screen == InteractionScreen.Employee && ScriptTextFocused) return;
                 CloseScreen();
                 return;
             }

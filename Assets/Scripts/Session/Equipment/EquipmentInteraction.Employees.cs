@@ -32,6 +32,8 @@ namespace FoodFactoryGame.Session.Equipment
         // Employee whose script screen is open; null unless Screen is Employee or PickPosition.
         public EmployeeWorker OpenEmployee { get; private set; }
         public EmployeeWorker HoveredEmployee => _hoveredEmployee;
+        // Set each frame by the script screen while its text box has focus, so an E typed there is text, not a close.
+        public bool ScriptTextFocused { get; set; }
         // Lua text a click would insert while picking ({x, z} for a cell, "<id>" for a machine or storage); null on nothing.
         public string PickText { get; private set; }
 
@@ -178,6 +180,8 @@ namespace FoodFactoryGame.Session.Equipment
             if (_suspendedActions.Count > 0) return;
             var keep = new[] { closeScreenAction.action, pointAction.action };
             if (alsoKeep.Length > 0) keep = keep.Append(placeAction.action).ToArray();
+            // E closes the script screen too, unless the text box has focus (Interact checks ScriptTextFocused).
+            if (Screen == InteractionScreen.Employee) keep = keep.Append(inventoryAction.action).ToArray();
             foreach (var action in placeAction.action.actionMap.actions
                          .Where(x => x.enabled && !keep.Contains(x) && !alsoKeep.Contains(x.name)))
             {

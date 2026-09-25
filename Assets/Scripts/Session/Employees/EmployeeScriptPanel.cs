@@ -1,6 +1,8 @@
 // Local player's employee script screen in UI Toolkit, built in code: a text box for a Lua program, Run/Stop/Close, the
 // employee's replicated status line and a short API reference. Opened by clicking an employee (EquipmentInteraction);
 // Run and Stop are requests the server checks (EmployeeWorker). Presentation only: the text box is this client's draft.
+// It opens unfocused, whether by E or by the left click, which is ignored by the text box until released. E closes the
+// screen unless the text box has focus, where it is typed.
 // "Select world pos" hides the screen while the player clicks a cell or machine in the world, then inserts its Lua text at
 // the text box's caret (replacing any selection); the draft survives because the screen stays open while hidden. "Give"
 // buttons hand the employee one of each machine kind the player holds, for its script's place().
@@ -101,6 +103,16 @@ namespace FoodFactoryGame.Session.Employees
             _caretBar.style.backgroundColor = Color.white;
             _caretBar.style.display = DisplayStyle.None;
             _source.Q<TextElement>()?.Add(_caretBar);
+            // The left click that opened the screen lands on the text box under the freed pointer; that press must not focus it.
+            _source.RegisterCallback<PointerDownEvent>(evt =>
+            {
+                if (interaction.ScreenClicksArmed) return;
+                _source.focusController?.IgnoreEvent(evt);
+                evt.StopImmediatePropagation();
+            }, TrickleDown.TrickleDown);
+            // Tracked on the focus events themselves, so an E typed right after a click is already seen as text.
+            _source.RegisterCallback<FocusInEvent>(_ => interaction.ScriptTextFocused = true);
+            _source.RegisterCallback<FocusOutEvent>(_ => interaction.ScriptTextFocused = false);
             _window.Add(_source);
 
             _status = Caption("", 12, Muted);
