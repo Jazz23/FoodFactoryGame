@@ -293,13 +293,21 @@ namespace FoodFactoryGame.Goods.Network
             return !string.IsNullOrWhiteSpace(player) && _world.CanView(player, siteId);
         }
 
-        // Server-only actors that are not connections (PROTOTYPE employees): the worker gets a site grant and a carried
-        // inventory of at least inventorySlots slots, committed like a player's admission. Returns false if not serving or
-        // the commit fails.
-        public bool EnsureWorker(string workerId, string siteId, int inventorySlots)
+        // Server-only: the saved employee records (PROTOTYPE workers: goods actors that are not connections), to spawn them.
+        public IReadOnlyList<GoodsEmployee> Employees() => IsServing ? _world.Employees() : Array.Empty<GoodsEmployee>();
+
+        // Server-only: where a worker stands, kept in memory and saved by the next commit.
+        public void RecordWorkerPose(string workerId, Vector3 position, float yaw)
         {
-            if (!IsServing) return false;
-            return _world.TryGrantDurably(workerId, siteId, _savePath, inventorySlots);
+            if (IsServing) _world.SetEmployeePose(workerId, position.x, position.y, position.z, yaw);
+        }
+
+        // Server-only: a worker's assigned script and whether it runs, committed before returning. Null when saved,
+        // otherwise the reason nothing changed.
+        public string RecordWorkerScript(string workerId, string script, bool running)
+        {
+            if (!IsServing) return "persistence-unavailable";
+            return _world.SetEmployeeScriptDurably(workerId, script, running, _savePath);
         }
 
         // Server-only: the worker's authorized view of a site (null if it has no grant or the bridge is not serving).

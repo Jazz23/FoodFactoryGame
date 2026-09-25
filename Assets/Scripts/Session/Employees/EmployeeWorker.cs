@@ -1,9 +1,11 @@
-// PROTOTYPE scriptable employee. A granted player sends a Lua program (EmployeeScript); only the server runs it, steering a
+// PROTOTYPE scriptable employee, spawned by the server from its saved record (GoodsEmployee in the world save; SessionRoot).
+// A granted player sends a Lua program (EmployeeScript); only the server runs it, steering a
 // NavMeshAgent and moving goods through GoodsNetworkBridge.WorkerTransfer, the same validated, durable transfer path as a
-// player's. The employee is a goods actor with its own site grant and carried inventory (carried:<employeeId>), so goods in
+// player's. The employee is a goods actor with its own site grant and carried inventory (carried:<_employeeId>), so goods in
 // its hands are ordinary lots: stopping or replacing a script never deletes or duplicates them. A transfer needs the
 // employee within reach of the place's footprint on the server. NetworkTransform replicates the pose; every peer animates
-// from observed movement and shows the carried box from the replicated Carrying flag.
+// from observed movement and shows the carried box from the replicated Carrying flag. The pose and the assigned script (and
+// whether it runs) are saved with the record; after a restart a running script starts again from its first line.
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -30,37 +32,43 @@ namespace FoodFactoryGame.Session.Employees
         [SerializeField] private Animator animator;
         // The box model parts, shown while the employee's hands hold goods.
         [SerializeField] private Renderer[] carriedBox = Array.Empty<Renderer>();
-        // Stable goods actor ID; also names its inventory location. Must be unique per employee and never a player ID.
-        [SerializeField] private string employeeId = "employee-1";
-        [SerializeField] private string displayName = "Employee";
-        [SerializeField] private string siteId = DevWorld.SiteId;
-        [SerializeField] private int handSlots = 4;
         // How close (metres, horizontally) to a place's footprint the employee must stand to use it.
         [SerializeField] private float reach = 1.3f;
         [SerializeField] private float walkTimeoutSeconds = 60f;
         // Ground speed at which the walk clip's feet do not slide; the clip is sped up or slowed to match actual speed.
         [SerializeField] private float walkClipSpeed = 1.5f;
+        // How often the server records the pose in the world (saved by the next commit), and the change worth recording.
+        [SerializeField] private float poseRecordSeconds = 1f;
 
+        private readonly SyncVar<string> _id = new("");
+        private readonly SyncVar<string> _name = new("Employee");
         private readonly SyncVar<bool> _carrying = new();
         private readonly SyncVar<string> _status = new("Idle");
         private readonly SyncVar<string> _source = new("");
 
+        // Server-only, from the saved record (Configure).
+        private GoodsEmployee _record;
+        private string _employeeId;
+        private string _siteId;
+
         private Vector3 _lastPosition;
         private float _speed;
         private SessionRoot _session;
-        private bool _registered;
         private float _nextCarryCheck;
+        private float _nextPoseRecord;
+        private Vector3 _recordedPosition;
+        private float _recordedYaw;
         private EmployeeScript _script;
         // The script's last say()/print(), kept on the status line after it ends.
         private string _lastMessage;
 
-        public string EmployeeId => employeeId;
-        public string DisplayName => displayName;
+        public string EmployeeId => _id.Value;
+        public string DisplayName => _name.Value;
         public bool Carrying => _carrying.Value;
         public string Status => _status.Value;
-        // The last program the server accepted, so the script screen can show it again.
+        // The last program assigned to this employee (saved with it), so the script screen can show it again.
         public string Source => _source.Value;
-        private string HandsId => GoodsWorld.InventoryLocationId(employeeId);
+        private string HandsId => GoodsWorld.InventoryLocationId(_employeeId);
 
         private void Awake()
         {
@@ -71,14 +79,29 @@ namespace FoodFactoryGame.Session.Employees
             ShowBox(false);
         }
 
+        // Server-only, before spawning: the saved record this worker acts for.
+        public void Configure(GoodsEmployee record)
+        {
+            _record = record ?? throw new ArgumentNullException(nameof(record));
+            _employeeId = record.Id;
+            _siteId = record.SiteId;
+        }
+
         public override void OnStartServer()
         {
+            if (_record == null) throw new InvalidOperationException("An employee is spawned from a saved record (Configure) only.");
+            _session = FindAnyObjectByType<SessionRoot>();
+            _id.Value = _employeeId;
+            _name.Value = string.IsNullOrWhiteSpace(_record.Name) ? _employeeId : _record.Name;
+            _source.Value = _record.Script ?? "";
             agent.enabled = true;
             if (!agent.isOnNavMesh && NavMesh.SamplePosition(transform.position, out var hit, 2f, NavMesh.AllAreas))
                 agent.Warp(hit.position);
             agent.stoppingDistance = 0.05f;
-            _session = FindAnyObjectByType<SessionRoot>();
-            _registered = false;
+            _recordedPosition = transform.position;
+            _recordedYaw = transform.eulerAngles.y;
+            // Interpreter state is not saved, so a script that was running starts again from its first line.
+            if (_record.ScriptRunning && !string.IsNullOrEmpty(_record.Script)) Begin(_record.Script, true);
         }
 
         public override void OnStopServer()
@@ -105,33 +128,59 @@ namespace FoodFactoryGame.Session.Employees
         {
             if (!Authorized(sender)) return;
             Halt();
+            Begin(source, false);
+        }
+
+        // Compiles the program and saves it as this employee's running assignment before it starts; neither happens if the
+        // program does not compile or the save fails.
+        private void Begin(string source, bool restarted)
+        {
+            EmployeeScript script;
             try
             {
-                _lastMessage = null;
-                _script = new EmployeeScript(source, Operations(), Queries(), Say);
-                _source.Value = source;
-                _status.Value = "Running";
-                Debug.Log($"[Employee] {employeeId} started a script ({source.Length} characters).");
+                script = new EmployeeScript(source, Operations(), Queries(), Say);
             }
             catch (Exception error) when (error is InterpreterException or ArgumentException)
             {
                 _status.Value = "Error: " + (error is InterpreterException lua ? lua.DecoratedMessage ?? lua.Message : error.Message);
+                if (restarted) Record(source, false);
+                return;
             }
+            var problem = Record(source, true);
+            if (problem != null)
+            {
+                _status.Value = "Error: could not save the script (" + problem + ")";
+                return;
+            }
+            _lastMessage = null;
+            _script = script;
+            _source.Value = source;
+            _status.Value = restarted ? "Running (restarted after the server restarted)" : "Running";
+            Debug.Log($"[Employee] {_employeeId} {(restarted ? "restarted its saved" : "started a")} script ({source.Length} characters).");
+        }
+
+        // Saves the assignment with the employee; null when saved, otherwise the reason.
+        private string Record(string source, bool running)
+        {
+            var bridge = Bridge;
+            return bridge == null ? "persistence-unavailable" : bridge.RecordWorkerScript(_employeeId, source, running);
         }
 
         [ServerRpc(RequireOwnership = false)]
         private void ServerStop(NetworkConnection sender = null)
         {
             if (!Authorized(sender)) return;
+            var wasRunning = _script != null;
             Halt();
+            if (wasRunning) Record(_source.Value, false);
             _status.Value = "Stopped";
         }
 
         private bool Authorized(NetworkConnection sender)
         {
             var bridge = Bridge;
-            if (bridge != null && bridge.CanCommand(sender, siteId)) return true;
-            Debug.LogWarning($"[Employee] Refused a command for {employeeId}: the sender has no grant on {siteId} or the server is not serving.");
+            if (bridge != null && bridge.CanCommand(sender, _siteId)) return true;
+            Debug.LogWarning($"[Employee] Refused a command for {_employeeId}: the sender has no grant on {_siteId} or the server is not serving.");
             return false;
         }
 
@@ -161,22 +210,31 @@ namespace FoodFactoryGame.Session.Employees
         {
             var bridge = Bridge;
             if (bridge == null) return;
-            if (!_registered)
-            {
-                _registered = bridge.EnsureWorker(employeeId, siteId, handSlots);
-                if (!_registered) return;
-            }
             // Goods can also leave the hands through a player's transfer, so the flag follows the world, not the script.
             if (Time.time >= _nextCarryCheck)
             {
                 _nextCarryCheck = Time.time + 0.5f;
-                RefreshCarrying(bridge.WorkerView(employeeId, siteId));
+                RefreshCarrying(bridge.WorkerView(_employeeId, _siteId));
             }
+            RecordPose(bridge);
             if (_script == null || _script.Step()) return;
             _status.Value = _script.State == EmployeeScriptState.Failed ? "Error: " + _script.Error
                 : "Finished" + (_lastMessage != null ? $" (last said: {_lastMessage})" : "");
             _script = null;
+            Record(_source.Value, false);
             if (agent.isOnNavMesh) agent.ResetPath();
+        }
+
+        // The pose is saved with the world's next commit (at most one tick-commit interval later), not committed each move.
+        private void RecordPose(Goods.Network.GoodsNetworkBridge bridge)
+        {
+            if (Time.time < _nextPoseRecord) return;
+            _nextPoseRecord = Time.time + poseRecordSeconds;
+            var yaw = transform.eulerAngles.y;
+            if ((transform.position - _recordedPosition).sqrMagnitude < 0.0025f && Mathf.Abs(Mathf.DeltaAngle(yaw, _recordedYaw)) < 2f) return;
+            _recordedPosition = transform.position;
+            _recordedYaw = yaw;
+            bridge.RecordWorkerPose(_employeeId, _recordedPosition, yaw);
         }
 
         private void RefreshCarrying(GoodsSnapshot view)
@@ -190,7 +248,7 @@ namespace FoodFactoryGame.Session.Employees
         {
             _lastMessage = text;
             _status.Value = "Running: " + text;
-            Debug.Log($"[Employee] {employeeId}: {text}");
+            Debug.Log($"[Employee] {_employeeId}: {text}");
         }
 
         // ---- Lua API ----
@@ -215,7 +273,7 @@ namespace FoodFactoryGame.Session.Employees
             }
         };
 
-        private GoodsSnapshot View() => Bridge?.WorkerView(employeeId, siteId);
+        private GoodsSnapshot View() => Bridge?.WorkerView(_employeeId, _siteId);
 
         // move_to(place): walks next to a place. Returns true, or false and a reason.
         private IEnumerator MoveTo(CallbackArguments args, EmployeeScript.Result result)
@@ -301,7 +359,7 @@ namespace FoodFactoryGame.Session.Employees
         {
             var kind = OptionalString(args, 0);
             var view = View();
-            var layout = view?.SiteLayouts.FirstOrDefault(x => x.SiteId == siteId);
+            var layout = view?.SiteLayouts.FirstOrDefault(x => x.SiteId == _siteId);
             var table = new Table(lua);
             if (layout == null) return DynValue.NewTable(table);
             foreach (var equipment in view.Equipment
@@ -352,7 +410,7 @@ namespace FoodFactoryGame.Session.Employees
                 return view.Locations.Any(x => x.Id == marker.LocationId)
                     ? new Place { Name = marker.Alias, Area = marker.Area, TakeFrom = new[] { marker.LocationId }, PutInto = marker.LocationId }
                     : new Place { Name = target, Problem = $"'{target}' is not on this site" };
-            var layout = view.SiteLayouts.FirstOrDefault(x => x.SiteId == siteId);
+            var layout = view.SiteLayouts.FirstOrDefault(x => x.SiteId == _siteId);
             var buffer = target.EndsWith(":in", StringComparison.Ordinal) || target.EndsWith(":out", StringComparison.Ordinal);
             var machineId = buffer ? target.Substring(0, target.LastIndexOf(':')) : target;
             var placed = view.Equipment.Where(x => x.State == EquipmentState.Placed).ToList();
@@ -483,7 +541,7 @@ namespace FoodFactoryGame.Session.Employees
             {
                 while (moved < amount)
                 {
-                    var view = bridge.WorkerView(employeeId, siteId);
+                    var view = bridge.WorkerView(_employeeId, _siteId);
                     var lot = view?.Lots
                         .Where(x => x.LocationId == source && (item == null || x.ItemId == item) && (includeSpoiled || !x.Spoiled))
                         .OrderByDescending(x => x.ExposureSeconds).ThenBy(x => x.Id, StringComparer.Ordinal)
@@ -496,7 +554,7 @@ namespace FoodFactoryGame.Session.Employees
                     }
                     var free = GoodsSlots.FreeUnits(view, destination, lot.ItemId, lot.Spoiled, _session.MaxStack);
                     var take = (int)Math.Min(Math.Min(free, lot.Quantity), amount - moved);
-                    var outcome = bridge.WorkerTransfer(employeeId, new TransferIntent
+                    var outcome = bridge.WorkerTransfer(_employeeId, new TransferIntent
                     {
                         RequestId = Guid.NewGuid().ToString("N"), LotId = lot.Id, DestinationId = destination, Quantity = take
                     });
@@ -508,8 +566,8 @@ namespace FoodFactoryGame.Session.Employees
                     moved += take;
                 }
             }
-            RefreshCarrying(bridge.WorkerView(employeeId, siteId));
-            if (moved > 0) Debug.Log($"[Employee] {employeeId} moved {moved} {(item ?? "goods")} into {destination}.");
+            RefreshCarrying(bridge.WorkerView(_employeeId, _siteId));
+            if (moved > 0) Debug.Log($"[Employee] {_employeeId} moved {moved} {(item ?? "goods")} into {destination}.");
             return (moved, reason);
         }
 

@@ -1,6 +1,8 @@
 // Authors the PROTOTYPE scriptable employee (clips, animator, outline material, prefab) and rebuilds SampleScene as a copy
-// of DevSite plus a storage shelf marking the dev storage, a baked NavMesh, the employee script panel and one scene-placed
-// employee. Idempotent; keeps asset GUIDs. DevSite is untouched and reopened at the end.
+// of DevSite plus a storage shelf marking the dev storage, a baked NavMesh and the employee script panel. Employees are not
+// placed in the scene: SessionRoot.employeePrefab makes the server seed the dev employee in the save and spawn one worker
+// per saved record, so SampleScene uses its own spawnable-prefab catalog (DevSite's two prefabs plus the employee).
+// Idempotent; keeps asset GUIDs. DevSite and its catalog are untouched; DevSite is reopened at the end.
 // Run the body of Run() with the Unity MCP execute_code tool (C# 6 / CodeDom compatible, no helper methods).
 // The employee model is exported from ArtSource/Employee/Employee_Asset.blend (Employee_Walk, Employee_Idle,
 // Employee_CarryWalk, Employee_CarryIdle actions; the Employee_CarryBox and Employee_CarryBoxTape parts ride the spine bone).
@@ -20,6 +22,8 @@ public static class BuildSampleScene
         const string outlinePath = materialFolder + "/EmployeeOutline.mat";
         const string shelfMaterialPath = materialFolder + "/StorageShelf.mat";
         const string crateMaterialPath = materialFolder + "/StorageCrate.mat";
+        const string devCatalogPath = "Assets/Network/GamePrefabs.asset";
+        const string catalogPath = "Assets/Network/SampleScenePrefabs.asset";
 
         // Clips: loop all, named after the Blender action without its prefix (Walk, Idle, CarryWalk, CarryIdle).
         var importer = (UnityEditor.ModelImporter)UnityEditor.AssetImporter.GetAtPath(modelPath);
@@ -232,9 +236,36 @@ public static class BuildSampleScene
             serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 
-        // Placed after the bake: the employee's collider is a trigger, but it must never shape the NavMesh.
-        var employee = (GameObject)UnityEditor.PrefabUtility.InstantiatePrefab(prefab, scene);
-        employee.transform.SetPositionAndRotation(new Vector3(-5f, 0f, 3f), Quaternion.Euler(0f, 90f, 0f));
+        // Spawnable prefabs: DevSite's catalog entries plus the employee, in a catalog only this scene uses.
+        var devCatalog = UnityEditor.AssetDatabase.LoadAssetAtPath<FishNet.Managing.Object.SinglePrefabObjects>(devCatalogPath);
+        var catalog = UnityEditor.AssetDatabase.LoadAssetAtPath<FishNet.Managing.Object.SinglePrefabObjects>(catalogPath);
+        if (catalog == null)
+        {
+            catalog = ScriptableObject.CreateInstance<FishNet.Managing.Object.SinglePrefabObjects>();
+            UnityEditor.AssetDatabase.CreateAsset(catalog, catalogPath);
+        }
+        using (var source = new UnityEditor.SerializedObject(devCatalog))
+        using (var serialized = new UnityEditor.SerializedObject(catalog))
+        {
+            var from = source.FindProperty("_prefabs");
+            var prefabs = serialized.FindProperty("_prefabs");
+            prefabs.ClearArray();
+            prefabs.arraySize = from.arraySize + 1;
+            for (var index = 0; index < from.arraySize; index++)
+                prefabs.GetArrayElementAtIndex(index).objectReferenceValue = from.GetArrayElementAtIndex(index).objectReferenceValue;
+            prefabs.GetArrayElementAtIndex(from.arraySize).objectReferenceValue = prefab.GetComponent<FishNet.Object.NetworkObject>();
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+        UnityEditor.EditorUtility.SetDirty(catalog);
+        var manager = UnityEngine.Object.FindAnyObjectByType<FishNet.Managing.NetworkManager>();
+        manager.SpawnablePrefabs = catalog;
+        UnityEditor.EditorUtility.SetDirty(manager);
+        var session = UnityEngine.Object.FindAnyObjectByType<FoodFactoryGame.Session.SessionRoot>();
+        using (var serialized = new UnityEditor.SerializedObject(session))
+        {
+            serialized.FindProperty("employeePrefab").objectReferenceValue = prefab.GetComponent<FoodFactoryGame.Session.Employees.EmployeeWorker>();
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
 
         UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(scene);
         UnityEditor.SceneManagement.EditorSceneManager.SaveScene(scene);

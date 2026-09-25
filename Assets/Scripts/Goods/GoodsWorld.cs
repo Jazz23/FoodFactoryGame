@@ -74,7 +74,7 @@ namespace FoodFactoryGame.Goods
 
     [Serializable] public sealed class GoodsSnapshot
     {
-        public const int CurrentSchema = 8;
+        public const int CurrentSchema = 9;
         public int SchemaVersion = CurrentSchema;
         public string WorldId;
         public long ClockSeconds;
@@ -91,6 +91,7 @@ namespace FoodFactoryGame.Goods
         public List<GoodsBelt> Belts = new();
         public List<GoodsCompany> Companies = new();
         public List<GoodsBuilding> Buildings = new();
+        public List<GoodsEmployee> Employees = new();
     }
 
     public sealed partial class GoodsWorld
@@ -246,6 +247,9 @@ namespace FoodFactoryGame.Goods
                 view.Belts = view.Belts.Where(x => x.SiteId == siteId).ToList();
                 view.Buildings = view.Buildings.Where(x => x.SiteId == siteId).ToList();
                 view.Companies = view.Companies.Where(x => x.SiteIds.Contains(siteId)).ToList();
+                // Scripts reach clients through the employee object, not with every baseline.
+                view.Employees = view.Employees.Where(x => x.SiteId == siteId).ToList();
+                foreach (var employee in view.Employees) employee.Script = "";
                 view.Reservations.Clear();
                 view.Outcomes.Clear();
                 view.Grants.Clear();
@@ -566,7 +570,7 @@ namespace FoodFactoryGame.Goods
                 || state.ClockSeconds < 0 || state.Revision < 0 || state.Locations == null || state.Lots == null
                 || state.Grants == null || state.Reservations == null || state.Outcomes == null
                 || state.Stations == null || state.Jobs == null || state.Equipment == null || state.SiteLayouts == null || state.Belts == null
-                || state.Companies == null || state.Buildings == null)
+                || state.Companies == null || state.Buildings == null || state.Employees == null)
                 throw new InvalidOperationException("Unsupported or invalid goods snapshot schema.");
             if (state.Locations.Any(x => x == null || string.IsNullOrWhiteSpace(x.Id) || string.IsNullOrWhiteSpace(x.SiteId) || x.Capacity < 1)
                 || state.Locations.GroupBy(x => x.Id).Any(x => x.Count() != 1)
@@ -590,6 +594,7 @@ namespace FoodFactoryGame.Goods
             ValidateBelts(state);
             ValidateCompanies(state);
             ValidateBuildings(state);
+            ValidateEmployees(state);
         }
     }
 }

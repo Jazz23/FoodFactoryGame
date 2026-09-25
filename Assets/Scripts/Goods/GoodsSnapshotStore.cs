@@ -283,6 +283,12 @@ namespace FoodFactoryGame.Goods
                 }
                 state.SchemaVersion = 8;
             }
+            // v8 had no employee records; the server's seed owner adds the dev employee before serving (DevWorld.EnsureEmployee).
+            if (state != null && state.SchemaVersion == 8)
+            {
+                state.Employees ??= new();
+                state.SchemaVersion = 9;
+            }
             GoodsWorld.Validate(state);
             return state;
         }

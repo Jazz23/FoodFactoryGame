@@ -2,7 +2,8 @@
 // The seed is applied only to a brand-new world: an existing save never gains the layout, oven or storage dough retroactively.
 // Belts, the company, the sell counter and the building shells are the exceptions: a save from before each existed gets the
 // dev belt stock (EnsureBeltStock), the dev company with its starting cash (EnsureCompany), the dev counter (EnsureCounter),
-// the dev restaurant shell (EnsureBuilding) or the dev factory shell (EnsureFactory) once.
+// the dev restaurant shell (EnsureBuilding), the dev factory shell (EnsureFactory) or, where the server spawns employees,
+// the dev employee (EnsureEmployee) once.
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -64,6 +65,12 @@ namespace FoodFactoryGame.Session
         public const long FloorCentsPerCell = 500;
         public const int MaxFloors = 3;
 
+        // PROTOTYPE employee (the scriptable worker): one per dev site, standing west of the counter, with 4 hand slots.
+        public const string EmployeeId = GoodsWorld.EmployeePrefix + "1";
+        public const int EmployeeHandSlots = 4;
+
+        public static GoodsEmployee Employee() => new() { Id = EmployeeId, SiteId = SiteId, Name = "Employee", X = -5f, Z = 3f, Yaw = 90f };
+
         public static FloorOffer FloorOffer => new() { CentsPerCell = FloorCentsPerCell, MaxFloors = MaxFloors };
 
         public static IReadOnlyList<GoodsLot> StarterGoods => new[]
@@ -76,9 +83,10 @@ namespace FoodFactoryGame.Session
         // Without an oven definition the seed has the layout but no equipment. Item max stacks (content) are registered
         // before the seed, because the seed's goods are counted in slots.
         // A pre-SQLite snapshot at legacyWorldPath is imported once, after a dry run, when no database exists yet.
-        // Without a counter definition no counter is seeded or added.
+        // Without a counter definition no counter is seeded or added. seedEmployee (a server that spawns employees) adds the
+        // dev employee.
         public static GoodsWorld LoadOrCreate(string worldPath, EquipmentDefinition oven = null, IEnumerable<ItemDefinition> items = null,
-            string legacyWorldPath = null, EquipmentDefinition counter = null)
+            string legacyWorldPath = null, EquipmentDefinition counter = null, bool seedEmployee = false)
         {
             if (!File.Exists(worldPath) && !string.IsNullOrWhiteSpace(legacyWorldPath)
                 && (File.Exists(legacyWorldPath) || File.Exists(legacyWorldPath + ".previous")))
@@ -96,6 +104,7 @@ namespace FoodFactoryGame.Session
                 EnsureCounter(loaded, worldPath, counter);
                 EnsureBuilding(loaded, worldPath);
                 EnsureFactory(loaded, worldPath);
+                if (seedEmployee) EnsureEmployee(loaded, worldPath);
                 return loaded;
             }
             var world = new GoodsWorld(WorldId);
@@ -113,6 +122,7 @@ namespace FoodFactoryGame.Session
             world.Bootstrap(Factory());
             if (oven != null) world.Bootstrap(oven.CreatePlaced(OvenId, SiteId, OvenCellX, OvenCellZ, 0));
             if (counter != null) world.Bootstrap(counter.CreatePlaced(CounterId, SiteId, CounterCellX, CounterCellZ, 0));
+            if (seedEmployee) world.Bootstrap(Employee(), EmployeeHandSlots);
             GoodsSnapshotStore.Save(world, worldPath);
             return world;
         }
@@ -230,6 +240,17 @@ namespace FoodFactoryGame.Session
             }
             GoodsSnapshotStore.Save(world, worldPath);
             Debug.Log("[Session] Added the dev factory shell to this save.");
+        }
+
+        // PROTOTYPE, one-time: employees are never removed, so a save without the dev employee record has never had it. It
+        // gets one, committed before serving. A grant and carried inventory left by the earlier unsaved prototype are reused.
+        private static void EnsureEmployee(GoodsWorld world, string worldPath)
+        {
+            var state = world.Snapshot();
+            if (state.Employees.Any(x => x.Id == EmployeeId) || state.Locations.All(x => x.SiteId != SiteId)) return;
+            world.Bootstrap(Employee(), EmployeeHandSlots);
+            GoodsSnapshotStore.Save(world, worldPath);
+            Debug.Log($"[Session] Added {EmployeeId} to this save.");
         }
     }
 }

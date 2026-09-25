@@ -1,5 +1,6 @@
 // Server composition root: commits the world save before FishNet starts, owns the player registry and bridge,
-// and spawns one avatar per authenticated connection. The world runs whenever the server runs, observed or not.
+// spawns one avatar per authenticated connection and one worker per saved employee. The world runs whenever the server runs,
+// observed or not.
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -11,6 +12,7 @@ using FishNet.Object;
 using FishNet.Transporting;
 using FoodFactoryGame.Goods;
 using FoodFactoryGame.Goods.Network;
+using FoodFactoryGame.Session.Employees;
 using FoodFactoryGame.Session.Equipment;
 using FoodFactoryGame.Session.Player;
 using SQLite;
@@ -34,6 +36,9 @@ namespace FoodFactoryGame.Session
         [SerializeField] private OfferAsset[] offers = Array.Empty<OfferAsset>();
         // Item content: names and icons for the HUD, and each item's max stack, which the server registers with the world.
         [SerializeField] private ItemDefinition[] items = Array.Empty<ItemDefinition>();
+        // PROTOTYPE: when set, the server seeds the dev employee and spawns one of these per saved employee record once the
+        // goods bridge serves. Scenes without a NavMesh leave it empty; their saves keep any employee records untouched.
+        [SerializeField] private EmployeeWorker employeePrefab;
         [SerializeField] private bool readCommandLine = true;
 
         private SessionOptions _options;
@@ -152,7 +157,8 @@ namespace FoodFactoryGame.Session
             // Max stacks are content: capacity counts slots, so they are registered (inside LoadOrCreate, before the seed)
             // ahead of any request.
             ServerWorld = DevWorld.LoadOrCreate(_options.WorldPath, equipmentDefinitions.FirstOrDefault(x => x != null && x.Kind == "oven"), items,
-                _options.LegacyWorldPath, equipmentDefinitions.FirstOrDefault(x => x != null && x.Kind == DevWorld.CounterKind));
+                _options.LegacyWorldPath, equipmentDefinitions.FirstOrDefault(x => x != null && x.Kind == DevWorld.CounterKind),
+                employeePrefab != null);
             // Machine buffer slot counts follow content, so a saved machine created with older counts is brought up to date.
             foreach (var definition in equipmentDefinitions.Where(x => x != null))
                 ServerWorld.ApplyEquipmentCapacitiesDurably(definition.Kind, definition.InputCapacity, definition.OutputCapacity, _options.WorldPath);
@@ -209,6 +215,19 @@ namespace FoodFactoryGame.Session
             if (bridge == null || ServerWorld == null) yield break;
             bridge.InitializeServer(ServerWorld, authenticator.PlayerIdOf, _options.WorldPath);
             ServerBridge = bridge;
+            SpawnEmployees(bridge);
+        }
+
+        // Employees exist because the save has them: one networked worker per record, at its saved pose.
+        private void SpawnEmployees(GoodsNetworkBridge bridge)
+        {
+            if (employeePrefab == null) return;
+            foreach (var record in bridge.Employees())
+            {
+                var worker = Instantiate(employeePrefab, new Vector3(record.X, record.Y, record.Z), Quaternion.Euler(0f, record.Yaw, 0f));
+                worker.Configure(record);
+                networkManager.ServerManager.Spawn(worker.gameObject);
+            }
         }
 
         private void ReleaseServer()
