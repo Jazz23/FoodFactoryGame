@@ -100,6 +100,7 @@ namespace FoodFactoryGame.Goods
                     || _state.Sites.Any(x => x.Id == site.Id) || _state.Locations.All(x => x.SiteId != site.Id))
                     throw new ArgumentException("Invalid or duplicate site, or a site without locations.");
                 _state.Sites.Add(JsonUtility.FromJson<GoodsSite>(JsonUtility.ToJson(site)));
+                InvalidateDiners();
                 _state.Revision++;
             }
         }
@@ -151,6 +152,7 @@ namespace FoodFactoryGame.Goods
             catch (InvalidOperationException error)
             {
                 _state = before;
+                InvalidateDiners();
                 throw new ArgumentException($"Invalid {what}: " + error.Message, error);
             }
         }
@@ -165,6 +167,7 @@ namespace FoodFactoryGame.Goods
                     || _state.Locations.All(x => x.SiteId != siteId) || _state.Companies.Any(x => x.SiteIds.Contains(siteId)))
                     throw new ArgumentException("Unknown company, or a site that does not exist or is already owned.");
                 company.SiteIds.Add(siteId);
+                InvalidateDiners();
                 _state.Revision++;
             }
         }
@@ -179,6 +182,7 @@ namespace FoodFactoryGame.Goods
                 if (site.MapX == mapX && site.MapZ == mapZ) return false;
                 site.MapX = mapX;
                 site.MapZ = mapZ;
+                InvalidateDiners();
                 _state.Revision++;
                 return true;
             }

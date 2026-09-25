@@ -160,11 +160,58 @@ namespace FoodFactoryGame.Goods.Tests
             _world.Advance(1);
             Assert.That(Customer("dine-in").State, Is.EqualTo(CustomerState.Queued), "Both seats are taken.");
             Assert.That((Customer("takeaway").State, Customer("takeaway").TableId), Is.EqualTo((CustomerState.Ordering, "")));
-            _world.Advance(20);
+            _world.Advance(4);
+            var published = _world.Snapshot().Diners.Single(x => x.RestaurantId == "restaurant");
+            Assert.That((published.PublishedWaitSeconds, published.PublishedFreeSeats), Is.EqualTo((4L, 0)),
+                "Published queue and seat counts include current customer transitions.");
+            _world.Advance(16);
             Assert.That(Customer("takeaway"), Is.Null, "Takeaway leaves after being served.");
             Assert.That((Customer("dine-in").State, Customer("dine-in").TableId), Is.EqualTo((CustomerState.Ordering, "table-1")),
                 "A seat freed, so the dine-in customer bought.");
             Assert.That(Cash(), Is.EqualTo(1500));
+        }
+
+        [Test]
+        public void AddedTableIsAvailableToAlreadyQueuedCustomers()
+        {
+            _world.Bootstrap(District(0));
+            Stock("bread-a", 2);
+            foreach (var id in new[] { "eating-1", "eating-2" })
+                _world.Bootstrap(new GoodsCustomer
+                {
+                    Id = id, DistrictId = "district", DineIn = true, PatienceSeconds = 100, State = CustomerState.Eating,
+                    RestaurantId = "restaurant", RecipeId = "sell-bread", RemainingSeconds = 20, TableId = "table-1", PaidCents = 250
+                });
+            _world.Bootstrap(Queued("waiting", true, 1));
+            _world.Advance(1);
+            Assert.That(Customer("waiting").State, Is.EqualTo(CustomerState.Queued));
+
+            _world.Bootstrap(new GoodsEquipment
+            {
+                Id = "table-2", Kind = GoodsWorld.TableKind, SiteId = "restaurant", CellX = 4, CellZ = 3, Width = 2, Depth = 1,
+                InputCapacity = 1, OutputCapacity = 1, Seats = 2
+            });
+            _world.Advance(1);
+            Assert.That((Customer("waiting").State, Customer("waiting").TableId),
+                Is.EqualTo((CustomerState.Ordering, "table-2")));
+        }
+
+        [Test]
+        public void EqualQueueTicketsKeepSnapshotOrderWhenATravellerArrives()
+        {
+            _world.Bootstrap(District(0));
+            Stock("bread-a", 1);
+            _world.Bootstrap(new GoodsCustomer
+            {
+                Id = "traveller", DistrictId = "district", PatienceSeconds = 100, State = CustomerState.Travelling,
+                RestaurantId = "restaurant", RecipeId = "sell-bread", RemainingSeconds = 1
+            });
+            _world.Bootstrap(Queued("already-queued", false, 0));
+
+            _world.Advance(1);
+            Assert.That(Customer("traveller").State, Is.EqualTo(CustomerState.Ordering),
+                "Equal tickets retain customer order in the snapshot.");
+            Assert.That(Customer("already-queued").State, Is.EqualTo(CustomerState.Queued));
         }
 
         [Test]
@@ -272,6 +319,26 @@ namespace FoodFactoryGame.Goods.Tests
                 twin.Id = "twin";
                 s.Customers.Add(twin);
             })), "one customer per counter");
+            Assert.Throws<InvalidOperationException>(() => GoodsWorld.Validate(Mutate(s =>
+            {
+                for (var index = 0; index < 2; index++)
+                    s.Customers.Add(new GoodsCustomer
+                    {
+                        Id = $"eating-{index}", DistrictId = "district", DineIn = true, PatienceSeconds = 100,
+                        State = CustomerState.Eating, RestaurantId = "restaurant", RemainingSeconds = 10,
+                        TableId = "table-1", PaidCents = 250
+                    });
+            })), "table occupancy cannot exceed its seats");
+            Assert.Throws<InvalidOperationException>(() => GoodsWorld.Validate(Mutate(s =>
+            {
+                s.Customers.Clear();
+                for (var index = 0; index < 2; index++)
+                    s.Customers.Add(new GoodsCustomer
+                    {
+                        Id = $"ordering-{index}", DistrictId = "district", PatienceSeconds = 100,
+                        State = CustomerState.Ordering, RestaurantId = "near", RemainingSeconds = 10, PaidCents = 300
+                    });
+            })), "competitor ordering count cannot exceed its servers");
             Assert.Throws<InvalidOperationException>(() => GoodsWorld.Validate(Mutate(s => s.Competitors[0].Id = "restaurant")), "competitor IDs are not sites");
             Assert.Throws<ArgumentException>(() => _world.Bootstrap(new GoodsEquipment
             {

@@ -125,6 +125,29 @@ namespace FoodFactoryGame.Goods
             public int Servers;
             public long ServiceSeconds;
             public int Seats;
+            public readonly List<GoodsCustomer> Queue = new();
+            public readonly Dictionary<string, int> SeatsUsed = new();
+            public readonly HashSet<string> BusyCounters = new();
+            public int OccupiedSeats;
+            public int BusyServers;
+        }
+
+        // Derived from the snapshot, never persisted. Structural changes rebuild the catalog; customer changes update its
+        // occupancy directly, except after bootstrap/rollback when the index is reconstructed from the snapshot.
+        private List<Diner> _cachedDiners;
+        private Dictionary<string, Diner> _dinersById;
+        private bool _customerIndexDirty = true;
+
+        private void InvalidateDiners()
+        {
+            _cachedDiners = null;
+            _dinersById = null;
+            _customerIndexDirty = true;
+        }
+
+        private void InvalidateDinersFor(GoodsEquipment equipment)
+        {
+            if (equipment.Kind == CounterKind || equipment.Kind == TableKind) InvalidateDiners();
         }
 
         // Server-only map data, like a site's map record.
@@ -150,6 +173,7 @@ namespace FoodFactoryGame.Goods
                 if (copy is null || _state.Competitors.Any(x => x.Id == copy.Id)) throw new ArgumentException("Invalid or duplicate competitor.");
                 var before = Snapshot();
                 _state.Competitors.Add(copy);
+                InvalidateDiners();
                 _state.Revision++;
                 ValidateOrRestore(before, "competitor");
             }
@@ -165,6 +189,7 @@ namespace FoodFactoryGame.Goods
                 if (copy is null || _state.Customers.Any(x => x.Id == copy.Id)) throw new ArgumentException("Invalid or duplicate customer.");
                 var before = Snapshot();
                 _state.Customers.Add(copy);
+                _customerIndexDirty = true;
                 _state.Revision++;
                 ValidateOrRestore(before, "customer");
             }
@@ -189,9 +214,15 @@ namespace FoodFactoryGame.Goods
                         customer.State = CustomerState.Queued;
                         customer.QueuedAtSeconds = now;
                         customer.Ticket = _state.NextCustomerNumber++;
+                        if (_dinersById.TryGetValue(customer.RestaurantId, out var arrived)) Enqueue(arrived, customer);
                         break;
                     case CustomerState.Ordering:
                         if (--customer.RemainingSeconds > 0) break;
+                        if (_dinersById.TryGetValue(customer.RestaurantId, out var served))
+                        {
+                            served.BusyServers--;
+                            if (customer.CounterId != "") served.BusyCounters.Remove(customer.CounterId);
+                        }
                         customer.CounterId = "";
                         if (!customer.DineIn)
                         {
@@ -202,10 +233,15 @@ namespace FoodFactoryGame.Goods
                         customer.RemainingSeconds = Between(MinEatSeconds, MaxEatSeconds);
                         break;
                     case CustomerState.Eating:
-                        if (--customer.RemainingSeconds <= 0) _state.Customers.Remove(customer);
+                        if (--customer.RemainingSeconds <= 0)
+                        {
+                            if (_dinersById.TryGetValue(customer.RestaurantId, out var eating)) ReleaseSeat(eating, customer.TableId);
+                            _state.Customers.Remove(customer);
+                        }
                         break;
                     case CustomerState.Queued:
                         if (now - customer.QueuedAtSeconds < customer.PatienceSeconds) break;
+                        if (_dinersById.TryGetValue(customer.RestaurantId, out var waiting)) waiting.Queue.Remove(customer);
                         var left = DinerRecord(customer.RestaurantId);
                         left.WalkedOut++;
                         AdjustReputation(left, WalkOutReputation);
@@ -240,6 +276,11 @@ namespace FoodFactoryGame.Goods
         // a menu; its servers are its counters and its seats are those of its placed tables.
         private List<Diner> Diners()
         {
+            if (_cachedDiners is not null)
+            {
+                if (_customerIndexDirty) RebuildCustomerIndex();
+                return _cachedDiners;
+            }
             var menu = _recipes.Values.Where(x => x.IsSale && x.StationKind == CounterKind).OrderBy(x => x.Id, StringComparer.Ordinal).ToList();
             var diners = new List<Diner>();
             foreach (var site in _state.Sites)
@@ -261,7 +302,71 @@ namespace FoodFactoryGame.Goods
                     Servers = competitor.Servers, ServiceSeconds = competitor.ServiceSeconds, Seats = competitor.Seats
                 });
             diners.Sort((a, b) => string.CompareOrdinal(a.Id, b.Id));
-            return diners;
+            _cachedDiners = diners;
+            _dinersById = diners.ToDictionary(x => x.Id, StringComparer.Ordinal);
+            RebuildCustomerIndex();
+            return _cachedDiners;
+        }
+
+        private void RebuildCustomerIndex()
+        {
+            foreach (var diner in _cachedDiners)
+            {
+                diner.Queue.Clear();
+                diner.SeatsUsed.Clear();
+                diner.BusyCounters.Clear();
+                diner.OccupiedSeats = diner.BusyServers = 0;
+            }
+            foreach (var customer in _state.Customers)
+            {
+                if (!_dinersById.TryGetValue(customer.RestaurantId, out var diner)) continue;
+                switch (customer.State)
+                {
+                    case CustomerState.Queued:
+                        Enqueue(diner, customer);
+                        break;
+                    case CustomerState.Ordering:
+                        diner.BusyServers++;
+                        if (customer.CounterId != "") diner.BusyCounters.Add(customer.CounterId);
+                        OccupySeat(diner, customer.TableId);
+                        break;
+                    case CustomerState.Eating:
+                        OccupySeat(diner, customer.TableId);
+                        break;
+                }
+            }
+            _customerIndexDirty = false;
+        }
+
+        private void Enqueue(Diner diner, GoodsCustomer customer)
+        {
+            var index = diner.Queue.Count;
+            while (index > 0)
+            {
+                var previous = diner.Queue[index - 1];
+                if (previous.Ticket < customer.Ticket
+                    || (previous.Ticket == customer.Ticket
+                        && _state.Customers.IndexOf(previous) < _state.Customers.IndexOf(customer))) break;
+                index--;
+            }
+            diner.Queue.Insert(index, customer);
+        }
+
+        private static void OccupySeat(Diner diner, string tableId)
+        {
+            if (tableId == "") return;
+            diner.SeatsUsed.TryGetValue(tableId, out var used);
+            diner.SeatsUsed[tableId] = used + 1;
+            diner.OccupiedSeats++;
+        }
+
+        private static void ReleaseSeat(Diner diner, string tableId)
+        {
+            if (tableId == "") return;
+            var used = diner.SeatsUsed[tableId] - 1;
+            if (used == 0) diner.SeatsUsed.Remove(tableId);
+            else diner.SeatsUsed[tableId] = used;
+            diner.OccupiedSeats--;
         }
 
         private void Spawn(GoodsDistrict district, List<Diner> diners)
@@ -342,29 +447,29 @@ namespace FoodFactoryGame.Goods
         // seat to dine in) does not hold up those behind who can.
         private void Serve(Diner diner, long now)
         {
-            var queue = _state.Customers.Where(x => x.State == CustomerState.Queued && x.RestaurantId == diner.Id).OrderBy(x => x.Ticket).ToList();
-            foreach (var customer in queue)
+            for (var index = 0; index < diner.Queue.Count;)
             {
-                if (_state.Customers.Count(x => x.State == CustomerState.Ordering && x.RestaurantId == diner.Id) >= diner.Servers) return;
+                if (diner.BusyServers >= diner.Servers) return;
+                var customer = diner.Queue[index];
                 var table = "";
                 if (customer.DineIn)
                 {
                     table = diner.Player
-                        ? diner.Tables.FirstOrDefault(x => _state.Customers.Count(y => y.TableId == x.Id) < x.Seats)?.Id
-                        : _state.Customers.Count(y => y.TableId == diner.Id) < diner.Seats ? diner.Id : null;
-                    if (table is null) continue;
+                        ? diner.Tables.FirstOrDefault(x => !diner.SeatsUsed.TryGetValue(x.Id, out var used) || used < x.Seats)?.Id
+                        : diner.OccupiedSeats < diner.Seats ? diner.Id : null;
+                    if (table is null) { index++; continue; }
                 }
                 long price, service;
                 var tier = 1;
                 var counterId = "";
                 if (diner.Player)
                 {
-                    if (!_recipes.TryGetValue(customer.RecipeId, out var recipe)) continue;
+                    if (!_recipes.TryGetValue(customer.RecipeId, out var recipe)) { index++; continue; }
                     var company = _state.Companies.First(x => x.SiteIds.Contains(diner.Id));
-                    if (company.Cash > long.MaxValue - recipe.SaleCents) continue;
-                    var counter = diner.Counters.FirstOrDefault(x => _state.Customers.All(y => y.CounterId != x.Id)
+                    if (company.Cash > long.MaxValue - recipe.SaleCents) { index++; continue; }
+                    var counter = diner.Counters.FirstOrDefault(x => !diner.BusyCounters.Contains(x.Id)
                         && InputPlan(_state.Stations.First(y => y.Id == x.Id), recipe) != null);
-                    if (counter is null) continue;
+                    if (counter is null) { index++; continue; }
                     // The purchase: the item leaves the world and the company is paid, in this same commit.
                     foreach (var (lot, take) in InputPlan(_state.Stations.First(x => x.Id == counter.Id), recipe))
                     {
@@ -388,6 +493,10 @@ namespace FoodFactoryGame.Goods
                 customer.RemainingSeconds = service;
                 customer.CounterId = counterId;
                 customer.TableId = table;
+                diner.Queue.RemoveAt(index);
+                diner.BusyServers++;
+                if (counterId != "") diner.BusyCounters.Add(counterId);
+                OccupySeat(diner, table);
                 var record = DinerRecord(diner.Id);
                 record.Served++;
                 AdjustReputation(record, (int)(5 * tier - Math.Min(now - customer.QueuedAtSeconds, 600) / 30));
@@ -397,12 +506,8 @@ namespace FoodFactoryGame.Goods
         private void Publish(Diner diner)
         {
             var record = DinerRecord(diner.Id);
-            var queued = _state.Customers.Count(x => x.State == CustomerState.Queued && x.RestaurantId == diner.Id);
-            record.PublishedWaitSeconds = queued * diner.ServiceSeconds / Math.Max(1, diner.Servers);
-            var seated = diner.Player
-                ? _state.Customers.Count(x => diner.Tables.Any(y => y.Id == x.TableId))
-                : _state.Customers.Count(x => x.TableId == diner.Id);
-            record.PublishedFreeSeats = Math.Max(0, diner.Seats - seated);
+            record.PublishedWaitSeconds = diner.Queue.Count * diner.ServiceSeconds / Math.Max(1, diner.Servers);
+            record.PublishedFreeSeats = Math.Max(0, diner.Seats - diner.OccupiedSeats);
         }
 
         private GoodsDiner DinerRecord(string restaurantId)
@@ -458,27 +563,47 @@ namespace FoodFactoryGame.Goods
                 || state.Diners.Any(x => x is null || string.IsNullOrWhiteSpace(x.RestaurantId)
                     || Math.Abs(x.Reputation) > ReputationLimit || x.PublishedWaitSeconds < 0 || x.PublishedFreeSeats < 0
                     || x.Served < 0 || x.WalkedOut < 0)
-                || state.Diners.GroupBy(x => x.RestaurantId).Any(x => x.Count() != 1)
-                || state.Customers.Any(x => x is null || string.IsNullOrWhiteSpace(x.Id) || state.Districts.All(y => y.Id != x.DistrictId)
+                || state.Diners.GroupBy(x => x.RestaurantId).Any(x => x.Count() != 1))
+                throw new InvalidOperationException("Goods snapshot violates customer invariants.");
+
+            var districtIds = new HashSet<string>(state.Districts.Select(x => x.Id));
+            var competitors = state.Competitors.ToDictionary(x => x.Id, StringComparer.Ordinal);
+            var equipment = state.Equipment.ToDictionary(x => x.Id, StringComparer.Ordinal);
+            var seats = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (var table in state.Equipment.Where(x => x.Kind == TableKind)) seats.Add(table.Id, table.Seats);
+            foreach (var competitor in state.Competitors) seats.Add(competitor.Id, competitor.Seats);
+            var ordering = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (var customer in state.Customers)
+            {
+                if (customer is null) continue;
+                if (customer.State == CustomerState.Ordering && customer.RestaurantId is not null
+                    && competitors.ContainsKey(customer.RestaurantId))
+                {
+                    ordering.TryGetValue(customer.RestaurantId, out var count);
+                    ordering[customer.RestaurantId] = count + 1;
+                }
+            }
+            if (state.Customers.Any(x => x is null || string.IsNullOrWhiteSpace(x.Id) || !districtIds.Contains(x.DistrictId)
                     || x.PatienceSeconds < 1 || x.Appearance < 0 || x.RecipeId is null || x.LeftRestaurantId is null
-                    || x.CounterId is null || x.TableId is null
-                    || !(siteIds.Contains(x.RestaurantId) || state.Competitors.Any(y => y.Id == x.RestaurantId)) || !ValidCustomer(state, x))
+                    || x.CounterId is null || x.TableId is null || string.IsNullOrWhiteSpace(x.RestaurantId)
+                    || !(siteIds.Contains(x.RestaurantId) || competitors.ContainsKey(x.RestaurantId))
+                    || !ValidCustomer(x, competitors, equipment))
                 || state.Customers.GroupBy(x => x.Id).Any(x => x.Count() != 1)
                 || state.Customers.Where(x => x.CounterId != "").GroupBy(x => x.CounterId).Any(x => x.Count() != 1)
                 || state.Customers.Where(x => x.TableId != "").GroupBy(x => x.TableId)
-                    .Any(x => x.Count() > (state.Equipment.FirstOrDefault(y => y.Id == x.Key)?.Seats
-                        ?? state.Competitors.FirstOrDefault(y => y.Id == x.Key)?.Seats ?? 0))
-                || state.Competitors.Any(x => state.Customers.Count(y => y.State == CustomerState.Ordering && y.RestaurantId == x.Id) > x.Servers))
+                    .Any(x => !seats.TryGetValue(x.Key, out var capacity) || x.Count() > capacity)
+                || state.Competitors.Any(x => ordering.TryGetValue(x.Id, out var count) && count > x.Servers))
                 throw new InvalidOperationException("Goods snapshot violates customer invariants.");
         }
 
         // Per-state shape: only a paying customer (Ordering or Eating) holds a price, a counter (Ordering at a player counter)
         // or a seat (dine-in, at a placed table of the restaurant's site or at the competitor).
-        private static bool ValidCustomer(GoodsSnapshot state, GoodsCustomer customer)
+        private static bool ValidCustomer(GoodsCustomer customer, Dictionary<string, GoodsCompetitor> competitors,
+            Dictionary<string, GoodsEquipment> equipment)
         {
-            var competitor = state.Competitors.Any(x => x.Id == customer.RestaurantId);
-            bool Placed(string id, string kind) => state.Equipment.Any(x => x.Id == id && x.Kind == kind && x.SiteId == customer.RestaurantId
-                && x.State == EquipmentState.Placed);
+            var competitor = competitors.ContainsKey(customer.RestaurantId);
+            bool Placed(string id, string kind) => equipment.TryGetValue(id, out var piece) && piece.Kind == kind
+                && piece.SiteId == customer.RestaurantId && piece.State == EquipmentState.Placed;
             var seat = customer.DineIn && (competitor ? customer.TableId == customer.RestaurantId : Placed(customer.TableId, TableKind));
             return customer.State switch
             {

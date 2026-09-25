@@ -1,7 +1,7 @@
 // Measures the RUNTIME customer code (GoodsWorld, decision 0024) at the GDD section 28 target of about 1,000 concurrent
 // customers and 20 restaurants, driven like the live server: AdvanceUncommitted(1) every clock second (which also copies the
-// world for rollback) and a durable commit every 10 s (decision 0016). Thresholds: a listen host ticks inside a rendered frame,
-// so the provisional tick budget is one 60 FPS frame (16.7 ms); commits use decision 0012's warning signals (50 ms, 1 MB).
+// world for rollback), one accepted player transfer at >=1,000 customers, and a durable commit every 10 s (decision 0016).
+// Reports save phases; thresholds: provisional one-frame tick (16.7 ms), decision 0012's commit signals (50 ms, 1 MB).
 // Editor Mono timings, isolated temp save. The synthetic world below is test data, not gameplay content.
 using System;
 using System.Diagnostics;
@@ -20,7 +20,7 @@ namespace FoodFactoryGame.Benchmarks.Tests
         private const double FrameBudgetMs = 1000.0 / 60.0;
         private const int PlayerSites = 10;
         private const int Competitors = 10;
-        private const int TargetCustomers = 900;
+        private const int TargetCustomers = 1000;
         private const int MeasuredSeconds = 300;
         private const int CommitEverySeconds = 10;
 
@@ -92,6 +92,7 @@ namespace FoodFactoryGame.Benchmarks.Tests
                     WealthPercent = 20 * index, AppearanceVariants = 4, LikedCuisines = { index % 2 == 0 ? "bakery" : "noodles" },
                     DineInPercent = 60, RangeMetres = 700
                 });
+            world.Grant("benchmark-player", "site-0");
             return world;
         }
 
@@ -115,15 +116,41 @@ namespace FoodFactoryGame.Benchmarks.Tests
             Assert.That(start.Customers.Count, Is.GreaterThanOrEqualTo(TargetCustomers),
                 $"The synthetic districts must reach the target population (reached {start.Customers.Count} after {warmup} s).");
 
+            // One accepted player command at the target population, including Durably's rollback copy and the save.
+            GoodsSnapshotStore.Stats.Reset();
+            var commandBegan = Stopwatch.GetTimestamp();
+            var outcome = world.TransferDurably("benchmark-player", new TransferIntent
+            {
+                RequestId = "benchmark-transfer", LotId = "site-0-bread-0", DestinationId = "site-0-storage", Quantity = 1
+            }, path);
+            var commandMs = (Stopwatch.GetTimestamp() - commandBegan) * 1000.0 / Stopwatch.Frequency;
+            Assert.That(outcome.Accepted, Is.True, outcome.Reason);
+            Assert.That(GoodsSnapshotStore.Stats.Commits, Is.EqualTo(1));
+            var commandSave = GoodsSnapshotStore.Stats.LastTimings;
+            var commandLine = $"[Benchmark] player transfer: customers={start.Customers.Count} total={commandMs:F2}ms " +
+                $"save={commandSave.TotalMilliseconds:F2}ms wrapper/action={commandMs - commandSave.TotalMilliseconds:F2}ms " +
+                $"save phases copy={commandSave.CopyMilliseconds:F2} validate={commandSave.ValidationMilliseconds:F2} " +
+                $"json={commandSave.JsonMilliseconds:F2} transaction={commandSave.TransactionMilliseconds:F2} " +
+                $"commit+sync={commandSave.CommitAndSyncMilliseconds:F2}ms";
+            TestContext.WriteLine(commandLine);
+            Debug.Log(commandLine);
+
             GoodsSnapshotStore.Stats.Reset();
             var ticks = new double[MeasuredSeconds];
+            var savePhases = new GoodsSaveTimings[MeasuredSeconds / CommitEverySeconds];
+            var commitIndex = 0;
             for (var second = 0; second < MeasuredSeconds; second++)
             {
                 var began = Stopwatch.GetTimestamp();
                 world.AdvanceUncommitted(1);
                 ticks[second] = (Stopwatch.GetTimestamp() - began) * 1000.0 / Stopwatch.Frequency;
-                if ((second + 1) % CommitEverySeconds == 0) Assert.That(world.TryCommitDurably(path), Is.True);
+                if ((second + 1) % CommitEverySeconds == 0)
+                {
+                    Assert.That(world.TryCommitDurably(path), Is.True);
+                    savePhases[commitIndex++] = GoodsSnapshotStore.Stats.LastTimings;
+                }
             }
+            Assert.That(commitIndex, Is.EqualTo(savePhases.Length));
 
             // Breakdown on the same world: the rollback copy AdvanceUncommitted takes (Snapshot) versus the step itself (Advance).
             const int samples = 30;
@@ -147,6 +174,14 @@ namespace FoodFactoryGame.Benchmarks.Tests
                 $"| cpu=\"{SystemInfo.processorType}\" unity={Application.unityVersion} editor-mono";
             TestContext.WriteLine(line);
             Debug.Log(line);
+            var phasesLine = $"[Benchmark] save phases over {commitIndex} tick commits (mean/max ms): " +
+                $"copy={Mean(savePhases, x => x.CopyMilliseconds):F2}/{Max(savePhases, x => x.CopyMilliseconds):F2} " +
+                $"validate={Mean(savePhases, x => x.ValidationMilliseconds):F2}/{Max(savePhases, x => x.ValidationMilliseconds):F2} " +
+                $"json={Mean(savePhases, x => x.JsonMilliseconds):F2}/{Max(savePhases, x => x.JsonMilliseconds):F2} " +
+                $"transaction={Mean(savePhases, x => x.TransactionMilliseconds):F2}/{Max(savePhases, x => x.TransactionMilliseconds):F2} " +
+                $"commit+sync={Mean(savePhases, x => x.CommitAndSyncMilliseconds):F2}/{Max(savePhases, x => x.CommitAndSyncMilliseconds):F2}";
+            TestContext.WriteLine(phasesLine);
+            Debug.Log(phasesLine);
 
             // Every budget is reported, not just the first one missed.
             var missed = new System.Collections.Generic.List<string>();
@@ -157,5 +192,8 @@ namespace FoodFactoryGame.Benchmarks.Tests
                 missed.Add($"payload {stats.LastPayloadBytes / 1024} KB exceeds the decision 0012 signal (1024 KB)");
             Assert.That(missed, Is.Empty);
         }
+
+        private static double Mean(GoodsSaveTimings[] timings, Func<GoodsSaveTimings, double> phase) => timings.Average(phase);
+        private static double Max(GoodsSaveTimings[] timings, Func<GoodsSaveTimings, double> phase) => timings.Max(phase);
     }
 }

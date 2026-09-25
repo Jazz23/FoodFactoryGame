@@ -85,6 +85,7 @@ namespace FoodFactoryGame.Goods
                     throw new ArgumentException("Invalid, duplicate or unplaceable equipment.");
                 _state.Equipment.Add(copy);
                 AddPlacedParts(copy);
+                InvalidateDinersFor(copy);
                 _state.Revision++;
             }
         }
@@ -119,6 +120,7 @@ namespace FoodFactoryGame.Goods
                 catch
                 {
                     _state = before;
+                    InvalidateDiners();
                     throw;
                 }
             }
@@ -170,6 +172,7 @@ namespace FoodFactoryGame.Goods
                 equipment.State = EquipmentState.Held;
                 equipment.HolderId = playerId;
                 equipment.CellX = equipment.CellZ = equipment.Rotation = equipment.Level = 0;
+                InvalidateDinersFor(equipment);
                 var result = Record(requestId, playerId, true, "picked-up", null);
                 result.JobId = job?.Id;
                 _state.Outcomes[_state.Outcomes.Count - 1].JobId = job?.Id;
@@ -207,6 +210,7 @@ namespace FoodFactoryGame.Goods
                 equipment.Rotation = rotation;
                 equipment.Level = level;
                 AddPlacedParts(equipment);
+                InvalidateDinersFor(equipment);
                 return Record(requestId, playerId, true, "placed", null);
             }
         }

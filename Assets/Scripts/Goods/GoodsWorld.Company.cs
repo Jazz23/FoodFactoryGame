@@ -30,6 +30,7 @@ namespace FoodFactoryGame.Goods
                     || company.SiteIds.Any(x => _state.Companies.Any(y => y.SiteIds.Contains(x))))
                     throw new ArgumentException("Invalid or duplicate company, or a site that does not exist or is already owned.");
                 _state.Companies.Add(JsonUtility.FromJson<GoodsCompany>(JsonUtility.ToJson(company)));
+                InvalidateDiners();
                 _state.Revision++;
             }
         }

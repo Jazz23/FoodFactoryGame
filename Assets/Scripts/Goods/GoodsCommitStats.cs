@@ -1,12 +1,33 @@
 // Measures what each committed goods save costs, so the JSON-payload-or-relational-tables question (decision 0012) is decided
 // from numbers. Report-only and in memory: nothing here is persisted or changes save behaviour. Only saves that write a new
-// revision count; a save that fails, rolls back, or finds its revision already stored is not recorded. Time covers
-// serialization and the transaction's own work, not waiting for the save lock or another writer.
+// revision count; a save that fails, rolls back, or finds its revision already stored is not recorded. Phase time excludes
+// waits for the save lock or another writer. COMMIT includes SQLite bookkeeping and the WAL disk sync, not just fsync.
 using System.Globalization;
 using UnityEngine;
 
 namespace FoodFactoryGame.Goods
 {
+    public readonly struct GoodsSaveTimings
+    {
+        public readonly double CopyMilliseconds;
+        public readonly double ValidationMilliseconds;
+        public readonly double JsonMilliseconds;
+        public readonly double TransactionMilliseconds;
+        public readonly double CommitAndSyncMilliseconds;
+
+        public GoodsSaveTimings(double copy, double validation, double json, double transaction, double commitAndSync)
+        {
+            CopyMilliseconds = copy;
+            ValidationMilliseconds = validation;
+            JsonMilliseconds = json;
+            TransactionMilliseconds = transaction;
+            CommitAndSyncMilliseconds = commitAndSync;
+        }
+
+        public double TotalMilliseconds => CopyMilliseconds + ValidationMilliseconds + JsonMilliseconds
+            + TransactionMilliseconds + CommitAndSyncMilliseconds;
+    }
+
     public sealed class GoodsCommitStats
     {
         // Decision 0012 revisit signals: past either, the whole-world payload should move to relational tables.
@@ -19,6 +40,7 @@ namespace FoodFactoryGame.Goods
         private double _maxMilliseconds;
         private double _lastMilliseconds;
         private int _lastPayloadBytes;
+        private GoodsSaveTimings _lastTimings;
         private bool _warnedSlow;
         private bool _warnedLarge;
 
@@ -27,6 +49,7 @@ namespace FoodFactoryGame.Goods
         public double MaxMilliseconds { get { lock (_gate) return _maxMilliseconds; } }
         public double AverageMilliseconds { get { lock (_gate) return _commits == 0 ? 0 : _totalMilliseconds / _commits; } }
         public int LastPayloadBytes { get { lock (_gate) return _lastPayloadBytes; } }
+        public GoodsSaveTimings LastTimings { get { lock (_gate) return _lastTimings; } }
 
         // The server calls this when it starts serving a world, so the counters and one-time warnings describe that world
         // only, not saves made earlier in the same process (Editor tests, a previous session).
@@ -37,19 +60,22 @@ namespace FoodFactoryGame.Goods
                 _commits = 0;
                 _totalMilliseconds = _maxMilliseconds = _lastMilliseconds = 0;
                 _lastPayloadBytes = 0;
+                _lastTimings = default;
                 _warnedSlow = _warnedLarge = false;
             }
         }
 
-        internal void Record(double milliseconds, int payloadBytes)
+        internal void Record(GoodsSaveTimings timings, int payloadBytes)
         {
             lock (_gate)
             {
+                var milliseconds = timings.TotalMilliseconds;
                 _commits++;
                 _totalMilliseconds += milliseconds;
                 if (milliseconds > _maxMilliseconds) _maxMilliseconds = milliseconds;
                 _lastMilliseconds = milliseconds;
                 _lastPayloadBytes = payloadBytes;
+                _lastTimings = timings;
                 // Once per session each, so a slow disk or a large world does not flood the log.
                 if (!_warnedSlow && milliseconds > SlowCommitMilliseconds)
                 {

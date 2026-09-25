@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="4" result="Passed" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-09-25 22:21:23Z" end-time="2026-09-25 22:21:24Z" duration="0.4125498">
+  <test-suite type="TestSuite" id="1301" name="FoodFactoryGame" fullname="FoodFactoryGame" runstate="Runnable" testcasecount="242" result="Passed" start-time="2026-09-25 22:21:23Z" end-time="2026-09-25 22:21:24Z" duration="0.412550" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="EditMode" />
+    </properties>
+    <test-suite type="Assembly" id="1204" name="FoodFactoryGame.Goods.EditModeTests.dll" fullname="E:/Projects/Unity/FoodFactoryGame/Library/ScriptAssemblies/FoodFactoryGame.Goods.EditModeTests.dll" runstate="Runnable" testcasecount="164" result="Passed" start-time="2026-09-25 22:21:23Z" end-time="2026-09-25 22:21:24Z" duration="0.411045" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="17660" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="EditMode" />
+        <property name="EditorOnly" value="True" />
+      </properties>
+      <test-suite type="TestSuite" id="1205" name="FoodFactoryGame" fullname="FoodFactoryGame" runstate="Runnable" testcasecount="164" result="Passed" start-time="2026-09-25 22:21:23Z" end-time="2026-09-25 22:21:24Z" duration="0.304997" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-suite type="TestSuite" id="1206" name="Goods" fullname="FoodFactoryGame.Goods" runstate="Runnable" testcasecount="164" result="Passed" start-time="2026-09-25 22:21:23Z" end-time="2026-09-25 22:21:24Z" duration="0.303673" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <test-suite type="TestSuite" id="1207" name="Tests" fullname="FoodFactoryGame.Goods.Tests" runstate="Runnable" testcasecount="164" result="Passed" start-time="2026-09-25 22:21:24Z" end-time="2026-09-25 22:21:24Z" duration="0.198403" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-suite type="TestFixture" id="1113" name="HeldSaveTests" fullname="FoodFactoryGame.Goods.Tests.HeldSaveTests" classname="FoodFactoryGame.Goods.Tests.HeldSaveTests" runstate="Runnable" testcasecount="4" result="Passed" start-time="2026-09-25 22:21:24Z" end-time="2026-09-25 22:21:24Z" duration="0.197462" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-case id="1115" name="HeldSaveCommitsEveryTickAndClosesOnRelease" fullname="FoodFactoryGame.Goods.Tests.HeldSaveTests.HeldSaveCommitsEveryTickAndClosesOnRelease" methodname="HeldSaveCommitsEveryTickAndClosesOnRelease" classname="FoodFactoryGame.Goods.Tests.HeldSaveTests" runstate="Runnable" seed="593890100" result="Passed" start-time="2026-09-25 22:21:24Z" end-time="2026-09-25 22:21:24Z" duration="0.036568" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1116" name="HeldSaveRecoversAfterARefusedCommit" fullname="FoodFactoryGame.Goods.Tests.HeldSaveTests.HeldSaveRecoversAfterARefusedCommit" methodname="HeldSaveRecoversAfterARefusedCommit" classname="FoodFactoryGame.Goods.Tests.HeldSaveTests" runstate="Runnable" seed="271596966" result="Passed" start-time="2026-09-25 22:21:24Z" end-time="2026-09-25 22:21:24Z" duration="0.033794" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1117" name="HoldNeedsAnExistingDatabaseAndReleaseIgnoresUnheldPaths" fullname="FoodFactoryGame.Goods.Tests.HeldSaveTests.HoldNeedsAnExistingDatabaseAndReleaseIgnoresUnheldPaths" methodname="HoldNeedsAnExistingDatabaseAndReleaseIgnoresUnheldPaths" classname="FoodFactoryGame.Goods.Tests.HeldSaveTests" runstate="Runnable" seed="681165336" result="Passed" start-time="2026-09-25 22:21:24Z" end-time="2026-09-25 22:21:24Z" duration="0.002793" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1114" name="SavesUseWriteAheadLogging" fullname="FoodFactoryGame.Goods.Tests.HeldSaveTests.SavesUseWriteAheadLogging" methodname="SavesUseWriteAheadLogging" classname="FoodFactoryGame.Goods.Tests.HeldSaveTests" runstate="Runnable" seed="1919004361" result="Passed" start-time="2026-09-25 22:21:24Z" end-time="2026-09-25 22:21:24Z" duration="0.016268" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <output><![CDATA[<b><color=#2EA3FF>MCP-FOR-UNITY</color></b>: [TestRunnerNoThrottle] Restored Interaction Mode after test run.
+Saving results to: C:/Users/Deven/AppData/LocalLow/DefaultCompany/FoodFactoryGame\TestResults.xml
+]]></output>
+              </test-case>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

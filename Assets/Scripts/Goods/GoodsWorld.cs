@@ -447,6 +447,7 @@ namespace FoodFactoryGame.Goods
                 catch
                 {
                     _state = before;
+                    InvalidateDiners();
                     throw;
                 }
             }
@@ -500,6 +501,7 @@ namespace FoodFactoryGame.Goods
                 catch (Exception error)
                 {
                     _state = before;
+                    InvalidateDiners();
                     if (!PersistenceError(error)) throw;
                     return unavailable();
                 }

@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="1" result="Failed(Child)" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-09-25 22:01:25Z" end-time="2026-09-25 22:01:32Z" duration="7.0673863">
+  <test-suite type="TestSuite" id="1300" name="FoodFactoryGame" fullname="FoodFactoryGame" runstate="Runnable" testcasecount="241" result="Failed" site="Child" start-time="2026-09-25 22:01:25Z" end-time="2026-09-25 22:01:32Z" duration="7.067386" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="EditMode" />
+    </properties>
+    <failure>
+      <message><![CDATA[One or more child tests had errors]]></message>
+    </failure>
+    <test-suite type="Assembly" id="1019" name="FoodFactoryGame.Benchmarks.EditModeTests.dll" fullname="E:/Projects/Unity/FoodFactoryGame/Library/ScriptAssemblies/FoodFactoryGame.Benchmarks.EditModeTests.dll" runstate="Runnable" testcasecount="7" result="Failed" site="Child" start-time="2026-09-25 22:01:25Z" end-time="2026-09-25 22:01:32Z" duration="6.963656" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="17660" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="EditMode" />
+        <property name="EditorOnly" value="True" />
+      </properties>
+      <failure>
+        <message><![CDATA[One or more child tests had errors]]></message>
+      </failure>
+      <test-suite type="TestSuite" id="1020" name="FoodFactoryGame" fullname="FoodFactoryGame" runstate="Runnable" testcasecount="7" result="Failed" site="Child" start-time="2026-09-25 22:01:25Z" end-time="2026-09-25 22:01:32Z" duration="6.963273" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <failure>
+          <message><![CDATA[One or more child tests had errors]]></message>
+        </failure>
+        <test-suite type="TestSuite" id="1021" name="Benchmarks" fullname="FoodFactoryGame.Benchmarks" runstate="Runnable" testcasecount="7" result="Failed" site="Child" start-time="2026-09-25 22:01:25Z" end-time="2026-09-25 22:01:32Z" duration="6.853494" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <failure>
+            <message><![CDATA[One or more child tests had errors]]></message>
+          </failure>
+          <test-suite type="TestSuite" id="1022" name="Tests" fullname="FoodFactoryGame.Benchmarks.Tests" runstate="Runnable" testcasecount="7" result="Failed" site="Child" start-time="2026-09-25 22:01:25Z" end-time="2026-09-25 22:01:32Z" duration="6.853034" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <failure>
+              <message><![CDATA[One or more child tests had errors]]></message>
+            </failure>
+            <test-suite type="TestFixture" id="1017" name="CustomerRuntimeBenchmarkTests" fullname="FoodFactoryGame.Benchmarks.Tests.CustomerRuntimeBenchmarkTests" classname="FoodFactoryGame.Benchmarks.Tests.CustomerRuntimeBenchmarkTests" runstate="Runnable" testcasecount="1" result="Failed" site="Child" start-time="2026-09-25 22:01:26Z" end-time="2026-09-25 22:01:32Z" duration="6.743917" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+              <properties>
+                <property name="Category" value="Benchmark" />
+              </properties>
+              <failure>
+                <message><![CDATA[One or more child tests had errors]]></message>
+              </failure>
+              <test-case id="1018" name="ThousandCustomersFitAFrameAndCommitUnderTheWarningSignals" fullname="FoodFactoryGame.Benchmarks.Tests.CustomerRuntimeBenchmarkTests.ThousandCustomersFitAFrameAndCommitUnderTheWarningSignals" methodname="ThousandCustomersFitAFrameAndCommitUnderTheWarningSignals" classname="FoodFactoryGame.Benchmarks.Tests.CustomerRuntimeBenchmarkTests" runstate="Runnable" seed="852441794" result="Failed" start-time="2026-09-25 22:01:26Z" end-time="2026-09-25 22:01:32Z" duration="6.742710" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <failure>
+                  <message><![CDATA[  Expected: <empty>
+  But was:  < "max commit 91.5 ms exceeds the decision 0012 signal (50 ms)" >
+]]></message>
+                  <stack-trace><![CDATA[at FoodFactoryGame.Benchmarks.Tests.CustomerRuntimeBenchmarkTests.ThousandCustomersFitAFrameAndCommitUnderTheWarningSignals () [0x0047e] in E:\Projects\Unity\FoodFactoryGame\Assets\Tests\EditMode\Benchmarks\CustomerRuntimeBenchmarkTests.cs:158
+]]></stack-trace>
+                </failure>
+                <output><![CDATA[[Goods] A world commit took 60.5 ms (> 50 ms); see decision 0012.
+[Benchmark] runtime customers: warmup=330s customers 905->1046 (Queued=254,Travelling=486,Eating=282,Ordering=24) served=1317 walkedOut=212 | tick mean=9.55ms p99=14.95ms max=40.35ms over 300 ticks (rollback copy 9.89ms + step 0.20ms) | commits=30 avg=43.3ms max=91.5ms payload=356KB | cpu="AMD Ryzen 5 5600X 6-Core Processor " unity=6000.5.9f1 editor-mono
+[Benchmark] runtime customers: warmup=330s customers 905->1046 (Queued=254,Travelling=486,Eating=282,Ordering=24) served=1317 walkedOut=212 | tick mean=9.55ms p99=14.95ms max=40.35ms over 300 ticks (rollback copy 9.89ms + step 0.20ms) | commits=30 avg=43.3ms max=91.5ms payload=356KB | cpu="AMD Ryzen 5 5600X 6-Core Processor " unity=6000.5.9f1 editor-mono
+<b><color=#2EA3FF>MCP-FOR-UNITY</color></b>: [TestRunnerNoThrottle] Restored Interaction Mode after test run.
+Saving results to: C:/Users/Deven/AppData/LocalLow/DefaultCompany/FoodFactoryGame\TestResults.xml
+]]></output>
+              </test-case>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

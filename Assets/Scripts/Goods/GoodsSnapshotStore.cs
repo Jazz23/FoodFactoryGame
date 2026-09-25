@@ -46,6 +46,19 @@ namespace FoodFactoryGame.Goods
         // Guarded by SaveGate.
         private static readonly Dictionary<string, SQLiteConnection> Held = new(StringComparer.OrdinalIgnoreCase);
 
+        // Only a row committed and validated by this held connection may use the fast save path. The database head is
+        // compared byte-for-byte inside BEGIN IMMEDIATE before reuse, so external edits or corruption take LatestValid.
+        // Guarded by SaveGate; unheld saves and loads always validate stored rows.
+        private static readonly Dictionary<string, SnapshotHead> HeldHeads = new(StringComparer.OrdinalIgnoreCase);
+
+        private sealed class SnapshotHead
+        {
+            public long Revision { get; set; }
+            public string WorldId { get; set; }
+            public string Payload { get; set; }
+            public string Sha256 { get; set; }
+        }
+
         // Cost of every commit in this process, from snapshot serialization to the end of the transaction.
         public static GoodsCommitStats Stats { get; } = new();
 
@@ -58,7 +71,11 @@ namespace FoodFactoryGame.Goods
             if (!File.Exists(full)) throw new FileNotFoundException("No goods database.", full);
             lock (SaveGate)
             {
-                if (!Held.ContainsKey(full)) Held[full] = Open(full, true);
+                if (!Held.ContainsKey(full))
+                {
+                    Held[full] = Open(full, true);
+                    HeldHeads.Remove(full);
+                }
             }
         }
 
@@ -69,6 +86,7 @@ namespace FoodFactoryGame.Goods
             var full = Path.GetFullPath(path);
             lock (SaveGate)
             {
+                HeldHeads.Remove(full);
                 if (Held.Remove(full, out var db)) db?.Dispose();
             }
         }
@@ -78,44 +96,76 @@ namespace FoodFactoryGame.Goods
             if (world == null || string.IsNullOrWhiteSpace(path)) throw new ArgumentException("World and explicit save path required.");
             var full = Path.GetFullPath(path);
             if (!Directory.Exists(Path.GetDirectoryName(full))) throw new DirectoryNotFoundException("Create an isolated save directory first.");
-            var timer = Stopwatch.StartNew();
+            var began = Stopwatch.GetTimestamp();
             var state = world.Snapshot();
+            var copied = Stopwatch.GetTimestamp();
             GoodsWorld.Validate(state);
+            var validated = Stopwatch.GetTimestamp();
             var payload = JsonUtility.ToJson(state);
-            timer.Stop();
+            var serialized = Stopwatch.GetTimestamp();
             var wrote = false;
+            string newSha = null;
+            var transactionMilliseconds = 0.0;
+            var commitAndSyncMilliseconds = 0.0;
             lock (SaveGate)
             {
-                timer.Start();
                 var held = Held.TryGetValue(full, out var db);
                 // A held path whose connection was dropped after a failure reopens here.
-                if (held && db == null) Held[full] = db = Open(full, true);
+                if (held && db == null)
+                {
+                    HeldHeads.Remove(full);
+                    Held[full] = db = Open(full, true);
+                }
                 using var opened = held ? null : Open(full, true);
                 db ??= opened;
                 try
                 {
                     // IMMEDIATE takes the write lock before the revision check, so another process cannot commit in between.
                     // Waiting for another writer is contention, not commit cost, so it is left out of the measurement.
-                    timer.Stop();
                     db.Execute("BEGIN IMMEDIATE");
-                    timer.Start();
+                    var transactionBegan = Stopwatch.GetTimestamp();
                     try
                     {
-                        var prior = LatestValid(db, true);
-                        if (prior != null)
+                        SnapshotHead cached = null;
+                        var fast = held && HeldHeads.TryGetValue(full, out cached)
+                            && MatchesHead(db, cached);
+                        long? priorRevision;
+                        if (fast)
                         {
-                            if (prior.WorldId != state.WorldId || prior.Revision > state.Revision
-                                || (prior.Revision == state.Revision && JsonUtility.ToJson(prior) != payload))
+                            priorRevision = cached.Revision;
+                            if (cached.WorldId != state.WorldId || cached.Revision > state.Revision
+                                || (cached.Revision == state.Revision && cached.Payload != payload))
                                 throw new IOException("Refusing a stale or conflicting world snapshot.");
                         }
-                        if (prior == null || prior.Revision != state.Revision)
+                        else
                         {
+                            var prior = LatestValid(db, true);
+                            priorRevision = prior?.Revision;
+                            if (prior != null && (prior.WorldId != state.WorldId || prior.Revision > state.Revision
+                                || (prior.Revision == state.Revision && JsonUtility.ToJson(prior) != payload)))
+                                throw new IOException("Refusing a stale or conflicting world snapshot.");
+                        }
+                        if (priorRevision != state.Revision)
+                        {
+                            newSha = Digest(payload);
                             db.Execute("INSERT INTO snapshots (revision, world_id, schema_version, payload, sha256, saved_utc) VALUES (?, ?, ?, ?, ?, ?)",
-                                state.Revision, state.WorldId, state.SchemaVersion, payload, Digest(payload), DateTimeOffset.UtcNow.ToUnixTimeSeconds());
-                            if (prior != null) db.Execute("DELETE FROM snapshots WHERE revision < ?", prior.Revision);
+                                state.Revision, state.WorldId, state.SchemaVersion, payload, newSha, DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+                            if (priorRevision.HasValue) db.Execute("DELETE FROM snapshots WHERE revision < ?", priorRevision.Value);
                             wrote = true;
                         }
+                        if (held)
+                        {
+                            if (wrote)
+                                HeldHeads[full] = new SnapshotHead
+                                {
+                                    Revision = state.Revision, WorldId = state.WorldId, Payload = payload, Sha256 = newSha
+                                };
+                            else if (!fast) HeldHeads.Remove(full);
+                        }
+                        var commitBegan = Stopwatch.GetTimestamp();
+                        transactionMilliseconds = ElapsedMilliseconds(transactionBegan, commitBegan);
                         db.Execute("COMMIT");
+                        commitAndSyncMilliseconds = ElapsedMilliseconds(commitBegan, Stopwatch.GetTimestamp());
                     }
                     catch
                     {
@@ -127,13 +177,29 @@ namespace FoodFactoryGame.Goods
                 {
                     // A held connection may be left mid-transaction if ROLLBACK failed; never reuse it after a failure.
                     Held[full] = null;
+                    HeldHeads.Remove(full);
                     db.Dispose();
                     throw;
                 }
             }
             // The save now holds this revision (written, or already identical).
             world.MarkCommitted(state.Revision);
-            if (wrote) Stats.Record(timer.Elapsed.TotalMilliseconds, Encoding.UTF8.GetByteCount(payload));
+            if (wrote) Stats.Record(new GoodsSaveTimings(
+                ElapsedMilliseconds(began, copied), ElapsedMilliseconds(copied, validated),
+                ElapsedMilliseconds(validated, serialized), transactionMilliseconds, commitAndSyncMilliseconds),
+                Encoding.UTF8.GetByteCount(payload));
+        }
+
+        private static double ElapsedMilliseconds(long began, long ended) =>
+            (ended - began) * 1000.0 / Stopwatch.Frequency;
+
+        private static bool MatchesHead(SQLiteConnection db, SnapshotHead cached)
+        {
+            var current = db.Query<SnapshotHead>(
+                "SELECT revision AS Revision, world_id AS WorldId, payload AS Payload, sha256 AS Sha256 "
+                + "FROM snapshots ORDER BY revision DESC LIMIT 1").FirstOrDefault();
+            return current != null && current.Revision == cached.Revision && current.WorldId == cached.WorldId
+                && current.Payload == cached.Payload && current.Sha256 == cached.Sha256;
         }
 
         public static GoodsWorld Load(string path)

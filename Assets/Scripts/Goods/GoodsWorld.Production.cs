@@ -108,6 +108,7 @@ namespace FoodFactoryGame.Goods
                     || _recipes.ContainsKey(recipe.Id))
                     throw new ArgumentException("Invalid or duplicate recipe.");
                 _recipes.Add(recipe.Id, JsonUtility.FromJson<RecipeDefinition>(JsonUtility.ToJson(recipe)));
+                InvalidateDiners();
             }
         }
 
