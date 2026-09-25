@@ -1,0 +1,1 @@
+{"name":"FoodFactoryGame.Editor","rootNamespace":"FoodFactoryGame.Editor","references":["FoodFactoryGame.Session"],"includePlatforms":["Editor"],"autoReferenced":false}
