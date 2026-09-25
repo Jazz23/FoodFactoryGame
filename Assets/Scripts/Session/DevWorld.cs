@@ -74,7 +74,7 @@ namespace FoodFactoryGame.Session
         public const int EmployeeHandSlots = 4;
 
         // PROTOTYPE logistics (decision 0022). The dev site is the "Restaurant" at the map origin; a remote "Warehouse" site with
-        // dough stock and a dock stands 600 m east and 300 m north, 900 m by road, so a truck at 15 m/s drives 60 s each way.
+        // dough stock and a dock stands 100 m east and 50 m north, 150 m by road, so a truck at 15 m/s drives 10 s each way.
         // Each site has a dock (2x1, 8 outgoing and 8 incoming slots); the restaurant's stands at the west edge of the grid, clear
         // of the seed, the spawn points and the PlayMode test cells. One 4-slot truck loading 5 units a second starts at the
         // warehouse on the warehouse-to-restaurant route with any cargo.
@@ -93,8 +93,8 @@ namespace FoodFactoryGame.Session
         public const string WarehouseDockId = "dev-warehouse-dock";
         public const int WarehouseDockCellX = 4;
         public const int WarehouseDockCellZ = 4;
-        public const int WarehouseMapX = 600;
-        public const int WarehouseMapZ = 300;
+        public const int WarehouseMapX = 100;
+        public const int WarehouseMapZ = 50;
         public const string TruckId = "dev-truck-1";
         public const int TruckCargoSlots = 4;
         public const int TruckSpeedMetresPerSecond = 15;
@@ -192,6 +192,9 @@ namespace FoodFactoryGame.Session
                 world.Bootstrap(new SiteLayout { SiteId = WarehouseSiteId, Width = WarehouseGridWidth, Depth = WarehouseGridDepth });
             if (state.Sites.All(x => x.Id != WarehouseSiteId))
                 world.Bootstrap(new GoodsSite { Id = WarehouseSiteId, Name = WarehouseName, MapX = WarehouseMapX, MapZ = WarehouseMapZ });
+            // The dev map is seed content, like machine slot counts: a save made with older positions follows the current ones.
+            world.MoveSite(SiteId, 0, 0);
+            world.MoveSite(WarehouseSiteId, WarehouseMapX, WarehouseMapZ);
             if (world.CompanyOfSite(WarehouseSiteId) == null && state.Companies.Any(x => x.Id == CompanyId))
                 world.AddCompanySite(CompanyId, WarehouseSiteId);
             if (state.Equipment.All(x => x.Id != WarehouseDockId))

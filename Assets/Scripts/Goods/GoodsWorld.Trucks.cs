@@ -122,6 +122,21 @@ namespace FoodFactoryGame.Goods
             }
         }
 
+        // Server-only: moves a mapped site to a new map position; true if it changed. Trucks already driving keep their
+        // remaining time; later trips use the new distance.
+        public bool MoveSite(string siteId, int mapX, int mapZ)
+        {
+            lock (_gate)
+            {
+                var site = _state.Sites.FirstOrDefault(x => x.Id == siteId) ?? throw new ArgumentException("Unknown site.");
+                if (site.MapX == mapX && site.MapZ == mapZ) return false;
+                site.MapX = mapX;
+                site.MapZ = mapZ;
+                _state.Revision++;
+                return true;
+            }
+        }
+
         // Whether any location stands on the site (sites exist through their locations).
         public bool HasSite(string siteId)
         {

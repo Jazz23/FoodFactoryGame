@@ -44,7 +44,7 @@ namespace FoodFactoryGame.Session.Tests
             var truck = state.Trucks.Single();
             Assert.That((truck.Id, truck.State, truck.PickupDockId, truck.DropoffDockId),
                 Is.EqualTo((DevWorld.TruckId, TruckState.Loading, DevWorld.WarehouseDockId, DevWorld.DockId)));
-            Assert.That(GoodsWorld.RoadSeconds(state, DevWorld.WarehouseSiteId, DevWorld.SiteId, truck.SpeedMetresPerSecond), Is.EqualTo(60));
+            Assert.That(GoodsWorld.RoadSeconds(state, DevWorld.WarehouseSiteId, DevWorld.SiteId, truck.SpeedMetresPerSecond), Is.EqualTo(10));
 
             // Someone stages 20 warehouse dough at the warehouse dock; the truck brings it to the restaurant.
             Assert.That(world.TryGrantDurably("manager", DevWorld.WarehouseSiteId, WorldPath), Is.True);
@@ -53,10 +53,10 @@ namespace FoodFactoryGame.Session.Tests
                 RequestId = "stage", LotId = DevWorld.WarehouseDoughLotId, DestinationId = DevWorld.WarehouseDockId + ":in", Quantity = 20
             }, WorldPath);
             Assert.That(staged.Accepted, Is.True);
-            Assert.That(world.TryAdvanceDurably(70, WorldPath), Is.True);
+            Assert.That(world.TryAdvanceDurably(20, WorldPath), Is.True);
             var delivered = GoodsSnapshotStore.Load(WorldPath).Snapshot().Lots.Where(x => x.LocationId == DevWorld.DockId + ":out").ToList();
             Assert.That((delivered.Sum(x => x.Quantity), delivered.All(x => x.OwnerId == DevWorld.SiteId && x.ItemId == DevWorld.DoughItemId)),
-                Is.EqualTo((20, true)), "Loaded in 4 s, 60 s on the road, unloaded in 4 s, and committed.");
+                Is.EqualTo((20, true)), "Loaded in 4 s, 10 s on the road, unloaded in 4 s, and committed.");
         }
 
         [Test]
@@ -69,6 +69,19 @@ namespace FoodFactoryGame.Session.Tests
             var restarted = Open(Dock());
             Assert.That((restarted.Snapshot().Revision, restarted.Snapshot().Trucks.Count, restarted.Snapshot().Equipment.Count(x => x.Kind == GoodsWorld.DockKind)),
                 Is.EqualTo((revision, 1, 2)), "Reopening adds and writes nothing.");
+        }
+
+        [Test]
+        public void SavedWarehouseAtAnOlderPositionFollowsTheSeedMap()
+        {
+            var world = Open(Dock());
+            Assert.That(world.MoveSite(DevWorld.WarehouseSiteId, 600, 300), Is.True);
+            GoodsSnapshotStore.Save(world, WorldPath);
+            var reopened = Open(Dock()).Snapshot();
+            var warehouse = reopened.Sites.Single(x => x.Id == DevWorld.WarehouseSiteId);
+            Assert.That((warehouse.MapX, warehouse.MapZ), Is.EqualTo((DevWorld.WarehouseMapX, DevWorld.WarehouseMapZ)));
+            Assert.That(GoodsWorld.RoadSeconds(GoodsSnapshotStore.Load(WorldPath).Snapshot(), DevWorld.WarehouseSiteId, DevWorld.SiteId,
+                DevWorld.TruckSpeedMetresPerSecond), Is.EqualTo(10), "Committed before serving.");
         }
 
         [Test]

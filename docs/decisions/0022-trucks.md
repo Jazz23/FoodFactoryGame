@@ -57,13 +57,15 @@ cross-site movement, and supplier purchases arrive instantly (decision 0014, "re
 ## Dev content (PROTOTYPE)
 
 - Map: the dev site "Restaurant" at (0, 0); a new remote site "Warehouse" (`dev-warehouse`, 10x10 grid, 30-slot storage
-  with 200 dough, owned by the dev company) at (600, 300): 900 m by road.
+  with 200 dough, owned by the dev company) at (100, 50): 150 m by road.
 - Docks: 2x1 cells, 8 Outgoing and 8 Incoming slots, $60.00 at the supplier. One placed at the warehouse (4, 4) and one on
   the restaurant grid at (0, 18), its back against the north edge.
-- Truck 1: 4 cargo slots, 15 m/s (60 s each way), 5 units a second, starting at the warehouse on the warehouse-to-restaurant
+- Truck 1: 4 cargo slots, 15 m/s (10 s each way), 5 units a second, starting at the warehouse on the warehouse-to-restaurant
   route with any cargo.
 - A save from before this decision gains whatever of these it lacks once, committed before serving; a restaurant dock
   whose cells are taken, or a dock the players already placed there, is kept and the truck then starts parked.
+- The dev sites' map positions are seed content, like machine slot counts: every server start moves them to the current
+  values, so a save made with older positions follows them (a truck already driving keeps its remaining time).
 
 ## Presentation
 
