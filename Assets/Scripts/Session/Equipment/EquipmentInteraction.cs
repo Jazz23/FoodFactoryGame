@@ -112,6 +112,7 @@ namespace FoodFactoryGame.Session.Equipment
         private string _ghostKind;
         private bool _openMachineSells;
         private bool _openMachineStores;
+        private bool _openMachineTable;
         private bool _openMachineDock;
         private Renderer[] _ghostRenderers = Array.Empty<Renderer>();
 
@@ -272,7 +273,9 @@ namespace FoodFactoryGame.Session.Equipment
                     InteractionScreen.Inventory => "Inventory: click a slot to pick up or put down, shift+click to move a stack across, 1-9 over a stack or dropping it on the hotbar assigns it there, Buy spends company cash at the supplier; E or Esc closes" + suffix,
                     // A sale station (decision 0013) has no results to take: it sells its input for the company.
                     InteractionScreen.Machine when _openMachineSells =>
-                        "Counter: put edible goods in the input; customers buy them one at a time for the company (shift+click moves a stack); E or Esc closes" + suffix,
+                        "Counter: put edible goods in the input; customers queue here and buy them for the company (shift+click moves a stack); E or Esc closes" + suffix,
+                    InteractionScreen.Machine when _openMachineTable =>
+                        "Table: customers who dine in buy only once a seat is free, then sit here to eat; right click picks it up when nobody sits here; E or Esc closes" + suffix,
                     InteractionScreen.Machine when _openMachineDock =>
                         "Dock: put goods in Outgoing for trucks to load; take deliveries from Incoming (shift+click moves a stack); L: trucks and routes; E or Esc closes" + suffix,
                     InteractionScreen.Machine when _openMachineStores =>
@@ -472,6 +475,7 @@ namespace FoodFactoryGame.Session.Equipment
             // A machine with no recipes is storage (the fridge, decision 0018) and gets the storage hint.
             _openMachineStores = !session.Recipes.Any(x => x != null && x.StationKind == kind);
             _openMachineDock = kind == GoodsWorld.DockKind;
+            _openMachineTable = kind == GoodsWorld.TableKind;
             _awaitingRelease = true;
         }
 

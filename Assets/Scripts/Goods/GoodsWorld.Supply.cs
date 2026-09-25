@@ -55,7 +55,8 @@ namespace FoodFactoryGame.Goods
                 var equipment = offer?.Equipment;
                 if (offer is null || string.IsNullOrWhiteSpace(offer.Id) || offer.PriceCents < 1 || OfferExistsLocked(offer.Id)
                     || equipment is null || string.IsNullOrWhiteSpace(equipment.Kind) || equipment.Width < 1 || equipment.Depth < 1
-                    || equipment.InputCapacity < 1 || equipment.OutputCapacity < 1)
+                    || equipment.InputCapacity < 1 || equipment.OutputCapacity < 1
+                    || equipment.Seats < 0 || (equipment.Kind == TableKind) != (equipment.Seats > 0))
                     throw new ArgumentException("Invalid or duplicate equipment offer.");
                 _equipmentOffers.Add(offer.Id, JsonUtility.FromJson<EquipmentOffer>(JsonUtility.ToJson(offer)));
             }

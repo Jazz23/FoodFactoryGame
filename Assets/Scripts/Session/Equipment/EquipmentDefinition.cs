@@ -16,6 +16,8 @@ namespace FoodFactoryGame.Session.Equipment
         [SerializeField, Min(1)] private int outputCapacity = 1;
         [SerializeField] private bool inputRefrigerated;
         [SerializeField] private bool outputRefrigerated;
+        // Dining seats (decision 0024): above zero only for a table.
+        [SerializeField, Min(0)] private int seats;
         [SerializeField] private GameObject visualPrefab;
         [SerializeField] private Sprite icon;
 
@@ -26,6 +28,7 @@ namespace FoodFactoryGame.Session.Equipment
         public int OutputCapacity => outputCapacity;
         public bool InputRefrigerated => inputRefrigerated;
         public bool OutputRefrigerated => outputRefrigerated;
+        public int Seats => seats;
         public GameObject VisualPrefab => visualPrefab;
         public Sprite Icon => icon;
 
@@ -34,7 +37,7 @@ namespace FoodFactoryGame.Session.Equipment
             Id = id, Kind = kind, SiteId = siteId, State = EquipmentState.Placed, HolderId = "",
             CellX = cellX, CellZ = cellZ, Rotation = rotation, Width = width, Depth = depth,
             InputCapacity = inputCapacity, OutputCapacity = outputCapacity, InputRefrigerated = inputRefrigerated,
-            OutputRefrigerated = outputRefrigerated
+            OutputRefrigerated = outputRefrigerated, Seats = seats
         };
 
         // Kind, footprint and capacities only: the server gives a bought piece its ID, site and holder (decision 0017).
@@ -42,7 +45,7 @@ namespace FoodFactoryGame.Session.Equipment
         {
             Kind = kind, State = EquipmentState.Held, Width = width, Depth = depth,
             InputCapacity = inputCapacity, OutputCapacity = outputCapacity, InputRefrigerated = inputRefrigerated,
-            OutputRefrigerated = outputRefrigerated
+            OutputRefrigerated = outputRefrigerated, Seats = seats
         };
     }
 }

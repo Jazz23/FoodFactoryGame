@@ -1,6 +1,7 @@
-// Verifies sale recipes (decision 0013): a counter sells edible goods one at a time on the server clock and pays the site's
-// company in the same commit; spoiled goods never sell; no company means no sale; pickup mid-sale refunds and pays nothing;
-// a failed tick commit rolls back goods and cash together; a sale saved mid-way completes exactly once. Isolated saves only.
+// Verifies sale recipes after decision 0024: a sale recipe is a menu item that only customers buy (CustomerTests), so stations
+// never start one, by themselves or on request. A sale job saved by an older build (decision 0013) still completes and pays
+// its company exactly once: it waits unpaid rather than overflowing the balance, pickup mid-sale refunds and pays nothing, a
+// failed tick commit rolls back goods and cash together, and it needs a company. Isolated saves only.
 using System;
 using System.IO;
 using System.Linq;
@@ -29,7 +30,7 @@ namespace FoodFactoryGame.Goods.Tests
         public void TearDown() => Directory.Delete(_saveDirectory, true);
 
         // TEST-ONLY values: a 10x10 restaurant owned by "co" (1000 cents) with a 2x1 counter (input 5 slots), a chef inventory,
-        // and a sale of 1 bread every 4 s for 250 cents; bread spoils after 100 s. Not gameplay content.
+        // and a sale of 1 bread for 250 cents served in 4 s; bread spoils after 100 s. Not gameplay content.
         private static GoodsWorld CreateWorld()
         {
             var world = new GoodsWorld("test-world");
@@ -56,6 +57,23 @@ namespace FoodFactoryGame.Goods.Tests
                 ExposureSeconds = exposure, SpoilAfterSeconds = 100, Spoiled = exposure >= 100
             });
 
+        // Replaces the world with its own state plus a running sale job, as an older build saved it: one bread already taken,
+        // remainingSeconds of service left.
+        private void WithLegacySale(long remainingSeconds = 2)
+        {
+            var state = _world.Snapshot();
+            state.Jobs.Add(new StationJob
+            {
+                Id = "legacy", StationId = "counter-1", RecipeId = "sell-bread", StartedBy = GoodsWorld.AutomaticStarter,
+                DurationSeconds = 4, RemainingSeconds = remainingSeconds, State = StationJobState.Running, OutputItemId = "",
+                SaleCents = 250,
+                Inputs = { new GoodsLot { Id = "legacy:in:0", ItemId = "bread", OwnerId = "restaurant", LocationId = "", Quantity = 1, SpoilAfterSeconds = 100 } }
+            });
+            _world = GoodsWorld.Restore(state);
+            _world.RegisterRecipe(SellBread());
+            _world.AutomaticJobs = true;
+        }
+
         private long Cash() => _world.Snapshot().Companies.Single().Cash;
         private int Bread(string location = "counter-1:in") =>
             _world.Snapshot().Lots.Where(x => x.LocationId == location && x.ItemId == "bread").Sum(x => x.Quantity);
@@ -73,48 +91,39 @@ namespace FoodFactoryGame.Goods.Tests
             negative.Id = "negative";
             negative.SaleCents = -1;
             Assert.Throws<ArgumentException>(() => _world.RegisterRecipe(negative), "negative price without goods");
+            var tierless = SellBread();
+            tierless.Id = "tierless";
+            tierless.Tier = 0;
+            Assert.Throws<ArgumentException>(() => _world.RegisterRecipe(tierless), "a menu tier starts at 1");
         }
 
         [Test]
-        public void CounterSellsOneBreadPerServiceTimeAndPaysTheCompany()
+        public void StationsNeverStartMenuItems()
         {
             Stock("bread-a", 3);
-            _world.Advance(1);
-            Assert.That(_world.Snapshot().Jobs.Single().IsSale, Is.True, "A customer is being served.");
-            Assert.That((Bread(), Cash()), Is.EqualTo((2, 1000L)), "The bread is taken at the start, paid for at the end.");
-            _world.Advance(4);
-            Assert.That(Cash(), Is.EqualTo(1250));
-            _world.Advance(4);
-            _world.Advance(4);
-            _world.Advance(4);
-            Assert.That((Bread(), Cash()), Is.EqualTo((0, 1750L)));
-            Assert.That(_world.Snapshot().Jobs, Is.Empty, "The counter is idle once sold out.");
-            Assert.That(_world.Snapshot().Lots.Any(x => x.ItemId == "bread"), Is.False, "Sold goods leave the world.");
+            _world.Advance(20);
+            Assert.That((_world.Snapshot().Jobs.Count, Bread(), Cash()), Is.EqualTo((0, 3, 1000L)), "Only customers buy.");
+            Assert.That(_world.StartJob("chef", "sell", "counter-1", "sell-bread").Reason, Is.EqualTo("customers-only"));
+            Assert.That(Bread(), Is.EqualTo(3));
         }
 
         [Test]
-        public void OneLongStepSellsWhatManyShortStepsWould()
+        public void LegacySaleJobCompletesAndPaysExactlyOnce()
         {
-            var shortSteps = CreateWorld();
-            foreach (var world in new[] { _world, shortSteps })
-                world.Bootstrap(new GoodsLot { Id = "stock", ItemId = "bread", OwnerId = "restaurant", LocationId = "counter-1:in", Quantity = 5, SpoilAfterSeconds = 100 });
+            Stock("bread-a", 2);
+            WithLegacySale();
             _world.Advance(1);
-            _world.Advance(13);
-            for (var second = 0; second < 14; second++) shortSteps.Advance(1);
-            string Summary(GoodsWorld world)
-            {
-                var state = world.Snapshot();
-                return $"{state.Companies.Single().Cash} {state.Lots.Where(x => x.ItemId == "bread").Sum(x => x.Quantity)} {state.Jobs.Single().RemainingSeconds}";
-            }
-            Assert.That(Summary(_world), Is.EqualTo(Summary(shortSteps)), "A server hitch must not lose sales.");
-            Assert.That(_world.Snapshot().Companies.Single().Cash, Is.EqualTo(1000 + 3 * 250), "Sales at 5, 9 and 13 s.");
+            Assert.That(Cash(), Is.EqualTo(1000));
+            _world.Advance(1);
+            Assert.That((Cash(), _world.Snapshot().Jobs.Count), Is.EqualTo((1250L, 0)));
+            _world.Advance(20);
+            Assert.That((Cash(), Bread()), Is.EqualTo((1250L, 2)), "No new sale starts; the stock stays for customers.");
         }
 
         [Test]
-        public void SaleThatWouldOverflowTheBalanceWaitsWithoutStoppingTheClock()
+        public void LegacySaleThatWouldOverflowTheBalanceWaitsWithoutStoppingTheClock()
         {
-            Stock("bread-a", 1);
-            _world.Advance(1);
+            WithLegacySale();
             GoodsSnapshotStore.Save(_world, PathForSave);
             Assert.That(_world.AdjustCashDurably("co", long.MaxValue - 1000 - 100, PathForSave), Is.Null);
             Assert.DoesNotThrow(() => _world.Advance(10));
@@ -130,47 +139,20 @@ namespace FoodFactoryGame.Goods.Tests
         }
 
         [Test]
-        public void SpoiledGoodsNeverSell()
+        public void LegacySaleNeedsACompany()
         {
-            Stock("stale", 2, exposure: 100);
-            _world.Advance(10);
-            Assert.That((Bread(), Cash(), _world.Snapshot().Jobs.Count), Is.EqualTo((2, 1000L, 0)));
-            Stock("fresh", 1);
-            _world.Advance(1);
-            _world.Advance(4);
-            Assert.That(Cash(), Is.EqualTo(1250), "Fresh bread sells even beside spoiled bread.");
-            Assert.That(_world.Snapshot().Lots.Single(x => x.Id == "stale").Quantity, Is.EqualTo(2));
-        }
-
-        [Test]
-        public void SiteWithoutACompanyDoesNotSell()
-        {
-            var world = new GoodsWorld("no-company");
-            world.Bootstrap(new SiteLayout { SiteId = "stall", Width = 4, Depth = 4 });
-            world.Bootstrap(new GoodsEquipment { Id = "counter-2", Kind = "counter", SiteId = "stall", Width = 2, Depth = 1, InputCapacity = 5, OutputCapacity = 1 });
-            world.Bootstrap(new GoodsLot { Id = "b", ItemId = "bread", OwnerId = "stall", LocationId = "counter-2:in", Quantity = 1, SpoilAfterSeconds = 100 });
-            world.Grant("chef", "stall");
-            world.RegisterRecipe(SellBread());
-            world.AutomaticJobs = true;
-            world.Advance(10);
-            Assert.That(world.Snapshot().Jobs, Is.Empty);
-            Assert.That(world.StartJob("chef", "sell", "counter-2", "sell-bread").Reason, Is.EqualTo("no-company"));
-            Assert.That(world.Snapshot().Lots.Single().Quantity, Is.EqualTo(1));
-
-            Stock("x", 1);
-            _world.Advance(1);
+            WithLegacySale();
             var selling = _world.Snapshot();
-            Assert.That(selling.Jobs.Single().IsSale, Is.True);
             Assert.DoesNotThrow(() => GoodsWorld.Validate(selling));
             selling.Companies.Clear();
             Assert.Throws<InvalidOperationException>(() => GoodsWorld.Validate(selling), "A sale in progress needs a company.");
         }
 
         [Test]
-        public void PickingUpMidSaleRefundsTheGoodsAndPaysNothing()
+        public void PickingUpMidLegacySaleRefundsTheGoodsAndPaysNothing()
         {
-            Stock("bread-a", 2);
-            _world.Advance(2);
+            Stock("bread-a", 1);
+            WithLegacySale();
             var outcome = _world.PickUp("chef", "pick", "counter-1");
             Assert.That(outcome.Accepted, Is.True, outcome.Reason);
             Assert.That((Bread("carried:chef"), Cash()), Is.EqualTo((2, 1000L)), "The bread being sold comes back unsold.");
@@ -180,22 +162,21 @@ namespace FoodFactoryGame.Goods.Tests
         [Test]
         public void FailedTickCommitRollsBackGoodsAndCashTogether()
         {
-            Stock("bread-a", 1);
-            _world.Advance(1);
+            WithLegacySale();
             GoodsSnapshotStore.Save(_world, PathForSave);
             var before = JsonUtility.ToJson(_world.Snapshot());
             Assert.That(_world.TryAdvanceDurably(4, BadPath), Is.False);
             Assert.That(JsonUtility.ToJson(_world.Snapshot()), Is.EqualTo(before), "Neither the sale nor the payment happened.");
             Assert.That(_world.TryAdvanceDurably(4, PathForSave), Is.True);
             var saved = GoodsSnapshotStore.Load(PathForSave).Snapshot();
-            Assert.That((saved.Companies.Single().Cash, saved.Jobs.Count, saved.Lots.Any(x => x.ItemId == "bread")), Is.EqualTo((1250L, 0, false)));
+            Assert.That((saved.Companies.Single().Cash, saved.Jobs.Count), Is.EqualTo((1250L, 0)));
         }
 
         [Test]
-        public void SaleSavedMidWayCompletesExactlyOnceAfterReload()
+        public void LegacySaleSavedMidWayCompletesExactlyOnceAfterReload()
         {
-            Stock("bread-a", 1);
-            _world.Advance(2);
+            WithLegacySale(3);
+            _world.Advance(1);
             GoodsSnapshotStore.Save(_world, PathForSave);
             var loaded = GoodsSnapshotStore.Load(PathForSave);
             loaded.RegisterRecipe(SellBread());

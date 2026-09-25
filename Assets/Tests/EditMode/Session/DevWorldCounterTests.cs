@@ -1,5 +1,6 @@
-// Verifies the dev seed's sell counter (decision 0013): a new world has it placed, an older save without one gains it exactly
-// once, a counter the players picked up is never replaced, and seeded bread at it earns the dev company cash. Isolated saves only.
+// Verifies the dev seed's sell counter (decisions 0013, 0024): a new world has it placed, an older save without one gains it
+// exactly once, a counter the players picked up is never replaced, and dev customers buy seeded bread there for the dev
+// company. Isolated saves only.
 using System;
 using System.IO;
 using System.Linq;
@@ -38,9 +39,12 @@ namespace FoodFactoryGame.Session.Tests
             DevWorld.LoadOrCreate(WorldPath, items: SessionTestFiles.ContentItems(), counter: counter);
 
         [Test]
-        public void NewWorldHasThePlacedCounterAndItSellsForTheDevCompany()
+        public void NewWorldHasThePlacedCounterAndCustomersBuyThereForTheDevCompany()
         {
-            var world = Open(Counter());
+            // The dock gives the dev site its map record, which customers need to find it (decision 0024).
+            var world = DevWorld.LoadOrCreate(WorldPath, items: SessionTestFiles.ContentItems(), counter: Counter(),
+                dock: AssetDatabase.LoadAssetAtPath<EquipmentDefinition>("Assets/Content/Equipment/Dock.asset"),
+                table: AssetDatabase.LoadAssetAtPath<EquipmentDefinition>("Assets/Content/Equipment/Table.asset"));
             var counter = world.Snapshot().Equipment.Single(x => x.Kind == DevWorld.CounterKind);
             Assert.That((counter.Id, counter.State, counter.CellX, counter.CellZ),
                 Is.EqualTo((DevWorld.CounterId, EquipmentState.Placed, DevWorld.CounterCellX, DevWorld.CounterCellZ)));
@@ -48,10 +52,12 @@ namespace FoodFactoryGame.Session.Tests
             world.RegisterRecipe(SellBread().ToDefinition());
             world.AutomaticJobs = true;
             world.Bootstrap(new GoodsLot { Id = "test-bread", ItemId = "bread", OwnerId = DevWorld.SiteId, LocationId = counter.InputLocationId, Quantity = 2, SpoilAfterSeconds = 3600 });
-            Assert.That(world.TryAdvanceDurably(1, WorldPath), Is.True);
-            Assert.That(world.TryAdvanceDurably(5, WorldPath), Is.True);
+            // The dev district sends a customer every 15 s from a 30 s walk away; ten minutes is ample for one to buy.
+            for (var second = 0; second < 600 && world.Snapshot().Companies.Single().Cash == DevWorld.StartingCash; second++)
+                Assert.That(world.TryAdvanceDurably(1, WorldPath), Is.True);
             var saved = GoodsSnapshotStore.Load(WorldPath).Snapshot();
-            Assert.That(saved.Companies.Single().Cash, Is.EqualTo(DevWorld.StartingCash + 250), "One bread sold and committed.");
+            Assert.That(saved.Companies.Single().Cash, Is.EqualTo(DevWorld.StartingCash + 250), "One bread bought and committed.");
+            Assert.That(saved.Lots.Where(x => x.ItemId == "bread").Sum(x => x.Quantity), Is.EqualTo(1));
         }
 
         [Test]

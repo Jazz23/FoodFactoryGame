@@ -404,6 +404,13 @@ namespace FoodFactoryGame.Session.Equipment
                 foreach (var slot in grid.Value) text.Append('|').Append(slot == null ? "" : $"{slot.Key}:{slot.Count}:{slot.Carried}");
             }
             foreach (var location in _site.Locations) text.Append('|').Append(location.Id).Append(location.Capacity);
+            // An open table shows its seats and the restaurant's standing, which change with customers.
+            if (_site.Equipment.Any(x => x.Id == interaction.OpenMachineId && x.Kind == GoodsWorld.TableKind))
+            {
+                text.Append('|').Append(_site.Customers.Count(x => x.TableId == interaction.OpenMachineId));
+                var diner = _site.Diners.FirstOrDefault();
+                text.Append('|').Append(diner?.Served).Append('/').Append(diner?.WalkedOut).Append('/').Append(diner?.Reputation);
+            }
             return text.ToString();
         }
 
@@ -564,6 +571,7 @@ namespace FoodFactoryGame.Session.Equipment
         private VisualElement MachineWindow(GoodsSnapshot site, GoodsEquipment equipment)
         {
             if (equipment.Kind == GoodsWorld.DockKind) return DockWindow(site, equipment);
+            if (equipment.Kind == GoodsWorld.TableKind) return TableWindow(site, equipment);
             if (!interaction.Session.Recipes.Any(x => x != null && x.StationKind == equipment.Kind)) return StorageMachineWindow(site, equipment);
             var window = Window("hud-machine", Title(equipment.Kind));
             window.style.minWidth = 300;
@@ -626,6 +634,26 @@ namespace FoodFactoryGame.Session.Equipment
                 : string.Join("\n", trucks.Select(x => $"{x.Truck.Name}: {(x.Route.PickupDockId == equipment.Id ? "picks up here" : "delivers here")}")), 12, Muted, 6);
             note.name = "hud-dock-trucks";
             window.Add(note);
+            return window;
+        }
+
+        // A dining table (decision 0024) holds no goods: it shows its seats and the restaurant's standing with customers.
+        private VisualElement TableWindow(GoodsSnapshot site, GoodsEquipment equipment)
+        {
+            var window = Window("hud-machine", "Table");
+            var body = new VisualElement();
+            body.style.backgroundColor = Inset;
+            Pad(body, 12);
+            var seated = site.Customers.Count(x => x.TableId == equipment.Id);
+            var seats = Caption($"Seats taken: {seated}/{equipment.Seats}", 14, Color.white);
+            seats.name = "hud-table-seats";
+            body.Add(seats);
+            var diner = site.Diners.FirstOrDefault();
+            var standing = Caption(diner == null ? "No customers yet."
+                : $"Served {diner.Served}, walked out {diner.WalkedOut}, reputation {diner.Reputation:+0;-0;0}", 12, Muted, 6);
+            standing.name = "hud-table-standing";
+            body.Add(standing);
+            window.Add(body);
             return window;
         }
 
@@ -755,8 +783,21 @@ namespace FoodFactoryGame.Session.Equipment
             if (_progressFill == null) return;
             var equipment = site.Equipment.FirstOrDefault(x => x.Id == interaction.OpenMachineId);
             var job = site.Jobs.FirstOrDefault(x => x.StationId == interaction.OpenMachineId);
+            // Customers (decision 0024) buy at a counter: one being served there, or how many wait in the site's queue.
+            var serving = site.Customers.FirstOrDefault(x => x.CounterId == interaction.OpenMachineId);
+            var waiting = site.Customers.Count(x => x.State == CustomerState.Queued);
             var fraction = 0f;
-            if (job == null)
+            if (job == null && serving != null)
+            {
+                var item = interaction.Session.Recipes.FirstOrDefault(x => x != null && x.Id == serving.RecipeId);
+                var duration = Math.Max(1, item?.DurationSeconds ?? 1);
+                var elapsed = duration - serving.RemainingSeconds + Mathf.Min(Time.unscaledTime - _siteSeenAt, 1f);
+                fraction = Mathf.Clamp01((float)(elapsed / duration));
+                var food = item == null ? "" : string.Join(" + ", item.Inputs.Select(x => ItemName(x.itemId)).Distinct()) + " ";
+                _progressLabel.text = $"Serving a customer: {food}for {FormatCash(serving.PaidCents)}"
+                    + (waiting > 0 ? $"; {waiting} waiting" : "");
+            }
+            else if (job == null)
             {
                 var recipes = interaction.Session.Recipes.Where(x => x != null && x.StationKind == equipment?.Kind).ToList();
                 var ingredients = recipes.SelectMany(x => x.Inputs).Select(x => ItemName(x.itemId)).Distinct().ToList();
@@ -769,6 +810,8 @@ namespace FoodFactoryGame.Session.Equipment
                 // A sale needs a company to pay (decision 0013); the baseline carries the site's company, if any.
                 else if (recipes.Count > 0 && recipes.All(x => x.IsSale) && site.Companies is not { Count: > 0 })
                     _progressLabel.text = "Idle: this site has no company to sell for";
+                else if (recipes.Count > 0 && recipes.All(x => x.IsSale))
+                    _progressLabel.text = WaitingText(site, equipment, recipes, ingredients, waiting);
                 else _progressLabel.text = ingredients.Count == 0 ? "Idle: no recipes for this machine" : $"Idle: put {string.Join(" or ", ingredients)} in the input";
             }
             else if (job.State == StationJobState.Blocked)
@@ -786,6 +829,23 @@ namespace FoodFactoryGame.Session.Equipment
                 _progressLabel.text = $"{what}: {job.DurationSeconds - job.RemainingSeconds}/{job.DurationSeconds} s";
             }
             _progressFill.style.width = new Length(fraction * 100f, LengthUnit.Percent);
+        }
+
+        // Why customers at an idle counter wait (decision 0024), naming the first blocker: no edible menu item in this counter,
+        // or every table seat taken while a dine-in customer queues. Otherwise they are on their way to being served.
+        private static string WaitingText(GoodsSnapshot site, GoodsEquipment counter, List<RecipeAsset> menu, List<string> ingredients, int waiting)
+        {
+            var food = string.Join(" or ", ingredients);
+            if (waiting == 0) return $"No customers waiting; keep {food} in the input";
+            var who = $"{waiting} customer{(waiting == 1 ? "" : "s")} waiting";
+            var items = new HashSet<string>(menu.SelectMany(x => x.Inputs).Select(x => x.itemId));
+            if (!site.Lots.Any(x => x.LocationId == counter.InputLocationId && !x.Spoiled && items.Contains(x.ItemId)))
+                return $"{who}: put edible {food} in the input";
+            var tables = site.Equipment.Where(x => x.Kind == GoodsWorld.TableKind && x.State == EquipmentState.Placed).ToList();
+            var freeSeats = tables.Sum(x => x.Seats) - site.Customers.Count(x => tables.Any(y => y.Id == x.TableId));
+            if (freeSeats <= 0 && site.Customers.Any(x => x.State == CustomerState.Queued && x.DineIn))
+                return $"{who}: every table seat is taken; place more tables";
+            return who;
         }
 
         // Spoil timers and the hover line follow each baseline (the server ages goods every clock step); display only.

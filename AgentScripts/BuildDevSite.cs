@@ -51,6 +51,9 @@ public static class BuildDevSite
     private const string CounterDefinitionPath = "Assets/Content/Equipment/Counter.asset";
     private const string CounterMaterialFolder = "Assets/Materials/Counter";
     private const string SellBreadRecipePath = "Assets/Content/Recipes/SellBread.asset";
+    private const string TablePrefabPath = "Assets/Prefabs/Equipment/Table.prefab";
+    private const string TableDefinitionPath = "Assets/Content/Equipment/Table.asset";
+    private const string TableMaterialFolder = "Assets/Materials/Table";
     private const string FridgePrefabPath = "Assets/Prefabs/Equipment/Fridge.prefab";
     private const string FridgeDefinitionPath = "Assets/Content/Equipment/Fridge.asset";
     private const string FridgeMaterialFolder = "Assets/Materials/Fridge";
@@ -65,7 +68,7 @@ public static class BuildDevSite
 
     public static string Run()
     {
-        foreach (var folder in new[] { "Assets/UI", "Assets/Prefabs/Network", "Assets/Prefabs/Player", "Assets/Network", "Assets/Content/Equipment", "Assets/Content/Recipes", "Assets/Content/Items", "Assets/Materials", BeltMaterialFolder, BeltPrefabFolder, CounterMaterialFolder, FridgeMaterialFolder, BuildingMaterialFolder, "Assets/Prefabs/Equipment", OfferFolder, DockMaterialFolder, TruckMaterialFolder, "Assets/Prefabs/Logistics" })
+        foreach (var folder in new[] { "Assets/UI", "Assets/Prefabs/Network", "Assets/Prefabs/Player", "Assets/Network", "Assets/Content/Equipment", "Assets/Content/Recipes", "Assets/Content/Items", "Assets/Materials", BeltMaterialFolder, BeltPrefabFolder, CounterMaterialFolder, FridgeMaterialFolder, BuildingMaterialFolder, "Assets/Prefabs/Equipment", OfferFolder, DockMaterialFolder, TruckMaterialFolder, "Assets/Prefabs/Logistics", TableMaterialFolder })
             Directory.CreateDirectory(folder);
         AssetDatabase.Refresh();
         var panelSettings = BuildPanelSettings();
@@ -81,9 +84,11 @@ public static class BuildDevSite
         var fridge = BuildEquipmentDefinition(FridgeDefinitionPath, "fridge", 1, 1, 8, 1, BuildFridgePrefab(), ImportIcon("Fridge"), true);
         // PROTOTYPE loading dock (decision 0022): 2x1 m, 8 outgoing slots trucks load from and 8 incoming slots they unload into.
         var dock = BuildEquipmentDefinition(DockDefinitionPath, GoodsWorld.DockKind, 2, 1, 8, 8, BuildDockPrefab(), ImportIcon("Dock"));
+        // PROTOTYPE dining table (decision 0024): 2x1 m with four seats; its one-slot buffers are unused.
+        var table = BuildEquipmentDefinition(TableDefinitionPath, GoodsWorld.TableKind, 2, 1, 1, 1, BuildTablePrefab(), ImportIcon("Table"), seats: 4);
         // PROTOTYPE supplier prices (decision 0014): dough at 50 cents a unit leaves $2.00 margin on a $2.50 bread. An oven
         // (decision 0017) costs $150.00, 75 breads of margin, so the $500.00 start can afford one while keeping ingredient money.
-        // A fridge costs $80.00, a loading dock $60.00 and a truck (decision 0023) $250.00.
+        // A fridge costs $80.00, a loading dock $60.00, a truck (decision 0023) $250.00 and a table (decision 0024) $40.00.
         var offers = new[]
         {
             BuildOffer("Dough5", "supplier-dough-5", DevWorld.DoughItemId, 5, 250, DevWorld.DoughSpoilAfterSeconds),
@@ -91,6 +96,7 @@ public static class BuildDevSite
             BuildOffer("Oven1", "supplier-oven", "", 1, 15000, 1, oven),
             BuildOffer("Fridge1", "supplier-fridge", "", 1, 8000, 1, fridge),
             BuildOffer("Dock1", "supplier-dock", "", 1, 6000, 1, dock),
+            BuildOffer("Table1", "supplier-table", "", 1, 4000, 1, table),
             BuildOffer("Truck1", "supplier-truck", "", 1, 25000, 1, truck: BuildTruckDefinition())
         };
         // PROTOTYPE stack sizes: dough and bread 20, belts 100 (Factorio's belt stack), lifts 50 (decision 0021).
@@ -111,7 +117,7 @@ public static class BuildDevSite
             LitMaterial(BuildingMaterialFolder, "BuildingFloor", new Color(0.7f, 0.72f, 0.74f), 0f, 0.55f),
             LitMaterial(BuildingMaterialFolder, "BuildingRoof", new Color(0.32f, 0.2f, 0.17f), 0f, 0.2f)
         };
-        BuildScene(catalog, bridge, player, panelSettings, new[] { oven, counter, fridge, dock }, new[] { bread, sellBread }, offers, items, ghostMaterial,
+        BuildScene(catalog, bridge, player, panelSettings, new[] { oven, counter, fridge, dock, table }, new[] { bread, sellBread }, offers, items, ghostMaterial,
             ghostModelMaterial, beltPrefabs, tread, itemSprite, buildingMaterials, BuildTruckPrefab());
         EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
         AssetDatabase.SaveAssets();
@@ -174,7 +180,7 @@ public static class BuildDevSite
     }
 
     private static EquipmentDefinition BuildEquipmentDefinition(string path, string kind, int width, int depth, int inputCapacity,
-        int outputCapacity, GameObject prefab, Sprite icon, bool inputRefrigerated = false)
+        int outputCapacity, GameObject prefab, Sprite icon, bool inputRefrigerated = false, int seats = 0)
     {
         var definition = AssetDatabase.LoadAssetAtPath<EquipmentDefinition>(path);
         if (definition == null)
@@ -191,6 +197,7 @@ public static class BuildDevSite
             serialized.FindProperty("outputCapacity").intValue = outputCapacity;
             serialized.FindProperty("inputRefrigerated").boolValue = inputRefrigerated;
             serialized.FindProperty("outputRefrigerated").boolValue = false;
+            serialized.FindProperty("seats").intValue = seats;
             serialized.FindProperty("visualPrefab").objectReferenceValue = prefab;
             serialized.FindProperty("icon").objectReferenceValue = icon;
             serialized.ApplyModifiedPropertiesWithoutUndo();
@@ -219,6 +226,34 @@ public static class BuildDevSite
             box.center = new Vector3(0f, 0.6f, 0f);
             box.size = new Vector3(2f, 1.2f, 0.9f);
             return PrefabUtility.SaveAsPrefabAsset(root, CounterPrefabPath);
+        }
+        finally { Object.DestroyImmediate(root); }
+    }
+
+    // DEVELOPMENT placeholder art for the decision-0024 dining table: a 2 x 1 m wooden table on four legs with two chairs on
+    // each long side, built from primitives. One box collider on the root lets aim rays name it and keeps players out of it.
+    private static GameObject BuildTablePrefab()
+    {
+        var wood = LitMaterial(TableMaterialFolder, "TableWood", new Color(0.72f, 0.47f, 0.25f), 0f, 0.4f);
+        var dark = LitMaterial(TableMaterialFolder, "TableDark", new Color(0.36f, 0.22f, 0.12f), 0f, 0.3f);
+        var root = new GameObject("Table");
+        try
+        {
+            Block(root, "Top", wood, new Vector3(0f, 0.74f, 0f), new Vector3(1.6f, 0.06f, 0.6f));
+            foreach (var x in new[] { -0.72f, 0.72f })
+            foreach (var z in new[] { -0.24f, 0.24f })
+                Block(root, "Leg", dark, new Vector3(x, 0.36f, z), new Vector3(0.07f, 0.72f, 0.07f));
+            foreach (var x in new[] { -0.45f, 0.45f })
+            foreach (var z in new[] { -1f, 1f })
+            {
+                Block(root, "Seat", wood, new Vector3(x, 0.45f, z * 0.5f), new Vector3(0.42f, 0.05f, 0.3f));
+                Block(root, "Back", dark, new Vector3(x, 0.72f, z * 0.64f), new Vector3(0.42f, 0.5f, 0.05f));
+                Block(root, "ChairLegs", dark, new Vector3(x, 0.22f, z * 0.5f), new Vector3(0.36f, 0.44f, 0.24f));
+            }
+            var box = root.AddComponent<BoxCollider>();
+            box.center = new Vector3(0f, 0.5f, 0f);
+            box.size = new Vector3(2f, 1f, 1f);
+            return PrefabUtility.SaveAsPrefabAsset(root, TablePrefabPath);
         }
         finally { Object.DestroyImmediate(root); }
     }
@@ -330,6 +365,9 @@ public static class BuildDevSite
             inputs.GetArrayElementAtIndex(0).FindPropertyRelative("quantity").intValue = 1;
             serialized.FindProperty("outputItemId").stringValue = "";
             serialized.FindProperty("saleCents").intValue = 250;
+            // PROTOTYPE menu attributes (decision 0024): basic tier, bakery cuisine.
+            serialized.FindProperty("tier").intValue = 1;
+            serialized.FindProperty("cuisine").stringValue = "bakery";
             serialized.ApplyModifiedPropertiesWithoutUndo();
         }
         EditorUtility.SetDirty(recipe);

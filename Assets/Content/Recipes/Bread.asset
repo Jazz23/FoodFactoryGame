@@ -23,3 +23,5 @@ MonoBehaviour:
   outputQuantity: 1
   outputSpoilAfterSeconds: 3600
   saleCents: 0
+  tier: 1
+  cuisine: 

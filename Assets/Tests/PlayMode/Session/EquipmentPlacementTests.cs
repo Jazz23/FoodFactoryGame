@@ -305,8 +305,8 @@ namespace FoodFactoryGame.Session.PlayModeTests
             interaction.CloseScreen();
         }
 
-        // Decision 0013: bread dropped into the seeded counter through the ordinary slot path sells on the server clock, the
-        // company cash rises in the committed save, the host HUD shows it, and a remote client receives it in its baseline.
+        // Decisions 0013, 0024: bread dropped into the seeded counter through the ordinary slot path is bought by customers on the
+        // server clock, the company cash rises in the committed save, the host HUD shows it, and a remote client receives it.
         [UnityTest]
         public IEnumerator HostSellsBreadAtTheCounterAndRemoteSeesTheCash()
         {
@@ -318,11 +318,17 @@ namespace FoodFactoryGame.Session.PlayModeTests
             var hud = UnityEngine.Object.FindAnyObjectByType<PlayerHud>();
             long RemoteCash() => _remoteSite.Latest?.Companies.SingleOrDefault()?.Cash ?? -1;
 
-            // TEST fixture: two fresh bread in the host's inventory, committed like any server change.
+            // TEST fixtures: two fresh bread in the host's inventory, and a district 10 m from the site sending one takeaway customer
+            // a second with only this restaurant in range, so sales come quickly; committed like any server change.
             _root.ServerWorld.Bootstrap(new GoodsLot
             {
                 Id = "test-bread", ItemId = "bread", OwnerId = DevWorld.SiteId, LocationId = GoodsWorld.InventoryLocationId(hostId),
                 Quantity = 2, SpoilAfterSeconds = 3600
+            });
+            _root.ServerWorld.Bootstrap(new GoodsDistrict
+            {
+                Id = "test-district", Name = "Test", MapZ = 10, CustomersPerHour = 3600, WealthPercent = 50, LikedCuisines = { "bakery" },
+                RangeMetres = 20
             });
             GoodsSnapshotStore.Save(_root.ServerWorld, _root.Options.WorldPath);
             yield return Until(() => { _remoteSite.Tick(); return RemoteCash() == DevWorld.StartingCash; }, "remote sees the starting cash");
@@ -335,7 +341,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
 
             hud.ClickSlot(PlayerHud.InventoryGrid, hud.SlotOf(PlayerHud.InventoryGrid, "bread"));
             hud.ClickSlot(PlayerHud.InputGrid, 0);
-            yield return Until(() => _root.ClientSite.Jobs.Any(x => x.StationId == DevWorld.CounterId && x.IsSale), "a customer being served");
+            yield return Until(() => _root.ClientSite.Customers.Any(x => x.CounterId == DevWorld.CounterId), "a customer being served", 15f);
             Assert.That(interaction.LastRejection, Is.Null);
             Assert.That(hud.ScreenRoot.Q<Label>("hud-progress-label").text, Does.StartWith("Serving a customer: Bread for $2.50"));
 
@@ -657,8 +663,8 @@ namespace FoodFactoryGame.Session.PlayModeTests
             yield return Until(() => _root.ServerBridge != null, "server-only restart");
             var oven = Oven(_root.ServerWorld.Snapshot());
             Assert.That((oven.State, oven.CellX, oven.CellZ, oven.Rotation), Is.EqualTo((EquipmentState.Placed, 3, 8, 2)));
-            Assert.That(_root.ServerWorld.Snapshot().Equipment.Select(x => x.Kind), Is.EquivalentTo(new[] { "oven", DevWorld.CounterKind, GoodsWorld.DockKind, GoodsWorld.DockKind }),
-                "The seed (with one dock per dev site, decision 0022) is not re-applied to an existing save.");
+            Assert.That(_root.ServerWorld.Snapshot().Equipment.Select(x => x.Kind), Is.EquivalentTo(new[] { "oven", DevWorld.CounterKind, GoodsWorld.DockKind, GoodsWorld.DockKind, DevWorld.TableKind }),
+                "The seed (with one dock per dev site, decision 0022, and the table, decision 0024) is not re-applied to an existing save.");
         }
     }
 }

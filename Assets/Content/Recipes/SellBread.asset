@@ -23,3 +23,5 @@ MonoBehaviour:
   outputQuantity: 1
   outputSpoilAfterSeconds: 1
   saleCents: 250
+  tier: 1
+  cuisine: bakery

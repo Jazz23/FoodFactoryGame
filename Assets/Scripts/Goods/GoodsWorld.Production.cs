@@ -1,8 +1,9 @@
 // Station jobs share GoodsWorld's lock and snapshot so input consumption, output creation and refunds commit atomically with goods.
 // A job keeps copies of its consumed inputs and its recipe output, so recovery and pickup never depend on registered recipe content.
 // Stations are created and removed only with placed equipment (GoodsWorld.Equipment.cs). Jobs start on request, or by
-// themselves when the server turns AutomaticJobs on. A sale recipe (decision 0013) is a job whose result is cash for the
-// site's company instead of goods: its inputs leave the world and the company is paid in the same commit.
+// themselves when the server turns AutomaticJobs on. A sale recipe (decision 0013) was a job whose result is cash for the
+// site's company. Since decision 0024 a sale recipe is a menu item that customers buy at a counter (GoodsWorld.Customers.cs);
+// stations never start one, and a sale job loaded from an older save still completes and pays exactly once.
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -29,6 +30,10 @@ namespace FoodFactoryGame.Goods
         // A sale (decision 0013): when above zero the recipe produces no goods; completing it pays this many cents to the
         // company that owns the station's site. Output fields are then empty/zero.
         public long SaleCents;
+        // Menu attributes of a sale recipe (decision 0024): tier (1 basic and up; wealthy districts value higher tiers) and
+        // cuisine (matched against a district's liked cuisines). Ignored for goods recipes.
+        public int Tier = 1;
+        public string Cuisine = "";
 
         public bool IsSale => SaleCents > 0;
     }
@@ -95,7 +100,7 @@ namespace FoodFactoryGame.Goods
                     || recipe.DurationSeconds < 1 || recipe.Inputs == null || recipe.Inputs.Count == 0
                     || recipe.Inputs.Any(x => x == null || string.IsNullOrWhiteSpace(x.ItemId) || x.Quantity < 1)
                     || recipe.Inputs.GroupBy(x => x.ItemId).Any(x => x.Count() != 1)
-                    || recipe.SaleCents < 0
+                    || recipe.SaleCents < 0 || recipe.Tier < 1 || recipe.Cuisine == null
                     // Exactly one result: goods, or a sale with no goods output.
                     || (recipe.IsSale
                         ? !string.IsNullOrEmpty(recipe.OutputItemId) || recipe.OutputQuantity != 0 || recipe.OutputSpoilAfterSeconds != 0
@@ -120,10 +125,10 @@ namespace FoodFactoryGame.Goods
                     return Record(requestId, playerId, false, "forbidden", null);
                 if (recipeId == null || !_recipes.TryGetValue(recipeId, out var recipe) || recipe.StationKind != station.Kind)
                     return Record(requestId, playerId, false, "invalid-recipe", null);
+                // Customers buy menu items themselves (decision 0024).
+                if (recipe.IsSale) return Record(requestId, playerId, false, "customers-only", null);
                 if (_state.Jobs.Any(x => x.StationId == station.Id))
                     return Record(requestId, playerId, false, "station-busy", null);
-                if (recipe.IsSale && CompanyOfSiteLocked(station.SiteId) is null)
-                    return Record(requestId, playerId, false, "no-company", null);
                 var plan = InputPlan(station, recipe);
                 if (plan == null) return Record(requestId, playerId, false, "missing-inputs", null);
 
@@ -201,11 +206,10 @@ namespace FoodFactoryGame.Goods
         private StationJob StartReadyJob(GoodsStation station)
         {
             if (_state.Jobs.Any(x => x.StationId == station.Id)) return null;
-            foreach (var recipe in _recipes.Values.Where(x => x.StationKind == station.Kind).OrderBy(x => x.Id, StringComparer.Ordinal))
+            // Menu items (sale recipes) are bought by customers, never started by a station (decision 0024).
+            foreach (var recipe in _recipes.Values.Where(x => x.StationKind == station.Kind && !x.IsSale).OrderBy(x => x.Id, StringComparer.Ordinal))
             {
-                // A sale needs a company to pay; goods need room for their output.
-                if (recipe.IsSale ? CompanyOfSiteLocked(station.SiteId) is null
-                        : !Fits(station.OutputLocationId, recipe.OutputItemId, false, recipe.OutputQuantity)) continue;
+                if (!Fits(station.OutputLocationId, recipe.OutputItemId, false, recipe.OutputQuantity)) continue;
                 var plan = InputPlan(station, recipe);
                 if (plan == null) continue;
                 return AddJob(station, recipe, plan, AutomaticStarter);
@@ -243,28 +247,15 @@ namespace FoodFactoryGame.Goods
         {
             foreach (var job in _state.Jobs.Where(x => x.State == StationJobState.Running).ToList())
             {
-                // Sale jobs started while catching up earlier in this loop are not in the list; a waiting sale (no headroom)
-                // is retried here with zero remaining.
-                if (!_state.Jobs.Contains(job)) continue;
+                // A waiting legacy sale (no headroom) is retried here with zero remaining.
                 var worked = Math.Min(seconds, job.RemainingSeconds);
                 job.RemainingSeconds -= worked;
                 if (job.RemainingSeconds > 0) continue;
                 var station = _state.Stations.First(x => x.Id == job.StationId);
                 if (job.IsSale)
                 {
-                    // Paid in this same commit. The rest of the step serves the next customers, so revenue does not depend
-                    // on how the server divides time: one long step sells what many short ones would.
-                    var left = seconds - worked;
-                    var sale = job;
-                    while (TryCompleteSale(sale, station) && left > 0 && _automaticJobs)
-                    {
-                        sale = StartReadyJob(station);
-                        if (sale is null || !sale.IsSale) break;
-                        var served = Math.Min(left, sale.RemainingSeconds);
-                        sale.RemainingSeconds -= served;
-                        left -= served;
-                        if (sale.RemainingSeconds > 0) break;
-                    }
+                    // A sale job from a save made before decision 0024: paid in this same commit, or retried next step.
+                    TryCompleteSale(job, station);
                     continue;
                 }
                 var output = _state.Locations.First(x => x.Id == station.OutputLocationId);

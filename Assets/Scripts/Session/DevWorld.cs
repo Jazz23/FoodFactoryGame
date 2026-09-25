@@ -2,7 +2,8 @@
 // The seed is applied only to a brand-new world: an existing save never gains the layout, oven or storage dough retroactively.
 // Belts, lifts, the company, the sell counter and the building shells are the exceptions: a save from before each existed
 // gets the dev belt stock (EnsureBeltStock), the dev lift stock (EnsureLiftStock), the dev company with its starting cash (EnsureCompany), the dev counter (EnsureCounter),
-// the dev restaurant shell (EnsureBuilding), the dev factory shell (EnsureFactory), the dev logistics (AddLogistics) or, where
+// the dev restaurant shell (EnsureBuilding), the dev factory shell (EnsureFactory), the dev logistics (AddLogistics), the dev
+// customers (AddCustomers: district, competitors and table) or, where
 // the server spawns employees, the dev employee (EnsureEmployee) once.
 using System.Collections.Generic;
 using System.IO;
@@ -101,6 +102,39 @@ namespace FoodFactoryGame.Session
         public const int TruckSpeedMetresPerSecond = 15;
         public const int TruckLoadUnitsPerSecond = 5;
 
+        // PROTOTYPE customers (decision 0024). One district, "Old Town", 60 m north of the restaurant (a 30 s walk), sends 240
+        // customers an hour who like bakery food; 70% prefer to dine in. Two fixed competitors stand in range: a pricier,
+        // better bakery café and a noodle bar. The restaurant gets a 2x1 four-seat table inside its shell, clear of the seed,
+        // the spawn points and the PlayMode test cells.
+        public const string DistrictId = "dev-district";
+        public const string CafeId = "dev-competitor-cafe";
+        public const string NoodlesId = "dev-competitor-noodles";
+        public const string TableKind = GoodsWorld.TableKind;
+        public const string TableId = "dev-table-1";
+        public const int TableCellX = 11;
+        public const int TableCellZ = 3;
+
+        public static GoodsDistrict District() => new()
+        {
+            Id = DistrictId, Name = "Old Town", MapX = 0, MapZ = 60, CustomersPerHour = 240, WealthPercent = 40,
+            Appearance = "old-town", AppearanceVariants = 4, LikedCuisines = new List<string> { "bakery" }, DineInPercent = 70,
+            RangeMetres = 400
+        };
+
+        public static IReadOnlyList<GoodsCompetitor> Competitors => new[]
+        {
+            new GoodsCompetitor
+            {
+                Id = CafeId, Name = "Corner Cafe", MapX = 120, MapZ = 60, Cuisine = "bakery", Tier = 2, PriceCents = 450,
+                Servers = 1, ServiceSeconds = 20, Seats = 6
+            },
+            new GoodsCompetitor
+            {
+                Id = NoodlesId, Name = "Noodle Bar", MapX = -150, MapZ = 100, Cuisine = "noodles", Tier = 1, PriceCents = 600,
+                Servers = 2, ServiceSeconds = 15, Seats = 10
+            }
+        };
+
         // Sites other than the dev site that every player is granted, for remote management (no inventory there).
         public static IReadOnlyList<string> RemoteSiteIds => new[] { WarehouseSiteId };
 
@@ -121,8 +155,10 @@ namespace FoodFactoryGame.Session
         // A pre-SQLite snapshot at legacyWorldPath is imported once, after a dry run, when no database exists yet.
         // Without a counter definition no counter is seeded or added. seedEmployee (a server that spawns employees) adds the
         // dev employee. Without a dock definition no logistics (map records, warehouse, docks, truck) are seeded or added.
+        // The dev district and competitors are always seeded or added; without a table definition no dev table is.
         public static GoodsWorld LoadOrCreate(string worldPath, EquipmentDefinition oven = null, IEnumerable<ItemDefinition> items = null,
-            string legacyWorldPath = null, EquipmentDefinition counter = null, bool seedEmployee = false, EquipmentDefinition dock = null)
+            string legacyWorldPath = null, EquipmentDefinition counter = null, bool seedEmployee = false, EquipmentDefinition dock = null,
+            EquipmentDefinition table = null)
         {
             if (!File.Exists(worldPath) && !string.IsNullOrWhiteSpace(legacyWorldPath)
                 && (File.Exists(legacyWorldPath) || File.Exists(legacyWorldPath + ".previous")))
@@ -147,6 +183,11 @@ namespace FoodFactoryGame.Session
                     GoodsSnapshotStore.Save(loaded, worldPath);
                     Debug.Log("[Session] Added the dev logistics (map, warehouse, docks, truck) this save was missing.");
                 }
+                if (AddCustomers(loaded, table))
+                {
+                    GoodsSnapshotStore.Save(loaded, worldPath);
+                    Debug.Log("[Session] Added the dev customers (district, competitors, table) this save was missing.");
+                }
                 return loaded;
             }
             var world = new GoodsWorld(WorldId);
@@ -167,6 +208,7 @@ namespace FoodFactoryGame.Session
             if (counter != null) world.Bootstrap(counter.CreatePlaced(CounterId, SiteId, CounterCellX, CounterCellZ, 0));
             if (seedEmployee) world.Bootstrap(Employee(), EmployeeHandSlots);
             if (dock != null) AddLogistics(world, dock);
+            AddCustomers(world, table);
             GoodsSnapshotStore.Save(world, worldPath);
             return world;
         }
@@ -217,6 +259,22 @@ namespace FoodFactoryGame.Session
                 });
             }
             return world.Snapshot().Revision != revision;
+        }
+
+        // PROTOTYPE, one-time per part (decision 0024): adds the dev district and competitors, keyed by ID, and the dev table to a
+        // site that has never had a table (tables are never destroyed, only held), and returns whether anything changed; the
+        // caller commits it before serving. A table whose cells are taken is skipped with a warning.
+        private static bool AddCustomers(GoodsWorld world, EquipmentDefinition table)
+        {
+            var state = world.Snapshot();
+            if (state.Locations.All(x => x.SiteId != SiteId)) return false;
+            if (state.Districts.All(x => x.Id != DistrictId)) world.Bootstrap(District());
+            foreach (var competitor in Competitors)
+                if (state.Competitors.All(x => x.Id != competitor.Id)) world.Bootstrap(competitor);
+            if (table != null && state.SiteLayouts.Any(x => x.SiteId == SiteId)
+                && state.Equipment.All(x => x.Id != TableId && !(x.Kind == table.Kind && x.SiteId == SiteId)))
+                TryPlace(world, table.CreatePlaced(TableId, SiteId, TableCellX, TableCellZ, 0));
+            return world.Snapshot().Revision != state.Revision;
         }
 
         private static void TryPlace(GoodsWorld world, GoodsEquipment equipment)

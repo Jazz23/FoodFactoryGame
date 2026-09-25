@@ -256,7 +256,7 @@ seating if applicable, pay, and leave.
 
 ## Menu
 
-- Player chooses which recipes each restaurant sells and sets prices.
+- Player chooses which recipes each restaurant sells. Prices are fixed per recipe; the player does not set them (owner decision 2026-09-25, revising "and sets prices").
 
 - Menus should match local tastes and the supply network behind the
   restaurant.
@@ -582,6 +582,14 @@ Status: selected - Simple workforce.
 - C. Hybrid - districts generate demand in aggregate, then spawned customers choose among nearby restaurants using a simpler score.
 
 Status: selected - Individual choice.
+
+Owner decisions recorded 2026-09-25 (details and open items: `docs/decisions/0024-customer-simulation.md`):
+
+- Districts create customers at a district-specific density; each district's customers look different; customers appear out of the player's view.
+- Wealthy districts demand nicer food, expressed as recipe/item tier only; food condition stays binary (section 24 unchanged). Wait time matters; spoiled food is never served.
+- Takeaway exists, but most customers prefer dining in; free seats count when choosing, so competitors with open tables tend to win them.
+- Self-seating: customers queue at the counter; dine-in customers buy once a seat is free, then seat themselves. With no free seat they keep waiting until a seat frees or their patience runs out.
+- Customers who are travelling or queued are saved and resume after a restart.
 
 # 24. Decision Record: Food Condition
 

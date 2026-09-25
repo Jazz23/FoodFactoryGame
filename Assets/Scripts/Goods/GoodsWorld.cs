@@ -74,7 +74,7 @@ namespace FoodFactoryGame.Goods
 
     [Serializable] public sealed class GoodsSnapshot
     {
-        public const int CurrentSchema = 12;
+        public const int CurrentSchema = 13;
         public int SchemaVersion = CurrentSchema;
         public string WorldId;
         public long ClockSeconds;
@@ -95,6 +95,14 @@ namespace FoodFactoryGame.Goods
         public List<GoodsSite> Sites = new();
         public List<GoodsTruck> Trucks = new();
         public List<GoodsRoute> Routes = new();
+        // Customers (decision 0024): district and competitor map records, the customers in the world, and each restaurant's
+        // reputation and published wait. The counters and random state keep customer IDs and choices deterministic.
+        public List<GoodsDistrict> Districts = new();
+        public List<GoodsCompetitor> Competitors = new();
+        public List<GoodsCustomer> Customers = new();
+        public List<GoodsDiner> Diners = new();
+        public long NextCustomerNumber;
+        public long CustomerRandom;
     }
 
     public sealed partial class GoodsWorld
@@ -254,6 +262,7 @@ namespace FoodFactoryGame.Goods
                 view.Employees = view.Employees.Where(x => x.SiteId == siteId).ToList();
                 foreach (var employee in view.Employees) employee.Script = "";
                 ViewLogistics(view, siteId);
+                ViewCustomers(view, siteId);
                 view.Reservations.Clear();
                 view.Outcomes.Clear();
                 view.Grants.Clear();
@@ -282,6 +291,7 @@ namespace FoodFactoryGame.Goods
                 StartReadyJobs();
                 MoveBeltItems(seconds);
                 MoveTrucks(seconds);
+                AdvanceCustomers(seconds);
                 _state.Revision++;
             }
         }
@@ -577,7 +587,8 @@ namespace FoodFactoryGame.Goods
                 || state.Grants == null || state.Reservations == null || state.Outcomes == null
                 || state.Stations == null || state.Jobs == null || state.Equipment == null || state.SiteLayouts == null || state.Belts == null
                 || state.Companies == null || state.Buildings == null || state.Employees == null || state.Sites == null || state.Trucks == null
-                || state.Routes == null)
+                || state.Routes == null || state.Districts == null || state.Competitors == null || state.Customers == null
+                || state.Diners == null)
                 throw new InvalidOperationException("Unsupported or invalid goods snapshot schema.");
             if (state.Locations.Any(x => x == null || string.IsNullOrWhiteSpace(x.Id) || string.IsNullOrWhiteSpace(x.SiteId) || x.Capacity < 1)
                 || state.Locations.GroupBy(x => x.Id).Any(x => x.Count() != 1)
@@ -603,6 +614,7 @@ namespace FoodFactoryGame.Goods
             ValidateBuildings(state);
             ValidateEmployees(state);
             ValidateTrucks(state);
+            ValidateCustomers(state);
         }
     }
 }

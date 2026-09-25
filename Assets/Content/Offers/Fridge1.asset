@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: FoodFactoryGame.Session::FoodFactoryGame.Session.Equipment.OfferAsset
   id: supplier-fridge
   equipment: {fileID: 11400000, guid: 7ca16dea8a818ab4d88e687f01247e4d, type: 2}
+  truck: {fileID: 0}
   itemId: 
   quantity: 1
   priceCents: 8000

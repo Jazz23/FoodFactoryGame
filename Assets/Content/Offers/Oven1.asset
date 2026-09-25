@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: FoodFactoryGame.Session::FoodFactoryGame.Session.Equipment.OfferAsset
   id: supplier-oven
   equipment: {fileID: 11400000, guid: ca44737585fd09849b1d302d33530d33, type: 2}
+  truck: {fileID: 0}
   itemId: 
   quantity: 1
   priceCents: 15000

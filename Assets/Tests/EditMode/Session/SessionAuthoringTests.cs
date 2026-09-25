@@ -35,6 +35,7 @@ namespace FoodFactoryGame.Session.Tests
         private const string FridgePrefabPath = "Assets/Prefabs/Equipment/Fridge.prefab";
         private const string FridgeDefinitionPath = "Assets/Content/Equipment/Fridge.asset";
         private const string DockDefinitionPath = "Assets/Content/Equipment/Dock.asset";
+        private const string TableDefinitionPath = "Assets/Content/Equipment/Table.asset";
         private const string TruckPrefabPath = "Assets/Prefabs/Logistics/Truck.prefab";
 
         private static void AssertAssigned(Object component, params string[] fields)
@@ -85,10 +86,10 @@ namespace FoodFactoryGame.Session.Tests
                     Assert.That(AssetDatabase.GetAssetPath(serialized.FindProperty("playerPrefab").objectReferenceValue), Is.EqualTo(PlayerPath));
                     Assert.That(AssetDatabase.GetAssetPath(serialized.FindProperty("bridgePrefab").objectReferenceValue), Is.EqualTo(BridgePath));
                     Assert.That(roots[0].EquipmentDefinitions.Select(AssetDatabase.GetAssetPath),
-                        Is.EqualTo(new[] { OvenDefinitionPath, CounterDefinitionPath, FridgeDefinitionPath, DockDefinitionPath }));
+                        Is.EqualTo(new[] { OvenDefinitionPath, CounterDefinitionPath, FridgeDefinitionPath, DockDefinitionPath, TableDefinitionPath }));
                     Assert.That(roots[0].Recipes.Select(AssetDatabase.GetAssetPath), Is.EqualTo(new[] { BreadRecipePath, SellBreadRecipePath }));
                     Assert.That(roots[0].Offers.Select(AssetDatabase.GetAssetPath),
-                        Is.EqualTo(new[] { "Assets/Content/Offers/Dough5.asset", "Assets/Content/Offers/Belt10.asset", "Assets/Content/Offers/Oven1.asset", "Assets/Content/Offers/Fridge1.asset", "Assets/Content/Offers/Dock1.asset", "Assets/Content/Offers/Truck1.asset" }));
+                        Is.EqualTo(new[] { "Assets/Content/Offers/Dough5.asset", "Assets/Content/Offers/Belt10.asset", "Assets/Content/Offers/Oven1.asset", "Assets/Content/Offers/Fridge1.asset", "Assets/Content/Offers/Dock1.asset", "Assets/Content/Offers/Table1.asset", "Assets/Content/Offers/Truck1.asset" }));
                 }
                 var panels = objects.SelectMany(x => x.GetComponents<SessionPanel>()).ToArray();
                 Assert.That(panels.Length, Is.EqualTo(1));
@@ -242,6 +243,7 @@ namespace FoodFactoryGame.Session.Tests
             Assert.That((definition.StationKind, definition.DurationSeconds, definition.SaleCents, definition.OutputItemId, definition.OutputQuantity),
                 Is.EqualTo((DevWorld.CounterKind, 5L, 250L, "", 0)));
             Assert.That(definition.Inputs.Select(x => (x.ItemId, x.Quantity)), Is.EqualTo(new[] { ("bread", 1) }));
+            Assert.That((definition.Tier, definition.Cuisine), Is.EqualTo((1, "bakery")), "PROTOTYPE menu attributes (decision 0024).");
             Assert.DoesNotThrow(() => new FoodFactoryGame.Goods.GoodsWorld("authoring-check").RegisterRecipe(definition));
         }
 
@@ -301,6 +303,19 @@ namespace FoodFactoryGame.Session.Tests
             Assert.That((AssetDatabase.GetAssetPath(offer.Equipment), offer.Quantity), Is.EqualTo((FridgeDefinitionPath, 1)));
             Assert.That(offer.ToEquipmentOffer().Equipment.InputRefrigerated, Is.True);
             Assert.DoesNotThrow(() => offer.RegisterWith(new FoodFactoryGame.Goods.GoodsWorld("authoring-check")));
+        }
+
+        [Test]
+        public void TableDefinitionIsABuyableFourSeatTable()
+        {
+            var definition = AssetDatabase.LoadAssetAtPath<EquipmentDefinition>(TableDefinitionPath);
+            Assert.That(definition, Is.Not.Null);
+            Assert.That((definition.Kind, definition.Width, definition.Depth, definition.Seats), Is.EqualTo((GoodsWorld.TableKind, 2, 1, 4)));
+            Assert.That(definition.Icon, Is.Not.Null);
+            Assert.That(definition.VisualPrefab.GetComponentsInChildren<Collider>(true).Length, Is.EqualTo(1), "One collider for aim rays.");
+            var offer = AssetDatabase.LoadAssetAtPath<OfferAsset>("Assets/Content/Offers/Table1.asset");
+            Assert.That((AssetDatabase.GetAssetPath(offer.Equipment), offer.Quantity, offer.PriceCents), Is.EqualTo((TableDefinitionPath, 1, 4000L)));
+            Assert.DoesNotThrow(() => offer.RegisterWith(new GoodsWorld("authoring-check")));
         }
 
         [Test]

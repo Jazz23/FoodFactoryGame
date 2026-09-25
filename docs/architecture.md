@@ -168,7 +168,7 @@ Decision: [0013](decisions/0013-sell-counter.md). Step 2 of the sell loop: edibl
 - Content: `RecipeAsset.saleCents`; `Assets/Content/Equipment/Counter.asset` (kind `counter`, 2x1, input 2 slots, unused output 1 slot), `Assets/Prefabs/Equipment/Counter.prefab` (primitives, one root box collider, `Assets/Materials/Counter`), `Assets/Art/Icons/Counter.png`, `Assets/Content/Recipes/SellBread.asset` (`counter-sell-bread`: 1 bread, 5 s, 250 cents). All authored by `AgentScripts/BuildDevSite.cs`; `SessionRoot` lists `[oven, counter]` and `[bread, sell bread]`.
 - Dev seed (`DevWorld`): `dev-counter-1` placed at cells (6, 13) in new worlds; `EnsureCounter` adds it once to a save with no counter (committed before serving; warns and skips if the cells are taken).
 - Presentation: the machine screen shows a sale station's prices (`hud-sale-prices`) instead of an output grid; progress reads "Serving a customer: <item> for <price>"; an ownerless site reads "no company to sell for"; the readout hint is counter-specific.
-Open: player-set prices, menus, real customers and demand (GDD sections 7 and 23), competing sale recipes on one counter (lowest recipe ID wins). Purchases: step 3, below.
+Superseded 2026-09-25 by customers (decision 0024, below): sale recipes are now menu items only customers buy; stations never start them. Purchases: step 3, below.
 
 ## Implemented: supplier purchases (2026-09-24)
 
@@ -282,6 +282,18 @@ Decision: [0023](decisions/0023-truck-routes-and-fleet.md). Supersedes the per-t
 
 Prototype: truck price, parking a driving truck at the site it left, panel layout. Open: see decision 0023.
 
+## Implemented: customers (2026-09-25)
+
+Decision: [0024](decisions/0024-customer-simulation.md). Replaces the sell counter's stand-in buyer (0013, above). Goods snapshot schema **v13**.
+
+- Domain (`GoodsWorld.Customers.cs`): `GoodsDistrict`, `GoodsCompetitor`, `GoodsCustomer`, `GoodsDiner` in `GoodsSnapshot.Districts`/`Competitors`/`Customers`/`Diners`, plus `NextCustomerNumber` and `CustomerRandom`. Customers advance inside `Advance` in one-second sub-steps after the other systems: spawn, logit choice among restaurants in range (or stay home), travel, queue, purchase (edible item out of a counter's input + company credit + seat, one revision), eat or leave, walk out once (re-choose) or twice (home). Server-only `Bootstrap(GoodsDistrict)`, `Bootstrap(GoodsCompetitor)`, `Bootstrap(GoodsCustomer)`. `View` carries the site's customers and diner record only. `Validate` checks per-state customer shape, one customer per counter, seats per table/competitor, competitor servers.
+- Production: sale recipes are menu items (`RecipeDefinition.Tier`, `Cuisine`); stations never start them (`customers-only`); a legacy sale job completes once. `GoodsEquipment.Seats` (kind `table` ⇔ seats > 0); `PickUp` answers `occupied` for a serving counter or an occupied table.
+- Session and content: `DevWorld.AddCustomers` seeds or adds once the dev district, Corner Cafe, Noodle Bar and `dev-table-1` (cells (11, 3), inside the restaurant). `EquipmentDefinition.seats`, `RecipeAsset.tier`/`cuisine`; `Assets/Content/Equipment/Table.asset`, `Assets/Prefabs/Equipment/Table.prefab`, `Assets/Art/Icons/Table.png`, offer `Table1` (`supplier-table`, $40.00), all authored by `BuildDevSite.cs`/`DrawItemIcons.ps1`; `SessionRoot` in `DevSite` lists the table definition and offer (`SampleScene` was not updated).
+- Presentation: the counter's progress line shows the customer being served and how many wait; a table opens a seats/standing window. No visual customers.
+- Evidence: [verification record](verification/customers-20260925.md).
+
+Prototype: all district, competitor, choice-weight, patience, eating, reputation and table values. Open: see decision 0024 (visual customers and out-of-view spawning, menus, customer groups, competitor AI).
+
 ## Required Constraints for Future Implementation
 
 - The server owns gameplay state; clients request validated actions through the command contract in decision 0002.
@@ -290,7 +302,7 @@ Prototype: truck price, parking a driving truck at the site it left, panel layou
 - Player and employee operational rules should be shared; input and AI choose actions through those rules.
 - Visual objects must not become the sole owners of authoritative simulation state.
 
-These remain accepted contracts; only the bounded goods slice, its station jobs, equipment placement, the working oven, conveyor belts, company cash, the sell counter, supplier purchases, equipment purchases, spoilage timing/refrigeration, building shells, factory floors, conveyor lifts, trucks with loading docks, and truck routes and fleet above have a runtime interface. Sales credit cash inside the clock tick; supplier purchases and floor orders are the player payment commands. Trucks move goods between sites only inside the clock tick, through their own cargo locations.
+These remain accepted contracts; only the bounded goods slice, its station jobs, equipment placement, the working oven, conveyor belts, company cash, the sell counter, supplier purchases, equipment purchases, spoilage timing/refrigeration, building shells, factory floors, conveyor lifts, trucks with loading docks, truck routes and fleet, and customers above have a runtime interface. Customer purchases credit cash inside the clock tick; supplier purchases and floor orders are the player payment commands. Trucks move goods between sites only inside the clock tick, through their own cargo locations.
 
 ## Planned / Undecided
 
@@ -299,6 +311,7 @@ These remain accepted contracts; only the bounded goods slice, its station jobs,
 - Physical goods model: selected in GDD section 28 and decision 0003; a logical lot/condition/transfer/recovery slice is implemented. Transport staging, actual placed-world positions, carrier/vehicle handling constraints, and visual projection remain pending.
 - Offline progression, host migration, discovery/lobbies/relay, and the shipped hosting model remain undecided. A direct-IP development host/join flow exists (decision 0005).
 - SQLite is the storage for all persisted data (decision 0011): the goods world, player registry and client identity. MoonSharp runs the prototype employee scripts (above); no wider scripting or modding role is selected.
+- Customers: first build implemented (above, decision 0024); visual customers, menus, customer groups and competitor AI remain open. The benchmarked choice model in the test assembly ([record](verification/customer-choice-benchmark-20260925.md)) is a separate prototype, not the runtime code.
 - Multiplayer smoke tests and representative scale benchmarks follow implementation; current tests do not establish replication correctness or the 60 FPS target.
 
 ## Baseline Test Evolution

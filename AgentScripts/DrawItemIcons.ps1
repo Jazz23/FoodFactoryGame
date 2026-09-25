@@ -1,4 +1,4 @@
-# Draws the DEVELOPMENT 2D item icons (dough, bread, oven, belt, lift, counter, fridge, dock) as 128x128 transparent PNGs with GDI+.
+# Draws the DEVELOPMENT 2D item icons (dough, bread, oven, belt, lift, counter, fridge, dock, table) as 128x128 transparent PNGs with GDI+.
 # Re-run to regenerate: powershell -ExecutionPolicy Bypass -File AgentScripts/DrawItemIcons.ps1
 # Unity imports them as sprites (AgentScripts/BuildDevSite.cs sets the import settings).
 Add-Type -AssemblyName System.Drawing
@@ -253,4 +253,32 @@ $g.DrawRectangle($dark, 72, 58, 28, 26)
 $brace = New-Object System.Drawing.Pen (Color '#7a4a22'), 3
 $g.DrawLine($brace, 72, 58, 100, 84)
 Save-Icon $bitmap $g 'Dock'
+
+# --- Table: a square wooden dining table seen at an angle, with a chair each side and a plate (decision 0024) ---
+$bitmap, $g = New-Icon
+Shadow $g 10 106 108 16
+$dark = New-Object System.Drawing.Pen (Color '#1f2a2e'), 4
+$dark.LineJoin = [System.Drawing.Drawing2D.LineJoin]::Round
+$chair = New-Object System.Drawing.SolidBrush (Color '#8a5a2b')
+foreach ($x in 6, 98) {
+    $g.FillRectangle($chair, $x, 40, 24, 10)
+    $g.DrawRectangle($dark, $x, 40, 24, 10)
+    $g.FillRectangle($chair, $x, 70, 24, 8)
+    $g.DrawRectangle($dark, $x, 70, 24, 8)
+    $g.FillRectangle($chair, $x + 2, 78, 5, 30)
+    $g.FillRectangle($chair, $x + 17, 78, 5, 30)
+}
+$legs = New-Object System.Drawing.SolidBrush (Color '#6b4220')
+$g.FillRectangle($legs, 34, 64, 8, 46)
+$g.FillRectangle($legs, 86, 64, 8, 46)
+$g.DrawRectangle($dark, 34, 64, 8, 46)
+$g.DrawRectangle($dark, 86, 64, 8, 46)
+$top = New-Object System.Drawing.RectangleF 22, 50, 84, 16
+$wood = New-Object System.Drawing.Drawing2D.LinearGradientBrush $top, (Color '#d99a55'), (Color '#a8672d'), 90
+$g.FillRectangle($wood, $top)
+$g.DrawRectangle($dark, 22, 50, 84, 16)
+$plate = New-Object System.Drawing.SolidBrush (Color '#f4f1ea')
+$g.FillEllipse($plate, 48, 40, 32, 12)
+$g.DrawEllipse($dark, 48, 40, 32, 12)
+Save-Icon $bitmap $g 'Table'
 "Icons written to $out"

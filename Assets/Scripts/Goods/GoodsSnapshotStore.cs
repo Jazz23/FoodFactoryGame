@@ -334,6 +334,16 @@ namespace FoodFactoryGame.Goods
                 }
                 state.SchemaVersion = 12;
             }
+            // v12 had no customers (decision 0024); every table-less machine's Seats reads 0. The server's seed owner adds the dev
+            // district and competitors before serving (DevWorld.EnsureCustomers).
+            if (state != null && state.SchemaVersion == 12)
+            {
+                state.Districts ??= new();
+                state.Competitors ??= new();
+                state.Customers ??= new();
+                state.Diners ??= new();
+                state.SchemaVersion = 13;
+            }
             GoodsWorld.Validate(state);
             return state;
         }

@@ -37,6 +37,9 @@ namespace FoodFactoryGame.Goods
         // refrigerated input buffer (decision 0018).
         public bool InputRefrigerated;
         public bool OutputRefrigerated;
+        // Dining seats (decision 0024): above zero only for a table, copied from content like the capacities. A table's
+        // buffers are unused.
+        public int Seats;
 
         public string InputLocationId => Id + ":in";
         public string OutputLocationId => Id + ":out";
@@ -75,6 +78,7 @@ namespace FoodFactoryGame.Goods
                 if (copy == null || string.IsNullOrWhiteSpace(copy.Id) || string.IsNullOrWhiteSpace(copy.Kind)
                     || copy.State != EquipmentState.Placed || !string.IsNullOrEmpty(copy.HolderId)
                     || copy.Width < 1 || copy.Depth < 1 || copy.InputCapacity < 1 || copy.OutputCapacity < 1
+                    || copy.Seats < 0 || (copy.Kind == TableKind) != (copy.Seats > 0)
                     || _state.Equipment.Any(x => x.Id == copy.Id) || _state.Stations.Any(x => x.Id == copy.Id)
                     || _state.Locations.Any(x => x.Id == copy.InputLocationId || x.Id == copy.OutputLocationId)
                     || SiteGrid.PlacementProblem(_state, copy, copy.CellX, copy.CellZ, copy.Rotation, copy.Level) != null)
@@ -135,6 +139,9 @@ namespace FoodFactoryGame.Goods
                 if (equipment == null || !_state.Grants.Any(x => x.PlayerId == playerId && x.SiteId == equipment.SiteId))
                     return Record(requestId, playerId, false, "forbidden", null);
                 if (equipment.State != EquipmentState.Placed) return Record(requestId, playerId, false, "not-placed", null);
+                // A customer who has paid is being served at this counter or sits at this table (decision 0024).
+                if (_state.Customers.Any(x => x.CounterId == equipment.Id || x.TableId == equipment.Id))
+                    return Record(requestId, playerId, false, "occupied", null);
                 var inventory = _state.Locations.FirstOrDefault(x => x.Id == InventoryLocationId(playerId));
                 if (inventory == null || inventory.SiteId != equipment.SiteId)
                     return Record(requestId, playerId, false, "no-inventory", null);
@@ -264,6 +271,7 @@ namespace FoodFactoryGame.Goods
                 || state.Equipment.Any(x => x == null || string.IsNullOrWhiteSpace(x.Id) || string.IsNullOrWhiteSpace(x.Kind)
                     || !state.SiteLayouts.Any(y => y.SiteId == x.SiteId)
                     || x.Width < 1 || x.Depth < 1 || x.InputCapacity < 1 || x.OutputCapacity < 1
+                    || x.Seats < 0 || (x.Kind == TableKind) != (x.Seats > 0)
                     || (x.State != EquipmentState.Placed && x.State != EquipmentState.Held))
                 || state.Equipment.GroupBy(x => x.Id).Any(x => x.Count() != 1))
                 throw new InvalidOperationException("Goods snapshot violates equipment or layout invariants.");
