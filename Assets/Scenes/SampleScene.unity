@@ -2119,6 +2119,7 @@ MonoBehaviour:
   buildings: {fileID: 1063332616}
   ghost: {fileID: 279533075}
   ghostModelMaterial: {fileID: 2100000, guid: 2c850730491a74a45ae513a8bcf63592, type: 2}
+  hoverOutlineMaterial: {fileID: 2100000, guid: 63c6299bfbcad5742a91f14aeaf6cf39, type: 2}
   ghostAlpha: 0.45
   placeAction: {fileID: -4487983323273826484, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   removeAction: {fileID: -1373323977448128999, guid: 052faaac586de48259a63d0c4782560b, type: 3}

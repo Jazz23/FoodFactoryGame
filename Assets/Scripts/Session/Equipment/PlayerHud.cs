@@ -1,5 +1,6 @@
 // Local player's Factorio-style HUD in UI Toolkit, built in code: crosshair, hotbar, and screens made of slot grids. The
-// inventory screen shows the player's inventory grid (goods stacks and held machines) beside the dev storage; the machine
+// inventory screen shows the player's inventory grid (goods stacks and held machines), beside the dev storage when E opened
+// it at the storage (EquipmentInteraction.StorageOpen); the machine
 // screen shows the inventory beside the machine's input slots, progress arrow and output slots. A grid has one slot per
 // unit of its location's capacity (decision 0009); each (item, spoiled) stack fills as many slots as its max stack needs.
 // Clicking a slot picks its stack up onto the cursor (the icon follows the pointer); clicking another container drops it
@@ -237,7 +238,7 @@ namespace FoodFactoryGame.Session.Equipment
             var content = slots[index];
             var target = interaction.Screen switch
             {
-                InteractionScreen.Inventory => grid == InventoryGrid ? StorageGrid : grid == StorageGrid ? InventoryGrid : null,
+                InteractionScreen.Inventory when interaction.StorageOpen => grid == InventoryGrid ? StorageGrid : grid == StorageGrid ? InventoryGrid : null,
                 InteractionScreen.Machine => grid == InventoryGrid ? InputGrid : grid is InputGrid or OutputGrid ? InventoryGrid : null,
                 _ => null
             };
@@ -311,7 +312,7 @@ namespace FoodFactoryGame.Session.Equipment
             _grids.Clear();
             if (interaction.InventoryId == null) return;
             _grids[InventoryGrid] = Contents(site, InventoryGrid, true);
-            if (interaction.Screen == InteractionScreen.Inventory) _grids[StorageGrid] = Contents(site, StorageGrid, false);
+            if (interaction.StorageOpen) _grids[StorageGrid] = Contents(site, StorageGrid, false);
             if (interaction.Screen == InteractionScreen.Machine && LocationOf(InputGrid) != null)
             {
                 _grids[InputGrid] = Contents(site, InputGrid, false);
@@ -388,7 +389,7 @@ namespace FoodFactoryGame.Session.Equipment
         private string Signature()
         {
             var text = new StringBuilder();
-            text.Append(interaction.Screen).Append('|').Append(interaction.OpenMachineId).Append('|').Append(interaction.SelectedSlot)
+            text.Append(interaction.Screen).Append('|').Append(interaction.StorageOpen).Append('|').Append(interaction.OpenMachineId).Append('|').Append(interaction.SelectedSlot)
                 .Append('|').Append(interaction.CursorKind).Append('|').Append(interaction.CursorGoods?.ItemId);
             foreach (var entry in interaction.Hotbar)
                 text.Append('|').Append(entry?.MachineKind).Append('/').Append(entry?.ItemId).Append(interaction.HotbarCount(entry));
@@ -476,9 +477,12 @@ namespace FoodFactoryGame.Session.Equipment
             _screen.Add(inventory);
             if (interaction.Screen == InteractionScreen.Inventory)
             {
-                var storage = Window("hud-storage", $"Storage  {Units(site, DevWorld.StorageId)}");
-                storage.Add(GridView(StorageGrid));
-                _screen.Add(storage);
+                if (interaction.StorageOpen)
+                {
+                    var storage = Window("hud-storage", $"Storage  {Units(site, DevWorld.StorageId)}");
+                    storage.Add(GridView(StorageGrid));
+                    _screen.Add(storage);
+                }
                 if (interaction.Session.Offers.Count > 0) _screen.Add(SupplierWindow());
                 var building = interaction.Buildings.LocalBuilding;
                 if (building?.Kind == GoodsWorld.FactoryKind) _screen.Add(ConstructionWindow(building));

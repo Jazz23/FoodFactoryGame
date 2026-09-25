@@ -41,7 +41,8 @@ namespace FoodFactoryGame.Session
             _menu.Add(_address);
             _menu.Add(buttons);
             _menu.Add(_menuStatus);
-            _readout = new Label { name = "session-readout", style = { color = Color.white } };
+            // Wraps within part of the width so long hints stay on screen and clear of the HUD's cash readout (top right).
+            _readout = new Label { name = "session-readout", style = { color = Color.white, whiteSpace = WhiteSpace.Normal, maxWidth = new Length(60, LengthUnit.Percent) } };
             Style(_readout, 8);
             root.Add(_menu);
             root.Add(_readout);

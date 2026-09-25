@@ -1,7 +1,8 @@
 // Owner-only camera with two views that SwitchCamera toggles, blending smoothly between them. The third-person view
 // orbits with Look (the gameplay cursor is locked to a centre crosshair) unless the local UI suspends it through
 // OrbitEnabled while a screen is open; its pivot sits beside the avatar (over the shoulder), so the crosshair aims past
-// the avatar at the floor ahead instead of through it. The top-down view looks straight down on the avatar with its yaw
+// the avatar at the floor ahead instead of through it. Pitch runs from straight up to straight down; looking up pulls the
+// camera in along its arm so it stays above the avatar's floor. The top-down view looks straight down on the avatar with its yaw
 // snapped to a multiple of 90 degrees, so the world-aligned site grid reads as horizontal and vertical lines; Look does
 // not orbit it. Each view zooms its own distance in steps, and Yaw follows the blend so movement stays screen-relative.
 // Indoors uses the top-down view (GDD section 3): SetIndoors switches views only when the avatar crosses a building's
@@ -23,8 +24,10 @@ namespace FoodFactoryGame.Session.Player
         [SerializeField] private float shoulderOffset = 1f;
         [SerializeField] private float orbitDegreesPerUnit = 0.2f;
         [SerializeField] private float zoomStep = 1f;
-        [SerializeField] private float minPitch = 10f;
-        [SerializeField] private float maxPitch = 80f;
+        [SerializeField] private float minPitch = -89f;
+        [SerializeField] private float maxPitch = 89f;
+        // Least height (metres) the third-person camera keeps above the avatar's feet when looking up.
+        [SerializeField] private float floorClearance = 0.3f;
         [SerializeField] private float minDistance = 3f;
         [SerializeField] private float maxDistance = 20f;
         [SerializeField] private float yaw;
@@ -108,7 +111,11 @@ namespace FoodFactoryGame.Session.Player
             var shoulder = focus + Quaternion.Euler(0f, yaw, 0f) * Vector3.right * shoulderOffset;
             transform.SetPositionAndRotation(Vector3.Lerp(shoulder, focus, eased),
                 Quaternion.Slerp(Quaternion.Euler(pitch, yaw, 0f), Quaternion.Euler(90f, _topDownYaw, 0f), eased));
-            cameraTransform.SetLocalPositionAndRotation(new Vector3(0f, 0f, -Mathf.Lerp(distance, topDownDistance, eased)), Quaternion.identity);
+            // Looking up swings the camera below the focus; its arm is shortened so it never drops through the floor.
+            var orbitDistance = pitch < 0f
+                ? Mathf.Min(distance, Mathf.Max(0f, focusHeight - floorClearance) / Mathf.Sin(-pitch * Mathf.Deg2Rad))
+                : distance;
+            cameraTransform.SetLocalPositionAndRotation(new Vector3(0f, 0f, -Mathf.Lerp(orbitDistance, topDownDistance, eased)), Quaternion.identity);
         }
     }
 }

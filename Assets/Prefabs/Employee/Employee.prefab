@@ -224,7 +224,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0cc4ee666b4bd7c49b2718a4bf5f6d4e, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: FoodFactoryGame.Session::FoodFactoryGame.Session.Employees.EmployeeOutline
+  m_EditorClassIdentifier: FoodFactoryGame.Session::FoodFactoryGame.Session.HoverOutline
   outlineMaterial: {fileID: 2100000, guid: 63c6299bfbcad5742a91f14aeaf6cf39, type: 2}
 --- !u!1001 &1697343950106330012
 PrefabInstance:

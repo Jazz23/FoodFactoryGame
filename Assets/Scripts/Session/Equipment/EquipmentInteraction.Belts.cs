@@ -115,7 +115,7 @@ namespace FoodFactoryGame.Session.Equipment
                 var way = LiftDirection > 0 ? "up" : "down";
                 var flip = _flipLiftAction?.GetBindingDisplayString() ?? "FlipLift";
                 Status = $"Lifts ({LiftsCarried(site)}, {way}): click places a lift carrying items {way} a floor to the belt in front, "
-                    + $"{flip} flips up/down, R turns, right click removes, Q clears" + (problem == null ? "" : $" [{problem}]") + suffix;
+                    + $"{flip} flips up/down, R turns, right click removes, X clears" + (problem == null ? "" : $" [{problem}]") + suffix;
                 return true;
             }
             HideLiftGhosts();
@@ -124,7 +124,7 @@ namespace FoodFactoryGame.Session.Equipment
                 ShowItemGhost(null, default);
                 UpdateBeltBuild(site, layout);
                 var held = BeltsCarried(site);
-                Status = $"Belts ({held}): drag to lay a line, R turns (while dragging: a corner out to the crosshair), right click removes, F takes an item off, Q clears"
+                Status = $"Belts ({held}): drag to lay a line, R turns (while dragging: a corner out to the crosshair), right click removes, F takes an item off, X clears"
                     + (held == 0 ? " [no-belts]" : "") + suffix;
                 return true;
             }
@@ -133,7 +133,7 @@ namespace FoodFactoryGame.Session.Equipment
             UpdateItemGhost(site, layout);
             var name = CursorGoods.ItemId;
             Status = _aimBelt == null
-                ? $"Cursor: {name}: aim at a belt, Z puts one on it; Q clears" + suffix
+                ? $"Cursor: {name}: aim at a belt, Z puts one on it; X clears" + suffix
                 : $"Cursor: {name}: Z puts one on this belt, F takes one off" + (BeltRules.FreePosition(RidingPositions(site, _aimBelt)) < 0 ? " [belt-full]" : "") + suffix;
             return true;
         }

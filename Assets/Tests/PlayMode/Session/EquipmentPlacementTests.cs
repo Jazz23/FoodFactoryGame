@@ -437,7 +437,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
             // Inventory screen: the storage's 20 dough join the 5 starter dough, one full slot and one slot of 5.
             yield return Until(() =>
             {
-                if (interaction.Screen == InteractionScreen.None) interaction.ToggleInventory();
+                if (interaction.Screen == InteractionScreen.None) interaction.OpenStorage();
                 return hud.SlotOf(PlayerHud.StorageGrid, "dough") >= 0;
             }, "storage dough slot");
             Assert.That(_root.ClientSite.Locations.Single(x => x.Id == inventory).Capacity, Is.EqualTo(DevWorld.InventoryCapacity));
@@ -502,7 +502,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
             {
                 yield return Until(() =>
                 {
-                    if (interaction.Screen == InteractionScreen.None) interaction.ToggleInventory();
+                    if (interaction.Screen == InteractionScreen.None) interaction.OpenStorage();
                     return hud.SlotOf(PlayerHud.StorageGrid, "dough") >= 0 && interaction.ScreenClicksArmed;
                 }, "inventory screen with storage dough");
                 yield return null;

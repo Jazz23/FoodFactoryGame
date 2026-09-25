@@ -408,7 +408,7 @@ namespace FoodFactoryGame.Session.Tests
             Assert.That(player.FindAction("Remove").bindings.Any(x => x.path == "<Mouse>/rightButton"), Is.True);
             Assert.That(player.FindAction("Rotate").bindings.Any(x => x.path == "<Keyboard>/r"), Is.True);
             Assert.That(player.FindAction("Inventory").bindings.Any(x => x.path == "<Keyboard>/e"), Is.True);
-            Assert.That(player.FindAction("ClearCursor").bindings.Any(x => x.path == "<Keyboard>/q"), Is.True);
+            Assert.That(player.FindAction("ClearCursor").bindings.Any(x => x.path == "<Keyboard>/x"), Is.True);
             Assert.That(player.FindAction("CloseScreen").bindings.Any(x => x.path == "<Keyboard>/escape"), Is.True);
             Assert.That(player.FindAction("QuickTransfer").bindings.Any(x => x.path == "<Keyboard>/shift"), Is.True, "Shift+click quick-transfers a stack.");
             Assert.That(player.FindAction("PlaceItem").bindings.Any(x => x.path == "<Keyboard>/z"), Is.True, "Z puts one item on a belt.");

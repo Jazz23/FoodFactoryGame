@@ -132,7 +132,11 @@ public static class BuildDevSite
             AssetDatabase.CreateAsset(settings, PanelSettingsPath);
         }
         settings.themeStyleSheet = AssetDatabase.LoadAssetAtPath<ThemeStyleSheet>(ThemePath);
-        settings.scaleMode = PanelScaleMode.ConstantPixelSize;
+        // Shrink fits the whole reference area on screen: the widest HUD screen (inventory, storage, supplier) is about
+        // 1330 px at scale 1, so it stays inside small windows such as a docked Game view instead of being clipped.
+        settings.scaleMode = PanelScaleMode.ScaleWithScreenSize;
+        settings.screenMatchMode = PanelScreenMatchMode.Shrink;
+        settings.referenceResolution = new Vector2Int(1440, 810);
         EditorUtility.SetDirty(settings);
         return settings;
     }

@@ -514,8 +514,9 @@ MonoBehaviour:
   shoulderOffset: 1
   orbitDegreesPerUnit: 0.2
   zoomStep: 1
-  minPitch: 10
-  maxPitch: 80
+  minPitch: -89
+  maxPitch: 89
+  floorClearance: 0.3
   minDistance: 3
   maxDistance: 20
   yaw: 0

@@ -1,6 +1,7 @@
 // Local player's Factorio-style controls. The gameplay cursor is locked to a centre crosshair so Look always orbits (the
 // top-down camera view instead leaves the pointer free and aims where it points);
-// opening a screen (E inventory, or clicking a machine) frees the pointer and suspends orbiting. Hotbar slots point to a
+// opening a screen (E, or clicking a machine) frees the pointer and suspends orbiting. E opens the screen of whatever
+// openable thing the crosshair is on (EquipmentInteraction.Hover.cs), or the inventory when it is on nothing openable. Hotbar slots point to a
 // machine kind or an item, assigned on a screen (a hotbar key over a stack, or dropping the cursor on a hotbar slot); this
 // client's arrangement only, never saved or sent. Hotbar keys (or picking a machine out of the inventory grid) put a held
 // machine kind or the inventory's stack of an item on the cursor; a machine shows a see-through ghost of the machine
@@ -83,6 +84,8 @@ namespace FoodFactoryGame.Session.Equipment
         [SerializeField] private Color validColor = new(0.2f, 0.85f, 0.3f, 1f);
         [SerializeField] private Color invalidColor = new(0.9f, 0.2f, 0.15f, 1f);
         [SerializeField] private float maximumRayDistance = 100f;
+        // Farthest the avatar may stand from a machine, employee or the storage (metres across the floor) to open it.
+        [SerializeField] private float interactReach = 2.5f;
 
         private readonly HashSet<string> _pending = new();
         private readonly HotbarEntry[] _hotbar = new HotbarEntry[HotbarSize];
@@ -90,6 +93,7 @@ namespace FoodFactoryGame.Session.Equipment
         private ClientSiteSubscription _subscription;
         private MaterialPropertyBlock _block;
         private Camera _camera;
+        private PlayerAvatar _avatar;
         private OrbitCameraRig _rig;
         private GoodsEquipment _held;
         private (int X, int Z) _target;
@@ -109,6 +113,8 @@ namespace FoodFactoryGame.Session.Equipment
         private Renderer[] _ghostRenderers = Array.Empty<Renderer>();
 
         public InteractionScreen Screen { get; private set; }
+        // True while the inventory screen also shows the dev storage; false on every other screen.
+        public bool StorageOpen { get; private set; }
         // Goods stack on the cursor while a screen is open; null when the cursor carries no goods.
         public CursorStack CursorGoods { get; private set; }
         public bool GhostVisible => _ghostModel != null && _ghostModel.activeSelf;
@@ -200,6 +206,7 @@ namespace FoodFactoryGame.Session.Equipment
             takeItemAction.action.performed -= OnTakeItem;
             DisableLiftInput();
             CloseEmployeeScreen();
+            ClearHover();
             foreach (var action in Actions) action.action.Disable();
             Subscribe(null);
             ApplyPointerLock(false);
@@ -215,7 +222,8 @@ namespace FoodFactoryGame.Session.Equipment
             Subscribe(session.ClientSubscription);
             var site = session.ClientSite;
             var me = LocalPlayerId;
-            _rig = LocalRig();
+            _avatar = LocalAvatar();
+            _rig = _avatar == null ? null : _avatar.CameraRig;
             _camera = _rig == null ? null : _rig.GetComponentInChildren<Camera>();
             if (_camera == null || site == null) CloseScreen();
             if (Screen == InteractionScreen.Machine
@@ -240,7 +248,7 @@ namespace FoodFactoryGame.Session.Equipment
             ApplyPointerLock(_camera != null && Screen == InteractionScreen.None && !_released && !_rig.TopDown);
             if (_rig != null) _rig.OrbitEnabled = PointerLocked;
             if (Screen == InteractionScreen.Employee && OpenEmployee == null) CloseScreen();
-            UpdateEmployeeHover();
+            UpdateHover();
 
             var layout = site?.SiteLayouts.FirstOrDefault(x => x.SiteId == DevWorld.SiteId);
             var suffix = HasPendingRequests ? " (waiting for server)" : !string.IsNullOrEmpty(LastRejection) ? $" (rejected: {LastRejection})" : "";
@@ -268,7 +276,7 @@ namespace FoodFactoryGame.Session.Equipment
                     InteractionScreen.Employee => "Employee: paste a Lua script and press Run; Stop halts it; Esc closes" + suffix,
                     InteractionScreen.Machine => "Machine: put ingredients in the input, take results from the output (shift+click moves a stack); E or Esc closes" + suffix,
                     _ => _released ? "Cursor released: click to resume" + suffix
-                        : ElevatorHint() + (_hoveredEmployee != null ? "Left click: give this employee a script. " : "") + "E: inventory (pick belts or goods to carry them out), L: trucks, 1-9: hotbar, left click: open machine, right click: pick up, R: turn belt, F: take an item off a belt" + suffix
+                        : ElevatorHint() + HoverHint() + "E: inventory (pick belts or goods to carry them out), L: trucks, 1-9: hotbar, left click: open machine, right click: pick up, R: turn belt, F: take an item off a belt" + suffix
                 };
                 return;
             }
@@ -297,7 +305,7 @@ namespace FoodFactoryGame.Session.Equipment
                     renderer.SetPropertyBlock(_block);
                 }
             }
-            Status = $"Cursor: {_held.Kind}: left click places, R rotates, Q clears" + (problem != null ? $" [{problem}]" : "") + suffix;
+            Status = $"Cursor: {_held.Kind}: left click places, R rotates, X or Esc clears" + (problem != null ? $" [{problem}]" : "") + suffix;
         }
 
         // Keeps one ghost model for the cursor's machine kind; a kind without a visual shows only the footprint.
@@ -416,14 +424,22 @@ namespace FoodFactoryGame.Session.Equipment
             _held = null;
         }
 
+        // Opens the inventory on its own, or closes any open screen.
         public void ToggleInventory()
         {
-            if (Screen == InteractionScreen.None && _camera != null && session.ClientSite != null)
-            {
-                Screen = InteractionScreen.Inventory;
-                _awaitingRelease = true;
-            }
+            if (Screen == InteractionScreen.None) OpenInventory(false);
             else CloseScreen();
+        }
+
+        // Opens the inventory beside the dev storage wherever the avatar stands (the screen E opens on the storage).
+        public void OpenStorage() => OpenInventory(true);
+
+        private void OpenInventory(bool storage)
+        {
+            if (Screen != InteractionScreen.None || _camera == null || session.ClientSite == null) return;
+            Screen = InteractionScreen.Inventory;
+            StorageOpen = storage;
+            _awaitingRelease = true;
         }
 
         // The logistics screen (decision 0022) opens from the world like the inventory and closes with L or Esc.
@@ -457,6 +473,7 @@ namespace FoodFactoryGame.Session.Equipment
         public void CloseScreen()
         {
             Screen = InteractionScreen.None;
+            StorageOpen = false;
             OpenMachineId = null;
             CloseEmployeeScreen();
             if (CursorGoods != null && CursorGoods.LocationId != InventoryId) CursorGoods = null;
@@ -516,8 +533,8 @@ namespace FoodFactoryGame.Session.Equipment
             if (bridge == null || StartBeltDrag()) return;
             if (_held == null)
             {
-                var visual = EquipmentUnderCrosshair();
-                if (visual != null) OpenMachine(visual.EquipmentId);
+                // Only a machine within reach (the hover target) opens.
+                if (_hovered is EquipmentVisual visual && visual != null) OpenMachine(visual.EquipmentId);
                 return;
             }
             if (!ghost.gameObject.activeSelf || HasPendingRequests) return;
@@ -566,16 +583,18 @@ namespace FoodFactoryGame.Session.Equipment
             if (!RotateBelts()) _rotation = (_rotation + 1) % 4;
         }
 
-        private void OnInventory(InputAction.CallbackContext _) => ToggleInventory();
+        private void OnInventory(InputAction.CallbackContext _) => Interact();
 
         private void OnLogistics(InputAction.CallbackContext _) => ToggleLogistics();
 
         private void OnClearCursor(InputAction.CallbackContext _) => ClearCursor();
 
-        // Esc closes an open screen; otherwise it releases the pointer (so the window can be left) until the next click.
+        // Esc closes an open screen, else empties a non-empty cursor; otherwise it releases the pointer (so the window can be
+        // left) until the next click.
         private void OnCloseScreen(InputAction.CallbackContext _)
         {
             if (Screen != InteractionScreen.None) CloseScreen();
+            else if (CursorKind != null || CursorGoods != null) ClearCursor();
             else if (_camera != null) _released = !_released;
         }
 
@@ -633,12 +652,14 @@ namespace FoodFactoryGame.Session.Equipment
             : pointAction.action.ReadValue<Vector2>());
 
         // The nearest hit that is not a player avatar (the local CharacterController sits right beside the aim ray).
+        private Collider UnderCrosshair() => Physics.RaycastAll(AimRay(), maximumRayDistance, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)
+            .Where(x => x.collider.GetComponentInParent<PlayerAvatar>() == null)
+            .OrderBy(x => x.distance).FirstOrDefault().collider;
+
         private EquipmentVisual EquipmentUnderCrosshair()
         {
-            var hit = Physics.RaycastAll(AimRay(), maximumRayDistance, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)
-                .Where(x => x.collider.GetComponentInParent<PlayerAvatar>() == null)
-                .OrderBy(x => x.distance).FirstOrDefault();
-            return hit.collider == null ? null : hit.collider.GetComponentInParent<EquipmentVisual>();
+            var hit = UnderCrosshair();
+            return hit == null ? null : hit.GetComponentInParent<EquipmentVisual>();
         }
 
         private bool TryFloorPoint(out Vector3 point)
@@ -651,14 +672,13 @@ namespace FoodFactoryGame.Session.Equipment
             return true;
         }
 
-        // The owning client's avatar rig is the only enabled camera for this connection.
-        private OrbitCameraRig LocalRig()
+        // The owning client's avatar; its rig is the only enabled camera for this connection.
+        private PlayerAvatar LocalAvatar()
         {
             var manager = session.NetworkManager;
             if (!manager.IsClientStarted) return null;
-            var avatar = manager.ClientManager.Objects.Spawned.Values
+            return manager.ClientManager.Objects.Spawned.Values
                 .Select(x => x.GetComponent<PlayerAvatar>()).FirstOrDefault(x => x != null && x.IsOwner);
-            return avatar == null ? null : avatar.CameraRig;
         }
     }
 }
