@@ -36,3 +36,20 @@ comparison; the per-second cost came from ticks.
 - `TryAdvanceDurably` stays for callers that need a durable step (tests, tools). `GoodsSnapshotStore.Save` and `Load`
   record the committed revision on the world (`MarkCommitted`).
 - Tests that read the save right after a tick now wait for the interval or stop the server first.
+
+## Amendment: tick exception rollback (2026-09-25)
+
+Status: **accepted and implemented**. `AdvanceUncommitted` restores the last committed revision from the JSON payload
+kept in memory after a successful save or load when a simulation step throws. It no longer copies the live world before
+every tick. A world must have an initial committed revision before this method advances it. The original exception is
+rethrown after restoring the snapshot and invalidating derived customer indexes.
+
+This can discard up to 10 s of unsaved simulation when a tick hits a bug, the same window already accepted for a crash.
+Goods, customer state and cash return together to the committed revision. A failed periodic database commit still keeps
+the uncommitted world for retry. Player commands still take a pre-command copy, roll back only that command on failure,
+and retain their durable acknowledgment and retry behavior.
+
+The network bridge requires the served world instance to carry that committed payload at startup. After a tick exception,
+it broadcasts fresh site baselines with a higher rollback epoch. Clients accept the lower committed revision in that new
+epoch and reject delayed baselines from older epochs, so subscribed host and remote clients converge with the server.
+The bridge logs the exception and resumes the normal clock on later updates.

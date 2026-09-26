@@ -119,6 +119,9 @@ namespace FoodFactoryGame.Goods.PlayModeTests
                 host.ServerManager.Spawn(instance);
                 var serverBridge = instance.GetComponent<GoodsNetworkBridge>();
                 yield return Until(() => serverBridge.IsServerStarted, "server bridge spawned");
+                Assert.Throws<InvalidOperationException>(() => serverBridge.InitializeServer(GoodsWorld.Restore(world.Snapshot()),
+                    connection => identities.TryGetValue(connection.ClientId, out var player) ? player : null, path),
+                    "A matching JSON copy has no retained committed payload for tick rollback.");
                 serverBridge.InitializeServer(world, connection => identities.TryGetValue(connection.ClientId, out var player) ? player : null, path);
                 host.SceneManager.AddConnectionToScene(host.ServerManager.Clients[hostId], instance.gameObject.scene);
                 host.SceneManager.AddConnectionToScene(host.ServerManager.Clients[remoteId], instance.gameObject.scene);
@@ -157,6 +160,40 @@ namespace FoodFactoryGame.Goods.PlayModeTests
                 Assert.That(hostResults.Single(x => x.RequestId == "host-transfer").Accepted, Is.True);
                 Assert.That(GoodsSnapshotStore.Load(path).Snapshot().Lots.Sum(x => x.Quantity), Is.EqualTo(10));
                 Assert.That(world.Snapshot().Lots.Single(x => x.LocationId == "kitchen").Quantity, Is.EqualTo(2));
+
+                // Both real clients receive a lower-revision baseline after a tick exception restores the last save.
+                world.Grant("ungranted-player", "restaurant");
+                GoodsSnapshotStore.Save(world, path);
+                var remoteRestaurantBaselines = new List<GoodsSnapshot>();
+                remoteBridge.SiteReceived += state =>
+                {
+                    if (state.Locations[0].SiteId == "restaurant") remoteRestaurantBaselines.Add(state);
+                };
+                remoteBridge.RequestSite("restaurant");
+                yield return Until(() => remoteRestaurantBaselines.Count > 0, "remote restaurant subscription");
+                yield return Until(() =>
+                {
+                    var revision = world.Snapshot().Revision;
+                    return world.HasUncommittedChanges && baselines.Last().Revision == revision
+                        && remoteRestaurantBaselines.Last().Revision == revision;
+                }, "both clients saw an unsaved tick", 12f);
+                var committed = GoodsSnapshotStore.Load(path).Snapshot();
+                var seenRevision = remoteRestaurantBaselines.Last().Revision;
+                Assert.That(seenRevision, Is.GreaterThan(committed.Revision));
+                var field = typeof(GoodsWorld).GetField("_state", BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.That(field, Is.Not.Null);
+                LogAssert.Expect(LogType.Error, new Regex("^\\[Goods\\] Clock step failed; restored the last committed world:"));
+                var liveLot = ((GoodsSnapshot)field.GetValue(world)).Lots[0];
+                liveLot.Spoiled = false;
+                liveLot.LocationId = "missing";
+                yield return Until(() => world.Snapshot().Revision == committed.Revision
+                    && baselines.Last().Revision == committed.Revision
+                    && remoteRestaurantBaselines.Last().Revision == committed.Revision,
+                    "host and remote rollback baselines", 4f);
+                Assert.That(JsonUtility.ToJson(world.Snapshot()), Is.EqualTo(JsonUtility.ToJson(committed)));
+                Assert.That(JsonUtility.ToJson(baselines.Last()), Is.EqualTo(JsonUtility.ToJson(world.View("host-player", "restaurant"))));
+                Assert.That(JsonUtility.ToJson(remoteRestaurantBaselines.Last()),
+                    Is.EqualTo(JsonUtility.ToJson(world.View("ungranted-player", "restaurant"))));
             }
             finally
             {

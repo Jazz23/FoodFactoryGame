@@ -96,13 +96,8 @@ namespace FoodFactoryGame.Goods
             if (world == null || string.IsNullOrWhiteSpace(path)) throw new ArgumentException("World and explicit save path required.");
             var full = Path.GetFullPath(path);
             if (!Directory.Exists(Path.GetDirectoryName(full))) throw new DirectoryNotFoundException("Create an isolated save directory first.");
-            var began = Stopwatch.GetTimestamp();
-            var state = world.Snapshot();
-            var copied = Stopwatch.GetTimestamp();
-            GoodsWorld.Validate(state);
-            var validated = Stopwatch.GetTimestamp();
-            var payload = JsonUtility.ToJson(state);
-            var serialized = Stopwatch.GetTimestamp();
+            var state = world.SerializeForSave();
+            var payload = state.Payload;
             var wrote = false;
             string newSha = null;
             var transactionMilliseconds = 0.0;
@@ -183,10 +178,10 @@ namespace FoodFactoryGame.Goods
                 }
             }
             // The save now holds this revision (written, or already identical).
-            world.MarkCommitted(state.Revision);
+            world.MarkCommitted(state.Revision, payload);
             if (wrote) Stats.Record(new GoodsSaveTimings(
-                ElapsedMilliseconds(began, copied), ElapsedMilliseconds(copied, validated),
-                ElapsedMilliseconds(validated, serialized), transactionMilliseconds, commitAndSyncMilliseconds),
+                0, state.ValidationMilliseconds, state.JsonMilliseconds,
+                transactionMilliseconds, commitAndSyncMilliseconds),
                 Encoding.UTF8.GetByteCount(payload));
         }
 
@@ -210,7 +205,7 @@ namespace FoodFactoryGame.Goods
             // Opened read-write (never created) so SQLite can recover a WAL or roll back a hot journal left by a crash.
             using var db = Open(full, false);
             var world = GoodsWorld.Restore(LatestValid(db, false) ?? throw new InvalidOperationException("No valid goods snapshot."));
-            world.MarkCommitted(world.Snapshot().Revision);
+            world.MarkLoadedCommitted();
             return world;
         }
 

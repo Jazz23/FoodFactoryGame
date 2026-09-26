@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="1" result="Passed" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-09-26 04:34:27Z" end-time="2026-09-26 04:34:40Z" duration="12.4004202">
+  <test-suite type="TestSuite" id="1380" name="FoodFactoryGame" fullname="FoodFactoryGame" runstate="Runnable" testcasecount="32" result="Passed" start-time="2026-09-26 04:34:27Z" end-time="2026-09-26 04:34:40Z" duration="12.400420" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="PlayMode" />
+    </properties>
+    <test-suite type="Assembly" id="1328" name="FoodFactoryGame.Goods.PlayModeTests.dll" fullname="E:/Projects/Unity/FoodFactoryGame/Library/ScriptAssemblies/FoodFactoryGame.Goods.PlayModeTests.dll" runstate="Runnable" testcasecount="1" result="Passed" start-time="2026-09-26 04:34:27Z" end-time="2026-09-26 04:34:40Z" duration="12.397880" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="17660" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="PlayMode" />
+        <property name="EditorOnly" value="False" />
+      </properties>
+      <test-suite type="TestSuite" id="1329" name="FoodFactoryGame" fullname="FoodFactoryGame" runstate="Runnable" testcasecount="1" result="Passed" start-time="2026-09-26 04:34:27Z" end-time="2026-09-26 04:34:40Z" duration="12.396209" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-suite type="TestSuite" id="1330" name="Goods" fullname="FoodFactoryGame.Goods" runstate="Runnable" testcasecount="1" result="Passed" start-time="2026-09-26 04:34:27Z" end-time="2026-09-26 04:34:40Z" duration="12.394828" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <test-suite type="TestSuite" id="1331" name="PlayModeTests" fullname="FoodFactoryGame.Goods.PlayModeTests" runstate="Runnable" testcasecount="1" result="Passed" start-time="2026-09-26 04:34:27Z" end-time="2026-09-26 04:34:40Z" duration="12.393459" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-suite type="TestFixture" id="1326" name="GoodsListenServerTests" fullname="FoodFactoryGame.Goods.PlayModeTests.GoodsListenServerTests" classname="FoodFactoryGame.Goods.PlayModeTests.GoodsListenServerTests" runstate="Runnable" testcasecount="1" result="Passed" start-time="2026-09-26 04:34:27Z" end-time="2026-09-26 04:34:40Z" duration="12.391764" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-case id="1327" name="HostAndRemoteUseRpcForGrantTransferRejectionAndUnobservedTime" fullname="FoodFactoryGame.Goods.PlayModeTests.GoodsListenServerTests.HostAndRemoteUseRpcForGrantTransferRejectionAndUnobservedTime" methodname="HostAndRemoteUseRpcForGrantTransferRejectionAndUnobservedTime" classname="FoodFactoryGame.Goods.PlayModeTests.GoodsListenServerTests" runstate="Runnable" seed="92380945" result="Passed" start-time="2026-09-26 04:34:27Z" end-time="2026-09-26 04:34:40Z" duration="12.388264" asserts="0">
+                <properties>
+                  <property name="_JOINTYPE" value="UnityCombinatorial" />
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <output><![CDATA[SpawnablePrefabs is null on goods-test-host. Select the NetworkManager in scene InitTestScenef893c221-abbd-4562-a441-357afbda922f and choose a prefabs file. Choosing DefaultPrefabObjects will automatically populate prefabs for you.
+SpawnablePrefabs is null on goods-test-remote. Select the NetworkManager in scene InitTestScenef893c221-abbd-4562-a441-357afbda922f and choose a prefabs file. Choosing DefaultPrefabObjects will automatically populate prefabs for you.
+Local server is starting for Tugboat. Listening on port 51889.
+Local server is started for Tugboat.
+Local client is starting for Tugboat. Server IP is 127.0.0.1, port is 51889.
+Remote connection started for Id 0.
+Local client is started for Tugboat.
+Local client is starting for Tugboat. Server IP is 127.0.0.1, port is 51889.
+Remote connection started for Id 1.
+Local client is started for Tugboat.
+[Goods] Clock step failed; restored the last committed world: System.InvalidOperationException: Sequence contains no matching element
+  at System.Linq.Enumerable.First[TSource] (System.Collections.Generic.IEnumerable`1[T] source, System.Func`2[T,TResult] predicate) [0x00011] in <fe644d7ad1cf499ebe4e7ad937bc03bf>:0
+  at FoodFactoryGame.Goods.GoodsWorld.Advance (System.Int64 seconds) [0x0006b] in E:\Projects\Unity\FoodFactoryGame\Assets\Scripts\Goods\GoodsWorld.cs:321
+  at FoodFactoryGame.Goods.GoodsWorld.AdvanceUncommitted (System.Int64 seconds) [0x0005b] in E:\Projects\Unity\FoodFactoryGame\Assets\Scripts\Goods\GoodsWorld.cs:488
+  at FoodFactoryGame.Goods.Network.GoodsNetworkBridge.Update () [0x00083] in E:\Projects\Unity\FoodFactoryGame\Assets\Scripts\Goods\Network\GoodsNetworkBridge.cs:100
+Local client is stopping for Tugboat.
+Local client is stopping for Tugboat.
+<b><color=#2EA3FF>MCP-FOR-UNITY</color></b>: [TestRunnerNoThrottle] Restored Interaction Mode after test run.
+Saving results to: C:/Users/Deven/AppData/LocalLow/DefaultCompany/FoodFactoryGame\TestResults.xml
+]]></output>
+              </test-case>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

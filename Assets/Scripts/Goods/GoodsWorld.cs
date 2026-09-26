@@ -1,6 +1,7 @@
 // Owns scene-independent, server-mutated goods, simulation time and replayable terminal command outcomes.
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -113,6 +114,8 @@ namespace FoodFactoryGame.Goods
         private GoodsSnapshot _state;
         // Revision of the last successful save of this world (or of the save it was loaded from); -1 if never saved.
         private long _committedRevision = -1;
+        // Last durable world, retained for decision-0016 tick exception recovery.
+        private string _committedPayload;
 
         // Bootstrap is server-only: callers supply durable IDs; never expose this method to an RPC.
         public GoodsWorld(string worldId)
@@ -134,6 +137,23 @@ namespace FoodFactoryGame.Goods
             lock (_gate) return JsonUtility.FromJson<GoodsSnapshot>(JsonUtility.ToJson(_state));
         }
 
+        // Validate and serialize the live state under one lock; saving needs no detached world copy.
+        internal (string Payload, long Revision, string WorldId, int SchemaVersion,
+            double ValidationMilliseconds, double JsonMilliseconds) SerializeForSave()
+        {
+            lock (_gate)
+            {
+                var began = Stopwatch.GetTimestamp();
+                Validate(_state);
+                var validated = Stopwatch.GetTimestamp();
+                var payload = JsonUtility.ToJson(_state);
+                var serialized = Stopwatch.GetTimestamp();
+                return (payload, _state.Revision, _state.WorldId, _state.SchemaVersion,
+                    (validated - began) * 1000.0 / Stopwatch.Frequency,
+                    (serialized - validated) * 1000.0 / Stopwatch.Frequency);
+            }
+        }
+
         // True while the in-memory world is ahead of its last save (AdvanceUncommitted, or never saved).
         public bool HasUncommittedChanges
         {
@@ -141,9 +161,24 @@ namespace FoodFactoryGame.Goods
         }
 
         // Called by GoodsSnapshotStore after a revision is committed to, or loaded from, a save.
-        internal void MarkCommitted(long revision)
+        internal void MarkCommitted(long revision, string payload)
         {
-            lock (_gate) _committedRevision = revision;
+            lock (_gate)
+            {
+                // SaveGate serializes writes, but a delayed caller can report an older commit after a newer one.
+                if (revision < _committedRevision) return;
+                _committedRevision = revision;
+                _committedPayload = payload;
+            }
+        }
+
+        internal void MarkLoadedCommitted()
+        {
+            lock (_gate)
+            {
+                _committedRevision = _state.Revision;
+                _committedPayload = JsonUtility.ToJson(_state);
+            }
         }
 
         public void Bootstrap(GoodsLocation location)
@@ -435,18 +470,20 @@ namespace FoodFactoryGame.Goods
 
         // Live clock step between commits (decision 0016): advances in memory only. The next TryCommitDurably, or any
         // durable command (it saves the whole world), persists it; a crash before then loses it together with everything
-        // it produced, so goods and cash roll back as one revision. A failure restores the prior state and rethrows.
+        // it produced, so goods and cash roll back as one revision. A simulation exception restores the last committed
+        // revision (decision-0016 amendment) and rethrows; commands retain their own pre-command rollback copy.
         public void AdvanceUncommitted(long seconds)
         {
             if (seconds < 0) throw new ArgumentOutOfRangeException(nameof(seconds));
             lock (_gate)
             {
                 if (seconds == 0) return;
-                var before = Snapshot();
+                if (_committedPayload is null)
+                    throw new InvalidOperationException("Uncommitted ticks require a committed world.");
                 try { Advance(seconds); }
                 catch
                 {
-                    _state = before;
+                    _state = JsonUtility.FromJson<GoodsSnapshot>(_committedPayload);
                     InvalidateDiners();
                     throw;
                 }

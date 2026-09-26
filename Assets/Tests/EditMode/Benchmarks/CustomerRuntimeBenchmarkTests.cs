@@ -1,6 +1,6 @@
 // Measures the RUNTIME customer code (GoodsWorld, decision 0024) at the GDD section 28 target of about 1,000 concurrent
-// customers and 20 restaurants, driven like the live server: AdvanceUncommitted(1) every clock second (which also copies the
-// world for rollback), one accepted player transfer at >=1,000 customers, and a durable commit every 10 s (decision 0016).
+// customers and 20 restaurants, driven like the live server: AdvanceUncommitted(1) every clock second, one accepted
+// player transfer at >=1,000 customers, and a durable commit every 10 s (decision 0016).
 // Reports save phases; thresholds: provisional one-frame tick (16.7 ms), decision 0012's commit signals (50 ms, 1 MB).
 // Editor Mono timings, isolated temp save. The synthetic world below is test data, not gameplay content.
 using System;
@@ -152,12 +152,9 @@ namespace FoodFactoryGame.Benchmarks.Tests
             }
             Assert.That(commitIndex, Is.EqualTo(savePhases.Length));
 
-            // Breakdown on the same world: the rollback copy AdvanceUncommitted takes (Snapshot) versus the step itself (Advance).
+            // The raw simulation step for comparison with the measured uncommitted tick (which now has no rollback copy).
             const int samples = 30;
             var began2 = Stopwatch.GetTimestamp();
-            for (var index = 0; index < samples; index++) world.Snapshot();
-            var copyMs = (Stopwatch.GetTimestamp() - began2) * 1000.0 / Stopwatch.Frequency / samples;
-            began2 = Stopwatch.GetTimestamp();
             for (var index = 0; index < samples; index++) world.Advance(1);
             var stepMs = (Stopwatch.GetTimestamp() - began2) * 1000.0 / Stopwatch.Frequency / samples;
 
@@ -169,7 +166,7 @@ namespace FoodFactoryGame.Benchmarks.Tests
             var line = $"[Benchmark] runtime customers: warmup={warmup}s customers {start.Customers.Count}->{end.Customers.Count} " +
                 $"({string.Join(",", end.Customers.GroupBy(x => x.State).Select(x => $"{x.Key}={x.Count()}"))}) " +
                 $"served={end.Diners.Sum(x => x.Served)} walkedOut={end.Diners.Sum(x => x.WalkedOut)} | tick mean={mean:F2}ms " +
-                $"p99={p99:F2}ms max={ticks[MeasuredSeconds - 1]:F2}ms over {MeasuredSeconds} ticks (rollback copy {copyMs:F2}ms + step {stepMs:F2}ms) | commits={stats.Commits} " +
+                $"p99={p99:F2}ms max={ticks[MeasuredSeconds - 1]:F2}ms over {MeasuredSeconds} ticks (step {stepMs:F2}ms) | commits={stats.Commits} " +
                 $"avg={stats.AverageMilliseconds:F1}ms max={stats.MaxMilliseconds:F1}ms payload={stats.LastPayloadBytes / 1024.0:F0}KB " +
                 $"| cpu=\"{SystemInfo.processorType}\" unity={Application.unityVersion} editor-mono";
             TestContext.WriteLine(line);

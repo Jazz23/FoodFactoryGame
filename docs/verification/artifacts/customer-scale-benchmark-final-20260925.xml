@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="1" result="Passed" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-09-26 04:36:13Z" end-time="2026-09-26 04:36:14Z" duration="1.0757589">
+  <test-suite type="TestSuite" id="1383" name="FoodFactoryGame" fullname="FoodFactoryGame" runstate="Runnable" testcasecount="262" result="Passed" start-time="2026-09-26 04:36:13Z" end-time="2026-09-26 04:36:14Z" duration="1.075759" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="EditMode" />
+    </properties>
+    <test-suite type="Assembly" id="1019" name="FoodFactoryGame.Benchmarks.EditModeTests.dll" fullname="E:/Projects/Unity/FoodFactoryGame/Library/ScriptAssemblies/FoodFactoryGame.Benchmarks.EditModeTests.dll" runstate="Runnable" testcasecount="7" result="Passed" start-time="2026-09-26 04:36:13Z" end-time="2026-09-26 04:36:14Z" duration="1.075201" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="17660" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="EditMode" />
+        <property name="EditorOnly" value="True" />
+      </properties>
+      <test-suite type="TestSuite" id="1020" name="FoodFactoryGame" fullname="FoodFactoryGame" runstate="Runnable" testcasecount="7" result="Passed" start-time="2026-09-26 04:36:13Z" end-time="2026-09-26 04:36:14Z" duration="0.976220" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-suite type="TestSuite" id="1021" name="Benchmarks" fullname="FoodFactoryGame.Benchmarks" runstate="Runnable" testcasecount="7" result="Passed" start-time="2026-09-26 04:36:13Z" end-time="2026-09-26 04:36:14Z" duration="0.975945" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <test-suite type="TestSuite" id="1022" name="Tests" fullname="FoodFactoryGame.Benchmarks.Tests" runstate="Runnable" testcasecount="7" result="Passed" start-time="2026-09-26 04:36:13Z" end-time="2026-09-26 04:36:14Z" duration="0.875811" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-suite type="TestFixture" id="1017" name="CustomerRuntimeBenchmarkTests" fullname="FoodFactoryGame.Benchmarks.Tests.CustomerRuntimeBenchmarkTests" classname="FoodFactoryGame.Benchmarks.Tests.CustomerRuntimeBenchmarkTests" runstate="Runnable" testcasecount="1" result="Passed" start-time="2026-09-26 04:36:13Z" end-time="2026-09-26 04:36:14Z" duration="0.875518" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties>
+                <property name="Category" value="Benchmark" />
+              </properties>
+              <test-case id="1018" name="ThousandCustomersFitAFrameAndCommitUnderTheWarningSignals" fullname="FoodFactoryGame.Benchmarks.Tests.CustomerRuntimeBenchmarkTests.ThousandCustomersFitAFrameAndCommitUnderTheWarningSignals" methodname="ThousandCustomersFitAFrameAndCommitUnderTheWarningSignals" classname="FoodFactoryGame.Benchmarks.Tests.CustomerRuntimeBenchmarkTests" runstate="Runnable" seed="1342974891" result="Passed" start-time="2026-09-26 04:36:13Z" end-time="2026-09-26 04:36:14Z" duration="0.774974" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <output><![CDATA[[Benchmark] player transfer: customers=1005 total=20.45ms save=12.96ms wrapper/action=7.48ms save phases copy=0.00 validate=2.81 json=3.02 transaction=5.08 commit+sync=2.05ms
+[Benchmark] player transfer: customers=1005 total=20.45ms save=12.96ms wrapper/action=7.48ms save phases copy=0.00 validate=2.81 json=3.02 transaction=5.08 commit+sync=2.05ms
+[Benchmark] player transfer: customers=1005 total=20.45ms save=12.96ms wrapper/action=7.48ms save phases copy=0.00 validate=2.81 json=3.02 transaction=5.08 commit+sync=2.05ms
+[Benchmark] player transfer: customers=1005 total=20.45ms save=12.96ms wrapper/action=7.48ms save phases copy=0.00 validate=2.81 json=3.02 transaction=5.08 commit+sync=2.05ms
+[Benchmark] runtime customers: warmup=420s customers 1005->994 (Eating=287,Queued=224,Travelling=459,Ordering=24) served=1568 walkedOut=274 | tick mean=0.18ms p99=0.72ms max=3.33ms over 300 ticks (step 0.14ms) | commits=30 avg=15.5ms max=34.0ms payload=338KB | cpu="AMD Ryzen 5 5600X 6-Core Processor " unity=6000.5.9f1 editor-mono
+[Benchmark] runtime customers: warmup=420s customers 1005->994 (Eating=287,Queued=224,Travelling=459,Ordering=24) served=1568 walkedOut=274 | tick mean=0.18ms p99=0.72ms max=3.33ms over 300 ticks (step 0.14ms) | commits=30 avg=15.5ms max=34.0ms payload=338KB | cpu="AMD Ryzen 5 5600X 6-Core Processor " unity=6000.5.9f1 editor-mono
+[Benchmark] runtime customers: warmup=420s customers 1005->994 (Eating=287,Queued=224,Travelling=459,Ordering=24) served=1568 walkedOut=274 | tick mean=0.18ms p99=0.72ms max=3.33ms over 300 ticks (step 0.14ms) | commits=30 avg=15.5ms max=34.0ms payload=338KB | cpu="AMD Ryzen 5 5600X 6-Core Processor " unity=6000.5.9f1 editor-mono
+[Benchmark] runtime customers: warmup=420s customers 1005->994 (Eating=287,Queued=224,Travelling=459,Ordering=24) served=1568 walkedOut=274 | tick mean=0.18ms p99=0.72ms max=3.33ms over 300 ticks (step 0.14ms) | commits=30 avg=15.5ms max=34.0ms payload=338KB | cpu="AMD Ryzen 5 5600X 6-Core Processor " unity=6000.5.9f1 editor-mono
+[Benchmark] save phases over 30 tick commits (mean/max ms): copy=0.00/0.00 validate=3.86/23.61 json=3.65/8.75 transaction=5.84/12.19 commit+sync=2.13/5.83
+[Benchmark] save phases over 30 tick commits (mean/max ms): copy=0.00/0.00 validate=3.86/23.61 json=3.65/8.75 transaction=5.84/12.19 commit+sync=2.13/5.83
+[Benchmark] save phases over 30 tick commits (mean/max ms): copy=0.00/0.00 validate=3.86/23.61 json=3.65/8.75 transaction=5.84/12.19 commit+sync=2.13/5.83
+[Benchmark] save phases over 30 tick commits (mean/max ms): copy=0.00/0.00 validate=3.86/23.61 json=3.65/8.75 transaction=5.84/12.19 commit+sync=2.13/5.83
+<b><color=#2EA3FF>MCP-FOR-UNITY</color></b>: [TestRunnerNoThrottle] Restored Interaction Mode after test run.
+<b><color=#2EA3FF>MCP-FOR-UNITY</color></b>: [TestRunnerNoThrottle] Restored Interaction Mode after test run.
+<b><color=#2EA3FF>MCP-FOR-UNITY</color></b>: [TestRunnerNoThrottle] Restored Interaction Mode after test run.
+Saving results to: C:/Users/Deven/AppData/LocalLow/DefaultCompany/FoodFactoryGame\TestResults.xml
+Saving results to: C:/Users/Deven/AppData/LocalLow/DefaultCompany/FoodFactoryGame\TestResults.xml
+Saving results to: C:/Users/Deven/AppData/LocalLow/DefaultCompany/FoodFactoryGame\TestResults.xml
+]]></output>
+              </test-case>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

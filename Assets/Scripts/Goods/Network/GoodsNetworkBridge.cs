@@ -16,6 +16,9 @@ namespace FoodFactoryGame.Goods.Network
         // A connection may watch several granted sites (its own and, for remote management, the company's other sites).
         private readonly Dictionary<NetworkConnection, HashSet<string>> _subscriptions = new();
         private readonly Dictionary<string, long> _clientRevisions = new();
+        // A tick exception may restore a lower revision. Epochs let clients accept that rollback and reject late old views.
+        private long _serverEpoch;
+        private long _clientEpoch = -1;
         private const float StatsIntervalSeconds = 60f;
         // Decision 0016: clock ticks run in memory and are saved this often (player commands still save at once), so a
         // crash loses at most this much simulated time.
@@ -35,7 +38,8 @@ namespace FoodFactoryGame.Goods.Network
             if (!IsServerStarted || world == null || resolvePlayer == null || string.IsNullOrWhiteSpace(savePath))
                 throw new InvalidOperationException("A running server world, identity resolver and save path are required.");
             // The composition owner must first create or explicitly recover this save; never overwrite it implicitly.
-            if (!File.Exists(savePath) || JsonUtility.ToJson(GoodsSnapshotStore.Load(savePath).Snapshot()) != JsonUtility.ToJson(world.Snapshot()))
+            if (world.HasUncommittedChanges || !File.Exists(savePath)
+                || JsonUtility.ToJson(GoodsSnapshotStore.Load(savePath).Snapshot()) != JsonUtility.ToJson(world.Snapshot()))
                 throw new InvalidOperationException("Server world must match its committed snapshot before accepting requests.");
             _world = world;
             _resolvePlayer = resolvePlayer;
@@ -57,9 +61,14 @@ namespace FoodFactoryGame.Goods.Network
             _uncommittedSeconds = 0;
             _statsRemainder = 0;
             _persistenceFailed = false;
+            _serverEpoch = 0;
         }
 
-        public override void OnStopClient() => _clientRevisions.Clear();
+        public override void OnStopClient()
+        {
+            _clientRevisions.Clear();
+            _clientEpoch = -1;
+        }
 
         // Backstop for a bridge destroyed without OnStopServer, so pending ticks are saved and the held save's files can
         // be closed and deleted.
@@ -88,7 +97,17 @@ namespace FoodFactoryGame.Goods.Network
             // While a commit is failing the clock waits, so memory never runs more than one interval ahead of the save.
             if (_persistenceFailed && !TryCommit()) return;
             var seconds = (long)_clockRemainder;
-            _world.AdvanceUncommitted(seconds);
+            try { _world.AdvanceUncommitted(seconds); }
+            catch (Exception error)
+            {
+                // The world restored its last save. Send a new baseline epoch even though its revision moved backward.
+                _clockRemainder = 0;
+                _uncommittedSeconds = 0;
+                _serverEpoch++;
+                Debug.LogError($"[Goods] Clock step failed; restored the last committed world: {error}");
+                Broadcast();
+                return;
+            }
             _clockRemainder -= seconds;
             _uncommittedSeconds += seconds;
             if (_uncommittedSeconds >= CommitIntervalSeconds) TryCommit();
@@ -482,7 +501,7 @@ namespace FoodFactoryGame.Goods.Network
                 return;
             }
             var view = _world.View(_resolvePlayer(connection), siteId);
-            TargetSite(connection, JsonUtility.ToJson(view));
+            TargetSite(connection, JsonUtility.ToJson(view), _serverEpoch);
         }
 
         private bool TryIdentify(NetworkConnection sender, string requestId, out string player)
@@ -515,10 +534,16 @@ namespace FoodFactoryGame.Goods.Network
         }
 
         [TargetRpc]
-        private void TargetSite(NetworkConnection connection, string json)
+        private void TargetSite(NetworkConnection connection, string json, long epoch)
         {
             var state = JsonUtility.FromJson<GoodsSnapshot>(json);
             if (state?.Locations == null || state.Locations.Count == 0) return;
+            if (epoch < _clientEpoch) return;
+            if (epoch > _clientEpoch)
+            {
+                _clientRevisions.Clear();
+                _clientEpoch = epoch;
+            }
             var siteId = state.Locations[0].SiteId;
             if (_clientRevisions.TryGetValue(siteId, out var revision) && state.Revision < revision) return;
             _clientRevisions[siteId] = state.Revision;

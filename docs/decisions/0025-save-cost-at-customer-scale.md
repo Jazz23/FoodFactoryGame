@@ -2,9 +2,11 @@
 
 Date: 2026-09-25
 
-Status: proposed, **not accepted**. The one-file fast save path described below is implemented; no storage migration or
-background writer is approved. Decisions [0012](0012-company-cash.md), [0015](0015-wal-and-held-world-connection.md),
-and [0016](0016-periodic-tick-commits.md) remain the accepted contracts.
+Status: **deferred** (2026-09-25). The held-connection fast path and the later direct serialization of the validated live
+world are implemented. The [0016 amendment](0016-periodic-tick-commits.md#amendment-tick-exception-rollback-2026-09-25)
+removed the per-tick rollback copy. No relational migration or background writer is implemented.
+Decisions [0012](0012-company-cash.md), [0015](0015-wal-and-held-world-connection.md), and
+[0016](0016-periodic-tick-commits.md) remain the storage and commit contracts.
 
 ## Context and measurement
 
@@ -44,27 +46,33 @@ An earlier post-change run, before a cache-update placement adjustment, measured
 The fast-path run stayed under decision 0012's 50 ms commit warning (42.1 ms max) and 1 MB payload warning (338 KB).
 This is one local run, so it does not establish the target PC or command p99. The clock-tick p99 issue is separate below.
 
-## Proposed decision
+## Disposition
 
-Keep the optimized whole-world snapshot store for now. The measured save no longer crosses the warning signals in this
-scenario, so the numbers do not justify immediate relational migration or background saving. Reconsider whole-world
-relational storage if representative player/server runs or larger worlds show sustained save or command latency. Any
-replacement still needs an isolated migration dry run, recovery and replay tests, and a comparable benchmark.
+Keep the optimized whole-world snapshot store for now. The final isolated Editor run measured 15.5 ms mean / 34.0 ms
+maximum across 30 saves, a 338 KB payload and 20.45 ms for one accepted player command. Neither decision-0012 warning
+fired in that run. **Revisit 0025 when either 0012 warning fires again in representative served-world measurements:** a
+commit above 50 ms or a payload above 1 MB. One intermediate run did have a 57.6 ms outlier, so the current result is
+not evidence that the warning cannot recur. Before replacing the store, repeat the measurement on target hardware and
+a player/server build and preserve recovery and replay semantics.
 
 | Option | Effect suggested by these numbers | Consistency and implementation cost | Disposition |
 | --- | --- | --- | --- |
-| (a) Customers-only SQLite table beside the JSON world | Could shrink part of the 338 KB payload, but the save still copies, validates and converts the whole world. Customer share of the payload was not measured. | Customer state, counter goods, seats, payments and cash cross the table boundary. Fallback to an older JSON revision must restore matching customer rows; an ordinary current-state table cannot do that. Requires coordinated revision history and recovery. | Reject as a separate store under decision 0012. |
-| (b) Relational storage for the whole world | Changed-row writes might remove repeated whole-world copy, validation and JSON work, but the measured pre-commit transaction is now 6.33 ms, not 18.44 ms. A speedup is an unmeasured design inference. | Requires one atomic revision for goods, customers, cash, outcomes and other state; stable identities, idempotent replay, database constraints, prior-revision recovery, migration and rollback tests. | Defer until representative measurements justify the migration. |
-| (c) Save tick commits in the background | Could move a 25.0 ms periodic save off the main thread if the entire save runs there. Offloading only `COMMIT` addresses 2.58 ms on average. It does not remove the 31.81 ms acknowledged command. | Needs an immutable revision handoff, ordered commands and ticks, backpressure and failure recovery. Commands must still wait for durable commit before acknowledgment. Thread safety of Unity JSON conversion cannot be assumed. | Defer as a possible scheduling improvement if tick-commit hitches remain visible in player builds. |
+| (a) Customers-only SQLite table beside the JSON world | Could shrink part of the 338 KB payload, but the save still validates and converts the whole world. Customer share of the payload was not measured. | Customer state, counter goods, seats, payments and cash cross the table boundary. Fallback to an older JSON revision must restore matching customer rows; an ordinary current-state table cannot do that. Requires coordinated revision history and recovery. | Reject as a separate store under decision 0012. |
+| (b) Relational storage for the whole world | Changed-row writes might remove whole-world validation and JSON work; the save copy is already gone. The final pre-commit transaction averages 5.84 ms. A speedup is an unmeasured design inference. | Requires one atomic revision for goods, customers, cash, outcomes and other state; stable identities, idempotent replay, database constraints, prior-revision recovery, migration and rollback tests. | Defer until representative measurements justify the migration. |
+| (c) Save tick commits in the background | Could move a 15.5 ms average periodic save off the main thread if the entire save runs there. Offloading only `COMMIT` addresses 2.13 ms on average. It does not remove the 20.45 ms acknowledged command. | Needs an immutable revision handoff, ordered commands and ticks, backpressure and failure recovery. Commands must still wait for durable commit before acknowledgment. Thread safety of Unity JSON conversion cannot be assumed. | Defer as a possible scheduling improvement if tick-commit hitches remain visible in player builds. |
 
-## Separate item: rollback copy during clock ticks
+## Resolved separate item: rollback copy during clock ticks
 
-`AdvanceUncommitted` copies the world before each one-second step for exception rollback. In separate 30-sample loops the
+Before the [0016 amendment](0016-periodic-tick-commits.md#amendment-tick-exception-rollback-2026-09-25),
+`AdvanceUncommitted` copied the world before each one-second step for exception rollback. In separate 30-sample loops the
 copy averaged 8.87 ms initially and 8.29 ms after the save change; the simulation step itself averaged 0.20 and 0.14 ms.
 The 300-tick p99 was 22.44 ms initially and 20.51 ms after the change, above the benchmark's provisional 16.7 ms
 one-frame signal both times. These runs do not show a regression caused by the save path: the save change does not alter
-`AdvanceUncommitted`, and the observed p99 difference may be run-to-run noise. Investigate its rollback strategy and
-measure tick latency separately from this storage decision. No rollback behavior is changed here.
+`AdvanceUncommitted`, and the observed p99 difference may be run-to-run noise. The amendment now restores the last
+committed payload on a tick exception. In the [final isolated run](../verification/customer-scale-performance-20260925.md),
+300 ticks measured 0.18 ms mean / 0.72 ms p99 / 3.33 ms maximum. A forced mid-tick exception restored goods, cash and
+customers to the last save, and host/remote clients accepted the rollback baseline. A tick exception may lose up to the
+same 10 s of simulation as a crash; command rollback and failed-commit retry remain unchanged.
 
 ## Required proof before replacing the store
 
@@ -74,7 +82,6 @@ measure tick latency separately from this storage decision. No rollback behavior
 - Measure the same 1,000-customer scenario on the target hardware and a player/server build: mean, p99 and maximum of
   tick commits and accepted commands, payload or changed-row count, and failure/recovery behavior. The one-command sample
   here cannot establish a command p99.
-- Track the `AdvanceUncommitted` rollback-copy cost under a separate performance item and verify any change to its
-  failure semantics with domain tests.
+- Recheck tick p99 on target hardware in a player/server build if simulation scale grows.
 
-No schema, threading, acknowledgement or crash-window change is authorized by this proposal.
+No schema, threading, acknowledgment or crash-window change was made for 0025.
