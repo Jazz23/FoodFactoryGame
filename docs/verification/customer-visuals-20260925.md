@@ -32,10 +32,26 @@ which `SessionBootstrapTests` consumes with `LogAssert.Expect`.
     models and 9.95 / 12.17 ms at 200. At 400, only 74 % of frames were under 16.67 ms, which supports the 100 cap.
   - [Running host probe](artifacts/customer-host-frame-probe-20260925.csv): 12 visuals, median / p95 frame 4.62 / 5.62 ms.
 
+## Remote client (2026-09-26)
+
+`CustomerPresenter.Bind(ClientSiteSubscription)` lets a presenter draw another connection's replicated site instead of its
+session's own. `RemoteClientDrawsTheCustomerFromItsOwnReplicatedSite` joins a client-only `NetworkManager` in the same
+process over loopback UDP with the real `DevAuthenticator` (isolated `remote.db`), binds a second presenter to that
+connection's dev-site subscription, seeds a customer on the server and checks three things. The remote baseline carries
+the customer with the server's restaurant and appearance. The remote presenter creates its own animated visual, and that
+visual walks.
+
+| Requested filter | Run identity (UTC) | Matched | Result | Artifact |
+| --- | --- | ---: | --- | --- |
+| PlayMode testName `CustomerPresenterTests` (async) | 2026-09-26, before the assembly run | 2 | 2 passed | (overwritten by the assembly run) |
+| PlayMode assembly `FoodFactoryGame.Session.PlayModeTests` (async) | NUnit id 2, 2026-09-26 16:56:23Z | 26 | 26 passed | [Session XML](artifacts/customer-visuals-remote-session-20260926.xml) |
+
+Console errors were only the expected `SpawnablePrefabs is null on session-test-remote`, consumed by `LogAssert.Expect`.
+
 ## Not verified
 
-- A remote client's view. The presenter reads the replicated `ClientSite`, which the Session fixture already replicates, but
-  no remote-client capture of customer visuals was made.
+- A running-game capture from a separate remote player process. The remote check above shares one process and camera
+  with the host.
 - Out-of-view spawning against other players' cameras. The presenter only checks the local camera, so another player
   can see a customer appear.
 - Crowding behavior: queued visuals stand in a fixed grid beside the counter and pass through each other. There is no

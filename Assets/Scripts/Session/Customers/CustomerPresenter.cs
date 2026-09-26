@@ -26,6 +26,7 @@ namespace FoodFactoryGame.Session.Customers
         private readonly List<string> _remove = new();
         private GoodsSnapshot _shown;
         private float _nextRefresh;
+        private ClientSiteSubscription _bound;
 
         private sealed class Visual
         {
@@ -40,9 +41,18 @@ namespace FoodFactoryGame.Session.Customers
 
         public int VisibleCount => _visuals.Count;
 
+        // Draws another client connection's replicated site instead of the session's own, e.g. a second client in one process.
+        public void Bind(ClientSiteSubscription subscription)
+        {
+            _bound = subscription;
+            Clear();
+        }
+
+        private ClientSiteSubscription Subscription => _bound ?? session.ClientSubscription;
+
         private void Update()
         {
-            var site = session.ClientSite;
+            var site = Subscription?.Latest;
             if (!ReferenceEquals(site, _shown) || Time.time >= _nextRefresh)
             {
                 _shown = site;
@@ -65,7 +75,7 @@ namespace FoodFactoryGame.Session.Customers
 
         private void Refresh(GoodsSnapshot site)
         {
-            var siteId = session.ClientSubscription?.SiteId;
+            var siteId = Subscription?.SiteId;
             var layout = site?.SiteLayouts.FirstOrDefault(x => x.SiteId == siteId);
             if (layout == null || customerPrefab == null)
             {
