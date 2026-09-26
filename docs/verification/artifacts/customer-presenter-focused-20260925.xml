@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="1" result="Passed" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-09-26 04:52:45Z" end-time="2026-09-26 04:52:46Z" duration="1.8500243">
+  <test-suite type="TestSuite" id="1057" name="FoodFactoryGame" fullname="FoodFactoryGame" runstate="Runnable" testcasecount="33" result="Passed" start-time="2026-09-26 04:52:45Z" end-time="2026-09-26 04:52:46Z" duration="1.850024" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="PlayMode" />
+    </properties>
+    <test-suite type="Assembly" id="1049" name="FoodFactoryGame.Session.PlayModeTests.dll" fullname="E:/Projects/Unity/FoodFactoryGame/Library/ScriptAssemblies/FoodFactoryGame.Session.PlayModeTests.dll" runstate="Runnable" testcasecount="32" result="Passed" start-time="2026-09-26 04:52:45Z" end-time="2026-09-26 04:52:46Z" duration="1.840204" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="17660" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="PlayMode" />
+        <property name="EditorOnly" value="False" />
+      </properties>
+      <test-suite type="TestSuite" id="1050" name="FoodFactoryGame" fullname="FoodFactoryGame" runstate="Runnable" testcasecount="32" result="Passed" start-time="2026-09-26 04:52:45Z" end-time="2026-09-26 04:52:46Z" duration="1.838270" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-suite type="TestSuite" id="1051" name="Session" fullname="FoodFactoryGame.Session" runstate="Runnable" testcasecount="32" result="Passed" start-time="2026-09-26 04:52:45Z" end-time="2026-09-26 04:52:46Z" duration="1.836820" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <test-suite type="TestSuite" id="1052" name="PlayModeTests" fullname="FoodFactoryGame.Session.PlayModeTests" runstate="Runnable" testcasecount="32" result="Passed" start-time="2026-09-26 04:52:45Z" end-time="2026-09-26 04:52:46Z" duration="1.835012" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-suite type="TestFixture" id="1014" name="CustomerPresenterTests" fullname="FoodFactoryGame.Session.PlayModeTests.CustomerPresenterTests" classname="FoodFactoryGame.Session.PlayModeTests.CustomerPresenterTests" runstate="Runnable" testcasecount="1" result="Passed" start-time="2026-09-26 04:52:45Z" end-time="2026-09-26 04:52:46Z" duration="1.832711" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-case id="1015" name="ReplicatedCustomerWalksFromOffscreenTowardTheCounter" fullname="FoodFactoryGame.Session.PlayModeTests.CustomerPresenterTests.ReplicatedCustomerWalksFromOffscreenTowardTheCounter" methodname="ReplicatedCustomerWalksFromOffscreenTowardTheCounter" classname="FoodFactoryGame.Session.PlayModeTests.CustomerPresenterTests" runstate="Runnable" seed="1679574894" result="Passed" start-time="2026-09-26 04:52:45Z" end-time="2026-09-26 04:52:46Z" duration="1.818030" asserts="0">
+                <properties>
+                  <property name="_JOINTYPE" value="UnityCombinatorial" />
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <output><![CDATA[[Session] Starting server...
+Local server is starting for Tugboat. Listening on port 59721.
+Local server is started for Tugboat.
+[Session] Hosting
+[Session] Connecting to 127.0.0.1...
+Local client is starting for Tugboat. Server IP is 127.0.0.1, port is 59721.
+Remote connection started for Id 0.
+Local client is started for Tugboat.
+[Session] Joined as player-9540d61f51914420a02873bcbc50bb59
+Local client is stopping for Tugboat.
+<b><color=#2EA3FF>MCP-FOR-UNITY</color></b>: [TestRunnerNoThrottle] Restored Interaction Mode after test run.
+Saving results to: C:/Users/Deven/AppData/LocalLow/DefaultCompany/FoodFactoryGame\TestResults.xml
+]]></output>
+              </test-case>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

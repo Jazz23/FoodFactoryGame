@@ -101,8 +101,10 @@ re-run against the real code, and one PlayMode check that the HUD cash comes fro
   `Assets/Content/Equipment/Table.asset` (2x1, 4 seats, supplier `supplier-table` at $40.00). The counter screen shows who is
   being served and how many are waiting; a table screen shows its seats and the restaurant's served, walked-out and
   reputation figures.
-- **Not built:** visual customers, out-of-view spawn points, district appearance sets, player menu choice, and competitor
-  behaviour beyond fixed records.
+- **Built 2026-09-25:** local visual customers with edge spawn points outside the local camera, capped at 100 per client
+  ([verification](../verification/customer-visuals-20260925.md)).
+- **Not built:** out-of-view checks against other players' cameras, district appearance sets, player menu choice, and
+  competitor behaviour beyond fixed records.
 
 ## Alternatives rejected
 
@@ -123,7 +125,7 @@ re-run against the real code, and one PlayMode check that the HUD cash comes fro
 - Patience, eating time and the takeaway/dine-in split.
 - Competitor AI beyond fixed records (section 11), and acquisitions.
 - Customer visuals and crowd rendering at scale. The benchmark measured the simulation only; animated visible customers are
-  the remaining performance risk.
+  the remaining performance risk. An Editor probe held 100 animated models under the 16.67 ms frame budget, but not 400.
 - Whether cuisine fit and distance weights differ by district or are global.
 - **Customer groups** (raised by the owner 2026-09-25, deferred to a later step): families of 3+ and couples, with table
   size deciding whether a party can be seated. Undecided: whether a party takes a whole table or shares with strangers,
