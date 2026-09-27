@@ -1,1 +1,1 @@
-{"name":"FoodFactoryGame.Goods.Network","rootNamespace":"FoodFactoryGame.Goods.Network","references":["FoodFactoryGame.Goods","FishNet.Runtime"],"autoReferenced":true}
+{"name":"FoodFactoryGame.Goods.Network","rootNamespace":"FoodFactoryGame.Goods.Network","references":["FoodFactoryGame.Goods","FoodFactoryGame.World","FishNet.Runtime"],"autoReferenced":true}

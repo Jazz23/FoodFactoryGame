@@ -1,0 +1,304 @@
+fileFormatVersion: 2
+guid: 66e1059bf201585498ca1466b1129109
+ModelImporter:
+  serializedVersion: 24501
+  internalIDToNameTable: []
+  externalObjects:
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WG_Awning
+    second: {fileID: 2100000, guid: e1d28c331eafa6846b703f54f0f2ff8f, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WG_Concrete
+    second: {fileID: 2100000, guid: 8b3c0e70f85ef6d4aa09d0e6e239da08, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WG_Door_Glass
+    second: {fileID: 2100000, guid: 30080e58529412a439e87f87a7f8ffc8, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WG_Door_Roller
+    second: {fileID: 2100000, guid: 1e11b74fa46dfda429984723dfa5ef4f, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WG_Door_Wood
+    second: {fileID: 2100000, guid: 9ca2d4f99971e4a41a750d374d9aff7d, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WG_Facade_Apartment
+    second: {fileID: 2100000, guid: 4dd973cc3e5a9de428ba0c6f401f9d47, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WG_Facade_Brick
+    second: {fileID: 2100000, guid: 3f4f11e95f408d549a780a452c7a38e2, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WG_Facade_Office
+    second: {fileID: 2100000, guid: 81eac45871ef0fb49ae7775e3208593d, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WG_Facade_OfficeDark
+    second: {fileID: 2100000, guid: 9737c5a17db534d4eb3791841e15cfb5, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WG_Facade_Plaster
+    second: {fileID: 2100000, guid: 443f6dc97aeb8174e9d3c19189bd4aff, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WG_Facade_Siding
+    second: {fileID: 2100000, guid: e7460000f17f39345b6e4c6d0be6c06b, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WG_Facade_Storefront
+    second: {fileID: 2100000, guid: e7f8b353f2807024b887549575273610, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WG_Field_Greens
+    second: {fileID: 2100000, guid: 947bf6a33774c8747b0a7dac72185057, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WG_Field_Wheat
+    second: {fileID: 2100000, guid: 76fb8b092b88bac45b9f55a783da7fe5, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WG_Ground
+    second: {fileID: 2100000, guid: 58cbcaf24da926348a062f8ca50e6623, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WG_Ground_Grass
+    second: {fileID: 2100000, guid: d8d2cc760f51b624b967b506d05000c1, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WG_Ground_Paving
+    second: {fileID: 2100000, guid: fc76aad4686992b43b4d1ac2a1fa0b84, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WG_Ground_Yard
+    second: {fileID: 2100000, guid: e9b325f7ea0af414a89846849248ca50, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WG_Metal_Dark
+    second: {fileID: 2100000, guid: 195e3a0450d40da4d8f4be76b034c18e, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WG_Metal_Roof
+    second: {fileID: 2100000, guid: 7be7fbb7f92d73c4fb042df6a51083f7, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WG_Metal_Wall
+    second: {fileID: 2100000, guid: 90786cbccfab4dd4ea4e1bd1424c0a59, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WG_Paint_Yellow
+    second: {fileID: 2100000, guid: 0dfdbbd06c5cab54caa93d969be587f2, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WG_Rail_Ballast
+    second: {fileID: 2100000, guid: c8ba5f6170492164c9072cf154575d6d, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WG_Road_Arterial
+    second: {fileID: 2100000, guid: 80715f86c474e4d40ac3241f4cedbd04, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WG_Road_Arterial_Crosswalk
+    second: {fileID: 2100000, guid: 3bddbcddb82ac664fb89780b001a642f, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WG_Road_Junction
+    second: {fileID: 2100000, guid: 36d4701e2c466c641a2f959bd0e8d2eb, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WG_Road_Local
+    second: {fileID: 2100000, guid: c1677f54d21b9754e85ea6a4821d35f3, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WG_Road_Local_Crosswalk
+    second: {fileID: 2100000, guid: 598c17274fe4ed04890899b674e5331c, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WG_Road_Rural
+    second: {fileID: 2100000, guid: b7aee8d646ac588409b6caefb8a01c90, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WG_Roof_ClayTiles
+    second: {fileID: 2100000, guid: 6742df85b5232774ba7b5170dfb02e56, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WG_Roof_Flat
+    second: {fileID: 2100000, guid: 8378bb5f8a5072d448131f3e87ea9000, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WG_Roof_Shingles
+    second: {fileID: 2100000, guid: a8cc43b34f5a2f344a40c2bd787891a6, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WG_Sign
+    second: {fileID: 2100000, guid: 12429c8c47a016645b78157b9c66a984, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WG_Steel
+    second: {fileID: 2100000, guid: a0c13d29320ba3b45af78c74a0ca59ab, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WG_Stucco
+    second: {fileID: 2100000, guid: 1c7bc21259ad63b4fa4e8f8246728107, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WG_Trim
+    second: {fileID: 2100000, guid: 76f76bdce4ade8444ba621a17f49e6d1, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WG_Window_Industrial
+    second: {fileID: 2100000, guid: a3d810345b85b2a4a9d2d530ac0883f6, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WG_Wood_Barn
+    second: {fileID: 2100000, guid: 131466b2a2ba12a4d97432970ca07ada, type: 2}
+  materials:
+    materialImportMode: 1
+    materialName: 0
+    materialSearch: 1
+    materialLocation: 1
+    searchTexturesGlobally: 0
+  animations:
+    legacyGenerateAnimations: 4
+    bakeSimulation: 0
+    resampleCurves: 1
+    optimizeGameObjects: 0
+    removeConstantScaleCurves: 0
+    motionNodeName: 
+    animationImportErrors: 
+    animationImportWarnings: 
+    animationRetargetingWarnings: 
+    animationDoRetargetingWarnings: 0
+    importAnimatedCustomProperties: 0
+    importConstraints: 0
+    animationCompression: 1
+    animationRotationError: 0.5
+    animationPositionError: 0.5
+    animationScaleError: 0.5
+    animationWrapMode: 0
+    extraExposedTransformPaths: []
+    extraUserProperties: []
+    clipAnimations: []
+    isReadable: 1
+  meshes:
+    lODScreenPercentages: []
+    globalScale: 1
+    meshCompression: 0
+    addColliders: 0
+    useSRGBMaterialColor: 1
+    sortHierarchyByName: 1
+    importPhysicalCameras: 1
+    importVisibility: 1
+    importBlendShapes: 1
+    importCameras: 1
+    importLights: 1
+    nodeNameCollisionStrategy: 1
+    fileIdsGeneration: 2
+    swapUVChannels: 0
+    generateSecondaryUV: 0
+    useFileUnits: 1
+    keepQuads: 0
+    weldVertices: 1
+    bakeAxisConversion: 0
+    preserveHierarchy: 0
+    skinWeightsMode: 0
+    maxBonesPerVertex: 4
+    minBoneWeight: 0.001
+    optimizeBones: 1
+    generateMeshLods: 0
+    meshLodGenerationFlags: 0
+    maximumMeshLod: -1
+    importUVs: -1
+    importVertexColors: 1
+    meshOptimizationFlags: -1
+    indexFormat: 0
+    secondaryUVAngleDistortion: 8
+    secondaryUVAreaDistortion: 15.000001
+    secondaryUVHardAngle: 88
+    secondaryUVMarginMethod: 1
+    secondaryUVMinLightmapResolution: 40
+    secondaryUVMinObjectScale: 1
+    secondaryUVPackMargin: 4
+    useFileScale: 1
+    strictVertexDataChecks: 0
+  tangentSpace:
+    normalSmoothAngle: 60
+    normalImportMode: 0
+    tangentImportMode: 3
+    normalCalculationMode: 4
+    legacyComputeAllNormalsFromSmoothingGroupsWhenMeshHasBlendShapes: 0
+    blendShapeNormalImportMode: 1
+    normalSmoothingSource: 0
+    calculateBlendshapeNormalsDeltaFromImportedNormals: 0
+  referencedClips: []
+  importAnimation: 0
+  humanDescription:
+    serializedVersion: 3
+    human: []
+    skeleton: []
+    armTwist: 0.5
+    foreArmTwist: 0.5
+    upperLegTwist: 0.5
+    legTwist: 0.5
+    armStretch: 0.05
+    legStretch: 0.05
+    feetSpacing: 0
+    globalScale: 1
+    rootMotionBoneName: 
+    hasTranslationDoF: 0
+    hasExtraRoot: 0
+    skeletonHasParents: 1
+  lastHumanDescriptionAvatarSource: {instanceID: 0}
+  autoGenerateAvatarMappingIfUnspecified: 1
+  animationType: 0
+  humanoidOversampling: 1
+  avatarSetup: 0
+  addHumanoidExtraRootOnlyWhenUsingAvatar: 1
+  importBlendShapeDeformPercent: 1
+  remapMaterialsIfMaterialImportModeIsNone: 0
+  additionalBone: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

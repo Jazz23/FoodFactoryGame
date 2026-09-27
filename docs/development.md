@@ -205,3 +205,25 @@ Artifacts are intentionally ignored by Git. Preserve required evidence externall
 - An actual multiplayer smoke-test procedure requires the networking foundation. No server/client replication is implemented by this setup.
 - Specify benchmark hardware and representative simulation scenarios before accepting performance targets.
 - Test on a new machine/empty global package cache if that environment is required; local cold import alone does not certify it.
+
+## World Generation (decision 0026)
+
+- Scene: `Assets/Scenes/WorldGen.unity`. Rebuild it (recopied from DevSite; keeps the material, bridge prefab and catalog GUIDs) by
+  running the body of `AgentScripts/BuildWorldGenScene.cs` through MCP `execute_code`. The body deletes only the old
+  `WorldGen.unity`, so the tool's safety check must be disabled for that call.
+- Creating a world: open WorldGen, press Play. The panel has **World** (the save folder name under `Saves/`, default
+  `worldgen`, separate from DevSite's `dev-world`), **World seed** and **New world**. **Host** opens the named world and
+  creates and generates it if that folder is new; **New world** picks the first unused `world-N` and hosts it. The seed
+  (a number is used as is, other text is hashed, blank is random) applies only when a world is created; an existing world
+  keeps its stored layout, and a save made before world generation keeps none (the readout says so). `-save <dir>` and
+  `-seed <text>` still work for a launched player.
+- The city's edge starts 40 m north of the dev site; tilt the camera up (mouse) to see it. While a layout is shown, local
+  cameras draw to about 2.4 km.
+- Tests: assembly `FoodFactoryGame.World.EditModeTests` (14 tests; generator and `world.db` layout storage, temporary databases
+  only) and `FoodFactoryGame.Session.Tests.WorldGenerationTests` (4). A change to generator output fails
+  `SameSeedProducesAnIdenticalLayout`: bump `WorldGenerator.Version` and re-pin `KnownHash` rather than editing the pin alone.
+- World art: regenerate textures and models in Blender, copy them into `Assets/Art/World`, and run
+  `AgentScripts/BuildWorldArt.cs` (steps in `ArtSource/World/README.md`). Keep object names stable so the catalog's mesh
+  references survive; `WorldArtAuthoringTests` fails if a piece the presenter needs is missing.
+- Captures of the whole map need a camera high above it with a far plane of a few km (see the
+  [verification record](verification/worldgen-20260927.md)).

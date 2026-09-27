@@ -2,6 +2,8 @@
 // The newest row and the prior valid row are kept, so a damaged latest payload falls back to the previous commit.
 // Databases use WAL with FULL sync: one fsync per commit. A served world holds its connection open between commits,
 // because closing the last connection checkpoints and deletes the WAL, which costs as much as the old journal.
+// Database layout 2 adds the write-once world_layout table (decision 0026, WorldLayoutStore); layout 1 databases are upgraded
+// by the next writable open and read unchanged until then.
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -38,7 +40,8 @@ namespace FoodFactoryGame.Goods
     public static class GoodsSnapshotStore
     {
         // Database layout version (PRAGMA user_version), separate from the snapshot payload's SchemaVersion.
-        public const int DatabaseSchema = 1;
+        // 1: snapshots and quarantined_snapshots. 2: adds world_layout.
+        public const int DatabaseSchema = 2;
 
         private static readonly object SaveGate = new();
 
@@ -197,6 +200,17 @@ namespace FoodFactoryGame.Goods
                 && current.Payload == cached.Payload && current.Sha256 == cached.Sha256;
         }
 
+        // True when the database holds at least one snapshot row, valid or not. A database that holds only a world layout
+        // (written first when a world is created, decision 0026) has none: its world has not been committed yet.
+        public static bool HasSnapshots(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) throw new ArgumentException("Explicit save path required.");
+            var full = Path.GetFullPath(path);
+            if (!File.Exists(full)) return false;
+            using var db = Open(full, false);
+            return db.ExecuteScalar<int>("SELECT EXISTS (SELECT 1 FROM snapshots)") == 1;
+        }
+
         public static GoodsWorld Load(string path)
         {
             if (string.IsNullOrWhiteSpace(path)) throw new ArgumentException("Explicit save path required.");
@@ -228,7 +242,9 @@ namespace FoodFactoryGame.Goods
             return world;
         }
 
-        private static SQLiteConnection Open(string full, bool create)
+        // Opens an existing initialized database, or (create) creates or upgrades one to DatabaseSchema. Shared with
+        // WorldLayoutStore so both tables live in one file with one layout version.
+        internal static SQLiteConnection Open(string full, bool create)
         {
             var flags = SQLiteOpenFlags.ReadWrite | SQLiteOpenFlags.FullMutex | (create ? SQLiteOpenFlags.Create : 0);
             var db = new SQLiteConnection(full, flags);
@@ -247,7 +263,7 @@ namespace FoodFactoryGame.Goods
                 if (!string.Equals(db.ExecuteScalar<string>("PRAGMA journal_mode = WAL"), "wal", StringComparison.OrdinalIgnoreCase))
                     throw new IOException("The goods database could not switch to WAL.");
                 db.ExecuteScalar<string>("PRAGMA synchronous = FULL");
-                if (version == 0)
+                if (version < DatabaseSchema)
                 {
                     db.RunInTransaction(() =>
                     {
@@ -265,6 +281,18 @@ namespace FoodFactoryGame.Goods
                             + "payload TEXT, "
                             + "sha256 TEXT, "
                             + "quarantined_utc INTEGER NOT NULL)");
+                        // Layout 2: at most one row, written when the world is created and never updated (WorldLayoutStore).
+                        db.Execute("CREATE TABLE IF NOT EXISTS world_layout ("
+                            + "id INTEGER PRIMARY KEY NOT NULL CHECK (id = 1), "
+                            + "world_id TEXT NOT NULL, "
+                            + "format_version INTEGER NOT NULL, "
+                            + "generator_version INTEGER NOT NULL, "
+                            + "requested_seed TEXT NOT NULL, "
+                            + "seed INTEGER NOT NULL, "
+                            + "attempt INTEGER NOT NULL, "
+                            + "payload TEXT NOT NULL, "
+                            + "sha256 TEXT NOT NULL, "
+                            + "created_utc INTEGER NOT NULL)");
                         db.Execute($"PRAGMA user_version = {DatabaseSchema}");
                     });
                 }

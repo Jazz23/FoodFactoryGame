@@ -7,7 +7,7 @@ Gameplay requirements and open product decisions are in [the GDD](../Food_Factor
 ## Implemented Baseline
 
 - Unity `6000.5.9f1`, URP `17.5.0`, and Input System `1.20.0`.
-- `Assets/Scenes/DevSite.unity` is the only enabled build scene (session bootstrap, below). `Assets/Scenes/SampleScene.unity` and its oven prototype remain in the project but are no longer built.
+- `Assets/Scenes/DevSite.unity` is the only enabled build scene (session bootstrap, below). `Assets/Scenes/SampleScene.unity` and its oven prototype remain in the project but are no longer built. `Assets/Scenes/WorldGen.unity` (world generation, decision 0026) is also not a build scene.
 - `Assets/InputSystem_Actions.inputactions` is imported starter input authoring, not completed gameplay controls.
 - FishNet `4.7.3` is vendored under `Assets/FishNet`, including its original metadata, demo references, and license files. See [decision 0001](decisions/0001-reproducible-baseline.md).
 - `Assets/DefaultPrefabObjects.asset` references FishNet demo prefabs and is auto-maintained by FishNet's prefab generator, which also appends the project's spawnable prefabs. No game NetworkManager uses it; `DevSite` uses the project-owned `Assets/Network/GamePrefabs.asset`.
@@ -140,7 +140,7 @@ Prototype: one lane, belt speed and spacing, dev belt stock, and trailing (non-p
 
 Decision: [0011](decisions/0011-sqlite-for-all-data-storage.md). All persisted data uses SQLite; no new save-file formats.
 
-- `GoodsSnapshotStore` keeps the same `Save(world, path)` / `Load(path)` contract on a SQLite database (`world.db`): `snapshots` rows hold the versioned JSON payload and its SHA-256. `Save` runs in one `BEGIN IMMEDIATE` transaction (`synchronous = FULL`), refuses stale/conflicting revisions, inserts the new revision and keeps only it and the prior valid row. `Load` returns the newest row that verifies; unverifiable rows are moved to `quarantined_snapshots` on the next save. Database layout is `user_version` 1; newer is refused. `ImportLegacy(legacy, database, dryRun)` reads a pre-SQLite `world.snapshot` (or `.previous`), upgrades it in memory, and writes a new database unless dry-run; it refuses an existing database and never touches the legacy file. `DevWorld.LoadOrCreate(..., legacyWorldPath)` runs the dry run and import once when `world.db` is missing.
+- `GoodsSnapshotStore` keeps the same `Save(world, path)` / `Load(path)` contract on a SQLite database (`world.db`): `snapshots` rows hold the versioned JSON payload and its SHA-256. `Save` runs in one `BEGIN IMMEDIATE` transaction (`synchronous = FULL`), refuses stale/conflicting revisions, inserts the new revision and keeps only it and the prior valid row. `Load` returns the newest row that verifies; unverifiable rows are moved to `quarantined_snapshots` on the next save. Database layout is `user_version` 1 (2 since decision 0026 added `world_layout`); newer is refused. `ImportLegacy(legacy, database, dryRun)` reads a pre-SQLite `world.snapshot` (or `.previous`), upgrades it in memory, and writes a new database unless dry-run; it refuses an existing database and never touches the legacy file. `DevWorld.LoadOrCreate(..., legacyWorldPath)` runs the dry run and import once when `world.db` is missing.
 - Commit cost ([decision 0015](decisions/0015-wal-and-held-world-connection.md), 2026-09-24): goods databases use WAL with `synchronous = FULL`. `GoodsSnapshotStore.Hold(path)` keeps one connection open for `Save` until `Release(path)`; the goods bridge holds the served save from `InitializeServer`, and `SessionRoot.Shutdown`, `OnStopServer` and the bridge's `OnDestroy` release it. A held connection is dropped after a failed commit and reopened by the next `Save`. Commits remain synchronous on the main thread.
 - Held-connection fast save (2026-09-25): after a successful write, `GoodsSnapshotStore` caches that validated row in memory. A later save compares the database's latest revision, world ID, payload and checksum inside `BEGIN IMMEDIATE`; an exact match skips rereading and validating the previous world. Any difference uses `LatestValid` and its quarantine behavior. The cache is removed on release or failure; loads and unheld saves retain full validation. The SQLite layout, WAL `FULL` sync, previous-revision recovery and command acknowledgment rules are unchanged. [Verification](verification/fast-save-20260925.md). Decision 0025 is deferred after [the customer-scale rerun](verification/customer-scale-performance-20260925.md).
 - Tick commits ([decision 0016](decisions/0016-periodic-tick-commits.md), amended 2026-09-25): the served clock advances in memory each second (`AdvanceUncommitted`) and is committed every 10 s (`TryCommitDurably`, a no-op when `HasUncommittedChanges` is false); player commands still commit before acknowledging, saving pending ticks with them; a clean stop saves pending ticks. A crash or tick exception can lose up to 10 s of simulation, rolled back as one revision. A tick exception restores the last committed payload held in memory; the initial save is required before uncommitted ticking and serving. The bridge broadcasts a new rollback epoch so subscribed clients accept the lower revision and reject late baselines from older epochs. Player commands retain their pre-command copy and retry behavior. While a periodic commit fails, commands are refused and the clock waits with unsaved memory intact.
@@ -297,6 +297,55 @@ Decision: [0024](decisions/0024-customer-simulation.md). Replaces the sell count
 
 Prototype: all district, competitor, choice-weight, patience, eating, reputation and table values, and the visual cap, queue layout, walk speed and tint. Visual spawning checks only the local camera (not other players'); visuals have no avoidance. Open: see decision 0024 (district appearance sets, menus, customer groups, competitor AI).
 
+## Implemented: procedural world layout, first slice (2026-09-27)
+
+Decision: [0026](decisions/0026-procedural-world-layout.md). GDD section 3 "World Generation". Verification:
+[record](verification/worldgen-20260927.md). All generator values are PROTOTYPE.
+
+- Generator (`Assets/Scripts/World`, assembly `FoodFactoryGame.World`, no Unity references): `WorldGenerator.Generate(requestedSeed,
+  seed)` -> `WorldLayout` (districts with cuisine weights, minimum tier, customers per hour, traffic and price percent; road
+  nodes and axis-aligned segments with capacity; two rail lines; buildings: restaurant and factory shells in the decision-0019
+  model, premade slots for farms, houses, apartments and offices with model key and footprint/facing; stations at level
+  crossings; ownership and prices; the starting restaurant). Seeded `WorldRandom` streams per phase, integer geometry, stable
+  IDs. `WorldLayoutValidator` checks identity, shells, overlaps, road access and connectivity, start, farms and stations,
+  and district placement; failures retry with `WorldRandom.DeriveSeed` (up to 8, all reported). `WorldLayoutText` is the
+  canonical text (hash, storage, replication). `WorldGenerator.Version` = 1; a test pins seed 20260927's hash.
+- Persistence: `world.db` database layout (`user_version`) **2** adds the write-once `world_layout` table (`WorldLayoutStore`),
+  written before a new world's first snapshot; `GoodsSnapshotStore.HasSnapshots` tells a layout-only database (a world still
+  being created) from a world, and `DevWorld.LoadOrCreate` now creates when there are no snapshot rows. Loading never
+  regenerates; a damaged row stops the start. Layout 1 databases load unchanged with no layout and are upgraded (empty
+  table) by the next commit. The goods payload schema is unchanged (v13). This is an exception to decision 0012's no-tables
+  rule for immutable data; owner confirmation pending.
+- Session: `SessionRoot.worldLayoutBridgePrefab` enables generation (`WorldGeneration.PrepareLayout` before the world save,
+  `ServerLayout`, `GeneratesWorld`); `SessionOptions.WorldSeed` (`-seed <text>`; blank = random, recorded). WorldGen's
+  `SessionRoot.saveFolder` is `worldgen` (DevSite keeps `dev-world`), so it never opens a DevSite world; the host panel has
+  World (save folder name, `SelectWorld`), World seed and New world (`NextNewWorldName`, first unused `world-N`) and a
+  world readout line. `WorldLayoutBridge` sends each authenticated client the gzip canonical text and
+  SHA-256; `WorldLayoutPresenter` (`Assets/Scripts/Session/WorldMap`) draws it from that data only with the world art
+  (2026-09-27, below).
+- World art (2026-09-27, owner request): low-poly textured models and tileable road/rail tiles made in Blender by
+  `ArtSource/World/build_world_textures.py` and `build_world_models.py` (see `ArtSource/World/README.md`; 2-134 triangles
+  per asset, detail in procedural textures with normal maps and smoothness), exported to `Assets/Art/World/Models/WorldArt.fbx`,
+  installed by `AgentScripts/BuildWorldArt.cs` (URP Lit materials in `Assets/Art/World/Materials`, `WorldArtCatalog`). The
+  presenter tiles roads (10 m tiles with crosswalk ends and junction patches) and rail (6 m tiles) into one merged mesh per
+  material, fits each building model to its footprint and facing (apartments and offices stacked from ground/middle/roof
+  modules by storeys; farms as a field quad plus a barn with silo), tints restaurant awnings by owner (player green, for
+  sale yellow, competitors by ID), adds box colliders, and static-batches the result. Replaces the earlier box blockout.
+  `WorldArtAuthoringTests` checks the catalog reference and pieces.
+- Scene: `Assets/Scenes/WorldGen.unity` (DevSite copy + bridge + presenter, catalog `Assets/Network/WorldGenPrefabs.asset`,
+  material `Assets/Materials/World/WorldBlockout.mat`), authored by `AgentScripts/BuildWorldGenScene.cs`; not a build scene.
+  DevSite, `GamePrefabs.asset` and the dev seed are unchanged, and the dev site and its seed still run in WorldGen.
+  `WorldLayoutBridge.prefab` was also appended to the auto-maintained `DefaultPrefabObjects.asset` by FishNet's generator.
+- Stub, **escalated**: whether each purchasable building becomes its own site/`SiteGrid`. `WorldBuilding.SiteId` is always
+  empty; `WorldLayoutShells` converts a shell to a `GoodsBuilding` on a grid of its own size for tests only.
+
+Planned / undecided: the site link above; buying property and ownership changes (payload state keyed by layout IDs);
+customers from district densities and whether district values replace the dev district (decision 0024); competitor
+behaviour; trains; the ingredient supplier near the start; traffic using road capacities; final Blender models for premade
+slots; how existing `GoodsSite.MapX/Z` relate to layout coordinates (the presenter places the map beside the dev site as
+PROTOTYPE presentation only: the city's edge starts 40 m north of the dev site, pieces over the dev site's floor are not
+drawn, and local cameras draw to about 2.4 km while a layout is shown). Not verified: separate-process multiplayer, a player build.
+
 ## Required Constraints for Future Implementation
 
 - The server owns gameplay state; clients request validated actions through the command contract in decision 0002.
@@ -305,7 +354,7 @@ Prototype: all district, competitor, choice-weight, patience, eating, reputation
 - Player and employee operational rules should be shared; input and AI choose actions through those rules.
 - Visual objects must not become the sole owners of authoritative simulation state.
 
-These remain accepted contracts; only the bounded goods slice, its station jobs, equipment placement, the working oven, conveyor belts, company cash, the sell counter, supplier purchases, equipment purchases, spoilage timing/refrigeration, building shells, factory floors, conveyor lifts, trucks with loading docks, truck routes and fleet, and customers above have a runtime interface. Customer purchases credit cash inside the clock tick; supplier purchases and floor orders are the player payment commands. Trucks move goods between sites only inside the clock tick, through their own cargo locations.
+These remain accepted contracts; only the bounded goods slice, its station jobs, equipment placement, the working oven, conveyor belts, company cash, the sell counter, supplier purchases, equipment purchases, spoilage timing/refrigeration, building shells, factory floors, conveyor lifts, trucks with loading docks, truck routes and fleet, customers, and the procedural world layout above have a runtime interface. Customer purchases credit cash inside the clock tick; supplier purchases and floor orders are the player payment commands. Trucks move goods between sites only inside the clock tick, through their own cargo locations.
 
 ## Planned / Undecided
 
@@ -313,7 +362,7 @@ These remain accepted contracts; only the bounded goods slice, its station jobs,
 - Player count, hosting/disconnect behavior, and exact performance hardware: GDD decisions pending.
 - Physical goods model: selected in GDD section 28 and decision 0003; a logical lot/condition/transfer/recovery slice is implemented. Transport staging, actual placed-world positions, carrier/vehicle handling constraints, and visual projection remain pending.
 - Offline progression, host migration, discovery/lobbies/relay, and the shipped hosting model remain undecided. A direct-IP development host/join flow exists (decision 0005).
-- SQLite is the storage for all persisted data (decision 0011): the goods world, player registry and client identity. MoonSharp runs the prototype employee scripts (above); no wider scripting or modding role is selected.
+- SQLite is the storage for all persisted data (decision 0011): the goods world (with its write-once world layout, decision 0026), player registry and client identity. MoonSharp runs the prototype employee scripts (above); no wider scripting or modding role is selected.
 - Customers: first build and local visual customers implemented (above, decision 0024); multi-camera out-of-view spawning, menus, customer groups and competitor AI remain open. The benchmarked choice model in the test assembly ([record](verification/customer-choice-benchmark-20260925.md)) is a separate prototype, not the runtime code.
 - Multiplayer smoke tests and representative scale benchmarks follow implementation; current tests do not establish replication correctness or the 60 FPS target.
 

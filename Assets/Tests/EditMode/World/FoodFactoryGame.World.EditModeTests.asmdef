@@ -1,0 +1,1 @@
+{"name":"FoodFactoryGame.World.EditModeTests","rootNamespace":"FoodFactoryGame.World.Tests","references":["FoodFactoryGame.World","FoodFactoryGame.Goods","Gilzoide.SqliteNet"],"includePlatforms":["Editor"],"optionalUnityReferences":["TestAssemblies"],"autoReferenced":false}

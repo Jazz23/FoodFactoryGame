@@ -167,7 +167,8 @@ namespace FoodFactoryGame.Session
                 GoodsSnapshotStore.ImportLegacy(legacyWorldPath, worldPath, false);
                 Debug.Log($"[Session] Imported {legacyWorldPath} into {worldPath}; the old file was left in place.");
             }
-            if (File.Exists(worldPath))
+            // A database holding only a generated layout (decision 0026) is a world still being created.
+            if (GoodsSnapshotStore.HasSnapshots(worldPath))
             {
                 var loaded = GoodsSnapshotStore.Load(worldPath);
                 Register(loaded, items);

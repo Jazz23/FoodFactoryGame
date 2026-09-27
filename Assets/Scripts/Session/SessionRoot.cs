@@ -1,6 +1,7 @@
 // Server composition root: commits the world save before FishNet starts, owns the player registry and bridge,
 // spawns one avatar per authenticated connection and one worker per saved employee. The world runs whenever the server runs,
-// observed or not.
+// observed or not. In a scene with a world layout bridge, a newly created world also gets a generated layout (decision 0026),
+// stored before its first snapshot and replicated to clients for presentation only.
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -39,6 +40,12 @@ namespace FoodFactoryGame.Session
         // PROTOTYPE: when set, the server seeds the dev employee and spawns one of these per saved employee record once the
         // goods bridge serves. Scenes without a NavMesh leave it empty; their saves keep any employee records untouched.
         [SerializeField] private EmployeeWorker employeePrefab;
+        // When set, a world created by this server gets a generated layout, and this bridge replicates the stored layout to
+        // clients. Scenes without it (DevSite) never generate one; their saves are unaffected.
+        [SerializeField] private NetworkObject worldLayoutBridgePrefab;
+        // Save folder under the saves directory when -save is not given. WorldGen uses its own, so it never loads a DevSite
+        // world (which could never gain a layout).
+        [SerializeField] private string saveFolder = SessionOptions.DefaultSaveFolder;
         [SerializeField] private bool readCommandLine = true;
 
         private SessionOptions _options;
@@ -55,6 +62,9 @@ namespace FoodFactoryGame.Session
         // Server-only diagnostics; null on pure clients.
         public GoodsWorld ServerWorld { get; private set; }
         public GoodsNetworkBridge ServerBridge { get; private set; }
+        // Server-only: this world's stored layout, or null (no generation in this scene, or a save from before it).
+        public StoredWorldLayout ServerLayout { get; private set; }
+        public bool GeneratesWorld => worldLayoutBridgePrefab != null;
         public PlayerRegistry ServerRegistry => _registry;
         public GoodsSnapshot ClientSite => _site?.Latest;
         public ClientSiteSubscription ClientSubscription => _site;
@@ -73,6 +83,8 @@ namespace FoodFactoryGame.Session
         private void Awake()
         {
             _options = readCommandLine ? SessionOptions.FromCommandLine(Environment.GetCommandLineArgs()) : SessionOptions.FromCommandLine(Array.Empty<string>());
+            if (!_options.SaveDirectoryExplicit && SessionOptions.IsValidWorldName(saveFolder))
+                _options.SaveDirectory = Path.Combine(SessionOptions.SavesRoot, saveFolder);
             _site = new ClientSiteSubscription(networkManager, DevWorld.SiteId);
             networkManager.ServerManager.OnServerConnectionState += OnServerState;
             networkManager.ClientManager.OnClientConnectionState += OnClientState;
@@ -106,6 +118,27 @@ namespace FoodFactoryGame.Session
             _options = options ?? throw new ArgumentNullException(nameof(options));
         }
 
+        // The world a host or server will open: the name of its save folder beside the current one.
+        public string WorldName => Path.GetFileName(_options.SaveDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+
+        // Points the next start at the named world's save folder, a sibling of the current one; a new name makes a new world.
+        public bool SelectWorld(string name)
+        {
+            if (IsRunning || !SessionOptions.IsValidWorldName(name)) return false;
+            var parent = Path.GetDirectoryName(_options.SaveDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+            _options.SaveDirectory = Path.Combine(parent, name.Trim());
+            return true;
+        }
+
+        // First unused "world-N" beside the current save folder.
+        public string NextNewWorldName()
+        {
+            var parent = Path.GetDirectoryName(_options.SaveDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+            var number = 1;
+            while (Directory.Exists(Path.Combine(parent, $"world-{number}"))) number++;
+            return $"world-{number}";
+        }
+
         public bool Begin(SessionMode mode, string displayName = null, string address = null)
         {
             if (!CanBegin || mode == SessionMode.None) return false;
@@ -120,7 +153,7 @@ namespace FoodFactoryGame.Session
             }
             catch (Exception error) when (error is IOException || error is UnauthorizedAccessException
                 || error is InvalidOperationException || error is NotSupportedException || error is SQLiteException
-                || error is ArgumentException)
+                || error is ArgumentException || error is FormatException)
             {
                 Debug.LogException(error);
                 SetStatus($"Could not start: {error.Message}");
@@ -153,6 +186,10 @@ namespace FoodFactoryGame.Session
         private void StartServer()
         {
             Directory.CreateDirectory(_options.SaveDirectory);
+            // Before the world save: a new world's layout is written first, so a crash cannot leave a new world without one.
+            ServerLayout = GeneratesWorld
+                ? WorldGeneration.PrepareLayout(_options.WorldPath, _options.LegacyWorldPath, DevWorld.WorldId, _options.WorldSeed)
+                : null;
             // The world is committed before FishNet listens, so the bridge never serves an uncommitted state.
             // Max stacks are content: capacity counts slots, so they are registered (inside LoadOrCreate, before the seed)
             // ahead of any request.
@@ -191,6 +228,12 @@ namespace FoodFactoryGame.Session
             {
                 var bridge = Instantiate(bridgePrefab);
                 networkManager.ServerManager.Spawn(bridge);
+                if (worldLayoutBridgePrefab != null)
+                {
+                    var layoutBridge = Instantiate(worldLayoutBridgePrefab);
+                    layoutBridge.GetComponent<WorldLayoutBridge>().InitializeServer(ServerLayout);
+                    networkManager.ServerManager.Spawn(layoutBridge);
+                }
                 StartCoroutine(InitializeBridge(bridge.GetComponent<GoodsNetworkBridge>()));
                 SetStatus(Mode == SessionMode.Server ? "Server running" : "Hosting");
                 if (Mode == SessionMode.Host)
@@ -240,6 +283,7 @@ namespace FoodFactoryGame.Session
             if (_options != null) GoodsSnapshotStore.Release(_options.WorldPath);
             ServerBridge = null;
             ServerWorld = null;
+            ServerLayout = null;
             _registry?.Dispose();
             _registry = null;
         }

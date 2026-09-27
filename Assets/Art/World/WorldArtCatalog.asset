@@ -1,0 +1,238 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cbe75ab13de55434fb0b4ca62f820107, type: 3}
+  m_Name: WorldArtCatalog
+  m_EditorClassIdentifier: FoodFactoryGame.Session::FoodFactoryGame.Session.WorldMap.WorldArtCatalog
+  pieces:
+  - name: Apartment_a_Ground
+    mesh: {fileID: -1449472789845114479, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: 4dd973cc3e5a9de428ba0c6f401f9d47, type: 2}
+    - {fileID: 2100000, guid: 8b3c0e70f85ef6d4aa09d0e6e239da08, type: 2}
+    - {fileID: 2100000, guid: 30080e58529412a439e87f87a7f8ffc8, type: 2}
+  - name: Apartment_a_Middle
+    mesh: {fileID: 7669512013847224782, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: 4dd973cc3e5a9de428ba0c6f401f9d47, type: 2}
+    - {fileID: 2100000, guid: 8b3c0e70f85ef6d4aa09d0e6e239da08, type: 2}
+  - name: Apartment_a_Roof
+    mesh: {fileID: -7496392854794137581, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: 8378bb5f8a5072d448131f3e87ea9000, type: 2}
+    - {fileID: 2100000, guid: 8b3c0e70f85ef6d4aa09d0e6e239da08, type: 2}
+  - name: Apartment_b_Ground
+    mesh: {fileID: -9185509755783048504, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: 3f4f11e95f408d549a780a452c7a38e2, type: 2}
+    - {fileID: 2100000, guid: 8b3c0e70f85ef6d4aa09d0e6e239da08, type: 2}
+    - {fileID: 2100000, guid: 30080e58529412a439e87f87a7f8ffc8, type: 2}
+  - name: Apartment_b_Middle
+    mesh: {fileID: -1465773994387975612, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: 3f4f11e95f408d549a780a452c7a38e2, type: 2}
+    - {fileID: 2100000, guid: 8b3c0e70f85ef6d4aa09d0e6e239da08, type: 2}
+  - name: Apartment_b_Roof
+    mesh: {fileID: -1244262965443191467, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: 8378bb5f8a5072d448131f3e87ea9000, type: 2}
+    - {fileID: 2100000, guid: 8b3c0e70f85ef6d4aa09d0e6e239da08, type: 2}
+  - name: Barn_a
+    mesh: {fileID: -9013008981841518949, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: 131466b2a2ba12a4d97432970ca07ada, type: 2}
+    - {fileID: 2100000, guid: 7be7fbb7f92d73c4fb042df6a51083f7, type: 2}
+    - {fileID: 2100000, guid: 76f76bdce4ade8444ba621a17f49e6d1, type: 2}
+    - {fileID: 2100000, guid: 90786cbccfab4dd4ea4e1bd1424c0a59, type: 2}
+  - name: Barn_b
+    mesh: {fileID: -5732486171685149230, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: 90786cbccfab4dd4ea4e1bd1424c0a59, type: 2}
+    - {fileID: 2100000, guid: 7be7fbb7f92d73c4fb042df6a51083f7, type: 2}
+    - {fileID: 2100000, guid: 131466b2a2ba12a4d97432970ca07ada, type: 2}
+    - {fileID: 2100000, guid: 76f76bdce4ade8444ba621a17f49e6d1, type: 2}
+  - name: Factory_a
+    mesh: {fileID: 2775621756690927640, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: 90786cbccfab4dd4ea4e1bd1424c0a59, type: 2}
+    - {fileID: 2100000, guid: 8b3c0e70f85ef6d4aa09d0e6e239da08, type: 2}
+    - {fileID: 2100000, guid: a3d810345b85b2a4a9d2d530ac0883f6, type: 2}
+    - {fileID: 2100000, guid: 1e11b74fa46dfda429984723dfa5ef4f, type: 2}
+    - {fileID: 2100000, guid: 9ca2d4f99971e4a41a750d374d9aff7d, type: 2}
+    - {fileID: 2100000, guid: 195e3a0450d40da4d8f4be76b034c18e, type: 2}
+    - {fileID: 2100000, guid: 7be7fbb7f92d73c4fb042df6a51083f7, type: 2}
+  - name: Factory_b
+    mesh: {fileID: -4578044402198596208, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: 90786cbccfab4dd4ea4e1bd1424c0a59, type: 2}
+    - {fileID: 2100000, guid: 8b3c0e70f85ef6d4aa09d0e6e239da08, type: 2}
+    - {fileID: 2100000, guid: a3d810345b85b2a4a9d2d530ac0883f6, type: 2}
+    - {fileID: 2100000, guid: 1e11b74fa46dfda429984723dfa5ef4f, type: 2}
+    - {fileID: 2100000, guid: 9ca2d4f99971e4a41a750d374d9aff7d, type: 2}
+    - {fileID: 2100000, guid: 195e3a0450d40da4d8f4be76b034c18e, type: 2}
+    - {fileID: 2100000, guid: 8378bb5f8a5072d448131f3e87ea9000, type: 2}
+    - {fileID: 2100000, guid: a0c13d29320ba3b45af78c74a0ca59ab, type: 2}
+  - name: Ground_Quad
+    mesh: {fileID: 3556981642449770806, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: 58cbcaf24da926348a062f8ca50e6623, type: 2}
+  - name: House_Large_a
+    mesh: {fileID: -8346732004391459010, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: 3f4f11e95f408d549a780a452c7a38e2, type: 2}
+    - {fileID: 2100000, guid: 8b3c0e70f85ef6d4aa09d0e6e239da08, type: 2}
+    - {fileID: 2100000, guid: a8cc43b34f5a2f344a40c2bd787891a6, type: 2}
+    - {fileID: 2100000, guid: 9ca2d4f99971e4a41a750d374d9aff7d, type: 2}
+    - {fileID: 2100000, guid: 76f76bdce4ade8444ba621a17f49e6d1, type: 2}
+    - {fileID: 2100000, guid: 8378bb5f8a5072d448131f3e87ea9000, type: 2}
+    - {fileID: 2100000, guid: 1e11b74fa46dfda429984723dfa5ef4f, type: 2}
+  - name: House_Large_b
+    mesh: {fileID: 7569530853858269494, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: e7460000f17f39345b6e4c6d0be6c06b, type: 2}
+    - {fileID: 2100000, guid: 8b3c0e70f85ef6d4aa09d0e6e239da08, type: 2}
+    - {fileID: 2100000, guid: 6742df85b5232774ba7b5170dfb02e56, type: 2}
+    - {fileID: 2100000, guid: 9ca2d4f99971e4a41a750d374d9aff7d, type: 2}
+    - {fileID: 2100000, guid: 76f76bdce4ade8444ba621a17f49e6d1, type: 2}
+    - {fileID: 2100000, guid: 8378bb5f8a5072d448131f3e87ea9000, type: 2}
+    - {fileID: 2100000, guid: 1e11b74fa46dfda429984723dfa5ef4f, type: 2}
+  - name: House_Large_c
+    mesh: {fileID: 6596673183267802659, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: 443f6dc97aeb8174e9d3c19189bd4aff, type: 2}
+    - {fileID: 2100000, guid: 8b3c0e70f85ef6d4aa09d0e6e239da08, type: 2}
+    - {fileID: 2100000, guid: 6742df85b5232774ba7b5170dfb02e56, type: 2}
+    - {fileID: 2100000, guid: 9ca2d4f99971e4a41a750d374d9aff7d, type: 2}
+    - {fileID: 2100000, guid: 76f76bdce4ade8444ba621a17f49e6d1, type: 2}
+    - {fileID: 2100000, guid: 8378bb5f8a5072d448131f3e87ea9000, type: 2}
+    - {fileID: 2100000, guid: 1e11b74fa46dfda429984723dfa5ef4f, type: 2}
+  - name: House_Small_a
+    mesh: {fileID: 6675661372838113590, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: 3f4f11e95f408d549a780a452c7a38e2, type: 2}
+    - {fileID: 2100000, guid: 8b3c0e70f85ef6d4aa09d0e6e239da08, type: 2}
+    - {fileID: 2100000, guid: a8cc43b34f5a2f344a40c2bd787891a6, type: 2}
+    - {fileID: 2100000, guid: 76f76bdce4ade8444ba621a17f49e6d1, type: 2}
+    - {fileID: 2100000, guid: 9ca2d4f99971e4a41a750d374d9aff7d, type: 2}
+  - name: House_Small_b
+    mesh: {fileID: 4075847272069829555, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: e7460000f17f39345b6e4c6d0be6c06b, type: 2}
+    - {fileID: 2100000, guid: 8b3c0e70f85ef6d4aa09d0e6e239da08, type: 2}
+    - {fileID: 2100000, guid: a8cc43b34f5a2f344a40c2bd787891a6, type: 2}
+    - {fileID: 2100000, guid: 76f76bdce4ade8444ba621a17f49e6d1, type: 2}
+    - {fileID: 2100000, guid: 9ca2d4f99971e4a41a750d374d9aff7d, type: 2}
+  - name: House_Small_c
+    mesh: {fileID: -1222917449056921826, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: 443f6dc97aeb8174e9d3c19189bd4aff, type: 2}
+    - {fileID: 2100000, guid: 8b3c0e70f85ef6d4aa09d0e6e239da08, type: 2}
+    - {fileID: 2100000, guid: 6742df85b5232774ba7b5170dfb02e56, type: 2}
+    - {fileID: 2100000, guid: 76f76bdce4ade8444ba621a17f49e6d1, type: 2}
+    - {fileID: 2100000, guid: 9ca2d4f99971e4a41a750d374d9aff7d, type: 2}
+  - name: Office_a_Ground
+    mesh: {fileID: -7077013882152368952, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: 81eac45871ef0fb49ae7775e3208593d, type: 2}
+    - {fileID: 2100000, guid: 30080e58529412a439e87f87a7f8ffc8, type: 2}
+    - {fileID: 2100000, guid: 195e3a0450d40da4d8f4be76b034c18e, type: 2}
+  - name: Office_a_Middle
+    mesh: {fileID: -9088013048581741397, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: 81eac45871ef0fb49ae7775e3208593d, type: 2}
+  - name: Office_a_Roof
+    mesh: {fileID: 1891111039150223021, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: 8378bb5f8a5072d448131f3e87ea9000, type: 2}
+    - {fileID: 2100000, guid: 195e3a0450d40da4d8f4be76b034c18e, type: 2}
+    - {fileID: 2100000, guid: 90786cbccfab4dd4ea4e1bd1424c0a59, type: 2}
+  - name: Office_b_Ground
+    mesh: {fileID: -8101816157227697890, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: 9737c5a17db534d4eb3791841e15cfb5, type: 2}
+    - {fileID: 2100000, guid: 30080e58529412a439e87f87a7f8ffc8, type: 2}
+    - {fileID: 2100000, guid: 195e3a0450d40da4d8f4be76b034c18e, type: 2}
+  - name: Office_b_Middle
+    mesh: {fileID: 9122552814122024856, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: 9737c5a17db534d4eb3791841e15cfb5, type: 2}
+  - name: Office_b_Roof
+    mesh: {fileID: -2000483626657015785, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: 8378bb5f8a5072d448131f3e87ea9000, type: 2}
+    - {fileID: 2100000, guid: 195e3a0450d40da4d8f4be76b034c18e, type: 2}
+    - {fileID: 2100000, guid: 90786cbccfab4dd4ea4e1bd1424c0a59, type: 2}
+  - name: Rail_Track
+    mesh: {fileID: 7547864743945157431, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: c8ba5f6170492164c9072cf154575d6d, type: 2}
+    - {fileID: 2100000, guid: a0c13d29320ba3b45af78c74a0ca59ab, type: 2}
+  - name: Restaurant_a
+    mesh: {fileID: 1315173915905118397, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: e7f8b353f2807024b887549575273610, type: 2}
+    - {fileID: 2100000, guid: 1c7bc21259ad63b4fa4e8f8246728107, type: 2}
+    - {fileID: 2100000, guid: 8378bb5f8a5072d448131f3e87ea9000, type: 2}
+    - {fileID: 2100000, guid: 76f76bdce4ade8444ba621a17f49e6d1, type: 2}
+    - {fileID: 2100000, guid: 30080e58529412a439e87f87a7f8ffc8, type: 2}
+    - {fileID: 2100000, guid: e1d28c331eafa6846b703f54f0f2ff8f, type: 2}
+    - {fileID: 2100000, guid: 12429c8c47a016645b78157b9c66a984, type: 2}
+    - {fileID: 2100000, guid: 90786cbccfab4dd4ea4e1bd1424c0a59, type: 2}
+  - name: Restaurant_b
+    mesh: {fileID: 7518579322040884692, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: e7f8b353f2807024b887549575273610, type: 2}
+    - {fileID: 2100000, guid: 3f4f11e95f408d549a780a452c7a38e2, type: 2}
+    - {fileID: 2100000, guid: 8378bb5f8a5072d448131f3e87ea9000, type: 2}
+    - {fileID: 2100000, guid: 76f76bdce4ade8444ba621a17f49e6d1, type: 2}
+    - {fileID: 2100000, guid: 30080e58529412a439e87f87a7f8ffc8, type: 2}
+    - {fileID: 2100000, guid: e1d28c331eafa6846b703f54f0f2ff8f, type: 2}
+    - {fileID: 2100000, guid: 12429c8c47a016645b78157b9c66a984, type: 2}
+    - {fileID: 2100000, guid: 90786cbccfab4dd4ea4e1bd1424c0a59, type: 2}
+  - name: Road_Arterial
+    mesh: {fileID: 3400598146835338921, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: 80715f86c474e4d40ac3241f4cedbd04, type: 2}
+  - name: Road_Arterial_Crosswalk
+    mesh: {fileID: 2332227207033923103, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: 3bddbcddb82ac664fb89780b001a642f, type: 2}
+  - name: Road_Junction
+    mesh: {fileID: -4169344414751772616, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: 36d4701e2c466c641a2f959bd0e8d2eb, type: 2}
+  - name: Road_Local
+    mesh: {fileID: 6495204747726959766, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: c1677f54d21b9754e85ea6a4821d35f3, type: 2}
+  - name: Road_Local_Crosswalk
+    mesh: {fileID: -8974177815588083479, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: 598c17274fe4ed04890899b674e5331c, type: 2}
+  - name: Road_Rural
+    mesh: {fileID: 723179156594339882, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: b7aee8d646ac588409b6caefb8a01c90, type: 2}
+  - name: Station
+    mesh: {fileID: 8967113820069872405, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: 8b3c0e70f85ef6d4aa09d0e6e239da08, type: 2}
+    - {fileID: 2100000, guid: 0dfdbbd06c5cab54caa93d969be587f2, type: 2}
+    - {fileID: 2100000, guid: 195e3a0450d40da4d8f4be76b034c18e, type: 2}
+    - {fileID: 2100000, guid: 7be7fbb7f92d73c4fb042df6a51083f7, type: 2}
+    - {fileID: 2100000, guid: 30080e58529412a439e87f87a7f8ffc8, type: 2}
+    - {fileID: 2100000, guid: 131466b2a2ba12a4d97432970ca07ada, type: 2}
+    - {fileID: 2100000, guid: 12429c8c47a016645b78157b9c66a984, type: 2}
+  grass: {fileID: 2100000, guid: d8d2cc760f51b624b967b506d05000c1, type: 2}
+  paving: {fileID: 2100000, guid: fc76aad4686992b43b4d1ac2a1fa0b84, type: 2}
+  yard: {fileID: 2100000, guid: e9b325f7ea0af414a89846849248ca50, type: 2}
+  wheat: {fileID: 2100000, guid: 76fb8b092b88bac45b9f55a783da7fe5, type: 2}
+  greens: {fileID: 2100000, guid: 947bf6a33774c8747b0a7dac72185057, type: 2}

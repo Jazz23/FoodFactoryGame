@@ -1,0 +1,75 @@
+// Authors the world-generation scene (decision 0026): WorldGen.unity is a copy of DevSite plus the world layout bridge on
+// SessionRoot (so a newly created world gets a generated layout) and a WorldLayoutPresenter that draws the replicated layout
+// with the world art (ArtSource/World, installed by BuildWorldArt.cs). WorldGen uses its own spawnable-prefab catalog (DevSite's prefabs plus the layout bridge), so DevSite
+// and GamePrefabs are untouched. Not a build scene. Idempotent: the scene is recopied from DevSite on every run; asset GUIDs of
+// the bridge prefab and catalog are kept. The scene that was open is reopened at the end.
+// Run the body of Run() with the Unity MCP execute_code tool (C# 6 / CodeDom compatible, no helper methods).
+public static class BuildWorldGenScene
+{
+    public static object Run()
+    {
+        const string devSitePath = "Assets/Scenes/DevSite.unity";
+        const string scenePath = "Assets/Scenes/WorldGen.unity";
+        const string devCatalogPath = "Assets/Network/GamePrefabs.asset";
+        const string catalogPath = "Assets/Network/WorldGenPrefabs.asset";
+        const string bridgePath = "Assets/Prefabs/Network/WorldLayoutBridge.prefab";
+        // World art catalog from AgentScripts/BuildWorldArt.cs (run that first).
+        const string artPath = "Assets/Art/World/WorldArtCatalog.asset";
+        var previousScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().path;
+
+        var art = UnityEditor.AssetDatabase.LoadAssetAtPath<FoodFactoryGame.Session.WorldMap.WorldArtCatalog>(artPath);
+
+        // Layout bridge prefab: a NetworkObject carrying only WorldLayoutBridge.
+        var bridgeRoot = new GameObject("WorldLayoutBridge");
+        bridgeRoot.AddComponent<FishNet.Object.NetworkObject>();
+        bridgeRoot.AddComponent<FoodFactoryGame.Goods.Network.WorldLayoutBridge>();
+        var bridge = UnityEditor.PrefabUtility.SaveAsPrefabAsset(bridgeRoot, bridgePath).GetComponent<FishNet.Object.NetworkObject>();
+        UnityEngine.Object.DestroyImmediate(bridgeRoot);
+
+        // Catalog: DevSite's prefabs in their order, then the layout bridge.
+        var devCatalog = UnityEditor.AssetDatabase.LoadAssetAtPath<FishNet.Managing.Object.SinglePrefabObjects>(devCatalogPath);
+        var catalog = UnityEditor.AssetDatabase.LoadAssetAtPath<FishNet.Managing.Object.SinglePrefabObjects>(catalogPath);
+        if (catalog == null)
+        {
+            catalog = ScriptableObject.CreateInstance<FishNet.Managing.Object.SinglePrefabObjects>();
+            UnityEditor.AssetDatabase.CreateAsset(catalog, catalogPath);
+        }
+        var devPrefabs = new UnityEditor.SerializedObject(devCatalog).FindProperty("_prefabs");
+        var serializedCatalog = new UnityEditor.SerializedObject(catalog);
+        var prefabs = serializedCatalog.FindProperty("_prefabs");
+        prefabs.ClearArray();
+        prefabs.arraySize = devPrefabs.arraySize + 1;
+        for (var index = 0; index < devPrefabs.arraySize; index++)
+            prefabs.GetArrayElementAtIndex(index).objectReferenceValue = devPrefabs.GetArrayElementAtIndex(index).objectReferenceValue;
+        prefabs.GetArrayElementAtIndex(devPrefabs.arraySize).objectReferenceValue = bridge;
+        serializedCatalog.ApplyModifiedPropertiesWithoutUndo();
+        UnityEditor.EditorUtility.SetDirty(catalog);
+        UnityEditor.AssetDatabase.SaveAssets();
+
+        // Scene: a fresh copy of DevSite, then the layout bridge, catalog and presenter.
+        if (UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEditor.SceneAsset>(scenePath) != null) UnityEditor.AssetDatabase.DeleteAsset(scenePath);
+        UnityEditor.AssetDatabase.CopyAsset(devSitePath, scenePath);
+        var scene = UnityEditor.SceneManagement.EditorSceneManager.OpenScene(scenePath, UnityEditor.SceneManagement.OpenSceneMode.Single);
+        var manager = UnityEngine.Object.FindFirstObjectByType<FishNet.Managing.NetworkManager>();
+        manager.SpawnablePrefabs = catalog;
+        UnityEditor.EditorUtility.SetDirty(manager);
+        var session = UnityEngine.Object.FindFirstObjectByType<FoodFactoryGame.Session.SessionRoot>();
+        var serializedSession = new UnityEditor.SerializedObject(session);
+        serializedSession.FindProperty("worldLayoutBridgePrefab").objectReferenceValue = bridge;
+        // Its own save folder: hosting WorldGen must never open the DevSite world, which can never gain a layout.
+        serializedSession.FindProperty("saveFolder").stringValue = "worldgen";
+        serializedSession.ApplyModifiedPropertiesWithoutUndo();
+        var presenterObject = new GameObject("WorldLayoutPresenter");
+        var presenter = presenterObject.AddComponent<FoodFactoryGame.Session.WorldMap.WorldLayoutPresenter>();
+        var serializedPresenter = new UnityEditor.SerializedObject(presenter);
+        serializedPresenter.FindProperty("session").objectReferenceValue = session;
+        serializedPresenter.FindProperty("art").objectReferenceValue = art;
+        serializedPresenter.ApplyModifiedPropertiesWithoutUndo();
+        UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(scene);
+        UnityEditor.SceneManagement.EditorSceneManager.SaveScene(scene);
+
+        if (!string.IsNullOrEmpty(previousScene) && previousScene != scenePath)
+            UnityEditor.SceneManagement.EditorSceneManager.OpenScene(previousScene, UnityEditor.SceneManagement.OpenSceneMode.Single);
+        return "WorldGen scene built: catalog " + prefabs.arraySize + " prefabs, bridge " + bridgePath;
+    }
+}
