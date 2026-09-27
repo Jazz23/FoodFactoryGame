@@ -68,7 +68,7 @@ vehicles.
 **5.** Expand into other districts with different tastes and income
 levels.
 
-**6.** Build larger road/rail distribution networks.
+**6.** Build larger truck and rail distribution networks over the fixed roads and rail lines.
 
 **7.** Buy weak competitors or open new restaurants.
 
@@ -84,14 +84,14 @@ objectives.
 
 # 3. World & Map
 
-- Procedurally generated map divided into districts/markets.
+- Procedurally generated city divided into districts/markets, with farmland outside it.
 
 - The game is fully 3D. Outdoors use a third-person camera that orbits the player. Indoors use a top-down camera aligned so the building floor grid reads vertically/horizontally on screen.
 
-- Districts vary by population, wealth, cuisine preferences, land cost,
-  traffic, and competition.
+- Districts vary by cuisine tastes, minimum recipe tier, customer density,
+  traffic, and building purchase cost.
 
-- Farms, competing restaurants, roads, rail corridors, and purchasable
+- Farms, competing restaurants, roads, rail lines and stations, and purchasable
   properties are distributed across the map.
 
 - Distance matters for delivery cost, employee travel, freshness, and
@@ -105,6 +105,31 @@ Each district has a demand profile rather than a fixed recipe list.
 Examples: strong preference for cheap fast food, high demand for fresh
 premium meals, preference for a cuisine family, or high lunch traffic
 but weak dinner traffic.
+
+## World Generation
+
+Owner decisions recorded 2026-09-27:
+
+- Seed: the world's creator enters a seed or leaves it random. The server generates the world once when it is created and stores the result in SQLite with stable IDs. Loading a world never regenerates it, so later generator changes do not alter existing worlds.
+- MVP city size: about 1 km across with 4 districts:
+
+| District | Character |
+|---|---|
+| Downtown core | High traffic, strong lunch rush |
+| Residential | Cheap; strong dinner demand; the player's starting restaurant is here |
+| Wealthy | Expensive; demands premium recipe tiers |
+| Industrial | At the edge of town, between the city and the farms; holds the factories; low customer demand |
+
+- District values: each district sets cuisine tastes, a minimum recipe tier (food condition stays binary, section 24), customer density, traffic, and building purchase cost.
+- Roads and rail are generated with the world and cannot be modified by players (section 26). Rail stations are generated along the lines and are bought like property.
+- Farms are outside the city. Every farm has road access, and some farms are near a generated station.
+- Buildings:
+  - Restaurants and factories are procedurally generated shells on the building grid: footprint, walls, and doors on the street side. Factories can add floors (section 29.8).
+  - Farms are premade Blender models for now.
+  - Houses, apartments, and offices are premade, non-enterable Blender models. They are scenery only and hold no population.
+- Property for sale: only buildings are sold; there is no empty land (section 29.5). At world start some restaurants are empty and for sale, and the rest are AI competitors that can become purchasable when they struggle (section 11). Factories, farms, and stations can also be bought.
+- Starting position: the generator gives the player a small, cheap restaurant shell in the residential district with an ingredient supplier reachable by road.
+- Customers: the server creates customers at each district's density (section 23). They appear at random street positions out of view of every player. This is only a placement rule; client visibility never controls whether or when customers exist.
 
 # 4. Player & Employees
 
@@ -159,7 +184,8 @@ Confirmed requirements (sections 5, 15, 18, 25-27):
 - Structural changes to buildings (not only new buildings) are construction.
 - Factories can add floors. Goods move between floors by conveyor lifts; workers and bulk/manual loads use freight elevators.
 - Buildings are procedurally generated with the map, and some of them are available for purchase. Adding floors to an owned building is a construction option. Whether players can construct fully custom buildings is undecided. (Project owner, 2026-09-24.)
-- Rail track and stations are player-built infrastructure. Roads are public and are never constructed by the player.
+- Roads and rail are generated with the world and are never constructed or modified by the player; rail stations are bought as property (section 26, owner 2026-09-27).
+- Only generated buildings are sold; there is no empty land, so there is no construction of new buildings for now (section 29.5, owner 2026-09-27).
 - Construction is planned in build/planning mode and completed by paying the required cost.
 - Indoors uses the top-down camera aligned to the building grid, so building layouts are grid-based.
 
@@ -172,7 +198,7 @@ Required by the development constraints (`AGENTS.md`), not optional design:
 
 Proposal - what counts as construction (not yet approved):
 
-- **Construction:** buying and building on land, building shells (outer walls, doors, footprint), interior walls, extra floors, demolition, elevator and conveyor-lift shafts, and rail track, stations, and loading infrastructure.
+- **Construction:** building shells (outer walls, doors, footprint), interior walls, extra floors, demolition, elevator and conveyor-lift shafts, and loading infrastructure.
 - **Not construction:** machines, furniture, storage, refrigeration units, and conveyor belts. These are purchased equipment that the player or an employee places, moves, and picks up directly, as equipment purchases and placement work today. Placing equipment costs no construction fee and does not wait for contractors.
 - This split keeps restaurant and factory layout editing hands-on and fast, while structural growth is a deliberate, planned investment.
 
@@ -185,7 +211,7 @@ Proposal - construction order flow (not yet approved):
 
 Proposal - costs (not yet approved):
 
-- Price scales with the size of the change (for example, per wall cell, per floor cell, per extra story, per track segment), plus a fixed charge per order so many tiny orders are not cheaper than one planned order.
+- Price scales with the size of the change (for example, per wall cell, per floor cell, per extra story), plus a fixed charge per order so many tiny orders are not cheaper than one planned order.
 - Land and district set a price multiplier: expensive districts cost more to build in as well as to buy.
 - Upper floors cost more per cell than ground floors, so vertical expansion is a response to scarce land rather than the default.
 
@@ -314,9 +340,11 @@ seating if applicable, pay, and leave.
 
 - High throughput over long distances.
 
-- Rail infrastructure is player-built and player-owned.
+- Rail lines are generated with the world and cannot be modified by the player.
 
-- Requires tracks, stations, trains, loading infrastructure, and scheduling.
+- Stations are generated along the lines and bought like property. Players own their stations and trains.
+
+- Requires owned stations, trains, loading infrastructure, and scheduling.
 
 - Best for repeated bulk flows between major hubs.
 
@@ -336,7 +364,8 @@ seating if applicable, pay, and leave.
 
 # 10. Farms & Raw Materials
 
-- Farms across the map can be purchased.
+- Farms outside the city can be purchased. Each has road access, and some
+  are near a generated rail station (section 3).
 
 - They produce raw ingredients used directly by restaurants or sent
   through processing chains.
@@ -430,7 +459,7 @@ support them.
 
 - Direct 3D character movement and interaction for local tasks.
 
-- Build/planning mode for placing layouts, furniture, machines, and player-built rail; construction is completed by paying the required cost. Roads are pre-existing public infrastructure.
+- Build/planning mode for placing layouts, furniture, and machines; construction is completed by paying the required cost. Roads and rail are generated with the world and cannot be modified.
 
 - Management overlays for inventory, freshness, throughput, profit,
   demand, staffing, and transport.
@@ -460,7 +489,7 @@ support them.
 
 # 17. Rough MVP Scope
 
-- One procedural 3D region with several districts.
+- One procedural 3D city of about 1 km with 4 districts (downtown, residential, wealthy, industrial) and farms outside it (section 3).
 
 - Player character + general-purpose employees.
 
@@ -502,7 +531,9 @@ support them.
 - Property ownership: LOCKED - properties are purchased outright; no renting or leasing. Construction is LOCKED as
   outsourced for money.
 
-- Roads/rail ownership: LOCKED - roads are public/pre-existing; rail is player-built and player-owned.
+- Roads/rail ownership: LOCKED - roads and rail are generated and cannot be modified; players buy generated stations (section 26, revised 2026-09-27).
+
+- World generation: LOCKED - seeded procedural city with 4 MVP districts, farms outside, industry at the edge of town (section 3).
 
 - How bankruptcy, loans, and recovery work.
 
@@ -519,9 +550,9 @@ support them.
 
 - Physical goods representation: LOCKED - location-based goods with selective visual representations (section 28).
 
-- Buildings and floors: LOCKED - buildings are procedurally generated and some are purchasable; adding floors is a construction option. Fully custom buildings are undecided (section 29.4). Adding floors: factories only, freight elevator, immediate on payment, conveyor lifts later (section 29.8).
+- Buildings and floors: LOCKED - restaurants and factories are generated shells, farms and scenery are premade models, and some buildings are purchasable; adding floors is a construction option. Only buildings are sold, so custom buildings are deferred (sections 29.4, 29.5). Adding floors: factories only, freight elevator, immediate on payment, conveyor lifts later (section 29.8).
 
-- Construction details: open - construction scope, timing, disruption, custom buildings, empty land, demolition, cancellation, and floor rules (section 29).
+- Construction details: open - construction scope, timing, disruption, demolition, cancellation, and floor rules (section 29).
 
 Decision process: handle these one at a time. For each decision, present
 three distinct options, select one, and update this document.
@@ -613,13 +644,13 @@ Status: selected - Buy only.
 
 # 26. Decision Record: Roads & Rail
 
-- A. Public roads, player-built rail - roads already exist; player builds and owns rail infrastructure. [SELECTED]
+- A. Public roads, player-built rail - roads already exist; player builds and owns rail infrastructure. (Selected earlier; superseded 2026-09-27.)
 
 - B. Player-built roads and rail - player constructs the full transport network.
 
-- C. Mostly public infrastructure - player buys access/stations/depots rather than constructing networks.
+- C. Mostly public infrastructure - player buys access/stations/depots rather than constructing networks. [SELECTED 2026-09-27]
 
-Status: selected - Public roads, player-built rail.
+Status: selected - Fixed generated roads and rail. Roads and rail lines are generated with the world and cannot be modified by players. Stations are generated along the lines and bought like property; players own their stations and trains (owner, 2026-09-27).
 
 
 # 27. Decision Record: Vertical Factory Transport
@@ -685,7 +716,7 @@ The accepted development starting point is an authoritative server with a listen
 
 # 29. Open Decisions: Construction
 
-None of 29.1-29.7 is selected. The owner's decisions on adding floors are recorded in 29.8. Section 5 records the confirmed construction requirements and the current proposals. Existing implementation: building shells exist as server data with walls on grid cells, created only by the server (`docs/decisions/0019-building-shells-and-indoor-camera.md`), and a factory can buy extra floors (`docs/decisions/0020-factory-floors-and-elevator.md`); buildings cannot be bought yet. Implementation choices made for those slices, including prototype prices, do not select any option below.
+None of 29.1-29.4 or 29.6-29.7 is selected. Land (29.5) is decided, and the owner's decisions on adding floors are recorded in 29.8. Section 5 records the confirmed construction requirements and the current proposals. Existing implementation: building shells exist as server data with walls on grid cells, created only by the server (`docs/decisions/0019-building-shells-and-indoor-camera.md`), and a factory can buy extra floors (`docs/decisions/0020-factory-floors-and-elevator.md`); buildings cannot be bought yet. Implementation choices made for those slices, including prototype prices, do not select any option below.
 
 ## 29.1 Construction Scope
 
@@ -707,7 +738,7 @@ None of 29.1-29.7 is selected. The owner's decisions on adding floors are record
 
 ## 29.4 Layout Freedom
 
-Owner direction (2026-09-24): buildings are procedurally generated and some are available for purchase; adding floors is an option. Whether players can also construct fully custom buildings is undecided. The options below apply only if custom buildings are added.
+Owner direction (2026-09-24): buildings are procedurally generated and some are available for purchase; adding floors is an option. Whether players can also construct fully custom buildings is undecided. Because only buildings are sold (29.5, 2026-09-27), custom buildings are deferred for now. The options below apply only if custom buildings are added.
 
 - A. Catalog shells - the player chooses from predefined building shells and floor plans that fit a lot.
 - B. Rectangular shells - the player sizes a rectangular shell on owned land, then places doors and interior walls freely.
@@ -717,11 +748,14 @@ Related open detail: walls currently occupy whole cells. Interior walls on cell 
 
 ## 29.5 Land
 
-Owner direction (2026-09-24): purchasable properties include procedurally generated buildings. Whether empty land is sold, and how, is undecided.
+Owner direction (2026-09-24): purchasable properties include procedurally generated buildings.
 
 - A. Fixed parcels - land is sold as predefined lots, some empty and some with existing buildings.
 - B. Grid land - the player buys any unowned cells, subject to district price.
 - C. Parcels that can be merged - predefined lots can be bought together and combined into one larger site.
+- D. Buildings only - only generated buildings are sold; there are no empty lots and no new buildings. [SELECTED 2026-09-27]
+
+Status: selected - Buildings only (owner, 2026-09-27). Revisit together with 29.4 if custom buildings are added.
 
 ## 29.6 Demolition and Resale
 
