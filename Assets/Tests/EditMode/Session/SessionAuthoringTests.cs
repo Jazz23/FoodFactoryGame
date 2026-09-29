@@ -387,7 +387,19 @@ namespace FoodFactoryGame.Session.Tests
             using (var serialized = new SerializedObject(transform))
                 Assert.That(serialized.FindProperty("_clientAuthoritative").boolValue, Is.True, "Prototype movement authority is the owner.");
             var avatar = prefab.GetComponent<PlayerAvatar>();
-            AssertAssigned(avatar, "controller", "cameraRig", "body", "moveAction");
+            AssertAssigned(avatar, "controller", "cameraRig", "body", "moveAction", "jumpAction", "sprintAction");
+            var animation = prefab.GetComponent<PlayerAnimation>();
+            Assert.That(animation, Is.Not.Null);
+            AssertAssigned(animation, "animator");
+            var animator = prefab.GetComponentInChildren<Animator>(true);
+            Assert.That(animator.runtimeAnimatorController, Is.Not.Null);
+            Assert.That(animator.applyRootMotion, Is.False, "PlayerAvatar moves the avatar; clips play in place.");
+            using (var serialized = new SerializedObject(avatar))
+            {
+                var body = (Renderer)serialized.FindProperty("body").objectReferenceValue;
+                var tint = serialized.FindProperty("tintMaterialIndex").intValue;
+                Assert.That(tint, Is.InRange(0, body.sharedMaterials.Length - 1), "The tinted submesh exists on the body.");
+            }
             var rig = prefab.GetComponentInChildren<OrbitCameraRig>(true);
             Assert.That(rig, Is.Not.Null);
             Assert.That(rig.gameObject.activeSelf, Is.False, "Only the owning client enables the rig.");

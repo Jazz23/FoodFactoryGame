@@ -15,8 +15,14 @@ namespace FoodFactoryGame.Session.Player
         [SerializeField] private CharacterController controller;
         [SerializeField] private OrbitCameraRig cameraRig;
         [SerializeField] private Renderer body;
+        // The body submesh that carries the per-player colour (the shirt).
+        [SerializeField] private int tintMaterialIndex;
         [SerializeField] private InputActionReference moveAction;
+        [SerializeField] private InputActionReference jumpAction;
+        [SerializeField] private InputActionReference sprintAction;
         [SerializeField] private float speed = 4f;
+        [SerializeField] private float sprintSpeed = 7f;
+        [SerializeField] private float jumpHeight = 1.2f;
         [SerializeField] private float turnDegreesPerSecond = 720f;
         [SerializeField] private float gravity = -20f;
 
@@ -35,13 +41,23 @@ namespace FoodFactoryGame.Session.Player
         {
             // Remote copies and the server's copies never own a camera, listener, or input.
             cameraRig.gameObject.SetActive(IsOwner);
-            if (IsOwner) moveAction.action.Enable();
+            if (IsOwner)
+            {
+                moveAction.action.Enable();
+                jumpAction.action.Enable();
+                sprintAction.action.Enable();
+            }
             Tint(_displayName.Value);
         }
 
         public override void OnStopClient()
         {
-            if (IsOwner) moveAction.action.Disable();
+            if (IsOwner)
+            {
+                moveAction.action.Disable();
+                jumpAction.action.Disable();
+                sprintAction.action.Disable();
+            }
             cameraRig.gameObject.SetActive(false);
         }
 
@@ -50,8 +66,14 @@ namespace FoodFactoryGame.Session.Player
             if (!IsOwner) return;
             var input = Vector2.ClampMagnitude(moveAction.action.ReadValue<Vector2>(), 1f);
             var direction = Quaternion.Euler(0f, cameraRig.Yaw, 0f) * new Vector3(input.x, 0f, input.y);
-            _verticalSpeed = controller.isGrounded ? -1f : _verticalSpeed + gravity * Time.deltaTime;
-            controller.Move((direction * speed + Vector3.up * _verticalSpeed) * Time.deltaTime);
+            if (controller.isGrounded)
+                _verticalSpeed = jumpAction.action.WasPressedThisFrame() ? Mathf.Sqrt(-2f * gravity * jumpHeight) : -1f;
+            else
+                _verticalSpeed += gravity * Time.deltaTime;
+            var moveSpeed = sprintAction.action.IsPressed() ? sprintSpeed : speed;
+            var flags = controller.Move((direction * moveSpeed + Vector3.up * _verticalSpeed) * Time.deltaTime);
+            // A jump that meets a ceiling starts falling instead of sticking to it.
+            if ((flags & CollisionFlags.Above) != 0 && _verticalSpeed > 0f) _verticalSpeed = 0f;
             if (direction.sqrMagnitude > 0.0001f)
                 transform.rotation = Quaternion.RotateTowards(transform.rotation, Quaternion.LookRotation(direction),
                     turnDegreesPerSecond * Time.deltaTime);
@@ -75,16 +97,16 @@ namespace FoodFactoryGame.Session.Player
                 if (renderer.enabled == hidden) renderer.enabled = !hidden;
         }
 
-        // Placeholder identification until character art exists: a stable hue per display name.
+        // Identification: the shirt takes a stable hue per display name.
         private void Tint(string displayName)
         {
             if (body == null || string.IsNullOrEmpty(displayName)) return;
             var hash = 17;
             foreach (var character in displayName) hash = hash * 31 + character;
             var block = new MaterialPropertyBlock();
-            body.GetPropertyBlock(block);
+            body.GetPropertyBlock(block, tintMaterialIndex);
             block.SetColor(BaseColor, Color.HSVToRGB((hash & 0xFFFF) / 65535f, 0.65f, 0.9f));
-            body.SetPropertyBlock(block);
+            body.SetPropertyBlock(block, tintMaterialIndex);
         }
     }
 }

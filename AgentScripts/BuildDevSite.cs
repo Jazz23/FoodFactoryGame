@@ -635,6 +635,7 @@ public static class BuildDevSite
             controller.center = new Vector3(0f, 1f, 0f);
             var avatar = root.AddComponent<PlayerAvatar>();
 
+            // Placeholder body; run AgentScripts/BuildPlayerVisual.cs afterwards to replace it with the animated character.
             var body = GameObject.CreatePrimitive(PrimitiveType.Capsule);
             body.name = "Body";
             Object.DestroyImmediate(body.GetComponent<CapsuleCollider>());
