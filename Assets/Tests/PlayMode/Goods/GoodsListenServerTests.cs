@@ -203,6 +203,105 @@ namespace FoodFactoryGame.Goods.PlayModeTests
             }
         }
 
+        // Decision 0028, piece 2: RequestBuyProperty answers each rejection and the acceptance over the real RPC path, the
+        // accepted purchase reaches a second subscriber's baseline as a public property record, and the teammate is granted the
+        // new site in the same commit and can subscribe to it although it has no locations yet.
+        [UnityTest, UnityPlatform(RuntimePlatform.WindowsEditor, RuntimePlatform.OSXEditor, RuntimePlatform.LinuxEditor)]
+        public IEnumerator PropertyPurchaseRepliesAndReachesEverySubscriber()
+        {
+#if UNITY_EDITOR
+            var prefab = AssetDatabase.LoadAssetAtPath<NetworkObject>(PrefabPath);
+#else
+            NetworkObject prefab = null;
+#endif
+            Assert.That(prefab, Is.Not.Null, "The isolated bridge fixture prefab must be authored by Unity Editor.");
+            _directory = Path.Combine(Path.GetTempPath(), "FoodFactoryGoodsListen", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(_directory);
+            var path = Path.Combine(_directory, "goods.db");
+            // TEST-ONLY sites, cash and lots: two players act for "home-co" (3000 cents); "diner" is for sale at 2000, "rival"
+            // is listed but not sold and "castle" costs more than the company has.
+            PropertyOffer Offer(string name, bool forSale, long price, int lotX) => new()
+            {
+                LotId = "lot-" + name, SiteId = "site-" + name, BuildingId = name, Category = GoodsWorld.RestaurantKind, ForSale = forSale,
+                PriceCents = price, LotX = lotX, LotZ = 200, Width = 8, Depth = 8, AccessX = lotX + 3, AccessZ = 208,
+                BuildingX = 1, BuildingZ = 0, BuildingWidth = 6, BuildingDepth = 6, Doors = new List<GridCell> { new() { X = 3, Z = 5 } }
+            };
+            var world = new GoodsWorld("test-property-world");
+            world.Bootstrap(new GoodsLocation { Id = "storage", SiteId = "home", Kind = "storage", Capacity = 4 });
+            world.Bootstrap(new GoodsCompany { Id = "home-co", Cash = 3000, SiteIds = new List<string> { "home" } });
+            world.Grant("host-player", "home");
+            world.Grant("remote-player", "home");
+            world.RegisterPropertyOffers(new[] { Offer("diner", true, 2000, 100), Offer("rival", false, 2000, 120), Offer("castle", true, 90000, 140) });
+            GoodsSnapshotStore.Save(world, path);
+            NetworkManager host = null;
+            NetworkManager remote = null;
+            _prefab = prefab;
+            prefab.SetIsSpawnable(true);
+            try
+            {
+                ushort port;
+                using (var socket = new UdpClient(new IPEndPoint(IPAddress.Loopback, 0)))
+                    port = (ushort)((IPEndPoint)socket.Client.LocalEndPoint).Port;
+                host = _host = CreateManager("goods-test-host", prefab, port, false, _objects);
+                remote = _remote = CreateManager("goods-test-remote", prefab, port, true, _objects);
+                Assert.That(host.ServerManager.StartConnection(), Is.True);
+                yield return Until(() => host.ServerManager.Started, "server started");
+                Assert.That(host.ClientManager.StartConnection(), Is.True);
+                yield return Until(() => host.IsHostStarted && host.ServerManager.Clients.Count == 1, "local host client");
+                Assert.That(remote.ClientManager.StartConnection(), Is.True);
+                yield return Until(() => remote.IsClientStarted && host.ServerManager.Clients.Count == 2, "remote UDP client");
+                var hostId = host.ClientManager.Connection.ClientId;
+                var remoteId = remote.ClientManager.Connection.ClientId;
+                var identities = new Dictionary<int, string> { [hostId] = "host-player", [remoteId] = "remote-player" };
+                var instance = UnityEngine.Object.Instantiate(prefab);
+                _objects.Add(instance.gameObject);
+                host.ServerManager.Spawn(instance);
+                var serverBridge = instance.GetComponent<GoodsNetworkBridge>();
+                yield return Until(() => serverBridge.IsServerStarted, "server bridge spawned");
+                serverBridge.InitializeServer(world, connection => identities.TryGetValue(connection.ClientId, out var player) ? player : null, path);
+                host.SceneManager.AddConnectionToScene(host.ServerManager.Clients[hostId], instance.gameObject.scene);
+                host.SceneManager.AddConnectionToScene(host.ServerManager.Clients[remoteId], instance.gameObject.scene);
+                yield return Until(() => remote.ClientManager.Objects.Spawned.Values.Any(x => x.GetComponent<GoodsNetworkBridge>() != null),
+                    "bridge visible on remote client");
+                var remoteBridge = remote.ClientManager.Objects.Spawned.Values.Single(x => x.GetComponent<GoodsNetworkBridge>() != null)
+                    .GetComponent<GoodsNetworkBridge>();
+                var hostResults = new Dictionary<string, GoodsOutcome>();
+                var remoteBaselines = new List<GoodsSnapshot>();
+                serverBridge.ResultReceived += x => hostResults[x.RequestId] = x;
+                remoteBridge.SiteReceived += remoteBaselines.Add;
+                serverBridge.RequestSite("home");
+                remoteBridge.RequestSite("home");
+                yield return Until(() => remoteBaselines.Count > 0, "remote home baseline");
+                Assert.That(remoteBaselines.Last().Properties, Is.Empty);
+
+                foreach (var (request, lot) in new[] { ("unknown", "lot-missing"), ("closed", "lot-rival"), ("costly", "lot-castle") })
+                    serverBridge.RequestBuyProperty(request, "home", lot);
+                yield return Until(() => hostResults.Count == 3, "three rejections");
+                Assert.That(new[] { "unknown", "closed", "costly" }.Select(x => (hostResults[x].Accepted, hostResults[x].Reason)),
+                    Is.EqualTo(new[] { (false, "unknown-lot"), (false, "not-for-sale"), (false, "insufficient-funds") }));
+                Assert.That(GoodsSnapshotStore.Load(path).Snapshot().Companies.Single().Cash, Is.EqualTo(3000));
+
+                serverBridge.RequestBuyProperty("buy-diner", "home", "lot-diner");
+                yield return Until(() => hostResults.ContainsKey("buy-diner"), "purchase reply");
+                Assert.That((hostResults["buy-diner"].Accepted, hostResults["buy-diner"].Reason), Is.EqualTo((true, "property-bought")));
+                yield return Until(() => remoteBaselines.Last().Properties.Any(x => x.LotId == "lot-diner"), "second subscriber sees the owner");
+                Assert.That(remoteBaselines.Last().Properties.Single().CompanyId, Is.EqualTo("home-co"));
+                Assert.That(remoteBaselines.Last().Companies.Single().Cash, Is.EqualTo(1000));
+                Assert.That(GoodsSnapshotStore.Load(path).CanView("remote-player", "site-diner"), Is.True, "The teammate is granted in the same commit.");
+
+                remoteBridge.RequestSite("site-diner");
+                yield return Until(() => remoteBaselines.Any(x => GoodsWorld.ViewSiteId(x) == "site-diner"), "teammate's baseline of the bought site");
+                var bought = remoteBaselines.Last(x => GoodsWorld.ViewSiteId(x) == "site-diner");
+                Assert.That(bought.Buildings.Single().Id, Is.EqualTo("diner"));
+            }
+            finally
+            {
+                _host = host;
+                _remote = remote;
+                Cleanup();
+            }
+        }
+
         // A failed UnityTest may abandon its coroutine without running finally, so TearDown repeats the cleanup.
         [TearDown]
         public void TearDown() => Cleanup();

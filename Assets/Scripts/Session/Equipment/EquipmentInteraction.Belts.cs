@@ -222,7 +222,7 @@ namespace FoodFactoryGame.Session.Equipment
         {
             if (_pendingBelts.ContainsKey(cell)) return null;
             if (FlatBeltAt(site, cell) != null) return null;
-            var problem = SiteGrid.CellProblem(site, DevWorld.SiteId, cell.X, cell.Z, 1, 1, null, Level);
+            var problem = SiteGrid.CellProblem(site, session.ClientSiteId, cell.X, cell.Z, 1, 1, null, Level);
             if (problem != null) return problem;
             return BeltsCarried(site) - _pendingBelts.Count(x => x.Value.NewBelt) > 0 ? null : "no-belts";
         }
@@ -245,7 +245,7 @@ namespace FoodFactoryGame.Session.Equipment
             }
             var requestId = Track();
             _pendingBelts[cell] = new PendingBelt { RequestId = requestId, Direction = direction, NewBelt = existing == null && pending?.NewBelt != false };
-            bridge.RequestPlaceBelt(requestId, DevWorld.SiteId, cell.X, cell.Z, direction, _beltLevel);
+            bridge.RequestPlaceBelt(requestId, session.ClientSiteId, cell.X, cell.Z, direction, _beltLevel);
         }
 
         // Drops pending belts the baseline now shows, and accepted ones whose baseline never came.
@@ -306,7 +306,7 @@ namespace FoodFactoryGame.Session.Equipment
             if (_held == null && _aimBelt != null && _aimBelt.Lift != 0)
             {
                 // A lift turns in place, whichever end is aimed at; the server finds it by the floor it takes items on.
-                _subscription?.Bridge?.RequestPlaceLift(Track(), DevWorld.SiteId, _aimBelt.CellX, _aimBelt.CellZ,
+                _subscription?.Bridge?.RequestPlaceLift(Track(), session.ClientSiteId, _aimBelt.CellX, _aimBelt.CellZ,
                     BeltRules.RightOf(_aimBelt.Direction), _aimBelt.Level, _aimBelt.Lift);
                 return true;
             }
@@ -479,8 +479,8 @@ namespace FoodFactoryGame.Session.Equipment
         private string LiftProblem(GoodsSnapshot site, (int X, int Z) cell)
         {
             if (site.Belts.Any(x => x.Lift == LiftDirection && x.Level == Level && x.CellX == cell.X && x.CellZ == cell.Z)) return null;
-            var problem = SiteGrid.CellProblem(site, DevWorld.SiteId, cell.X, cell.Z, 1, 1, null, Level)
-                ?? SiteGrid.CellProblem(site, DevWorld.SiteId, cell.X, cell.Z, 1, 1, null, Level + LiftDirection);
+            var problem = SiteGrid.CellProblem(site, session.ClientSiteId, cell.X, cell.Z, 1, 1, null, Level)
+                ?? SiteGrid.CellProblem(site, session.ClientSiteId, cell.X, cell.Z, 1, 1, null, Level + LiftDirection);
             if (problem != null) return problem;
             return LiftsCarried(site) > 0 ? null : "no-lifts";
         }
@@ -499,7 +499,7 @@ namespace FoodFactoryGame.Session.Equipment
                 LastRejection = problem;
                 return;
             }
-            bridge.RequestPlaceLift(Track(), DevWorld.SiteId, cell.X, cell.Z, _rotation, Level, LiftDirection);
+            bridge.RequestPlaceLift(Track(), session.ClientSiteId, cell.X, cell.Z, _rotation, Level, LiftDirection);
         }
 
         // Switches the cursor's lifts between going up and going down a floor.

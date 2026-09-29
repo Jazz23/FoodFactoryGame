@@ -7,8 +7,12 @@ purchasable building become its own site?"). Owner decisions of 2026-09-29; GDD 
 
 Implemented (piece 1, 2026-09-29; see `docs/architecture.md`): lots and reserved site IDs in layout format 3 (generator v3),
 their validation, the property catalog, the server-side purchase (`BuyPropertyDurably`) with ownership as its own record
-(goods schema v14), and a server-only bootstrap for the starting restaurant. Not yet: networking, UI, generated worlds in
-the game (they still show the dev site beside the city), teammates' access, competitors linked to lots. Resolved open items:
+(goods schema v14), and a server-only bootstrap for the starting restaurant. Piece 2 (2026-09-29): generated worlds start
+in the starting restaurant's own site (the map is moved so its lot sits at the scene origin), `RequestBuyProperty` over the
+network, teammates' access in the purchase's commit (players granted any of the company's sites; not employees), public
+ownership in every site view, ownership colours and a buy panel. Owner decisions for piece 2: PROTOTYPE starting cash
+$5,000; bought sites are managed remotely only until several sites can be drawn at once (piece 3). Not yet: walking into
+bought sites, customers in generated worlds, competitors linked to lots. Resolved open items:
 format 3 / generator v3; existing format 1 and 2 worlds get no lots and are treated as unsupported development data; PROTOTYPE
 apron depths (factories 12 m, farms 8 m, others the 2 m setback); a lot costs its building's layout price for now.
 
@@ -66,7 +70,7 @@ Reserving IDs keeps the stable-identity advantage of up-front creation at on-pur
 The DevSite scene, its seed and its `dev-world` save remain a test and development fixture. Generated worlds will not contain
 it; the player starts in the generator's starting restaurant (GDD section 3), which becomes a site like any other purchased
 building. The current PROTOTYPE presentation that places the city 40 m north of the dev site in `WorldGen.unity` is
-replaced once the starting restaurant is a site.
+replaced once the starting restaurant is a site (done in piece 2 for format 3 worlds; format 1 and 2 worlds keep it).
 
 ## Decision: competitors stay records, linked to lots
 

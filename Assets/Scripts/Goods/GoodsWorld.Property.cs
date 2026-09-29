@@ -1,8 +1,9 @@
 // Buying generated buildings (decision 0028). Each purchasable building of the stored world layout is listed as a PropertyOffer:
 // content derived from the layout, registered by the server at start and never saved. A lot's site is created on its first
 // purchase, in the one commit that debits the buyer's company, records ownership as its own GoodsProperty record and grants
-// the buyer the new site; a rejected or failed purchase leaves no site, property or debit behind. Sites and properties are
-// never removed. The site grid covers exactly the lot; a restaurant or factory shell becomes the site's GoodsBuilding
+// the buyer and every teammate (players granted any of the company's sites; not employees) the new site; a rejected or failed
+// purchase leaves no site, property or debit behind. Sites and properties are never removed. Ownership is public: every site
+// view carries all properties, so any client can colour the map by owner. The site grid covers exactly the lot; a restaurant or factory shell becomes the site's GoodsBuilding
 // (decision 0019) and the rest of the lot is ordinary outdoor cells.
 using System;
 using System.Collections.Generic;
@@ -107,8 +108,10 @@ namespace FoodFactoryGame.Goods
 
                 // All checks precede this single locked mutation.
                 TryDebit(company, offer.PriceCents);
+                var teammates = Teammates(company);
                 CreateProperty(offer, company);
                 Grant(playerId, offer.SiteId);
+                foreach (var teammate in teammates) Grant(teammate, offer.SiteId);
                 return Record(requestId, playerId, true, "property-bought", null);
             }
         }
@@ -139,6 +142,20 @@ namespace FoodFactoryGame.Goods
                 }
             }
         }
+
+        // Call only under _gate. Every player granted any site of the company, in grant order: they act for it (membership is
+        // implied by grants, decision 0012), so they are given each site it buys. Employees are site-bound workers and are not.
+        private List<string> Teammates(string companyId)
+        {
+            var sites = _state.Companies.First(x => x.Id == companyId).SiteIds;
+            return _state.Grants.Where(x => sites.Contains(x.SiteId) && !x.PlayerId.StartsWith(EmployeePrefix, StringComparison.Ordinal))
+                .Select(x => x.PlayerId).Distinct().ToList();
+        }
+
+        // The site a baseline from View describes: its own layout's site, or else its first location's (a view lists the site's
+        // own locations before any truck cargo). A bought site may have no locations yet, but it always has its layout.
+        public static string ViewSiteId(GoodsSnapshot view) =>
+            view?.SiteLayouts?.FirstOrDefault()?.SiteId ?? view?.Locations?.FirstOrDefault()?.SiteId;
 
         internal static GoodsBuilding BuildingOf(PropertyOffer offer) => new()
         {

@@ -238,7 +238,7 @@ namespace FoodFactoryGame.Session.Logistics
             if (site == null) return Array.Empty<GoodsEquipment>();
             return site.Sites.Select(x => SiteView(x.Id)).Where(x => x != null).SelectMany(x => x.Equipment)
                 .Where(x => x.Kind == GoodsWorld.DockKind)
-                .OrderBy(x => x.SiteId == site.Locations[0].SiteId ? 0 : 1).ThenBy(x => x.SiteId, StringComparer.Ordinal)
+                .OrderBy(x => x.SiteId == GoodsWorld.ViewSiteId(site) ? 0 : 1).ThenBy(x => x.SiteId, StringComparer.Ordinal)
                 .ThenBy(x => x.Id, StringComparer.Ordinal).ToList();
         }
 
@@ -281,7 +281,7 @@ namespace FoodFactoryGame.Session.Logistics
         }
 
         private IEnumerable<GoodsSite> RemoteSites(GoodsSnapshot site) =>
-            site.Sites.Where(x => x.Id != site.Locations[0].SiteId).OrderBy(x => x.Id, StringComparer.Ordinal);
+            site.Sites.Where(x => x.Id != GoodsWorld.ViewSiteId(site)).OrderBy(x => x.Id, StringComparer.Ordinal);
 
         private void Build(GoodsSnapshot site)
         {
@@ -428,7 +428,7 @@ namespace FoodFactoryGame.Session.Logistics
             var name = Caption(remote.Name, 13, Color.white);
             name.style.unityFontStyleAndWeight = FontStyle.Bold;
             card.Add(name);
-            var metres = GoodsWorld.RoadMetres(primary, primary.Locations[0].SiteId, remote.Id);
+            var metres = GoodsWorld.RoadMetres(primary, GoodsWorld.ViewSiteId(primary), remote.Id);
             if (metres is { } road) card.Add(Caption($"{road.ToString("N0", CultureInfo.InvariantCulture)} m by road", 12, Muted));
             var view = SiteView(remote.Id);
             if (view == null)
@@ -452,7 +452,7 @@ namespace FoodFactoryGame.Session.Logistics
         // One location's stacks, each with its live count and a button that moves one stack to target.
         private void Stock(VisualElement card, GoodsSnapshot view, string locationId, string title, (string Label, string LocationId)? target)
         {
-            var siteId = view.Locations[0].SiteId;
+            var siteId = GoodsWorld.ViewSiteId(view);
             var location = view.Locations.First(x => x.Id == locationId);
             Live(card, null, () => $"{title}  {Slots(SiteView(siteId), locationId)}/{location.Capacity}", Heading, 4);
             var groups = view.Lots.Where(x => x.LocationId == locationId).Select(x => (x.ItemId, x.Spoiled)).Distinct()

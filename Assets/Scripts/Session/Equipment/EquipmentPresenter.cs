@@ -38,7 +38,7 @@ namespace FoodFactoryGame.Session.Equipment
         private void Refresh(GoodsSnapshot site)
         {
             _shown = site;
-            var layout = site?.SiteLayouts.FirstOrDefault(x => x.SiteId == DevWorld.SiteId);
+            var layout = site?.SiteLayouts.FirstOrDefault(x => x.SiteId == session.ClientSiteId);
             var placed = layout == null ? new List<GoodsEquipment>()
                 : site.Equipment.Where(x => x.State == EquipmentState.Placed).ToList();
             foreach (var id in _visuals.Keys.Where(x => placed.All(y => y.Id != x)).ToList())

@@ -33,7 +33,9 @@ namespace FoodFactoryGame.Session.Equipment
         // (EquipmentInteraction.Employees.cs); the avatar can walk and look, and a click or Esc returns to the script.
         PickPosition,
         // Trucks, routes and the company's remote sites (decision 0022, LogisticsPanel).
-        Logistics
+        Logistics,
+        // A map building's price, owner and Buy button (decision 0028, PropertyPanel).
+        Property
     }
 
     // One slot's goods stack (item and spoiled state, up to the item's max stack) in one container, carried on the cursor.
@@ -126,6 +128,8 @@ namespace FoodFactoryGame.Session.Equipment
         public Vector2 PointerPosition => pointAction.action.ReadValue<Vector2>();
         // Equipment ID of the open machine screen; null unless Screen is Machine.
         public string OpenMachineId { get; private set; }
+        // Lot of the open property screen; null unless Screen is Property.
+        public string OpenLotId { get; private set; }
         // Machine kind on the cursor; null when the cursor is empty.
         public string CursorKind { get; private set; }
         // Hotbar slot whose machine or item is on the cursor; -1 when none is.
@@ -256,7 +260,7 @@ namespace FoodFactoryGame.Session.Equipment
             UpdateHover();
             UpdatePick(site);
 
-            var layout = site?.SiteLayouts.FirstOrDefault(x => x.SiteId == DevWorld.SiteId);
+            var layout = site?.SiteLayouts.FirstOrDefault(x => x.SiteId == session.ClientSiteId);
             var suffix = HasPendingRequests ? " (waiting for server)" : !string.IsNullOrEmpty(LastRejection) ? $" (rejected: {LastRejection})" : "";
             if (UpdateBelts(site, layout, suffix))
             {
@@ -281,6 +285,7 @@ namespace FoodFactoryGame.Session.Equipment
                     InteractionScreen.Machine when _openMachineStores =>
                         "Storage: click or shift+click to move goods in and out; hover a stack to see when it spoils; E or Esc closes" + suffix,
                     InteractionScreen.Logistics => "Logistics: set each truck's route and cargo, and move stock at remote sites; L or Esc closes" + suffix,
+                    InteractionScreen.Property => "Property: Buy spends company cash on this building and its lot; E or Esc closes",
                     InteractionScreen.Employee => "Employee: paste a Lua script and press Run; Stop halts it; Esc closes" + suffix,
                     InteractionScreen.PickPosition => "Select world pos: look at a cell or a machine (red) and click to insert it into the script; Esc returns"
                         + (PickText != null ? $" [{PickText}]" : ""),
@@ -463,6 +468,15 @@ namespace FoodFactoryGame.Session.Equipment
             else if (Screen == InteractionScreen.Logistics) CloseScreen();
         }
 
+        // The buy panel of a map building's lot (decision 0028); presentation only, the panel sends the request.
+        public void OpenProperty(string lotId)
+        {
+            if (Screen != InteractionScreen.None || _camera == null || session.ClientSite == null || string.IsNullOrEmpty(lotId)) return;
+            Screen = InteractionScreen.Property;
+            OpenLotId = lotId;
+            _awaitingRelease = true;
+        }
+
         public void OpenMachine(string equipmentId)
         {
             if (_camera == null || session.ClientSite?.Equipment.Any(x => x.Id == equipmentId && x.State == EquipmentState.Placed) != true)
@@ -486,6 +500,7 @@ namespace FoodFactoryGame.Session.Equipment
             Screen = InteractionScreen.None;
             StorageOpen = false;
             OpenMachineId = null;
+            OpenLotId = null;
             CloseEmployeeScreen();
             if (CursorGoods != null && CursorGoods.LocationId != InventoryId) CursorGoods = null;
         }

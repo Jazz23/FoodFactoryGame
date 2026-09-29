@@ -276,5 +276,59 @@ namespace FoodFactoryGame.Goods.Tests
             Assert.Throws<ArgumentException>(() => CreateWorld(catalog: false).RegisterPropertyOffers(scenery));
             Assert.Throws<ArgumentException>(() => CreateWorld().RegisterPropertyOffers(Offers()), "The catalog is registered once.");
         }
+
+        // Piece 2: everyone who acts for the buying company is given the new site in the purchase's own commit; the company's
+        // employee (a site-bound worker) and a player of an unrelated site are not.
+        [Test]
+        public void APurchaseGrantsTeammatesButNotEmployeesOrOutsiders()
+        {
+            var world = CreateWorld();
+            world.Grant("sous", "home");
+            world.Bootstrap(new GoodsEmployee { Id = GoodsWorld.EmployeePrefix + "1", SiteId = "home", Name = "Worker" }, 1);
+            world.Grant("stranger", "lonely");
+            GoodsSnapshotStore.Save(world, PathForSave);
+            Assert.That(world.BuyPropertyDurably("chef", "buy-diner", "home", "lot-diner", PathForSave).Accepted, Is.True);
+
+            var saved = GoodsSnapshotStore.Load(PathForSave);
+            Assert.That(saved.Snapshot().Grants.Where(x => x.SiteId == "site-diner").Select(x => x.PlayerId), Is.EquivalentTo(new[] { "chef", "sous" }));
+            Assert.That((saved.CanView(GoodsWorld.EmployeePrefix + "1", "site-diner"), saved.CanView("stranger", "site-diner")), Is.EqualTo((false, false)));
+        }
+
+        // Ownership is public: every site's view carries every property record, and a bought site with no locations yet is
+        // still named by its baseline.
+        [Test]
+        public void ViewsCarryEveryPropertyAndNameABoughtSite()
+        {
+            var world = CreateWorld();
+            world.Grant("stranger", "lonely");
+            Assert.That(world.BuyProperty("chef", "buy-farm", "home", "lot-farm").Accepted, Is.True);
+
+            var outsider = world.View("stranger", "lonely");
+            Assert.That(outsider.Properties.Select(x => (x.LotId, x.CompanyId)), Is.EqualTo(new[] { ("lot-farm", "company") }));
+            Assert.That(outsider.Companies, Is.Empty, "Cash stays private to the owner's sites.");
+            var bought = world.View("chef", "site-farm");
+            Assert.That(bought.Locations.Where(x => x.SiteId == "site-farm"), Is.Empty);
+            Assert.That(GoodsWorld.ViewSiteId(bought), Is.EqualTo("site-farm"));
+            Assert.That(GoodsWorld.ViewSiteId(world.View("chef", "home")), Is.EqualTo("home"));
+        }
+
+        // Every rejection leaves the world byte-for-byte unchanged, teammates' grants included.
+        [Test]
+        public void RejectionsGrantAndChargeNothing()
+        {
+            var world = CreateWorld(cash: DinerPrice - 1);
+            world.Grant("sous", "home");
+            var before = Json(world);
+            var reasons = new[]
+            {
+                world.BuyProperty("chef", "a", "home", "lot-missing").Reason,
+                world.BuyProperty("chef", "b", "home", "lot-rival").Reason,
+                world.BuyProperty("chef", "c", "home", "lot-diner").Reason,
+                world.BuyProperty("stranger", "d", "home", "lot-farm").Reason,
+                world.BuyProperty("chef", "e", "lonely", "lot-farm").Reason
+            };
+            Assert.That(reasons, Is.EqualTo(new[] { "unknown-lot", "not-for-sale", "insufficient-funds", "no-grant", "no-company" }));
+            Assert.That(Json(world), Is.EqualTo(before));
+        }
     }
 }

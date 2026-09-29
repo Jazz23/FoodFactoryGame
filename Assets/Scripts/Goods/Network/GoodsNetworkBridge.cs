@@ -229,6 +229,22 @@ namespace FoodFactoryGame.Goods.Network
             if (result.Accepted) Broadcast();
         }
 
+        // Buys a listed lot of the world layout with the paying site's company cash (decision 0028, BuyPropertyDurably). An
+        // accepted purchase is broadcast, so every subscriber's baseline shows the new owner.
+        public void RequestBuyProperty(string requestId, string payingSiteId, string lotId)
+        {
+            if (IsClientStarted) ServerBuyProperty(requestId, payingSiteId, lotId);
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        private void ServerBuyProperty(string requestId, string payingSiteId, string lotId, NetworkConnection sender = null)
+        {
+            if (!TryIdentify(sender, requestId, out var player)) return;
+            var result = _world.BuyPropertyDurably(player, requestId, payingSiteId, lotId, _savePath);
+            Reply(sender, result);
+            if (result.Accepted) Broadcast();
+        }
+
         // Makes a company route between two docks, with the items its trucks may load (empty for any) (CreateRouteDurably).
         public void RequestCreateRoute(string requestId, string pickupDockId, string dropoffDockId, string[] allowedItemIds)
         {
@@ -537,14 +553,14 @@ namespace FoodFactoryGame.Goods.Network
         private void TargetSite(NetworkConnection connection, string json, long epoch)
         {
             var state = JsonUtility.FromJson<GoodsSnapshot>(json);
-            if (state?.Locations == null || state.Locations.Count == 0) return;
+            var siteId = GoodsWorld.ViewSiteId(state);
+            if (siteId == null) return;
             if (epoch < _clientEpoch) return;
             if (epoch > _clientEpoch)
             {
                 _clientRevisions.Clear();
                 _clientEpoch = epoch;
             }
-            var siteId = state.Locations[0].SiteId;
             if (_clientRevisions.TryGetValue(siteId, out var revision) && state.Revision < revision) return;
             _clientRevisions[siteId] = state.Revision;
             SiteReceived?.Invoke(state);

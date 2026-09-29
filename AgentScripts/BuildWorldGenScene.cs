@@ -1,9 +1,12 @@
-// Authors the world-generation scene (decision 0026): WorldGen.unity is a copy of DevSite plus the world layout bridge on
+// Authors the world-generation scene (decisions 0026, 0028): WorldGen.unity is a copy of DevSite plus the world layout bridge on
 // SessionRoot (so a newly created world gets a generated layout) and a WorldLayoutPresenter that draws the replicated layout
 // with the world art (ArtSource/World, installed by BuildWorldArt.cs). WorldGen uses its own spawnable-prefab catalog (DevSite's prefabs plus the layout bridge), so DevSite
-// and GamePrefabs are untouched. Not a build scene. Idempotent: the scene is recopied from DevSite on every run; asset GUIDs of
+// and GamePrefabs are untouched. DevSite's floor, landmarks and NavMesh are handed to the presenter to show only for dev-site
+// worlds, and a PropertyPanel (buy panel, decision 0028) is added. Not a build scene. Idempotent: the scene is recopied from DevSite on every run; asset GUIDs of
 // the bridge prefab and catalog are kept. The scene that was open is reopened at the end.
 // Run the body of Run() with the Unity MCP execute_code tool (C# 6 / CodeDom compatible, no helper methods).
+using UnityEngine;
+
 public static class BuildWorldGenScene
 {
     public static object Run()
@@ -17,7 +20,8 @@ public static class BuildWorldGenScene
         const string artPath = "Assets/Art/World/WorldArtCatalog.asset";
         var previousScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().path;
 
-        var art = UnityEditor.AssetDatabase.LoadAssetAtPath<FoodFactoryGame.Session.WorldMap.WorldArtCatalog>(artPath);
+        // Loaded untyped: the value only goes into a serialized reference.
+        var art = UnityEditor.AssetDatabase.LoadMainAssetAtPath(artPath);
 
         // Layout bridge prefab: a NetworkObject carrying only WorldLayoutBridge.
         var bridgeRoot = new GameObject("WorldLayoutBridge");
@@ -64,7 +68,31 @@ public static class BuildWorldGenScene
         var serializedPresenter = new UnityEditor.SerializedObject(presenter);
         serializedPresenter.FindProperty("session").objectReferenceValue = session;
         serializedPresenter.FindProperty("art").objectReferenceValue = art;
+        // DevSite's floor, landmarks and baked NavMesh belong to the dev site: the presenter shows them only for worlds that keep
+        // it (no layout, or layout format 1 or 2). A generated world's ground is the levelled terrain with its lots paved.
+        var devOnly = new System.Collections.Generic.List<GameObject>();
+        foreach (var root in scene.GetRootGameObjects())
+            if (root.name == "Floor" || root.name.StartsWith("Landmark") || root.GetComponent<Unity.AI.Navigation.NavMeshSurface>() != null)
+                devOnly.Add(root);
+        var devOnlyProperty = serializedPresenter.FindProperty("devSiteOnly");
+        devOnlyProperty.arraySize = devOnly.Count;
+        for (var index = 0; index < devOnly.Count; index++) devOnlyProperty.GetArrayElementAtIndex(index).objectReferenceValue = devOnly[index];
         serializedPresenter.ApplyModifiedPropertiesWithoutUndo();
+
+        // Buy panel (decision 0028): a UI document like the logistics panel's, reading the presenter's offers.
+        var logistics = UnityEngine.Object.FindFirstObjectByType<FoodFactoryGame.Session.Logistics.LogisticsPanel>();
+        var logisticsDocument = logistics.GetComponent<UnityEngine.UIElements.UIDocument>();
+        var interaction = UnityEngine.Object.FindFirstObjectByType<FoodFactoryGame.Session.Equipment.EquipmentInteraction>();
+        var panelObject = new GameObject("PropertyPanel");
+        var panelDocument = panelObject.AddComponent<UnityEngine.UIElements.UIDocument>();
+        panelDocument.panelSettings = logisticsDocument.panelSettings;
+        panelDocument.sortingOrder = logisticsDocument.sortingOrder;
+        var panel = panelObject.AddComponent<FoodFactoryGame.Session.WorldMap.PropertyPanel>();
+        var serializedPanel = new UnityEditor.SerializedObject(panel);
+        serializedPanel.FindProperty("document").objectReferenceValue = panelDocument;
+        serializedPanel.FindProperty("interaction").objectReferenceValue = interaction;
+        serializedPanel.FindProperty("map").objectReferenceValue = presenter;
+        serializedPanel.ApplyModifiedPropertiesWithoutUndo();
         UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(scene);
         UnityEditor.SceneManagement.EditorSceneManager.SaveScene(scene);
 

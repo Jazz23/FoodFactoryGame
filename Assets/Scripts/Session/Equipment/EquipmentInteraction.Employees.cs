@@ -99,7 +99,7 @@ namespace FoodFactoryGame.Session.Equipment
                 ClearPick();
                 return;
             }
-            var layout = site.SiteLayouts.FirstOrDefault(x => x.SiteId == DevWorld.SiteId);
+            var layout = site.SiteLayouts.FirstOrDefault(x => x.SiteId == session.ClientSiteId);
             var hit = UnderCrosshair();
             Component target = hit == null ? null : hit.GetComponentInParent<EquipmentVisual>();
             string text = null;

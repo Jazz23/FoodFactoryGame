@@ -9,6 +9,7 @@ using UnityEngine;
 
 [assembly: InternalsVisibleTo("FoodFactoryGame.Goods.EditModeTests")]
 [assembly: InternalsVisibleTo("FoodFactoryGame.Session.EditModeTests")]
+[assembly: InternalsVisibleTo("FoodFactoryGame.Session.PlayModeTests")]
 
 namespace FoodFactoryGame.Goods
 {
@@ -301,6 +302,7 @@ namespace FoodFactoryGame.Goods
                 foreach (var employee in view.Employees) employee.Script = "";
                 ViewLogistics(view, siteId);
                 ViewCustomers(view, siteId);
+                // Properties stay whole: who owns which lot is public map information (decision 0028).
                 view.Reservations.Clear();
                 view.Outcomes.Clear();
                 view.Grants.Clear();

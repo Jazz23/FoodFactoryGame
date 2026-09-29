@@ -41,6 +41,12 @@ namespace FoodFactoryGame.Goods
             lock (_gate) return CompanyOfSiteLocked(siteId);
         }
 
+        // Every site of the company that owns this site, in its order; empty when no company owns it.
+        public IReadOnlyList<string> CompanySiteIds(string siteId)
+        {
+            lock (_gate) return _state.Companies.FirstOrDefault(x => x.SiteIds.Contains(siteId))?.SiteIds.ToList() ?? new List<string>();
+        }
+
         private string CompanyOfSiteLocked(string siteId) => _state.Companies.FirstOrDefault(x => x.SiteIds.Contains(siteId))?.Id;
 
         // Server-only cash change committed on its own, for dev/admin use and tests. Returns null when committed, otherwise

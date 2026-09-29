@@ -57,7 +57,7 @@ namespace FoodFactoryGame.Session.Buildings
         public bool RoofVisible(string buildingId) => _shells.TryGetValue(buildingId, out var shell) && shell.Roof.enabled;
 
         public GoodsBuilding LocalBuilding => LocalBuildingId == null ? null : _shown?.Buildings.FirstOrDefault(x => x.Id == LocalBuildingId);
-        public SiteLayout Layout => _shown?.SiteLayouts.FirstOrDefault(x => x.SiteId == DevWorld.SiteId);
+        public SiteLayout Layout => _shown?.SiteLayouts.FirstOrDefault(x => x.SiteId == session.ClientSiteId);
 
         // True when something at this cell and level is inside the local avatar's building above its level, so this client
         // hides it with the storeys it stands on.
@@ -71,7 +71,7 @@ namespace FoodFactoryGame.Session.Buildings
         private void Update()
         {
             var site = session.ClientSite;
-            var layout = site?.SiteLayouts.FirstOrDefault(x => x.SiteId == DevWorld.SiteId);
+            var layout = site?.SiteLayouts.FirstOrDefault(x => x.SiteId == session.ClientSiteId);
             if (!ReferenceEquals(site, _shown))
             {
                 _shown = site;
