@@ -84,6 +84,75 @@ namespace FoodFactoryGame.World
         public static WorldRect TurnRect(WorldRect rect) => new(rect.Z, -(rect.X + rect.Width), rect.Depth, rect.Width);
 
         public static Facing TurnFacing(Facing facing) => (Facing)(((int)facing + 1) % 4);
+
+        public static long FloorDiv(long value, long divisor) => value >= 0 ? value / divisor : -((-value + divisor - 1) / divisor);
+
+        // Smallest n with n * n >= value.
+        public static long CeilSqrt(long value)
+        {
+            if (value <= 0) return 0;
+            var root = (long)Math.Sqrt(value);
+            while (root * root > value) root--;
+            while (root * root < value) root++;
+            return root;
+        }
+
+        // Whether point p lies within `radius` of segment a-b (inclusive), exactly, in whatever unit the arguments share.
+        public static bool WithinDistance(long px, long pz, long ax, long az, long bx, long bz, long radius)
+        {
+            var dx = bx - ax;
+            var dz = bz - az;
+            var qx = px - ax;
+            var qz = pz - az;
+            var along = qx * dx + qz * dz;
+            var lengthSquared = dx * dx + dz * dz;
+            if (along <= 0 || lengthSquared == 0) return qx * qx + qz * qz <= radius * radius;
+            if (along >= lengthSquared) return (px - bx) * (px - bx) + (pz - bz) * (pz - bz) <= radius * radius;
+            var cross = dx * qz - dz * qx;
+            return cross * cross <= radius * radius * lengthSquared;
+        }
+
+        public static bool WithinDistance(IReadOnlyList<WorldCell> line, long px, long pz, long radius)
+        {
+            for (var index = 0; index + 1 < line.Count; index++)
+                if (WithinDistance(px, pz, line[index].X, line[index].Z, line[index + 1].X, line[index + 1].Z, radius)) return true;
+            return false;
+        }
+
+        // Where a polyline crosses the axis line (vertical: x = fixedAt, else z = fixedAt) strictly between from and to, as the
+        // along coordinate rounded down, with the direction of the polyline piece that crosses. Pieces lying on the line are skipped.
+        public static List<(int Along, int Dx, int Dz)> Crossings(IReadOnlyList<WorldCell> line, bool vertical, int fixedAt, int from, int to)
+        {
+            var result = new List<(int, int, int)>();
+            for (var index = 0; index + 1 < line.Count; index++)
+            {
+                var a = line[index];
+                var b = line[index + 1];
+                long a0 = vertical ? a.X : a.Z, b0 = vertical ? b.X : b.Z;
+                long a1 = vertical ? a.Z : a.X, b1 = vertical ? b.Z : b.X;
+                if (a0 == b0) continue;
+                // Half-open on the far end so a crossing exactly at a shared point counts once.
+                var low = Math.Min(a0, b0);
+                var high = Math.Max(a0, b0);
+                if (fixedAt < low || fixedAt >= high) continue;
+                var along = a1 + FloorDiv((b1 - a1) * (fixedAt - a0), b0 - a0);
+                if (along <= from || along >= to) continue;
+                result.Add(((int)along, b.X - a.X, b.Z - a.Z));
+            }
+            return result;
+        }
+
+        // Boxes (doubled units) covering a polyline widened by `radius` metres each side, one per piece; conservative.
+        public static IEnumerable<Box> Corridor(IReadOnlyList<WorldCell> line, int radius)
+        {
+            for (var index = 0; index + 1 < line.Count; index++)
+            {
+                var a = line[index];
+                var b = line[index + 1];
+                yield return new Box(2 * (Math.Min(a.X, b.X) - radius), 2 * (Math.Min(a.Z, b.Z) - radius),
+                    2 * (Math.Max(a.X, b.X) + radius), 2 * (Math.Max(a.Z, b.Z) + radius));
+            }
+        }
     }
 
     // Bucketed boxes for overlap and point queries. Query results come back in insertion order, never bucket order.

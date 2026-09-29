@@ -1,21 +1,25 @@
 # World art — roads, rail, buildings, farms, station
 
-Low-poly, textured art for the generated world (decision 0026 presentation). Everything is produced by two Blender scripts,
+Low-poly, textured art for the generated world (decisions 0026 and 0027 presentation). Everything is produced by two Blender scripts,
 so it can be regenerated and changed in code.
 
 - `build_world_textures.py`: seamless procedural textures (numpy) in `Textures/`: base maps (RGBA, smoothness in alpha) and
   `*_Normal.png` tangent-space normal maps. Roads carry sidewalks, curbs, lane markings and crosswalks; façades are one window
   bay by one storey (brick, siding, plaster, apartment panels, office curtain wall, storefront); plus corrugated metal,
   industrial windows, roller/wood/glass doors, barn planks, shingles, clay tiles, flat roof, concrete, grass, paving, yard,
-  wheat and green crop fields, and rail ballast with sleepers.
+  wheat and green crop fields, and rail ballast with sleepers; since 2026-09-28 also water, river bank, foliage, bark and
+  the lettered stop sign and crossbuck (appended after the originals so those keep their random draws).
 - `build_world_models.py`: builds every asset with bmesh into `World_Assets.blend` and exports `Export/WorldArt.fbx` (one
   object per asset). UVs are world-scaled per material; façade walls snap to whole window bays and storeys.
 
-Run both in Blender 5.2 (the models script starts a fresh file):
+Run both in Blender 5.2 (the models script starts a fresh file). Set `WORLD_ART_ROOT` to this folder in your checkout
+(the scripts default to `G:/Unity/FoodFactoryGame/ArtSource/World`):
 
 ```python
-exec(open(r'G:/Unity/FoodFactoryGame/ArtSource/World/build_world_textures.py').read())
-exec(open(r'G:/Unity/FoodFactoryGame/ArtSource/World/build_world_models.py').read())
+WORLD_ART_ROOT = r'E:/Projects/Unity/FoodFactoryGame/ArtSource/World'
+g = {'WORLD_ART_ROOT': WORLD_ART_ROOT}
+exec(open(WORLD_ART_ROOT + '/build_world_textures.py').read(), g)
+exec(open(WORLD_ART_ROOT + '/build_world_models.py').read(), g)
 ```
 
 Then copy `Textures/*.png` to `Assets/Art/World/Textures/` and `Export/WorldArt.fbx` to `Assets/Art/World/Models/`, and run
@@ -27,11 +31,11 @@ presenter). Mesh references survive a re-export as long as object names stay the
 
 | Asset | Tris | Notes |
 |---|---|---|
-| `Road_Arterial`, `Road_Local` (+ `_Crosswalk`) | 14 | 10 m tiles along +Y; 14 m / 10 m wide with raised sidewalks and curbs |
-| `Road_Rural` | 6 | 8 m wide, gravel shoulders |
-| `Road_Junction` | 2 | unit quad, scaled to each crossing |
-| `Rail_Track` | 18 | 6 m tile: ballast, sleepers (texture), two rails |
-| `Ground_Quad` | 2 | unit quad for ground, lots and fields |
+| `Road_Arterial`, `Road_Local` (+ `_Crosswalk`) | 56 | 10 m tiles along +Y in 4 segments; 14 m / 10 m wide, raised sidewalks, curbs, skirts to -0.6 m |
+| `Road_Rural` | 40 | 8 m wide, gravel shoulders, skirts |
+| `Road_Junction` | 32 | unit square cut 4 x 4, scaled to each crossing |
+| `Rail_Track` | 66 | 6 m tile in 3 segments: 0.15 m ballast, sleepers (texture), two rails, skirts |
+| `Ground_Quad` | 2 | unit quad (no longer used by the presenter; land is a generated terrain mesh) |
 | `House_Small_a/b/c` | 52 | 10 x 9 m, gable roof, chimney, porch step |
 | `House_Large_a/b/c` | 74 | 15 x 12 m, two storeys, hip roof, porch, garage |
 | `Apartment_a/b` `_Ground/_Middle/_Roof` | 28 / 18 / 52 | 18 x 15 m modules, 3 m storeys, stacked by floors |
@@ -40,10 +44,19 @@ presenter). Mesh references survive a re-export as long as object names stay the
 | `Factory_a/b` | 84 / 134 | 30 x 26 m; pitched or flat roof, roller doors, window bands |
 | `Barn_a/b` | 108 | gambrel barn with silo, placed at authored size |
 | `Station` | 124 | 10 x 30 m platform, ramp, shelter, benches, sign |
+| `Rail_Crossing` | 72 | level crossing panel, 10 m along the rail (scaled to the road width), ramped, rails flush |
+| `Rail_Signal` | 170 | crossbuck (RAILROAD / CROSSING), twin red lamps, raised red-and-white gate arm |
+| `Stop_Sign` | 38 | octagon on a post, STOP texture |
+| `Traffic_Light_Arterial` / `_Local` | 224 / 164 | pole on the kerb, mast arm reaching to the driver's left (-X from the front), 3-lamp heads |
+| `Bridge_Deck`, `Bridge_Railing`, `Bridge_Pier` | 24 / 48 / 8 | deck slab (unit width), parapet with top rail, pier (unit size) |
+| `Foundation` | 8 | unit plinth under buildings on sloping land |
+| `Tree_Broadleaf_a/b`, `Tree_Conifer`, `Tree_Poplar`, `Tree_Bush` | 136 / 58 / 96 / 100 | faceted icosphere canopies with seeded jitter, cone tiers |
 
 ## Conventions
 
 Metres, Z up. Building fronts (doors) face -Y, which imports as Unity +Z; X runs along the street; pivot at the footprint
 centre on the ground. Tiles run along +Y from 0 (Unity -Z). Materials are `WG_*` and map one-to-one to Unity materials.
-Unity mirrors X on import, which only flips textures left-to-right (all assets are symmetric enough for that).
+Unity negates X on import together with the handedness change, so an asset seen from its front looks as it does in
+Blender seen from -Y: lettering reads correctly and the traffic-light arm (Blender -X) reaches to the driver's left (checked
+2026-09-28 in the running game).
 `World_Assets_Preview.png` is a Blender render of the set. Poly counts are deliberately tiny; detail is in the textures.

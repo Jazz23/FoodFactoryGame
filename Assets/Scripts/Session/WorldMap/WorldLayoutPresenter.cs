@@ -1,9 +1,11 @@
-// Client presentation of the replicated world layout (decision 0026) with the ArtSource/World models: tiled roads with
-// crosswalks and junction patches, rail track, ground cover, and a model per building fitted to its footprint and facing
-// (modular apartments and offices stacked to their storeys, farms as a field plus a barn). It is built only from the layout
-// the server sent through WorldLayoutBridge and is rebuilt when that changes; it writes no state, and nothing in the
-// simulation reads it or depends on whether it exists. Road and rail tiles are merged into one mesh per material and the
-// rest is static-batched, so a ~1,000-building city stays a few hundred draw calls.
+// Client presentation of the replicated world layout (decision 0026) with the ArtSource/World models: the land as a chunked
+// terrain mesh (the river's channel and banks cut into it), water, road and rail tiles draped over the land, bridges with
+// decks, parapets and piers, level crossings with signals, traffic lights and stop signs at controlled junctions, trees, and
+// a model per building fitted to its footprint and facing at its recorded elevation, on a foundation where the land falls
+// away. It is built only from the layout the server sent through WorldLayoutBridge and is rebuilt when that changes; it
+// writes no state, and nothing in the simulation reads it or depends on whether it exists. Tiles, furniture and trees are
+// merged into one mesh per material per 250 m chunk and the buildings are static-batched, so a ~1,800-building city with
+// ~6,000 trees stays a few hundred draw calls. Format 1 layouts (generator v1) show as flat land with no river or trees.
 using System.Collections.Generic;
 using System.Linq;
 using FoodFactoryGame.Goods.Network;
@@ -20,12 +22,14 @@ namespace FoodFactoryGame.Session.WorldMap
         [SerializeField] private WorldArtCatalog art;
         // PROTOTYPE placement. How the map relates to the dev site is part of the open site question (decision 0026), so the
         // dev site (DevSite's 40 m floor at the scene origin) sits in the farmland with the city's edge this far north of it,
-        // where a player sees the city on arrival. Pieces that would land on the dev site are not drawn.
+        // where a player sees the city on arrival. Pieces that would land on the dev site are not drawn, the land around it
+        // is levelled to its floor, and the whole map is lowered so that floor stays at y = 0.
         [SerializeField] private float cityGap = 40f;
         [SerializeField] private Vector2 devSiteClearHalfSize = new(24f, 24f);
+        [SerializeField] private float devSiteBlend = 30f;
 
         // Authored model sizes (ArtSource/World/build_world_models.py): along the street (X) by depth, in metres, and storey
-        // heights of the stacked modules. Road tiles are 10 m long, rail tiles 6 m; both run along local -Z from 0.
+        // heights of the stacked modules. Road and bridge tiles are 10 m long, rail tiles 6 m; all run along local -Z from 0.
         private static readonly Dictionary<string, Vector2> Footprints = new()
         {
             ["House_Small"] = new Vector2(10f, 9f), ["House_Large"] = new Vector2(15f, 12f), ["Apartment"] = new Vector2(18f, 15f),
@@ -39,17 +43,31 @@ namespace FoodFactoryGame.Session.WorldMap
         // Every catalog piece this presenter can ask for (checked by an authoring test).
         public static readonly string[] RequiredPieces =
         {
-            "Ground_Quad", "Road_Junction", "Road_Arterial", "Road_Arterial_Crosswalk", "Road_Local", "Road_Local_Crosswalk", "Road_Rural",
-            "Rail_Track", "House_Small_a", "House_Small_b", "House_Small_c", "House_Large_a", "House_Large_b", "House_Large_c",
+            "Road_Junction", "Road_Arterial", "Road_Arterial_Crosswalk", "Road_Local", "Road_Local_Crosswalk", "Road_Rural",
+            "Rail_Track", "Rail_Crossing", "Rail_Signal", "Stop_Sign", "Traffic_Light_Arterial", "Traffic_Light_Local",
+            "Bridge_Railing", "Bridge_Deck", "Bridge_Pier", "Foundation",
+            "Tree_Broadleaf_a", "Tree_Broadleaf_b", "Tree_Conifer", "Tree_Poplar", "Tree_Bush",
+            "House_Small_a", "House_Small_b", "House_Small_c", "House_Large_a", "House_Large_b", "House_Large_c",
             "Apartment_a_Ground", "Apartment_a_Middle", "Apartment_a_Roof", "Apartment_b_Ground", "Apartment_b_Middle", "Apartment_b_Roof",
             "Office_a_Ground", "Office_a_Middle", "Office_a_Roof", "Office_b_Ground", "Office_b_Middle", "Office_b_Roof",
             "Restaurant_a", "Restaurant_b", "Factory_a", "Factory_b", "Barn_a", "Barn_b", "Station"
         };
         private const float RoadTileLength = 10f;
         private const float RailTileLength = 6f;
+        private const float BridgeTileLength = 10f;
         private const float ApartmentStorey = 3f;
         private const float OfficeStorey = 3.5f;
-        private static readonly int BaseMapSt = Shader.PropertyToID("_BaseMap_ST");
+        // Terrain mesh resolution and chunking; merged pieces are chunked the same way for culling.
+        private const float TerrainCell = 5f;
+        private const int TerrainChunkCells = 76;
+        private const float ChunkSize = 250f;
+        // The land is lowered this far under roads and rails so it never shows through them; their skirts hide the step.
+        private const float RoadCarve = 0.15f;
+        // River channel: bed depth below the water surface and the width of the sloping bank beyond the water's edge.
+        private const float RiverBedBelowSurface = 1.6f;
+        private const float RiverBankWidth = 10f;
+        private const float TextureMetres = 8f;
+        private const float FieldMetres = 12f;
         private static readonly int BaseColor = Shader.PropertyToID("_BaseColor");
         // Awning colours: the player's restaurant, restaurants for sale, then competitors by ID.
         private static readonly Color PlayerAwning = new(0.18f, 0.62f, 0.26f);
@@ -59,16 +77,43 @@ namespace FoodFactoryGame.Session.WorldMap
             new(0.72f, 0.14f, 0.12f), new(0.16f, 0.3f, 0.6f), new(0.45f, 0.18f, 0.5f), new(0.12f, 0.45f, 0.45f)
         };
 
+        private enum Drape
+        {
+            // Vertices keep the given height.
+            None,
+            // The whole piece moves up by the land height at its origin (signs, trees).
+            Rigid,
+            // Every vertex moves up by the land height under it (tiles, bridge parts).
+            Surface
+        }
+
+        private sealed class MeshBuffer
+        {
+            public readonly List<Vector3> Vertices = new();
+            public readonly List<Vector2> Uvs = new();
+            public readonly List<int> Triangles = new();
+        }
+
+        private sealed class PieceData
+        {
+            public Vector3[] Vertices;
+            public Vector2[] Uvs;
+            public int[][] Triangles;
+        }
+
         private WorldLayoutBridge _bridge;
         private Transform _root;
         private Vector3 _layoutOrigin;
         private Rect _clear;
         private MaterialPropertyBlock _block;
+        private WorldTerrain _terrain;
+        private float _devHeight;
         private readonly List<Mesh> _meshes = new();
-        private readonly Dictionary<Material, List<CombineInstance>> _merged = new();
+        private readonly Dictionary<(Material Material, int X, int Z, bool Collide), MeshBuffer> _buffers = new();
+        private readonly Dictionary<Mesh, PieceData> _pieceData = new();
 
         public WorldLayout Shown { get; private set; }
-        // Where the layout's origin (the city centre) stands in the scene while a layout is shown.
+        // Where the layout's origin (the city centre, at land height) stands in the scene while a layout is shown.
         public Vector3 LayoutOrigin => _layoutOrigin;
         public int BuildingCount { get; private set; }
 
@@ -86,7 +131,7 @@ namespace FoodFactoryGame.Session.WorldMap
         // 1 km far plane, so while a layout is shown every local camera draws far enough to see all of it.
         private void ExtendCameraRange(WorldLayout layout)
         {
-            var needed = _layoutOrigin.magnitude + layout.MapHalfSize * 1.5f;
+            var needed = new Vector2(_layoutOrigin.x, _layoutOrigin.z).magnitude + layout.MapHalfSize * 1.5f;
             foreach (var camera in Camera.allCameras)
                 if (camera.farClipPlane < needed) camera.farClipPlane = needed;
         }
@@ -99,6 +144,8 @@ namespace FoodFactoryGame.Session.WorldMap
             _root = null;
             foreach (var mesh in _meshes) Destroy(mesh);
             _meshes.Clear();
+            _buffers.Clear();
+            _pieceData.Clear();
             BuildingCount = 0;
         }
 
@@ -108,18 +155,25 @@ namespace FoodFactoryGame.Session.WorldMap
             Shown = layout;
             if (layout == null) return;
             _block ??= new MaterialPropertyBlock();
+            _terrain = layout.Terrain ?? WorldTerrain.Flat();
+            var planar = new Vector3(0f, 0f, devSiteClearHalfSize.y + cityGap + layout.CityHalfSize);
+            // The dev site's floor in layout-local coordinates, and the land height the map is levelled to there.
+            _clear = new Rect(-devSiteClearHalfSize.x - planar.x, -devSiteClearHalfSize.y - planar.z, 2f * devSiteClearHalfSize.x, 2f * devSiteClearHalfSize.y);
+            _devHeight = _terrain.Height(_clear.center.x, _clear.center.y);
+            _layoutOrigin = planar + Vector3.down * _devHeight;
             _root = new GameObject("World Layout").transform;
             _root.SetParent(transform, false);
-            _layoutOrigin = new Vector3(0f, 0f, devSiteClearHalfSize.y + cityGap + layout.CityHalfSize);
             _root.position = _layoutOrigin;
-            // The dev site's floor in layout-local coordinates.
-            _clear = new Rect(-devSiteClearHalfSize.x - _layoutOrigin.x, -devSiteClearHalfSize.y - _layoutOrigin.z,
-                2f * devSiteClearHalfSize.x, 2f * devSiteClearHalfSize.y);
 
-            Ground(layout);
-            Roads(layout);
-            Rails(layout);
-            FlushMerged("Roads and rail");
+            Terrain(layout);
+            Water(layout);
+            Fields(layout);
+            var nodes = layout.Nodes.ToDictionary(x => x.Id);
+            Roads(layout, nodes);
+            Bridges(layout, nodes);
+            Rails(layout, nodes);
+            Junctions(layout, nodes);
+            Trees(layout);
             var districts = layout.Districts.ToDictionary(x => x.Id);
             foreach (var building in layout.Buildings)
             {
@@ -127,51 +181,266 @@ namespace FoodFactoryGame.Session.WorldMap
                 Building(building, districts.TryGetValue(building.DistrictId ?? "", out var district) ? district.Kind : null);
                 BuildingCount++;
             }
+            Flush();
             StaticBatchingUtility.Combine(_root.gameObject);
         }
 
-        // ------------------------------------------------------------------ ground
+        // ------------------------------------------------------------------ land
 
-        private void Ground(WorldLayout layout)
+        // Land height (layout-local metres) with the ground around the dev site levelled to its floor.
+        private float Land(float x, float z)
         {
-            var map = 2f * layout.MapHalfSize;
-            var ground = Quad("Ground", art.grass, new Vector3(0f, -0.01f, 0f), new Vector2(map, map), 8f, false);
-            // The ground is walkable everywhere; the dev site keeps its own floor on top.
-            var collider = ground.AddComponent<BoxCollider>();
-            collider.size = new Vector3(1f, 0.02f, 1f);
-            collider.center = new Vector3(0f, -0.01f, 0f);
-            foreach (var district in layout.Districts)
+            var raw = _terrain.Height(x, z);
+            var dx = Mathf.Max(0f, Mathf.Abs(x - _clear.center.x) - _clear.width / 2f);
+            var dz = Mathf.Max(0f, Mathf.Abs(z - _clear.center.y) - _clear.height / 2f);
+            var outside = Mathf.Max(dx, dz);
+            if (outside >= devSiteBlend) return raw;
+            var t = Mathf.SmoothStep(0f, 1f, outside / devSiteBlend);
+            return Mathf.Lerp(_devHeight, raw, t);
+        }
+
+        // Distance from a point to the nearest river's centreline and that river (null when there is none).
+        private (float Distance, WorldRiver River) NearestRiver(WorldLayout layout, float x, float z)
+        {
+            var best = float.MaxValue;
+            WorldRiver found = null;
+            foreach (var river in layout.Rivers)
             {
-                var cover = district.Kind switch
+                var reach = river.Width / 2f + RiverBankWidth + 20f;
+                for (var index = 0; index + 1 < river.Points.Count; index++)
                 {
-                    DistrictKind.Downtown => art.paving,
-                    DistrictKind.Industrial => art.yard,
-                    _ => null
-                };
-                if (cover == null) continue;
-                foreach (var area in district.Areas)
-                    Quad($"Lot {district.Id}", cover, new Vector3(area.X + area.Width / 2f, 0.005f, area.Z + area.Depth / 2f),
-                        new Vector2(area.Width, area.Depth), 8f, true);
+                    var a = river.Points[index];
+                    var b = river.Points[index + 1];
+                    if (x < Mathf.Min(a.X, b.X) - reach || x > Mathf.Max(a.X, b.X) + reach || z < Mathf.Min(a.Z, b.Z) - reach
+                        || z > Mathf.Max(a.Z, b.Z) + reach) continue;
+                    var distance = SegmentDistance(new Vector2(x, z), new Vector2(a.X, a.Z), new Vector2(b.X, b.Z));
+                    if (distance >= best) continue;
+                    best = distance;
+                    found = river;
+                }
+            }
+            return (best, found);
+        }
+
+        private static float SegmentDistance(Vector2 p, Vector2 a, Vector2 b)
+        {
+            var ab = b - a;
+            var t = Mathf.Clamp01(Vector2.Dot(p - a, ab) / Mathf.Max(1e-6f, ab.sqrMagnitude));
+            return Vector2.Distance(p, a + ab * t);
+        }
+
+        // How far the river's channel cuts below the land at a point.
+        private float Carve(WorldLayout layout, float x, float z)
+        {
+            var (distance, river) = NearestRiver(layout, x, z);
+            if (river == null) return 0f;
+            var half = river.Width / 2f;
+            var bed = river.SurfaceDropCm / 100f + RiverBedBelowSurface;
+            if (distance <= half) return bed;
+            if (distance >= half + RiverBankWidth) return 0f;
+            return bed * (1f - Mathf.SmoothStep(0f, 1f, (distance - half) / RiverBankWidth));
+        }
+
+        // The land as a grid of TerrainCell squares in chunks: grass, downtown paving, industrial yard and river bank by cell,
+        // cut down under roads and rails and into the river's channel. Chunks carry mesh colliders, so the land is walkable.
+        private void Terrain(WorldLayout layout)
+        {
+            var half = layout.MapHalfSize;
+            var cells = Mathf.RoundToInt(2f * half / TerrainCell);
+            var size = cells + 1;
+            var heights = new float[size * size];
+            var carved = new bool[size * size];
+            // Roads and rails (with a margin) carve the land a little so it never shows through them.
+            var nodes = layout.Nodes.ToDictionary(x => x.Id);
+            void Mark(float x0, float z0, float x1, float z1)
+            {
+                var i0 = Mathf.Max(0, Mathf.CeilToInt((x0 + half) / TerrainCell));
+                var i1 = Mathf.Min(cells, Mathf.FloorToInt((x1 + half) / TerrainCell));
+                var j0 = Mathf.Max(0, Mathf.CeilToInt((z0 + half) / TerrainCell));
+                var j1 = Mathf.Min(cells, Mathf.FloorToInt((z1 + half) / TerrainCell));
+                for (var j = j0; j <= j1; j++)
+                for (var i = i0; i <= i1; i++)
+                    carved[j * size + i] = true;
+            }
+            foreach (var road in layout.Roads)
+            {
+                var a = nodes[road.FromId];
+                var b = nodes[road.ToId];
+                var w = road.Width / 2f + 0.8f;
+                Mark(Mathf.Min(a.X, b.X) - w, Mathf.Min(a.Z, b.Z) - w, Mathf.Max(a.X, b.X) + w, Mathf.Max(a.Z, b.Z) + w);
+            }
+            foreach (var line in layout.Rails)
+                for (var index = 0; index + 1 < line.Points.Count; index++)
+                {
+                    var a = line.Points[index];
+                    var b = line.Points[index + 1];
+                    const float w = 2.8f;
+                    Mark(Mathf.Min(a.X, b.X) - w, Mathf.Min(a.Z, b.Z) - w, Mathf.Max(a.X, b.X) + w, Mathf.Max(a.Z, b.Z) + w);
+                }
+            for (var j = 0; j < size; j++)
+            for (var i = 0; i < size; i++)
+            {
+                var x = -half + i * TerrainCell;
+                var z = -half + j * TerrainCell;
+                var h = Land(x, z) - Carve(layout, x, z);
+                if (carved[j * size + i]) h -= RoadCarve;
+                // Keep the land just under the dev site's own floor.
+                if (_clear.Contains(new Vector2(x, z))) h = _devHeight - 0.05f;
+                heights[j * size + i] = h;
+            }
+            // Cover per cell, by the cell's centre.
+            var covers = new Material[cells * cells];
+            var districtCover = layout.Districts
+                .Select(d => (Areas: d.Areas, Cover: d.Kind == DistrictKind.Downtown ? art.paving : d.Kind == DistrictKind.Industrial ? art.yard : null))
+                .Where(x => x.Cover != null).ToList();
+            for (var j = 0; j < cells; j++)
+            for (var i = 0; i < cells; i++)
+            {
+                var x = -half + (i + 0.5f) * TerrainCell;
+                var z = -half + (j + 0.5f) * TerrainCell;
+                var cover = art.grass;
+                foreach (var (areas, material) in districtCover)
+                    if (areas.Any(a => x >= a.X && x < a.X + a.Width && z >= a.Z && z < a.Z + a.Depth)) cover = material;
+                if (art.bank != null)
+                {
+                    var (distance, river) = NearestRiver(layout, x, z);
+                    if (river != null && distance < river.Width / 2f + RiverBankWidth + 1f) cover = art.bank;
+                }
+                covers[j * cells + i] = cover;
+            }
+            for (var cj = 0; cj < cells; cj += TerrainChunkCells)
+            for (var ci = 0; ci < cells; ci += TerrainChunkCells)
+                TerrainChunk(half, size, heights, covers, cells, ci, cj, Mathf.Min(TerrainChunkCells, cells - ci), Mathf.Min(TerrainChunkCells, cells - cj));
+        }
+
+        private void TerrainChunk(float half, int size, float[] heights, Material[] covers, int cells, int ci, int cj, int ni, int nj)
+        {
+            var vertices = new List<Vector3>();
+            var uvs = new List<Vector2>();
+            for (var j = 0; j <= nj; j++)
+            for (var i = 0; i <= ni; i++)
+            {
+                var x = -half + (ci + i) * TerrainCell;
+                var z = -half + (cj + j) * TerrainCell;
+                vertices.Add(new Vector3(x, heights[(cj + j) * size + ci + i], z));
+                uvs.Add(new Vector2(x / TextureMetres, z / TextureMetres));
+            }
+            var bySubmesh = new Dictionary<Material, List<int>>();
+            for (var j = 0; j < nj; j++)
+            for (var i = 0; i < ni; i++)
+            {
+                var cover = covers[(cj + j) * cells + ci + i];
+                if (!bySubmesh.TryGetValue(cover, out var list)) bySubmesh[cover] = list = new List<int>();
+                var a = j * (ni + 1) + i;
+                var b = a + 1;
+                var c = a + ni + 1;
+                var d = c + 1;
+                list.AddRange(new[] { a, c, b, b, c, d });
+            }
+            var mesh = new Mesh { name = $"Land {ci}-{cj}", indexFormat = IndexFormat.UInt32 };
+            mesh.SetVertices(vertices);
+            mesh.SetUVs(0, uvs);
+            var materials = bySubmesh.Keys.ToArray();
+            mesh.subMeshCount = materials.Length;
+            for (var sub = 0; sub < materials.Length; sub++) mesh.SetTriangles(bySubmesh[materials[sub]], sub);
+            mesh.RecalculateNormals();
+            mesh.RecalculateTangents();
+            mesh.RecalculateBounds();
+            _meshes.Add(mesh);
+            var land = Place($"Land {ci}-{cj}", mesh, materials, _root, Vector3.zero, Quaternion.identity, Vector3.one);
+            land.AddComponent<MeshCollider>().sharedMesh = mesh;
+        }
+
+        // Each river's water: a ribbon along its centreline at the surface level, reaching under the banks.
+        private void Water(WorldLayout layout)
+        {
+            if (art.water == null) return;
+            foreach (var river in layout.Rivers)
+            {
+                var points = river.Points.Select(p => new Vector2(p.X, p.Z)).ToList();
+                var reach = river.Width / 2f + RiverBankWidth * 0.7f;
+                var vertices = new List<Vector3>();
+                var uvs = new List<Vector2>();
+                var triangles = new List<int>();
+                var along = 0f;
+                for (var index = 0; index < points.Count; index++)
+                {
+                    var previous = points[Mathf.Max(0, index - 1)];
+                    var next = points[Mathf.Min(points.Count - 1, index + 1)];
+                    var tangent = (next - previous).normalized;
+                    var side = new Vector2(-tangent.y, tangent.x) * reach;
+                    if (index > 0) along += Vector2.Distance(points[index - 1], points[index]);
+                    var level = Land(points[index].x, points[index].y) - river.SurfaceDropCm / 100f;
+                    var left = points[index] + side;
+                    var right = points[index] - side;
+                    vertices.Add(new Vector3(left.x, level, left.y));
+                    vertices.Add(new Vector3(right.x, level, right.y));
+                    uvs.Add(new Vector2(0f, along / TextureMetres));
+                    uvs.Add(new Vector2(2f * reach / TextureMetres, along / TextureMetres));
+                    if (index == 0) continue;
+                    var a = 2 * (index - 1);
+                    triangles.AddRange(new[] { a, a + 2, a + 1, a + 1, a + 2, a + 3 });
+                }
+                var mesh = new Mesh { name = $"Water {river.Id}", indexFormat = IndexFormat.UInt32 };
+                mesh.SetVertices(vertices);
+                mesh.SetUVs(0, uvs);
+                mesh.SetTriangles(triangles, 0);
+                mesh.RecalculateNormals();
+                // Wound either way depending on the river's direction: face the water up.
+                if (mesh.normals.Length > 0 && mesh.normals[0].y < 0f)
+                {
+                    for (var t = 0; t < triangles.Count; t += 3) (triangles[t + 1], triangles[t + 2]) = (triangles[t + 2], triangles[t + 1]);
+                    mesh.SetTriangles(triangles, 0);
+                    mesh.RecalculateNormals();
+                }
+                mesh.RecalculateTangents();
+                mesh.RecalculateBounds();
+                _meshes.Add(mesh);
+                Place($"Water {river.Id}", mesh, new[] { art.water }, _root, Vector3.zero, Quaternion.identity, Vector3.one);
             }
         }
 
-        // A ground-cover quad of the given size whose texture repeats every `metresPerRepeat`.
-        private GameObject Quad(string objectName, Material material, Vector3 centre, Vector2 size, float metresPerRepeat, bool clearOfDevSite)
+        // Crop fields over every farm plot, draped on the land just above it.
+        private void Fields(WorldLayout layout)
         {
-            if (clearOfDevSite && Overlaps(centre.x - size.x / 2f, centre.z - size.y / 2f, size.x, size.y)) return null;
-            var piece = art.Get("Ground_Quad");
-            var quad = Place(objectName, piece.mesh, new[] { material }, _root, centre, Quaternion.identity, new Vector3(size.x, 1f, size.y));
-            _block.Clear();
-            _block.SetVector(BaseMapSt, new Vector4(size.x / metresPerRepeat, size.y / metresPerRepeat, 0f, 0f));
-            quad.GetComponent<MeshRenderer>().SetPropertyBlock(_block);
-            return quad;
+            foreach (var farm in layout.Buildings.Where(x => x.Category == BuildingCategory.Farm))
+            {
+                if (Overlaps(farm.X, farm.Z, farm.Width, farm.Depth)) continue;
+                var material = Variant(farm) == "a" ? art.wheat : art.greens;
+                var xs = Grid(farm.X, farm.X + farm.Width);
+                var zs = Grid(farm.Z, farm.Z + farm.Depth);
+                var buffer = Buffer(material, farm.X + farm.Width / 2f, farm.Z + farm.Depth / 2f, false);
+                var first = buffer.Vertices.Count;
+                foreach (var z in zs)
+                foreach (var x in xs)
+                {
+                    buffer.Vertices.Add(new Vector3(x, Land(x, z) + 0.05f, z));
+                    buffer.Uvs.Add(new Vector2(x / FieldMetres, z / FieldMetres));
+                }
+                for (var j = 0; j + 1 < zs.Count; j++)
+                for (var i = 0; i + 1 < xs.Count; i++)
+                {
+                    var a = first + j * xs.Count + i;
+                    var c = a + xs.Count;
+                    buffer.Triangles.AddRange(new[] { a, c, a + 1, a + 1, c, c + 1 });
+                }
+            }
         }
 
-        // ------------------------------------------------------------------ roads and rail
-
-        private void Roads(WorldLayout layout)
+        // Coordinates from `from` to `to` through every terrain grid line between them, so draped patches meet the land exactly.
+        private static List<float> Grid(float from, float to)
         {
-            var nodes = layout.Nodes.ToDictionary(x => x.Id);
+            var result = new List<float> { from };
+            for (var value = Mathf.Floor(from / TerrainCell + 1f) * TerrainCell; value < to - 0.01f; value += TerrainCell)
+                if (value > from + 0.01f) result.Add(value);
+            result.Add(to);
+            return result;
+        }
+
+        // ------------------------------------------------------------------ roads, bridges and rail
+
+        private void Roads(WorldLayout layout, Dictionary<string, RoadNode> nodes)
+        {
             // Half widths of the roads meeting at each node in each direction: a road along X is trimmed at its ends by the
             // half width of the roads along Z there, and the junction patch covers the crossing of both.
             var alongZHalf = new Dictionary<string, float>();
@@ -187,7 +456,8 @@ namespace FoodFactoryGame.Session.WorldMap
             foreach (var node in layout.Nodes)
             {
                 if (!alongZHalf.TryGetValue(node.Id, out var x) || !alongXHalf.TryGetValue(node.Id, out var z)) continue;
-                Merge(junction, new Vector3(node.X, 0f, node.Z), Quaternion.identity, new Vector3(2f * x, 1f, 2f * z), 2f * x, 2f * z);
+                Merge(junction, Matrix4x4.TRS(new Vector3(node.X, 0f, node.Z), Quaternion.identity, new Vector3(2f * x, 1f, 2f * z)),
+                    Drape.Surface, true, new Rect(node.X - x, node.Z - z, 2f * x, 2f * z));
             }
             foreach (var road in layout.Roads)
             {
@@ -222,15 +492,60 @@ namespace FoodFactoryGame.Session.WorldMap
                         tileDirection = -direction;
                     }
                     var centre = from + tileDirection * (tile / 2f);
-                    Merge(piece, from, Quaternion.LookRotation(-tileDirection), new Vector3(1f, 1f, tile / RoadTileLength),
-                        alongZ ? road.Width : tile, alongZ ? tile : road.Width, centre);
+                    Merge(piece, Matrix4x4.TRS(from, Quaternion.LookRotation(-tileDirection), new Vector3(1f, 1f, tile / RoadTileLength)),
+                        Drape.Surface, true, Footprint(centre, alongZ ? road.Width : tile, alongZ ? tile : road.Width));
                 }
             }
         }
 
-        private void Rails(WorldLayout layout)
+        // Every bridge: a deck slab under the carried way, parapets along both edges, and a pier at each water crossing.
+        private void Bridges(WorldLayout layout, Dictionary<string, RoadNode> nodes)
+        {
+            var widths = layout.Roads.ToDictionary(x => x.Id, x => (float)x.Width);
+            foreach (var line in layout.Rails) widths[line.Id] = line.Width - 3f;
+            var deck = art.Get("Bridge_Deck");
+            var railing = art.Get("Bridge_Railing");
+            var pier = art.Get("Bridge_Pier");
+            var rivers = layout.Rivers.ToDictionary(x => x.Id);
+            foreach (var bridge in layout.Bridges)
+            {
+                if (!widths.TryGetValue(bridge.CarriesId, out var width)) continue;
+                var start = new Vector3(bridge.From.X, 0f, bridge.From.Z);
+                var end = new Vector3(bridge.To.X, 0f, bridge.To.Z);
+                var direction = (end - start).normalized;
+                var length = Vector3.Distance(start, end);
+                if (length < 1f) continue;
+                var side = Vector3.Cross(Vector3.up, direction);
+                var rotation = Quaternion.LookRotation(-direction);
+                var count = Mathf.Max(1, Mathf.RoundToInt(length / BridgeTileLength));
+                var tile = length / count;
+                for (var index = 0; index < count; index++)
+                {
+                    var from = start + direction * (index * tile);
+                    var footprint = Footprint(from + direction * (tile / 2f), Mathf.Abs(direction.x) > 0.5f ? tile : width, Mathf.Abs(direction.x) > 0.5f ? width : tile);
+                    Merge(deck, Matrix4x4.TRS(from, rotation, new Vector3(width, 1f, tile / BridgeTileLength)), Drape.Surface, true, footprint);
+                    foreach (var sign in new[] { -1f, 1f })
+                        Merge(railing, Matrix4x4.TRS(from + side * (sign * (width / 2f + 0.15f)), rotation, new Vector3(1f, 1f, tile / BridgeTileLength)),
+                            Drape.Surface, true, footprint);
+                }
+                // Piers stand where the carried way crosses the water, down to the river bed.
+                if (!rivers.ContainsKey(bridge.RiverId)) continue;
+                var middle = (start + end) / 2f;
+                var top = Land(middle.x, middle.z) - 1.3f;
+                var bottom = Land(middle.x, middle.z) - Carve(layout, middle.x, middle.z) - 0.5f;
+                if (top - bottom < 0.5f) continue;
+                Merge(pier, Matrix4x4.TRS(new Vector3(middle.x, top, middle.z), Quaternion.LookRotation(direction), new Vector3(width, top - bottom, 1f)),
+                    Drape.None, false, Footprint(middle, 2f, 2f));
+            }
+        }
+
+        // Rail track, with level crossing panels where a road crosses at grade (and no ballast on the road there).
+        private void Rails(WorldLayout layout, Dictionary<string, RoadNode> nodes)
         {
             var track = art.Get("Rail_Track");
+            var panel = art.Get("Rail_Crossing");
+            var roads = layout.Roads.ToDictionary(x => x.Id);
+            var crossings = layout.Crossings.Where(x => roads.ContainsKey(x.RoadId)).ToList();
             foreach (var line in layout.Rails)
                 for (var index = 0; index + 1 < line.Points.Count; index++)
                 {
@@ -238,59 +553,235 @@ namespace FoodFactoryGame.Session.WorldMap
                     var end = new Vector3(line.Points[index + 1].X, 0f, line.Points[index + 1].Z);
                     var direction = (end - start).normalized;
                     var length = Vector3.Distance(start, end);
-                    var count = Mathf.Max(1, Mathf.RoundToInt(length / RailTileLength));
-                    var tile = length / count;
                     var alongZ = Mathf.Abs(direction.z) > 0.5f;
-                    for (var step = 0; step < count; step++)
+                    // Crossings on this piece as (distance along it, road half width), in order; track is tiled in the gaps.
+                    var here = crossings.Where(x => x.RailId == line.Id)
+                        .Select(x => (Crossing: x, At: Vector3.Dot(new Vector3(x.X, 0f, x.Z) - start, direction), Half: roads[x.RoadId].Width / 2f + 0.2f))
+                        .Where(x => x.At > 0f && x.At < length).OrderBy(x => x.At).ToList();
+                    var gapStart = 0f;
+                    for (var k = 0; k <= here.Count; k++)
                     {
-                        var from = start + direction * (step * tile);
-                        Merge(track, from, Quaternion.LookRotation(-direction), new Vector3(1f, 1f, tile / RailTileLength),
-                            alongZ ? line.Width : tile, alongZ ? tile : line.Width, from + direction * (tile / 2f));
+                        var gapEnd = k < here.Count ? here[k].At - here[k].Half : length;
+                        var gap = gapEnd - gapStart;
+                        if (gap > 0.5f)
+                        {
+                            var count = Mathf.Max(1, Mathf.RoundToInt(gap / RailTileLength));
+                            var tile = gap / count;
+                            for (var step = 0; step < count; step++)
+                            {
+                                var from = start + direction * (gapStart + step * tile);
+                                Merge(track, Matrix4x4.TRS(from, Quaternion.LookRotation(-direction), new Vector3(1f, 1f, tile / RailTileLength)),
+                                    Drape.Surface, true, Footprint(from + direction * (tile / 2f), alongZ ? line.Width : tile, alongZ ? tile : line.Width));
+                            }
+                        }
+                        if (k < here.Count) gapStart = here[k].At + here[k].Half;
+                    }
+                    // The panel spans the road's full width, sidewalks included.
+                    foreach (var (crossing, at, half) in here)
+                    {
+                        var from = start + direction * (at - half);
+                        Merge(panel, Matrix4x4.TRS(from, Quaternion.LookRotation(-direction), new Vector3(1f, 1f, 2f * half / RoadTileLength)),
+                            Drape.Surface, true, Footprint(start + direction * at, 4f, 4f));
+                        CrossingSignals(crossing, roads[crossing.RoadId], nodes);
                     }
                 }
         }
 
-        // Queues a piece into the merged road/rail meshes, one per material, unless it would cover the dev site.
-        private void Merge(WorldArtCatalog.Piece piece, Vector3 position, Quaternion rotation, Vector3 scale, float sizeX, float sizeZ,
-            Vector3? centre = null)
+        // A crossing signal on the right of each road approach, facing the traffic, clear of the track.
+        private void CrossingSignals(LevelCrossing crossing, RoadSegment road, Dictionary<string, RoadNode> nodes)
         {
-            var c = centre ?? position;
-            if (Overlaps(c.x - sizeX / 2f, c.z - sizeZ / 2f, sizeX, sizeZ)) return;
-            var matrix = Matrix4x4.TRS(position, rotation, scale);
-            for (var sub = 0; sub < piece.mesh.subMeshCount; sub++)
+            var signal = art.Get("Rail_Signal");
+            var a = nodes[road.FromId];
+            var b = nodes[road.ToId];
+            var roadDirection = new Vector3(b.X - a.X, 0f, b.Z - a.Z).normalized;
+            var point = new Vector3(crossing.X, 0f, crossing.Z);
+            var kerb = road.Kind == RoadKind.Rural ? road.Width / 2f + 0.9f : road.Width / 2f - 0.7f;
+            foreach (var d in new[] { roadDirection, -roadDirection })
             {
-                var material = piece.materials[sub];
-                if (!_merged.TryGetValue(material, out var list)) _merged[material] = list = new List<CombineInstance>();
-                list.Add(new CombineInstance { mesh = piece.mesh, subMeshIndex = sub, transform = matrix });
+                var right = Vector3.Cross(Vector3.up, d);
+                var position = point - d * 4.5f + right * kerb;
+                Merge(signal, Matrix4x4.TRS(position, Quaternion.LookRotation(-d), Vector3.one), Drape.Rigid, false, Footprint(position, 1f, 1f));
             }
         }
 
-        private void FlushMerged(string objectName)
+        // Traffic lights and stop signs on the right of each controlled approach, facing the traffic, before the junction.
+        private void Junctions(WorldLayout layout, Dictionary<string, RoadNode> nodes)
         {
-            foreach (var pair in _merged)
+            var bySegment = new Dictionary<string, List<RoadSegment>>();
+            foreach (var road in layout.Roads)
+                foreach (var id in new[] { road.FromId, road.ToId })
+                {
+                    if (!bySegment.TryGetValue(id, out var list)) bySegment[id] = list = new List<RoadSegment>();
+                    list.Add(road);
+                }
+            var stop = art.Get("Stop_Sign");
+            var arterialLight = art.Get("Traffic_Light_Arterial");
+            var localLight = art.Get("Traffic_Light_Local");
+            foreach (var node in layout.Nodes)
             {
-                var mesh = new Mesh { name = $"{objectName} {pair.Key.name}", indexFormat = IndexFormat.UInt32 };
-                mesh.CombineMeshes(pair.Value.ToArray(), true, true);
-                _meshes.Add(mesh);
-                Place($"{objectName} {pair.Key.name}", mesh, new[] { pair.Key }, _root, Vector3.zero, Quaternion.identity, Vector3.one);
+                if (node.Control == JunctionControl.None || !bySegment.TryGetValue(node.Id, out var segments)) continue;
+                var kinds = segments.Select(x => x.Kind).ToList();
+                var here = new Vector3(node.X, 0f, node.Z);
+                foreach (var road in segments)
+                {
+                    var far = nodes[road.FromId == node.Id ? road.ToId : road.FromId];
+                    var d = (here - new Vector3(far.X, 0f, far.Z)).normalized;
+                    var right = Vector3.Cross(Vector3.up, d);
+                    // Half the width of the widest road crossing this approach.
+                    var cross = segments.Where(x => x != road && Mathf.Abs(Vector3.Dot(Direction(x, nodes), d)) < 0.5f).Select(x => x.Width / 2f).DefaultIfEmpty(4f).Max();
+                    var kerb = road.Kind == RoadKind.Rural ? road.Width / 2f + 0.9f : road.Width / 2f - 0.7f;
+                    WorldArtCatalog.Piece piece;
+                    float back;
+                    if (node.Control == JunctionControl.TrafficLight)
+                    {
+                        piece = road.Kind == RoadKind.Arterial ? arterialLight : localLight;
+                        back = cross + 1.2f;
+                    }
+                    else if (WorldJunctions.Stops(node.Control, road.Kind, kinds))
+                    {
+                        piece = stop;
+                        back = cross + (road.Kind == RoadKind.Rural ? 2f : 5f);
+                    }
+                    else continue;
+                    var position = here - d * back + right * kerb;
+                    Merge(piece, Matrix4x4.TRS(position, Quaternion.LookRotation(-d), Vector3.one), Drape.Rigid, false, Footprint(position, 1f, 1f));
+                }
             }
-            _merged.Clear();
+        }
+
+        private static Vector3 Direction(RoadSegment road, Dictionary<string, RoadNode> nodes)
+        {
+            var a = nodes[road.FromId];
+            var b = nodes[road.ToId];
+            return new Vector3(b.X - a.X, 0f, b.Z - a.Z).normalized;
+        }
+
+        // ------------------------------------------------------------------ trees
+
+        private void Trees(WorldLayout layout)
+        {
+            var pieces = new Dictionary<TreeKind, WorldArtCatalog.Piece[]>
+            {
+                [TreeKind.Broadleaf] = new[] { art.Get("Tree_Broadleaf_a"), art.Get("Tree_Broadleaf_b") },
+                [TreeKind.Conifer] = new[] { art.Get("Tree_Conifer") },
+                [TreeKind.Poplar] = new[] { art.Get("Tree_Poplar") },
+                [TreeKind.Bush] = new[] { art.Get("Tree_Bush") }
+            };
+            foreach (var tree in layout.Trees)
+            {
+                var hash = WorldRandom.Mix((ulong)(uint)tree.X << 32 ^ (uint)tree.Z);
+                var options = pieces[tree.Kind];
+                var piece = options[(int)(hash % (ulong)options.Length)];
+                var yaw = (hash >> 8) % 360;
+                var position = new Vector3(tree.X + 0.5f, 0f, tree.Z + 0.5f);
+                Merge(piece, Matrix4x4.TRS(position, Quaternion.Euler(0f, yaw, 0f), Vector3.one * (tree.Scale / 100f)), Drape.Rigid, false,
+                    Footprint(position, 1f, 1f));
+            }
+        }
+
+        // ------------------------------------------------------------------ merged meshes
+
+        private static Rect Footprint(Vector3 centre, float sizeX, float sizeZ) => new(centre.x - sizeX / 2f, centre.z - sizeZ / 2f, sizeX, sizeZ);
+
+        private MeshBuffer Buffer(Material material, float x, float z, bool collide)
+        {
+            var key = (material, Mathf.FloorToInt(x / ChunkSize), Mathf.FloorToInt(z / ChunkSize), collide);
+            if (!_buffers.TryGetValue(key, out var buffer)) _buffers[key] = buffer = new MeshBuffer();
+            return buffer;
+        }
+
+        private PieceData Data(Mesh mesh)
+        {
+            if (_pieceData.TryGetValue(mesh, out var data)) return data;
+            data = new PieceData { Vertices = mesh.vertices, Uvs = mesh.uv, Triangles = new int[mesh.subMeshCount][] };
+            for (var sub = 0; sub < mesh.subMeshCount; sub++) data.Triangles[sub] = mesh.GetTriangles(sub);
+            _pieceData[mesh] = data;
+            return data;
+        }
+
+        // Queues a piece into the merged meshes (one per material and chunk), unless it would cover the dev site.
+        private void Merge(WorldArtCatalog.Piece piece, Matrix4x4 matrix, Drape drape, bool collide, Rect footprint)
+        {
+            if (Overlaps(footprint.x, footprint.y, footprint.width, footprint.height)) return;
+            var origin = matrix.GetColumn(3);
+            var lift = drape == Drape.Rigid ? Land(origin.x, origin.z) : 0f;
+            var data = Data(piece.mesh);
+            for (var sub = 0; sub < data.Triangles.Length; sub++)
+            {
+                var buffer = Buffer(piece.materials[sub], origin.x, origin.z, collide);
+                // Each submesh copies only the vertices its triangles use.
+                var remap = new Dictionary<int, int>();
+                foreach (var index in data.Triangles[sub])
+                {
+                    if (!remap.TryGetValue(index, out var mapped))
+                    {
+                        var point = matrix.MultiplyPoint3x4(data.Vertices[index]);
+                        point.y += drape == Drape.Surface ? Land(point.x, point.z) : lift;
+                        mapped = buffer.Vertices.Count;
+                        buffer.Vertices.Add(point);
+                        buffer.Uvs.Add(data.Uvs.Length > index ? data.Uvs[index] : Vector2.zero);
+                        remap[index] = mapped;
+                    }
+                    buffer.Triangles.Add(mapped);
+                }
+            }
+        }
+
+        private void Flush()
+        {
+            foreach (var pair in _buffers.OrderBy(x => x.Key.Material.name).ThenBy(x => x.Key.X).ThenBy(x => x.Key.Z))
+            {
+                if (pair.Value.Triangles.Count == 0) continue;
+                var (material, x, z, collide) = pair.Key;
+                var objectName = $"{material.name} {x},{z}";
+                var mesh = new Mesh { name = objectName, indexFormat = IndexFormat.UInt32 };
+                mesh.SetVertices(pair.Value.Vertices);
+                mesh.SetUVs(0, pair.Value.Uvs);
+                mesh.SetTriangles(pair.Value.Triangles, 0);
+                mesh.RecalculateNormals();
+                mesh.RecalculateTangents();
+                mesh.RecalculateBounds();
+                _meshes.Add(mesh);
+                var go = Place(objectName, mesh, new[] { material }, _root, Vector3.zero, Quaternion.identity, Vector3.one);
+                if (collide) go.AddComponent<MeshCollider>().sharedMesh = mesh;
+            }
+            _buffers.Clear();
         }
 
         // ------------------------------------------------------------------ buildings
 
+        // Where a building's ground floor stands: its recorded elevation, levelled like the land near the dev site.
+        private float Base(WorldBuilding building)
+        {
+            if (building.Doors.Count == 0) return building.ElevationCm / 100f;
+            var door = building.Doors[0];
+            return building.ElevationCm / 100f + Land(door.X + 0.5f, door.Z + 0.5f) - _terrain.Height(door.X + 0.5f, door.Z + 0.5f);
+        }
+
+        // A concrete plinth under a footprint from its floor down past the lowest land beneath it.
+        private void Foundation(float x, float z, float width, float depth, float floor)
+        {
+            var lowest = new[] { Land(x, z), Land(x + width, z), Land(x, z + depth), Land(x + width, z + depth), Land(x + width / 2f, z + depth / 2f) }.Min();
+            var drop = floor - lowest + 0.4f;
+            if (drop < 0.45f) return;
+            Merge(art.Get("Foundation"), Matrix4x4.TRS(new Vector3(x + width / 2f, floor, z + depth / 2f), Quaternion.identity, new Vector3(width, drop, depth)),
+                Drape.None, false, new Rect(x, z, width, depth));
+        }
+
         private void Building(WorldBuilding building, DistrictKind? district)
         {
-            var centre = new Vector3(building.X + building.Width / 2f, 0f, building.Z + building.Depth / 2f);
+            var floor = Base(building);
+            var centre = new Vector3(building.X + building.Width / 2f, floor, building.Z + building.Depth / 2f);
             var yaw = Quaternion.Euler(0f, building.YawDegrees, 0f);
             var northSouth = building.Facing == Facing.North || building.Facing == Facing.South;
             var along = northSouth ? building.Width : building.Depth;
             var deep = northSouth ? building.Depth : building.Width;
             var variant = Variant(building);
+            if (building.Category != BuildingCategory.Farm) Foundation(building.X, building.Z, building.Width, building.Depth, floor);
             switch (building.Category)
             {
                 case BuildingCategory.Farm:
-                    Farm(building, centre, yaw, variant);
+                    Farm(building, yaw, variant);
                     return;
                 case BuildingCategory.Apartment:
                     Stack(building, centre, yaw, along, deep, $"Apartment_{variant}", "Apartment", ApartmentStorey);
@@ -331,16 +822,18 @@ namespace FoodFactoryGame.Session.WorldMap
             AddCollider(holder, size, floors * storey + 1f);
         }
 
-        // A farm is its field over the whole plot and a barn with its silo just inside the entrance, at its authored size.
-        private void Farm(WorldBuilding building, Vector3 centre, Quaternion yaw, string variant)
+        // A farm is its field (see Fields) and a barn with its silo just inside the entrance, at its authored size and on a
+        // plinth levelled to the land's highest point under it.
+        private void Farm(WorldBuilding building, Quaternion yaw, string variant)
         {
-            Quad($"Field {building.Id}", variant == "a" ? art.wheat : art.greens, centre + new Vector3(0f, 0.02f, 0f),
-                new Vector2(building.Width, building.Depth), 12f, false);
             var door = building.Doors[0];
             var (stepX, stepZ) = WorldGeometry.Step(building.Facing);
-            var barnCentre = new Vector3(door.X + 0.5f - stepX * 9.5f, 0f, door.Z + 0.5f - stepZ * 9.5f);
+            var x = door.X + 0.5f - stepX * 9.5f;
+            var z = door.Z + 0.5f - stepZ * 9.5f;
+            var floor = new[] { Land(x - 8f, z - 8f), Land(x + 8f, z - 8f), Land(x - 8f, z + 8f), Land(x + 8f, z + 8f) }.Max() + 0.1f;
+            Foundation(x - 8f, z - 8f, 16f, 16f, floor);
             var piece = art.Get($"Barn_{variant}");
-            var barn = Place($"Barn {building.Id}", piece.mesh, piece.materials, _root, barnCentre, yaw, Vector3.one);
+            var barn = Place($"Barn {building.Id}", piece.mesh, piece.materials, _root, new Vector3(x, floor, z), yaw, Vector3.one);
             var collider = barn.AddComponent<BoxCollider>();
             collider.center = new Vector3(0f, 4.5f, 0f);
             collider.size = new Vector3(12f, 9f, 16f);

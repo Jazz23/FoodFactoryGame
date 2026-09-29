@@ -2,7 +2,7 @@
 
 Date: 2026-09-27
 
-Status: first slice **implemented** 2026-09-27 (see [architecture status](../architecture.md#implemented-procedural-world-layout-first-slice-2026-09-27)
+Status: first slice **implemented** 2026-09-27; generator v2 and layout format 2 amended by [0027](0027-world-generator-v2-land-river-roads.md) (2026-09-28) (see [architecture status](../architecture.md#implemented-procedural-world-layout-first-slice-2026-09-27)
 and the [verification record](../verification/worldgen-20260927.md)). The GDD section 3 "World Generation" owner decisions of
 2026-09-27 are the requirements. The storage choice below was the implementer's, as the task allowed; it amends
 [0012](0012-company-cash.md)'s "no mixed storage" rule for write-once data and needs owner confirmation. Every generator number

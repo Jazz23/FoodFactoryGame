@@ -1,5 +1,6 @@
 // Authoring check for the world art (decision 0026 presentation): WorldGen's presenter references the art catalog, and the
-// catalog holds every piece the presenter asks for with a mesh and one Lit material per submesh, plus the ground covers.
+// catalog holds every piece the presenter asks for with a mesh and one Lit material per submesh, plus the ground covers,
+// water and river bank.
 using System.Linq;
 using FoodFactoryGame.Session.WorldMap;
 using NUnit.Framework;
@@ -28,7 +29,7 @@ namespace FoodFactoryGame.Session.Tests
                     Assert.That(piece.materials.All(x => x != null && x.shader.name == "Universal Render Pipeline/Lit"), name);
                     Assert.That(piece.mesh.isReadable, name + " must be readable to merge and batch");
                 }
-                Assert.That(new[] { catalog.grass, catalog.paving, catalog.yard, catalog.wheat, catalog.greens }.All(x => x != null));
+                Assert.That(new[] { catalog.grass, catalog.paving, catalog.yard, catalog.wheat, catalog.greens, catalog.water, catalog.bank }.All(x => x != null));
             }
             finally
             {

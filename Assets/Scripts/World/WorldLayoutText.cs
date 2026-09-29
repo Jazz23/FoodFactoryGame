@@ -14,6 +14,7 @@ namespace FoodFactoryGame.World
     {
         private const string Magic = "food-factory-world-layout";
         private const string Empty = "%";
+        private const int TreesPerLine = 200;
 
         public static string Write(WorldLayout layout)
         {
@@ -28,13 +29,37 @@ namespace FoodFactoryGame.World
                 Line("district", d.Id, d.Kind, d.MinRecipeTier, d.CustomersPerHour, d.TrafficPercent, d.PricePercent,
                     JoinList(d.Cuisines.Select(x => Escape(x.Cuisine) + ":" + Number(x.Weight))),
                     JoinList(d.Areas.Select(x => string.Join(",", Number(x.X), Number(x.Z), Number(x.Width), Number(x.Depth)))));
-            foreach (var n in layout.Nodes) Line("node", n.Id, n.X, n.Z);
+            // Format 1 is written exactly as generator v1 wrote it, so stored v1 layouts keep their hash.
+            var v2 = layout.FormatVersion >= 2;
+            foreach (var n in layout.Nodes)
+                if (v2) Line("node", n.Id, n.X, n.Z, n.Control);
+                else Line("node", n.Id, n.X, n.Z);
             foreach (var r in layout.Roads) Line("road", r.Id, r.FromId, r.ToId, r.Kind, r.Width, r.CapacityPerHour);
             foreach (var l in layout.Rails) Line("rail", l.Id, l.Width, Cells(l.Points));
             foreach (var b in layout.Buildings)
-                Line("building", b.Id, b.Category, Escape(b.DistrictId), b.X, b.Z, b.Width, b.Depth, b.Facing, Cells(b.Doors),
-                    Escape(b.ModelKey), b.Floors, b.Ownership, b.PriceCents, Escape(b.LineId), Escape(b.SiteId));
-            Line("end", layout.Districts.Count, layout.Nodes.Count, layout.Roads.Count, layout.Rails.Count, layout.Buildings.Count);
+                if (v2)
+                    Line("building", b.Id, b.Category, Escape(b.DistrictId), b.X, b.Z, b.Width, b.Depth, b.Facing, Cells(b.Doors),
+                        Escape(b.ModelKey), b.Floors, b.Ownership, b.PriceCents, Escape(b.LineId), Escape(b.SiteId), b.ElevationCm);
+                else
+                    Line("building", b.Id, b.Category, Escape(b.DistrictId), b.X, b.Z, b.Width, b.Depth, b.Facing, Cells(b.Doors),
+                        Escape(b.ModelKey), b.Floors, b.Ownership, b.PriceCents, Escape(b.LineId), Escape(b.SiteId));
+            if (!v2)
+            {
+                Line("end", layout.Districts.Count, layout.Nodes.Count, layout.Roads.Count, layout.Rails.Count, layout.Buildings.Count);
+                return text.ToString();
+            }
+            var terrain = layout.Terrain ?? WorldTerrain.Flat();
+            Line("terrain", terrain.Spacing, terrain.Samples);
+            for (var row = 0; row < terrain.Samples; row++)
+                Line("heights", row, JoinList(Enumerable.Range(0, terrain.Samples).Select(x => Number(terrain.Sample(x, row)))));
+            foreach (var r in layout.Rivers) Line("river", r.Id, r.Width, r.SurfaceDropCm, Cells(r.Points));
+            foreach (var b in layout.Bridges) Line("bridge", b.Id, b.CarriesId, b.RiverId, Cells(new[] { b.From }), Cells(new[] { b.To }));
+            foreach (var c in layout.Crossings) Line("crossing", c.Id, c.RoadId, c.RailId, c.X, c.Z);
+            for (var first = 0; first < layout.Trees.Count; first += TreesPerLine)
+                Line("trees", JoinList(layout.Trees.Skip(first).Take(TreesPerLine)
+                    .Select(t => string.Join(",", Number(t.X), Number(t.Z), Number((int)t.Kind), Number(t.Scale)))));
+            Line("end", layout.Districts.Count, layout.Nodes.Count, layout.Roads.Count, layout.Rails.Count, layout.Buildings.Count,
+                layout.Rivers.Count, layout.Bridges.Count, layout.Crossings.Count, layout.Trees.Count);
             return text.ToString();
         }
 
@@ -55,7 +80,7 @@ namespace FoodFactoryGame.World
 
             var head = Next(Magic, 1);
             var layout = new WorldLayout { FormatVersion = Int(head[1]) };
-            if (layout.FormatVersion != WorldLayout.CurrentFormat) throw new NotSupportedException($"World layout format {layout.FormatVersion} is not supported.");
+            if (layout.FormatVersion < 1 || layout.FormatVersion > WorldLayout.CurrentFormat) throw new NotSupportedException($"World layout format {layout.FormatVersion} is not supported.");
             layout.GeneratorVersion = Int(Next("generator", 1)[1]);
             var seed = Next("seed", 3);
             layout.Seed = ulong.Parse(seed[1], NumberStyles.None, CultureInfo.InvariantCulture);
@@ -85,10 +110,14 @@ namespace FoodFactoryGame.World
                     }).ToList()
                 });
             }
+            var v2 = layout.FormatVersion >= 2;
             while (Peek() == "node")
             {
-                var p = Next("node", 3);
-                layout.Nodes.Add(new RoadNode { Id = p[1], X = Int(p[2]), Z = Int(p[3]) });
+                var p = Next("node", v2 ? 4 : 3);
+                layout.Nodes.Add(new RoadNode
+                {
+                    Id = p[1], X = Int(p[2]), Z = Int(p[3]), Control = v2 ? ParseEnum<JunctionControl>(p[4]) : JunctionControl.None
+                });
             }
             while (Peek() == "road")
             {
@@ -105,18 +134,68 @@ namespace FoodFactoryGame.World
             }
             while (Peek() == "building")
             {
-                var p = Next("building", 15);
+                var p = Next("building", v2 ? 16 : 15);
                 layout.Buildings.Add(new WorldBuilding
                 {
                     Id = p[1], Category = ParseEnum<BuildingCategory>(p[2]), DistrictId = Unescape(p[3]), X = Int(p[4]), Z = Int(p[5]),
                     Width = Int(p[6]), Depth = Int(p[7]), Facing = ParseEnum<Facing>(p[8]), Doors = ReadCells(p[9]), ModelKey = Unescape(p[10]),
                     Floors = Int(p[11]), Ownership = ParseEnum<Ownership>(p[12]), PriceCents = long.Parse(p[13], NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture),
-                    LineId = Unescape(p[14]), SiteId = Unescape(p[15])
+                    LineId = Unescape(p[14]), SiteId = Unescape(p[15]), ElevationCm = v2 ? Int(p[16]) : 0
                 });
             }
-            var end = Next("end", 5);
+            if (!v2)
+            {
+                var end1 = Next("end", 5);
+                if (Int(end1[1]) != layout.Districts.Count || Int(end1[2]) != layout.Nodes.Count || Int(end1[3]) != layout.Roads.Count
+                    || Int(end1[4]) != layout.Rails.Count || Int(end1[5]) != layout.Buildings.Count)
+                    throw new FormatException("World layout counts do not match.");
+                if (row != lines.Length - 1 || lines[row] != "") throw new FormatException("Unexpected text after the world layout.");
+                return layout;
+            }
+            var terrainLine = Next("terrain", 2);
+            var terrain = new WorldTerrain { Spacing = Int(terrainLine[1]), Samples = Int(terrainLine[2]) };
+            if (terrain.Spacing < 0 || terrain.Samples < 0 || (long)terrain.Samples * terrain.Samples > 4_000_000) throw new FormatException("Bad terrain size.");
+            terrain.HeightsCm = new int[terrain.Samples * terrain.Samples];
+            for (var z = 0; z < terrain.Samples; z++)
+            {
+                var p = Next("heights", 2);
+                var values = Items(p[2]).ToArray();
+                if (Int(p[1]) != z || values.Length != terrain.Samples) throw new FormatException("Bad terrain row.");
+                for (var x = 0; x < terrain.Samples; x++) terrain.HeightsCm[z * terrain.Samples + x] = Int(values[x]);
+            }
+            layout.Terrain = terrain;
+            while (Peek() == "river")
+            {
+                var p = Next("river", 4);
+                layout.Rivers.Add(new WorldRiver { Id = p[1], Width = Int(p[2]), SurfaceDropCm = Int(p[3]), Points = ReadCells(p[4]) });
+            }
+            while (Peek() == "bridge")
+            {
+                var p = Next("bridge", 5);
+                var from = ReadCells(p[4]);
+                var to = ReadCells(p[5]);
+                if (from.Count != 1 || to.Count != 1) throw new FormatException("Bad bridge ends.");
+                layout.Bridges.Add(new WorldBridge { Id = p[1], CarriesId = p[2], RiverId = p[3], From = from[0], To = to[0] });
+            }
+            while (Peek() == "crossing")
+            {
+                var p = Next("crossing", 5);
+                layout.Crossings.Add(new LevelCrossing { Id = p[1], RoadId = p[2], RailId = p[3], X = Int(p[4]), Z = Int(p[5]) });
+            }
+            while (Peek() == "trees")
+            {
+                var p = Next("trees", 1);
+                foreach (var item in Items(p[1]))
+                {
+                    var v = Ints(item, 4);
+                    if (!System.Enum.IsDefined(typeof(TreeKind), v[2])) throw new FormatException($"Unknown tree kind {v[2]}.");
+                    layout.Trees.Add(new WorldTree { X = v[0], Z = v[1], Kind = (TreeKind)v[2], Scale = v[3] });
+                }
+            }
+            var end = Next("end", 9);
             if (Int(end[1]) != layout.Districts.Count || Int(end[2]) != layout.Nodes.Count || Int(end[3]) != layout.Roads.Count
-                || Int(end[4]) != layout.Rails.Count || Int(end[5]) != layout.Buildings.Count)
+                || Int(end[4]) != layout.Rails.Count || Int(end[5]) != layout.Buildings.Count || Int(end[6]) != layout.Rivers.Count
+                || Int(end[7]) != layout.Bridges.Count || Int(end[8]) != layout.Crossings.Count || Int(end[9]) != layout.Trees.Count)
                 throw new FormatException("World layout counts do not match.");
             if (row != lines.Length - 1 || lines[row] != "") throw new FormatException("Unexpected text after the world layout.");
             return layout;

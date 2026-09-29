@@ -2,6 +2,8 @@
 // A layout is created once when a world is created and then only read: loading never regenerates it (decision 0026).
 // Coordinates are whole metres on the building cell grid (1 m cells), with the city centre at the origin, +X east, +Z north.
 // A rectangle's X/Z is its minimum cell and Width/Depth count cells along X/Z. Roads and rails are centrelines with a width.
+// Format 2 adds the land surface (WorldTerrain), rivers with bridges, level crossings, junction controls, building elevations
+// and trees; a format 1 layout (generator v1) reads as flat land with none of them.
 using System.Collections.Generic;
 
 namespace FoodFactoryGame.World
@@ -49,6 +51,23 @@ namespace FoodFactoryGame.World
         Arterial,
         Local,
         Rural
+    }
+
+    // How a road node is controlled (format 2). A stop sign stops the approaches of the lowest road kind meeting there, or every
+    // approach when all are the same kind (WorldJunctions.Stops).
+    public enum JunctionControl
+    {
+        None,
+        StopSign,
+        TrafficLight
+    }
+
+    public enum TreeKind
+    {
+        Broadleaf,
+        Conifer,
+        Poplar,
+        Bush
     }
 
     public sealed class WorldCell
@@ -106,6 +125,8 @@ namespace FoodFactoryGame.World
         public string Id;
         public int X;
         public int Z;
+        // None where at most two segments meet.
+        public JunctionControl Control;
     }
 
     // An axis-aligned piece of road between two adjacent nodes.
@@ -125,6 +146,47 @@ namespace FoodFactoryGame.World
         public string Id;
         public int Width;
         public List<WorldCell> Points = new();
+    }
+
+    // A river's centreline (points about 20 m apart, any direction) and its water width. The water surface lies SurfaceDropCm
+    // below the land surface at the centreline; only bridges may stand over the water.
+    public sealed class WorldRiver
+    {
+        public string Id;
+        public int Width;
+        public int SurfaceDropCm;
+        public List<WorldCell> Points = new();
+    }
+
+    // A road segment or rail line carried over a river between two points of its centreline. The deck follows the land surface
+    // (WorldTerrain), which runs smoothly over the river's channel.
+    public sealed class WorldBridge
+    {
+        public string Id;
+        // A road segment ID or a rail line ID.
+        public string CarriesId;
+        public string RiverId;
+        public WorldCell From;
+        public WorldCell To;
+    }
+
+    // A rail line crossing a road segment at grade, at the intersection of their centrelines.
+    public sealed class LevelCrossing
+    {
+        public string Id;
+        public string RoadId;
+        public string RailId;
+        public int X;
+        public int Z;
+    }
+
+    // Scenery only. Scale is a percentage of the model's authored size.
+    public sealed class WorldTree
+    {
+        public int X;
+        public int Z;
+        public TreeKind Kind;
+        public int Scale;
     }
 
     // Restaurants and factories are generated shells (decision 0019: footprint includes the walls, doors are non-corner
@@ -154,6 +216,8 @@ namespace FoodFactoryGame.World
         public string LineId = "";
         // Stub: which site (and SiteGrid) a purchasable building becomes is an open owner decision (decision 0026). Always empty.
         public string SiteId = "";
+        // Ground-floor level in centimetres: the land height at the entrance (0 in format 1).
+        public int ElevationCm;
 
         public bool IsShell => Category == BuildingCategory.Restaurant || Category == BuildingCategory.Factory;
         public bool IsPurchasable => Ownership == Ownership.ForSale || Ownership == Ownership.Competitor;
@@ -164,7 +228,7 @@ namespace FoodFactoryGame.World
     public sealed class WorldLayout
     {
         // Format of WorldLayoutText; the generator version is separate (a new generator may keep the format).
-        public const int CurrentFormat = 1;
+        public const int CurrentFormat = 2;
 
         public int FormatVersion = CurrentFormat;
         public int GeneratorVersion;
@@ -181,5 +245,11 @@ namespace FoodFactoryGame.World
         public List<RoadSegment> Roads = new();
         public List<RailLine> Rails = new();
         public List<WorldBuilding> Buildings = new();
+        // Format 2; flat and empty in format 1.
+        public WorldTerrain Terrain = WorldTerrain.Flat();
+        public List<WorldRiver> Rivers = new();
+        public List<WorldBridge> Bridges = new();
+        public List<LevelCrossing> Crossings = new();
+        public List<WorldTree> Trees = new();
     }
 }

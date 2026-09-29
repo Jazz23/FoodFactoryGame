@@ -1,6 +1,8 @@
 """Seamless procedural textures for the world blockout art (decision 0026 presentation).
 
-Run inside Blender (numpy is bundled): exec(open(r'G:/Unity/FoodFactoryGame/ArtSource/World/build_world_textures.py').read())
+Run inside Blender (numpy is bundled), with WORLD_ART_ROOT set to this folder when the project is not at the default path:
+    WORLD_ART_ROOT = r'E:/Projects/Unity/FoodFactoryGame/ArtSource/World'
+    exec(open(WORLD_ART_ROOT + '/build_world_textures.py').read())
 Writes PNGs to ArtSource/World/Textures. Every texture tiles seamlessly (noise wraps). Base maps are RGBA with smoothness
 in alpha (URP Lit "Smoothness source: Albedo alpha"); *_Normal.png are tangent-space normal maps (OpenGL, +Y up).
 Texture scale (metres per repeat) is noted per texture and matches the UVs written by build_world_models.py.
@@ -10,7 +12,7 @@ import os
 import numpy as np
 import bpy
 
-OUT = 'G:/Unity/FoodFactoryGame/ArtSource/World/Textures'
+OUT = globals().get('WORLD_ART_ROOT', 'G:/Unity/FoodFactoryGame/ArtSource/World') + '/Textures'
 os.makedirs(OUT, exist_ok=True)
 rng = np.random.default_rng(20260927)
 
@@ -439,4 +441,113 @@ roof_textures()
 junction_rgb, junction_h = asphalt(512, 512, 10, 10, 0.14, 0.4)
 save('Road_Junction', junction_rgb, np.full((512, 512), 0.18))
 save_normal('Road_Junction', junction_h, 2.5)
+
+# ---------------------------------------------------------------- generator v2 additions (2026-09-28): water, banks, trees, signs
+# Appended after the originals so the earlier textures keep their random draws.
+
+GLYPHS = {
+    'S': ['.###.', '#...#', '#....', '.###.', '....#', '#...#', '.###.'],
+    'T': ['#####', '..#..', '..#..', '..#..', '..#..', '..#..', '..#..'],
+    'O': ['.###.', '#...#', '#...#', '#...#', '#...#', '#...#', '.###.'],
+    'P': ['####.', '#...#', '#...#', '####.', '#....', '#....', '#....'],
+    'R': ['####.', '#...#', '#...#', '####.', '#.#..', '#..#.', '#...#'],
+    'A': ['.###.', '#...#', '#...#', '#####', '#...#', '#...#', '#...#'],
+    'I': ['.###.', '..#..', '..#..', '..#..', '..#..', '..#..', '.###.'],
+    'L': ['#....', '#....', '#....', '#....', '#....', '#....', '#####'],
+    'D': ['####.', '#...#', '#...#', '#...#', '#...#', '#...#', '####.'],
+    'C': ['.###.', '#...#', '#....', '#....', '#....', '#...#', '.###.'],
+    'N': ['#...#', '##..#', '#.#.#', '#..##', '#...#', '#...#', '#...#'],
+    'G': ['.###.', '#...#', '#....', '#.###', '#...#', '#...#', '.###.'],
+}
+
+
+def text_mask(h, w, text, centre_u, centre_v, glyph_height, bold=1):
+    """Block letters (5x7 glyphs, one column apart) centred at pixel (centre_u, centre_v); rows run bottom-up."""
+    mask = np.zeros((h, w))
+    cell = glyph_height / 7.0
+    total = (len(text) * 6 - 1) * cell
+    left = centre_u - total / 2
+    top = centre_v + glyph_height / 2
+    for index, letter in enumerate(text):
+        for row, line in enumerate(GLYPHS[letter]):
+            for col, bit in enumerate(line):
+                if bit != '#':
+                    continue
+                u0 = int(round(left + (index * 6 + col) * cell)) - bold + 1
+                u1 = int(round(left + (index * 6 + col + 1) * cell)) + bold - 1
+                v1 = int(round(top - row * cell))
+                v0 = int(round(top - (row + 1) * cell))
+                mask[max(0, v0):min(h, v1), max(0, u0):min(w, u1)] = 1.0
+    return mask
+
+
+def water_texture():
+    # River water, 8 m per repeat: dark green-teal with soft ripples; very smooth.
+    h = w = 512
+    ripples = noise(h, w, 24, 12, 4, 0.55)
+    swell = noise(h, w, 4, 3, 3, 0.5)
+    rgb = np.stack([0.04 + 0.03 * swell, 0.11 + 0.05 * swell, 0.12 + 0.05 * swell], axis=-1) * (0.9 + 0.2 * ripples[..., None])
+    save('Water', rgb, np.full((h, w), 0.93))
+    save_normal('Water', 0.7 * ripples + 0.3 * swell, 1.5)
+
+
+def bank_texture():
+    # River bank, 8 m per repeat: wet mud and pebbles with tufts of grass.
+    h = w = 512
+    mud = noise(h, w, 20, 20, 5, 0.6)
+    pebbles = noise(h, w, 128, 128, 2, 0.5)
+    tufts = np.clip((noise(h, w, 10, 10, 4, 0.6) - 0.5) / 0.15, 0, 1)
+    rgb = np.stack([0.2 + 0.08 * mud, 0.16 + 0.06 * mud, 0.1 + 0.04 * mud], axis=-1)
+    rgb = paint(rgb, (pebbles > 0.62) * 0.8, (0.36, 0.34, 0.3))
+    grass = np.stack([0.12 + 0.05 * mud, 0.22 + 0.08 * mud, 0.07 + 0.03 * mud], axis=-1)
+    rgb = rgb * (1 - tufts[..., None]) + grass * tufts[..., None]
+    save('Ground_Bank', rgb, 0.35 - 0.25 * tufts)
+    save_normal('Ground_Bank', mud + 0.8 * (pebbles > 0.62), 3.0)
+
+
+def tree_textures():
+    # Foliage, 2 m per repeat: overlapping leaf clusters (tinted per material in Unity: mid, dark conifer, light poplar).
+    h = w = 256
+    clusters = noise(h, w, 16, 16, 4, 0.65)
+    leaves = speckle(h, w, 0.25) * rng.random((h, w))
+    shade = np.clip(clusters * 1.4 - 0.2, 0, 1)
+    rgb = np.stack([0.11 + 0.1 * shade, 0.22 + 0.16 * shade + 0.05 * leaves, 0.07 + 0.05 * shade], axis=-1)
+    save('Foliage', rgb, np.full((h, w), 0.15))
+    save_normal('Foliage', clusters + 0.6 * leaves, 4.0)
+    # Bark, 1 m per repeat: vertical ridges.
+    v, u = grid(h, w, 1.0, 1.0)
+    ridges = noise(h, w, 4, 24, 3, 0.6)
+    rgb = np.stack([0.2 + 0.1 * ridges, 0.15 + 0.07 * ridges, 0.1 + 0.05 * ridges], axis=-1)
+    save('Bark', rgb, np.full((h, w), 0.1))
+    save_normal('Bark', ridges, 4.0)
+
+
+def sign_textures():
+    # Stop sign: the texture spans the octagon flat-to-flat; red face, white border, white STOP.
+    h = w = 256
+    v, u = grid(h, w, 2.0, 2.0)
+    x, y = u - 1.0, v - 1.0
+    d = np.maximum(np.maximum(np.abs(x), np.abs(y)), (np.abs(x) + np.abs(y)) * 0.70710678)
+    rgb = colour(h, w, (0.62, 0.04, 0.04))
+    rgb = paint(rgb, (d > 0.88).astype(float), (0.92, 0.92, 0.9))
+    rgb = paint(rgb, (d > 0.97).astype(float), (0.55, 0.03, 0.03))
+    rgb = paint(rgb, text_mask(h, w, 'STOP', w / 2, h / 2, 56, 2), (0.92, 0.92, 0.9))
+    save('Sign_Stop', rgb, np.full((h, w), 0.55))
+    save_normal('Sign_Stop', np.zeros((h, w)), 1.0)
+    # Crossbuck boards: RAILROAD on the upper half, CROSSING on the lower, black border on each.
+    h, w = 128, 512
+    rgb = colour(h, w, (0.9, 0.9, 0.88))
+    v, u = np.meshgrid(np.arange(h), np.arange(w), indexing='ij')
+    edge = ((u < 8) | (u >= w - 8) | (v < 6) | (v >= h - 6) | ((v >= h // 2 - 6) & (v < h // 2 + 6))).astype(float)
+    rgb = paint(rgb, edge, (0.05, 0.05, 0.05))
+    rgb = paint(rgb, text_mask(h, w, 'RAILROAD', w / 2, h * 0.75, 34, 1), (0.05, 0.05, 0.05))
+    rgb = paint(rgb, text_mask(h, w, 'CROSSING', w / 2, h * 0.25, 34, 1), (0.05, 0.05, 0.05))
+    save('Sign_Crossbuck', rgb, np.full((h, w), 0.5))
+    save_normal('Sign_Crossbuck', np.zeros((h, w)), 1.0)
+
+
+water_texture()
+bank_texture()
+tree_textures()
+sign_textures()
 result = {"textures": sorted(os.listdir(OUT))}

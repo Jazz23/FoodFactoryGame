@@ -24,6 +24,9 @@ namespace FoodFactoryGame.Session.WorldMap
         public Material yard;
         public Material wheat;
         public Material greens;
+        // River water and the carved river banks (generator v2 layouts).
+        public Material water;
+        public Material bank;
 
         private Dictionary<string, Piece> _byName;
 

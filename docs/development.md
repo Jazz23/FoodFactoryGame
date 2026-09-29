@@ -219,11 +219,17 @@ Artifacts are intentionally ignored by Git. Preserve required evidence externall
   `-seed <text>` still work for a launched player.
 - The city's edge starts 40 m north of the dev site; tilt the camera up (mouse) to see it. While a layout is shown, local
   cameras draw to about 2.4 km.
-- Tests: assembly `FoodFactoryGame.World.EditModeTests` (14 tests; generator and `world.db` layout storage, temporary databases
+- Tests: assembly `FoodFactoryGame.World.EditModeTests` (19 tests; generator v2, format 1 compatibility and `world.db` layout storage, temporary databases
   only) and `FoodFactoryGame.Session.Tests.WorldGenerationTests` (4). A change to generator output fails
   `SameSeedProducesAnIdenticalLayout`: bump `WorldGenerator.Version` and re-pin `KnownHash` rather than editing the pin alone.
 - World art: regenerate textures and models in Blender, copy them into `Assets/Art/World`, and run
-  `AgentScripts/BuildWorldArt.cs` (steps in `ArtSource/World/README.md`). Keep object names stable so the catalog's mesh
+  `AgentScripts/BuildWorldArt.cs` (steps in `ArtSource/World/README.md`; set `WORLD_ART_ROOT` to `ArtSource/World` of this
+  checkout before running the Blender scripts, and run the installer body with the MCP file-eval tool). Keep object names stable so the catalog's mesh
   references survive; `WorldArtAuthoringTests` fails if a piece the presenter needs is missing.
 - Captures of the whole map need a camera high above it with a far plane of a few km (see the
   [verification record](verification/worldgen-20260927.md)).
+- Capture tips (2026-09-28): the MCP capture tool refuses `..` in `save_path` and saves under `Assets/`; save into
+  `Assets/Captures~/` (Unity ignores folders ending in `~`) and move the files to `docs/verification/`. The first render of a
+  newly created capture camera drew only restaurant awnings once; a second capture was complete (seen once, not reproduced).
+- A stored world never regenerates, so after a generator change host a new world folder (or an isolated `-save` directory)
+  to see the change.

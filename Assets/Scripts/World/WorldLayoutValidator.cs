@@ -23,7 +23,8 @@ namespace FoodFactoryGame.World
 
             var ids = new HashSet<string>(StringComparer.Ordinal);
             foreach (var id in layout.Districts.Select(x => x.Id).Concat(layout.Nodes.Select(x => x.Id)).Concat(layout.Roads.Select(x => x.Id))
-                         .Concat(layout.Rails.Select(x => x.Id)).Concat(layout.Buildings.Select(x => x.Id)))
+                         .Concat(layout.Rails.Select(x => x.Id)).Concat(layout.Buildings.Select(x => x.Id)).Concat(layout.Rivers.Select(x => x.Id))
+                         .Concat(layout.Bridges.Select(x => x.Id)).Concat(layout.Crossings.Select(x => x.Id)))
                 if (string.IsNullOrWhiteSpace(id) || id.Any(char.IsWhiteSpace) || !ids.Add(id)) problems.Add($"id: blank, spaced or duplicate '{id}'");
 
             Districts(layout, problems);
@@ -34,6 +35,14 @@ namespace FoodFactoryGame.World
             Access(layout, settings, nodes, roadIndex, problems);
             Start(layout, settings, problems);
             FarmsAndStations(layout, problems);
+            if (layout.FormatVersion >= 2)
+            {
+                Land(layout, settings, problems);
+                Controls(layout, problems);
+                Rivers(layout, nodes, problems);
+                LevelCrossings(layout, nodes, problems);
+                Trees(layout, nodes, roadIndex, railIndex, problems);
+            }
 
             problems.Sort(StringComparer.Ordinal);
             return problems;
@@ -278,5 +287,179 @@ namespace FoodFactoryGame.World
         }
 
         private static long Squared(long value) => value * value;
+
+        // ------------------------------------------------------------------ format 2: land, rivers, crossings, junctions, trees
+
+        // The land covers the map; every building's entrance is at land height, and every footprint but a farm's is near level.
+        private static void Land(WorldLayout layout, WorldSettings settings, List<string> problems)
+        {
+            var terrain = layout.Terrain;
+            if (terrain == null || terrain.IsFlat || terrain.Spacing * (terrain.Samples - 1) != 2 * layout.MapHalfSize
+                || terrain.HeightsCm.Length != terrain.Samples * terrain.Samples)
+            {
+                problems.Add("land: the terrain must cover the map");
+                return;
+            }
+            foreach (var building in layout.Buildings)
+            {
+                if (building.Doors.Count == 0) continue;
+                var level = terrain.CellHeightCm(building.Doors[0].X, building.Doors[0].Z);
+                if (building.ElevationCm != level) problems.Add($"building {building.Id}: elevation is not the land height at its entrance");
+                if (building.Category == BuildingCategory.Farm) continue;
+                var x0 = 2 * building.X;
+                var z0 = 2 * building.Z;
+                var x1 = 2 * (building.X + building.Width);
+                var z1 = 2 * (building.Z + building.Depth);
+                foreach (var h in new[] { terrain.HeightCm(x0, z0), terrain.HeightCm(x1, z0), terrain.HeightCm(x0, z1), terrain.HeightCm(x1, z1) })
+                    if (Math.Abs(h - level) > settings.MaxFootprintRiseCm)
+                    {
+                        problems.Add($"building {building.Id}: stands on land too steep");
+                        break;
+                    }
+            }
+        }
+
+        private static Dictionary<string, List<RoadSegment>> SegmentsByNode(WorldLayout layout)
+        {
+            var result = new Dictionary<string, List<RoadSegment>>(StringComparer.Ordinal);
+            foreach (var road in layout.Roads)
+                foreach (var id in new[] { road.FromId ?? "", road.ToId ?? "" })
+                {
+                    if (!result.TryGetValue(id, out var list)) result[id] = list = new List<RoadSegment>();
+                    list.Add(road);
+                }
+            return result;
+        }
+
+        // A junction (three or more segments) is controlled; a bend or a straight join is not.
+        private static void Controls(WorldLayout layout, List<string> problems)
+        {
+            var segments = SegmentsByNode(layout);
+            foreach (var node in layout.Nodes)
+            {
+                var degree = segments.TryGetValue(node.Id, out var list) ? list.Count : 0;
+                if ((degree >= 3) != (node.Control != JunctionControl.None)) problems.Add($"node {node.Id}: control {node.Control} at {degree} segments");
+            }
+        }
+
+        private static (bool Vertical, int Fixed, int From, int To, int Width)? Line(RoadSegment road, Dictionary<string, RoadNode> nodes)
+        {
+            if (!nodes.TryGetValue(road.FromId ?? "", out var a) || !nodes.TryGetValue(road.ToId ?? "", out var b)) return null;
+            return a.X == b.X ? (true, a.X, Math.Min(a.Z, b.Z), Math.Max(a.Z, b.Z), road.Width) : (false, a.Z, Math.Min(a.X, b.X), Math.Max(a.X, b.X), road.Width);
+        }
+
+        private static IEnumerable<(string Id, bool Vertical, int Fixed, int From, int To, int Width)> RailPieces(WorldLayout layout)
+        {
+            foreach (var line in layout.Rails)
+                for (var index = 0; index + 1 < line.Points.Count; index++)
+                {
+                    var a = line.Points[index];
+                    var b = line.Points[index + 1];
+                    yield return a.X == b.X
+                        ? (line.Id, true, a.X, Math.Min(a.Z, b.Z), Math.Max(a.Z, b.Z), line.Width)
+                        : (line.Id, false, a.Z, Math.Min(a.X, b.X), Math.Max(a.X, b.X), line.Width);
+                }
+        }
+
+        // Rivers stay on the map and off buildings; wherever a road or rail line crosses one, a bridge on that way spans it.
+        private static void Rivers(WorldLayout layout, Dictionary<string, RoadNode> nodes, List<string> problems)
+        {
+            var m = layout.MapHalfSize;
+            var ways = layout.Roads.Select(x => (x.Id, Line: Line(x, nodes))).Where(x => x.Line != null)
+                .Select(x => (x.Id, x.Line.Value.Vertical, x.Line.Value.Fixed, x.Line.Value.From, x.Line.Value.To, x.Line.Value.Width))
+                .Concat(RailPieces(layout)).ToList();
+            foreach (var river in layout.Rivers)
+            {
+                if (river.Width <= 0 || river.Width % 2 != 0 || river.SurfaceDropCm <= 0 || river.Points.Count < 2
+                    || river.Points.Any(p => Math.Abs(p.X) > m || Math.Abs(p.Z) > m)
+                    || river.Points.Zip(river.Points.Skip(1), (a, b) => a.X == b.X && a.Z == b.Z).Any(x => x))
+                {
+                    problems.Add($"river {river.Id}: invalid line");
+                    continue;
+                }
+                var half = river.Width / 2;
+                var water = new BoxIndex<int>();
+                foreach (var box in WorldGeometry.Corridor(river.Points, half)) water.Add(box, 0);
+                foreach (var building in layout.Buildings.Where(b => water.Any(WorldGeometry.Of(b))))
+                    problems.Add($"building {building.Id}: stands in river {river.Id}");
+                foreach (var way in ways)
+                    foreach (var (along, _, _) in WorldGeometry.Crossings(river.Points, way.Vertical, way.Fixed, way.From, way.To))
+                    {
+                        var covered = layout.Bridges.Any(b => b.CarriesId == way.Id && b.RiverId == river.Id
+                            && (way.Vertical ? b.From.X == way.Fixed && b.To.X == way.Fixed : b.From.Z == way.Fixed && b.To.Z == way.Fixed)
+                            && Math.Min(way.Vertical ? b.From.Z : b.From.X, way.Vertical ? b.To.Z : b.To.X) <= along - half
+                            && Math.Max(way.Vertical ? b.From.Z : b.From.X, way.Vertical ? b.To.Z : b.To.X) >= along + half);
+                        if (!covered) problems.Add($"river {river.Id}: {way.Id} crosses it without a bridge");
+                    }
+            }
+            var rivers = new HashSet<string>(layout.Rivers.Select(x => x.Id), StringComparer.Ordinal);
+            foreach (var bridge in layout.Bridges)
+            {
+                var onWay = ways.Any(x => x.Id == bridge.CarriesId && (x.Vertical
+                    ? bridge.From.X == x.Fixed && bridge.To.X == x.Fixed && Math.Min(bridge.From.Z, bridge.To.Z) >= x.From && Math.Max(bridge.From.Z, bridge.To.Z) <= x.To
+                    : bridge.From.Z == x.Fixed && bridge.To.Z == x.Fixed && Math.Min(bridge.From.X, bridge.To.X) >= x.From && Math.Max(bridge.From.X, bridge.To.X) <= x.To));
+                if (!onWay || !rivers.Contains(bridge.RiverId ?? "") || (bridge.From.X == bridge.To.X && bridge.From.Z == bridge.To.Z))
+                    problems.Add($"bridge {bridge.Id}: not on the centreline of what it carries, or over no river");
+            }
+        }
+
+        // Every at-grade meeting of a rail line and a road segment is a level crossing, and every level crossing is one.
+        private static void LevelCrossings(WorldLayout layout, Dictionary<string, RoadNode> nodes, List<string> problems)
+        {
+            var expected = new HashSet<(string, string, int, int)>();
+            foreach (var rail in RailPieces(layout))
+                foreach (var road in layout.Roads)
+                {
+                    var line = Line(road, nodes);
+                    if (line == null || line.Value.Vertical == rail.Vertical) continue;
+                    var (_, fixedAt, from, to, _) = line.Value;
+                    if (rail.Fixed > from && rail.Fixed < to && fixedAt > rail.From && fixedAt < rail.To)
+                        expected.Add((road.Id, rail.Id, rail.Vertical ? rail.Fixed : fixedAt, rail.Vertical ? fixedAt : rail.Fixed));
+                }
+            var recorded = new HashSet<(string, string, int, int)>();
+            foreach (var crossing in layout.Crossings)
+                if (!recorded.Add((crossing.RoadId, crossing.RailId, crossing.X, crossing.Z)) || !expected.Contains((crossing.RoadId, crossing.RailId, crossing.X, crossing.Z)))
+                    problems.Add($"crossing {crossing.Id}: not where {crossing.RailId} meets {crossing.RoadId}");
+            foreach (var missing in expected.Where(x => !recorded.Contains(x)).OrderBy(x => x.Item1, StringComparer.Ordinal))
+                problems.Add($"crossing: {missing.Item2} meets {missing.Item1} without a level crossing");
+        }
+
+        // Trees stand on the map, never in a building, on a rail line, in the water, on a carriageway or in a junction; the only
+        // trees on a road are sidewalk trees within 1.5 m of a city street's edge.
+        private static void Trees(WorldLayout layout, Dictionary<string, RoadNode> nodes, BoxIndex<RoadSegment> roads, BoxIndex<RailLine> rails,
+            List<string> problems)
+        {
+            var m = layout.MapHalfSize;
+            var buildings = new BoxIndex<WorldBuilding>();
+            foreach (var building in layout.Buildings) buildings.Add(WorldGeometry.Of(building), building);
+            var water = layout.Rivers.Select(r => (Points: r.Points.Select(p => new WorldCell(2 * p.X, 2 * p.Z)).ToList(), Radius: r.Width)).ToList();
+            var bad = 0;
+            string first = null;
+            foreach (var tree in layout.Trees)
+            {
+                var x = 2 * tree.X + 1;
+                var z = 2 * tree.Z + 1;
+                var point = new Box(x - 1, z - 1, x + 1, z + 1);
+                var wrong = Math.Abs(x) > 2 * m || Math.Abs(z) > 2 * m || tree.Scale < 25 || tree.Scale > 400
+                            || buildings.Overlapping(point).Count > 0 || rails.Overlapping(point).Count > 0
+                            || water.Any(r => WorldGeometry.WithinDistance(r.Points, x, z, r.Radius));
+                if (!wrong)
+                {
+                    var on = roads.Overlapping(point);
+                    foreach (var road in on)
+                    {
+                        var line = Line(road, nodes);
+                        if (line == null) continue;
+                        var offset = Math.Abs((line.Value.Vertical ? x : z) - 2 * line.Value.Fixed);
+                        if (road.Kind == RoadKind.Rural || offset < road.Width - 3) wrong = true;
+                    }
+                    if (on.Select(r => Line(r, nodes)?.Vertical).Distinct().Count() > 1) wrong = true;
+                }
+                if (!wrong) continue;
+                bad++;
+                first ??= $"{tree.X},{tree.Z}";
+            }
+            if (bad > 0) problems.Add($"trees: {bad} misplaced (first at {first})");
+        }
     }
 }

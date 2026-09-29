@@ -12,6 +12,11 @@ ModelImporter:
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
+      name: WG_Bark
+    second: {fileID: 2100000, guid: 2abfff199b32b4a4fb101598b6c52d77, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
       name: WG_Concrete
     second: {fileID: 2100000, guid: 8b3c0e70f85ef6d4aa09d0e6e239da08, type: 2}
   - first:
@@ -77,8 +82,28 @@ ModelImporter:
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
+      name: WG_Foliage
+    second: {fileID: 2100000, guid: d90c2ca1ffc16e942b26a1f44e977e37, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WG_Foliage_Dark
+    second: {fileID: 2100000, guid: 5f73fb50f84107b4a84033284f64acdf, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WG_Foliage_Light
+    second: {fileID: 2100000, guid: d48f9504e56a8bd4097e6f42b6f766dc, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
       name: WG_Ground
     second: {fileID: 2100000, guid: 58cbcaf24da926348a062f8ca50e6623, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WG_Ground_Bank
+    second: {fileID: 2100000, guid: 72e154a935333a649ae70034228616ef, type: 2}
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
@@ -97,6 +122,21 @@ ModelImporter:
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
+      name: WG_Lamp_Amber
+    second: {fileID: 2100000, guid: e112689e1b47435489d1d37890212e93, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WG_Lamp_Green
+    second: {fileID: 2100000, guid: ff784fde85ffea44a95438ba5963d874, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WG_Lamp_Red
+    second: {fileID: 2100000, guid: 7f67c7105ebe4b9479aee3a9586626e6, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
       name: WG_Metal_Dark
     second: {fileID: 2100000, guid: 195e3a0450d40da4d8f4be76b034c18e, type: 2}
   - first:
@@ -109,6 +149,11 @@ ModelImporter:
       assembly: UnityEngine.CoreModule
       name: WG_Metal_Wall
     second: {fileID: 2100000, guid: 90786cbccfab4dd4ea4e1bd1424c0a59, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WG_Paint_Red
+    second: {fileID: 2100000, guid: 771ef2c15581f1d43a28b622ce3ce5d1, type: 2}
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
@@ -172,6 +217,16 @@ ModelImporter:
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
+      name: WG_Sign_Crossbuck
+    second: {fileID: 2100000, guid: a5faea32f2015e546a9d932ac4c30d91, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WG_Sign_Stop
+    second: {fileID: 2100000, guid: d8671222d11147344b76be2142c2ef89, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
       name: WG_Steel
     second: {fileID: 2100000, guid: a0c13d29320ba3b45af78c74a0ca59ab, type: 2}
   - first:
@@ -184,6 +239,11 @@ ModelImporter:
       assembly: UnityEngine.CoreModule
       name: WG_Trim
     second: {fileID: 2100000, guid: 76f76bdce4ade8444ba621a17f49e6d1, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WG_Water
+    second: {fileID: 2100000, guid: 04c3a0ffaadea174ea4745495c90a5f2, type: 2}
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule

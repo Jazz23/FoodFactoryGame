@@ -129,6 +129,9 @@ Owner decisions recorded 2026-09-27:
   - Houses, apartments, and offices are premade, non-enterable Blender models. They are scenery only and hold no population.
 - Property for sale: only buildings are sold; there is no empty land (section 29.5). At world start some restaurants are empty and for sale, and the rest are AI competitors that can become purchasable when they struggle (section 11). Factories, farms, and stations can also be bought.
 - Starting position: the generator gives the player a small, cheap restaurant shell in the residential district with an ingredient supplier reachable by road.
+- Owner request 2026-09-28: a denser city, land at different elevations, a river with bridges, level crossings where rail
+  meets roads, traffic lights and stop signs at junctions, and trees. How much of each, where, and the rules for them are
+  implementer proposals (decision 0027), not owner decisions; none of them has a gameplay effect yet.
 - Customers: the server creates customers at each district's density (section 23). They appear at random street positions out of view of every player. This is only a placement rule; client visibility never controls whether or when customers exist.
 
 # 4. Player & Employees

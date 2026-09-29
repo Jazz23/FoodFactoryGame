@@ -1356,6 +1356,7 @@ MonoBehaviour:
   art: {fileID: 11400000, guid: 1a91b3662e3a1cf4bab72dffe0248057, type: 2}
   cityGap: 40
   devSiteClearHalfSize: {x: 24, y: 24}
+  devSiteBlend: 30
 --- !u!4 &1617226260
 Transform:
   m_ObjectHideFlags: 0

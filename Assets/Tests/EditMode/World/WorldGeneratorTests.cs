@@ -1,7 +1,8 @@
 // Verifies the world generator (decision 0026) without Unity scenes or saves: the same seed gives the same layout (and a pinned
 // hash, so an output change without a new generator version fails), validation holds across many seeds, districts sit where
-// GDD section 3 puts them, retries use derived seeds and are reported, the validator catches broken layouts, and every
-// generated shell is a valid decision-0019 building.
+// GDD section 3 puts them, v2 worlds have land relief, a bridged river, level crossings, junction controls, trees and denser
+// blocks, format 1 (v1) layouts still read and write unchanged, retries use derived seeds and are reported, the validator
+// catches broken layouts, and every generated shell is a valid decision-0019 building.
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,8 +14,9 @@ namespace FoodFactoryGame.World.Tests
     public sealed class WorldGeneratorTests
     {
         private const ulong KnownSeed = 20260927;
-        // WorldLayoutText.Hash of generator v1's layout for KnownSeed. Changing it requires bumping WorldGenerator.Version.
-        private const string KnownHash = "c8aed6b791942176c02ccfffe38e7336b6d578e39b408ab0fd73e60c172b4269";
+        // WorldLayoutText.Hash of generator v2's layout for KnownSeed (v1's was c8aed6b7…4269). Changing it requires bumping
+        // WorldGenerator.Version.
+        private const string KnownHash = "6e12b0fd73136c383c74d42545df4f85482c41b9063c5ac2178b25d3c80fb598";
         private const int SeedCount = 120;
 
         private static WorldLayout Generate(ulong seed) => WorldGenerator.Generate(seed.ToString(), seed).Layout;
@@ -175,6 +177,111 @@ namespace FoodFactoryGame.World.Tests
                 Assert.That(shell.SiteId, Is.Empty, "the site link is undecided");
             }
             Assert.That(world.Snapshot().Buildings.Count, Is.EqualTo(shells.Count));
+        }
+
+        [Test]
+        public void WorldsHaveLandRiverBridgesCrossingsJunctionsAndTrees()
+        {
+            for (var seed = 1UL; seed <= 20; seed++)
+            {
+                var layout = Generate(seed);
+                var heights = layout.Terrain.HeightsCm;
+                Assert.That(heights.Max() - heights.Min(), Is.GreaterThan(400), $"seed {seed}: land has relief");
+                Assert.That(layout.Rivers, Has.Count.EqualTo(1));
+                Assert.That(layout.Bridges.Count(x => x.CarriesId.StartsWith("road-")), Is.GreaterThanOrEqualTo(6), $"seed {seed}: road bridges");
+                Assert.That(layout.Bridges.Any(x => x.CarriesId == "rail-city"), $"seed {seed}: the city line bridges the river");
+                Assert.That(layout.Crossings.Count, Is.GreaterThanOrEqualTo(5), $"seed {seed}: level crossings");
+                Assert.That(layout.Nodes.Count(x => x.Control == JunctionControl.TrafficLight), Is.GreaterThan(10), $"seed {seed}: lights");
+                Assert.That(layout.Nodes.Count(x => x.Control == JunctionControl.StopSign), Is.GreaterThan(100), $"seed {seed}: stop signs");
+                Assert.That(layout.Trees.Count, Is.GreaterThan(2000), $"seed {seed}: trees");
+                Assert.That(Enum.GetValues(typeof(TreeKind)).Cast<TreeKind>().All(k => layout.Trees.Any(t => t.Kind == k)), $"seed {seed}: every tree kind");
+                Assert.That(layout.Buildings.Count, Is.GreaterThan(1400), $"seed {seed}: density");
+                Assert.That(layout.Buildings.Select(x => x.ElevationCm).Distinct().Count(), Is.GreaterThan(50), $"seed {seed}: buildings follow the land");
+            }
+        }
+
+        [Test]
+        public void StopSignsStopTheMinorRoadOrEveryApproach()
+        {
+            var minor = new[] { RoadKind.Arterial, RoadKind.Arterial, RoadKind.Local };
+            Assert.That(WorldJunctions.Stops(JunctionControl.StopSign, RoadKind.Local, minor), Is.True);
+            Assert.That(WorldJunctions.Stops(JunctionControl.StopSign, RoadKind.Arterial, minor), Is.False);
+            Assert.That(WorldJunctions.Stops(JunctionControl.StopSign, RoadKind.Local, new[] { RoadKind.Local, RoadKind.Local, RoadKind.Local }), Is.True);
+            Assert.That(WorldJunctions.Stops(JunctionControl.TrafficLight, RoadKind.Local, minor), Is.False);
+            Assert.That(WorldJunctions.Stops(JunctionControl.None, RoadKind.Local, minor), Is.False);
+        }
+
+        [Test]
+        public void LandHeightIsTheSameAfterAQuarterTurn()
+        {
+            var terrain = Generate(KnownSeed).Terrain;
+            var turned = terrain.Turned();
+            foreach (var (x, z) in new[] { (0, 0), (137, -411), (-940, 12), (333, 777), (-1, -1) })
+            {
+                var (tx, tz) = WorldGeometry.TurnPoint(x, z);
+                Assert.That(turned.HeightCm(2 * tx, 2 * tz), Is.EqualTo(terrain.HeightCm(2 * x, 2 * z)), $"{x},{z}");
+                Assert.That(terrain.Height(x, z), Is.EqualTo(terrain.HeightCm(2 * x, 2 * z) / 100f).Within(0.011f), $"{x},{z} float sampler");
+            }
+        }
+
+        // Worlds created by generator v1 are stored as format 1 text; they must still read, and write back byte-for-byte.
+        [Test]
+        public void AFormatOneLayoutStillReadsAndWritesUnchanged()
+        {
+            const string v1 = "food-factory-world-layout 1\ngenerator 1\nseed 7 7 0\nbounds 500 950\nstart restaurant-0001\n"
+                              + "district downtown Downtown 1 900 90 250 fast-food:40 -100,-100,200,200\n"
+                              + "node node-0001 0 0\nnode node-0002 0 10\nroad road-0001 node-0001 node-0002 Local 10 600\n"
+                              + "rail rail-city 8 20,-100;20,100\n"
+                              + "building restaurant-0001 Restaurant downtown 8 0 10 9 West 8,4;8,5 % 1 Player 150000 % %\n"
+                              + "end 1 2 1 1 1\n";
+            var layout = WorldLayoutText.Read(v1);
+            Assert.That(layout.FormatVersion, Is.EqualTo(1));
+            Assert.That(layout.Terrain.IsFlat && layout.Terrain.HeightCm(123, 456) == 0);
+            Assert.That(layout.Nodes.All(x => x.Control == JunctionControl.None));
+            Assert.That(layout.Rivers.Count + layout.Bridges.Count + layout.Crossings.Count + layout.Trees.Count, Is.Zero);
+            Assert.That(layout.Buildings.Single().ElevationCm, Is.Zero);
+            Assert.That(WorldLayoutText.Write(layout), Is.EqualTo(v1));
+            Assert.That(WorldLayoutText.Hash(layout), Is.EqualTo(WorldLayoutText.Hash(v1)));
+        }
+
+        [Test]
+        public void TheValidatorReportsBrokenLandRiversCrossingsJunctionsAndTrees()
+        {
+            List<string> ProblemsAfter(Action<WorldLayout> damage)
+            {
+                var layout = Generate(3);
+                damage(layout);
+                return WorldLayoutValidator.Validate(layout);
+            }
+
+            Assert.That(ProblemsAfter(x => x.Bridges.RemoveAll(b => b.CarriesId == "rail-city")), Has.Some.Contains("rail-city crosses it without a bridge"));
+            Assert.That(ProblemsAfter(x => x.Bridges.RemoveAt(0)), Has.Some.Contains("without a bridge"));
+            Assert.That(ProblemsAfter(x => x.Crossings.RemoveAt(0)), Has.Some.Contains("without a level crossing"));
+            Assert.That(ProblemsAfter(x => x.Crossings[0].X += 3), Has.Some.StartsWith("crossing crossing-0001"));
+            Assert.That(ProblemsAfter(x => x.Nodes.First(n => n.Control == JunctionControl.StopSign).Control = JunctionControl.None),
+                Has.Some.Contains(": control None at "));
+            Assert.That(ProblemsAfter(x => x.Buildings.First(b => b.Category == BuildingCategory.House).ElevationCm += 50),
+                Has.Some.Contains("elevation is not the land height"));
+            Assert.That(ProblemsAfter(x =>
+            {
+                var house = x.Buildings.First(b => b.Category == BuildingCategory.House);
+                x.Trees[0].X = house.X + house.Width / 2;
+                x.Trees[0].Z = house.Z + house.Depth / 2;
+            }), Has.Some.StartsWith("trees: 1 misplaced"));
+            Assert.That(ProblemsAfter(x =>
+            {
+                var point = x.Rivers[0].Points[x.Rivers[0].Points.Count / 2];
+                x.Trees[0].X = point.X;
+                x.Trees[0].Z = point.Z;
+            }), Has.Some.StartsWith("trees: 1 misplaced"));
+            Assert.That(ProblemsAfter(x =>
+            {
+                var house = x.Buildings.First(b => b.Category == BuildingCategory.House);
+                var point = x.Rivers[0].Points[x.Rivers[0].Points.Count / 2];
+                house.X = point.X - house.Width / 2;
+                house.Z = point.Z - house.Depth / 2;
+            }), Has.Some.Contains("stands in river"));
+            Assert.That(ProblemsAfter(x => x.Terrain = WorldTerrain.Flat()), Has.Some.EqualTo("land: the terrain must cover the map"));
         }
 
         [Test]

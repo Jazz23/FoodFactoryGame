@@ -17,6 +17,12 @@ namespace FoodFactoryGame.World
         // Local streets added across each superblock in each direction.
         public int MinLocalStreets;
         public int MaxLocalStreets;
+        // Gap between neighbouring lots along a street, inclusive range in metres.
+        public int MinGap;
+        public int MaxGap;
+        // Chance of a street tree at each sidewalk spot, and of a tree at each point of the yard lattice.
+        public int StreetTreePercent;
+        public int YardTreePercent;
         // Relative chance of each lot category along this district's streets.
         public int RestaurantWeight;
         public int FactoryWeight;
@@ -41,7 +47,7 @@ namespace FoodFactoryGame.World
 
     public sealed class WorldSettings
     {
-        // PROTOTYPE geometry: a 1000 m city (5x5 superblocks between 6 arterials each way) in a 1900 m map.
+        // PROTOTYPE geometry (densified for generator v2, owner request 2026-09-28): a 1000 m city (5x5 superblocks between 6 arterials each way) in a 1900 m map.
         public int CityHalfSize = 500;
         public int MapHalfSize = 950;
         public int Superblocks = 5;
@@ -58,8 +64,45 @@ namespace FoodFactoryGame.World
         public int RuralCapacity = 400;
         // Gap between a road's edge and a building's street wall.
         public int Setback = 2;
-        public int MinBuildingGap = 2;
-        public int MaxBuildingGap = 6;
+
+        // Land (generator v2): value noise in centimetres, one octave per lattice size, sampled every TerrainSpacing metres
+        // (which must divide the map). Relief is damped to CityReliefPercent inside the city (full relief TerrainCityFade m
+        // outside it) and to RailReliefPercent along rail lines. A building's footprint may rise or fall at most
+        // MaxFootprintRiseCm from its entrance; lots on steeper land are left empty. Farms (fields) are exempt.
+        public int TerrainSpacing = 20;
+        public int[] TerrainLatticeMetres = { 480, 200, 80 };
+        public int[] TerrainAmplitudeCm = { 2400, 650, 150 };
+        public int CityReliefPercent = 22;
+        public int TerrainCityFade = 220;
+        public int RailReliefPercent = 20;
+        public int RailReliefFade = 120;
+        public int MaxFootprintRiseCm = 150;
+
+        // River (generator v2): crosses the whole map along one row of superblocks (never the industrial row), meandering
+        // inside it. Bridges and buildings keep RiverBank metres clear of the water; the valley floor is flattened within
+        // RiverValleyFlat of the centreline and blends back to the hills by RiverValleyFade.
+        public int RiverWidth = 22;
+        public int RiverBank = 12;
+        public int RiverSurfaceDropCm = 160;
+        public int RiverValleyDropCm = 150;
+        public int RiverValleyFlat = 30;
+        public int RiverValleyFade = 150;
+        public int RiverMeanderStep = 160;
+        // Clearance between the water and a parallel street, which is dropped when it would come closer.
+        public int RiverStreetClearance = 10;
+
+        // Trees (generator v2, scenery): sidewalk trees every StreetTreeSpacing metres (plus jitter) on city streets, a yard
+        // lattice inside city blocks, and a countryside lattice with woodland where the woodland noise is high.
+        public int StreetTreeSpacing = 13;
+        public int StreetTreeJunctionClear = 14;
+        public int YardTreeLattice = 8;
+        public int CountryTreeLattice = 10;
+        public int WoodlandLatticeMetres = 220;
+        public int WoodlandThresholdPercent = 62;
+        public int WoodlandTreePercent = 70;
+        public int LoneTreePercent = 3;
+        public int RiverbankTreePercent = 55;
+        public int RiverbankTreeBand = 20;
 
         // Rail: one line through the city from the farm line, one along the farmland beyond the industrial edge.
         public int RailWidth = 8;
@@ -71,9 +114,9 @@ namespace FoodFactoryGame.World
 
         // Farms along rural spurs.
         public SizeRange Farm = new(40, 70, 40, 70);
-        public int FarmChancePercent = 45;
-        public int MinFarmGap = 10;
-        public int MaxFarmGap = 40;
+        public int FarmChancePercent = 70;
+        public int MinFarmGap = 6;
+        public int MaxFarmGap = 20;
         public int FarmIndustrialSideBonusPercent = 30;
 
         public SizeRange Restaurant = new(9, 16, 8, 14);
@@ -81,7 +124,7 @@ namespace FoodFactoryGame.World
         public SizeRange House = new(8, 12, 8, 12);
         public SizeRange LargeHouse = new(12, 18, 12, 18);
         public SizeRange Apartment = new(14, 22, 12, 18);
-        public SizeRange Office = new(16, 28, 14, 24);
+        public SizeRange Office = new(16, 28, 12, 24);
 
         // PROTOTYPE ownership and prices (whole cents per footprint cell, before the district multiplier).
         public int RestaurantForSalePercent = 30;
@@ -99,28 +142,28 @@ namespace FoodFactoryGame.World
             new DistrictProfile
             {
                 Kind = DistrictKind.Downtown, Id = "downtown", MinRecipeTier = 1, CustomersPerHour = 900, TrafficPercent = 90,
-                PricePercent = 250, MinLocalStreets = 2, MaxLocalStreets = 2,
+                PricePercent = 250, MinLocalStreets = 3, MaxLocalStreets = 3, MinGap = 0, MaxGap = 1, StreetTreePercent = 70, YardTreePercent = 15,
                 RestaurantWeight = 30, OfficeWeight = 45, ApartmentWeight = 25,
                 Cuisines = Weights(("fast-food", 40), ("noodles", 30), ("bakery", 20), ("grill", 10))
             },
             new DistrictProfile
             {
                 Kind = DistrictKind.Residential, Id = "residential", MinRecipeTier = 1, CustomersPerHour = 500, TrafficPercent = 40,
-                PricePercent = 60, MinLocalStreets = 1, MaxLocalStreets = 2,
+                PricePercent = 60, MinLocalStreets = 2, MaxLocalStreets = 3, MinGap = 1, MaxGap = 3, StreetTreePercent = 75, YardTreePercent = 35,
                 RestaurantWeight = 20, HouseWeight = 55, ApartmentWeight = 25,
                 Cuisines = Weights(("bakery", 30), ("fast-food", 30), ("noodles", 25), ("grill", 15))
             },
             new DistrictProfile
             {
                 Kind = DistrictKind.Wealthy, Id = "wealthy", MinRecipeTier = 3, CustomersPerHour = 350, TrafficPercent = 30,
-                PricePercent = 300, MinLocalStreets = 1, MaxLocalStreets = 1,
+                PricePercent = 300, MinLocalStreets = 2, MaxLocalStreets = 2, MinGap = 2, MaxGap = 4, StreetTreePercent = 90, YardTreePercent = 50,
                 RestaurantWeight = 20, HouseWeight = 70, ApartmentWeight = 10,
                 Cuisines = Weights(("fine-dining", 40), ("bakery", 30), ("grill", 20), ("noodles", 10))
             },
             new DistrictProfile
             {
                 Kind = DistrictKind.Industrial, Id = "industrial", MinRecipeTier = 1, CustomersPerHour = 120, TrafficPercent = 60,
-                PricePercent = 40, MinLocalStreets = 0, MaxLocalStreets = 1,
+                PricePercent = 40, MinLocalStreets = 1, MaxLocalStreets = 2, MinGap = 2, MaxGap = 4, StreetTreePercent = 15, YardTreePercent = 6,
                 RestaurantWeight = 8, FactoryWeight = 92,
                 Cuisines = Weights(("fast-food", 60), ("grill", 30), ("noodles", 10))
             }

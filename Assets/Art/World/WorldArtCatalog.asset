@@ -59,6 +59,19 @@ MonoBehaviour:
     - {fileID: 2100000, guid: 7be7fbb7f92d73c4fb042df6a51083f7, type: 2}
     - {fileID: 2100000, guid: 131466b2a2ba12a4d97432970ca07ada, type: 2}
     - {fileID: 2100000, guid: 76f76bdce4ade8444ba621a17f49e6d1, type: 2}
+  - name: Bridge_Deck
+    mesh: {fileID: -2670234097450483591, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: 8b3c0e70f85ef6d4aa09d0e6e239da08, type: 2}
+  - name: Bridge_Pier
+    mesh: {fileID: 7856015455598985820, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: 8b3c0e70f85ef6d4aa09d0e6e239da08, type: 2}
+  - name: Bridge_Railing
+    mesh: {fileID: -5656123194863637978, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: 8b3c0e70f85ef6d4aa09d0e6e239da08, type: 2}
+    - {fileID: 2100000, guid: a0c13d29320ba3b45af78c74a0ca59ab, type: 2}
   - name: Factory_a
     mesh: {fileID: 2775621756690927640, guid: 66e1059bf201585498ca1466b1129109, type: 3}
     materials:
@@ -80,6 +93,10 @@ MonoBehaviour:
     - {fileID: 2100000, guid: 195e3a0450d40da4d8f4be76b034c18e, type: 2}
     - {fileID: 2100000, guid: 8378bb5f8a5072d448131f3e87ea9000, type: 2}
     - {fileID: 2100000, guid: a0c13d29320ba3b45af78c74a0ca59ab, type: 2}
+  - name: Foundation
+    mesh: {fileID: 48619220562948502, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: 8b3c0e70f85ef6d4aa09d0e6e239da08, type: 2}
   - name: Ground_Quad
     mesh: {fileID: 3556981642449770806, guid: 66e1059bf201585498ca1466b1129109, type: 3}
     materials:
@@ -170,6 +187,21 @@ MonoBehaviour:
     - {fileID: 2100000, guid: 8378bb5f8a5072d448131f3e87ea9000, type: 2}
     - {fileID: 2100000, guid: 195e3a0450d40da4d8f4be76b034c18e, type: 2}
     - {fileID: 2100000, guid: 90786cbccfab4dd4ea4e1bd1424c0a59, type: 2}
+  - name: Rail_Crossing
+    mesh: {fileID: -7791187675870657225, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: 8b3c0e70f85ef6d4aa09d0e6e239da08, type: 2}
+    - {fileID: 2100000, guid: a0c13d29320ba3b45af78c74a0ca59ab, type: 2}
+  - name: Rail_Signal
+    mesh: {fileID: -5817897045267005206, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: 8b3c0e70f85ef6d4aa09d0e6e239da08, type: 2}
+    - {fileID: 2100000, guid: a0c13d29320ba3b45af78c74a0ca59ab, type: 2}
+    - {fileID: 2100000, guid: a5faea32f2015e546a9d932ac4c30d91, type: 2}
+    - {fileID: 2100000, guid: 195e3a0450d40da4d8f4be76b034c18e, type: 2}
+    - {fileID: 2100000, guid: 7f67c7105ebe4b9479aee3a9586626e6, type: 2}
+    - {fileID: 2100000, guid: 771ef2c15581f1d43a28b622ce3ce5d1, type: 2}
+    - {fileID: 2100000, guid: 76f76bdce4ade8444ba621a17f49e6d1, type: 2}
   - name: Rail_Track
     mesh: {fileID: 7547864743945157431, guid: 66e1059bf201585498ca1466b1129109, type: 3}
     materials:
@@ -231,8 +263,55 @@ MonoBehaviour:
     - {fileID: 2100000, guid: 30080e58529412a439e87f87a7f8ffc8, type: 2}
     - {fileID: 2100000, guid: 131466b2a2ba12a4d97432970ca07ada, type: 2}
     - {fileID: 2100000, guid: 12429c8c47a016645b78157b9c66a984, type: 2}
+  - name: Stop_Sign
+    mesh: {fileID: -1987023265166281597, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: a0c13d29320ba3b45af78c74a0ca59ab, type: 2}
+    - {fileID: 2100000, guid: d8671222d11147344b76be2142c2ef89, type: 2}
+  - name: Traffic_Light_Arterial
+    mesh: {fileID: -3662558034148267050, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: 195e3a0450d40da4d8f4be76b034c18e, type: 2}
+    - {fileID: 2100000, guid: 8b3c0e70f85ef6d4aa09d0e6e239da08, type: 2}
+    - {fileID: 2100000, guid: 7f67c7105ebe4b9479aee3a9586626e6, type: 2}
+    - {fileID: 2100000, guid: e112689e1b47435489d1d37890212e93, type: 2}
+    - {fileID: 2100000, guid: ff784fde85ffea44a95438ba5963d874, type: 2}
+  - name: Traffic_Light_Local
+    mesh: {fileID: -2376427039815656436, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: 195e3a0450d40da4d8f4be76b034c18e, type: 2}
+    - {fileID: 2100000, guid: 8b3c0e70f85ef6d4aa09d0e6e239da08, type: 2}
+    - {fileID: 2100000, guid: 7f67c7105ebe4b9479aee3a9586626e6, type: 2}
+    - {fileID: 2100000, guid: e112689e1b47435489d1d37890212e93, type: 2}
+    - {fileID: 2100000, guid: ff784fde85ffea44a95438ba5963d874, type: 2}
+  - name: Tree_Broadleaf_a
+    mesh: {fileID: -1194022343268401341, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: 2abfff199b32b4a4fb101598b6c52d77, type: 2}
+    - {fileID: 2100000, guid: d90c2ca1ffc16e942b26a1f44e977e37, type: 2}
+  - name: Tree_Broadleaf_b
+    mesh: {fileID: -1582375600409383013, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: 2abfff199b32b4a4fb101598b6c52d77, type: 2}
+    - {fileID: 2100000, guid: d90c2ca1ffc16e942b26a1f44e977e37, type: 2}
+  - name: Tree_Bush
+    mesh: {fileID: 5032481825571228488, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: d90c2ca1ffc16e942b26a1f44e977e37, type: 2}
+  - name: Tree_Conifer
+    mesh: {fileID: -7077885386226695551, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: 2abfff199b32b4a4fb101598b6c52d77, type: 2}
+    - {fileID: 2100000, guid: 5f73fb50f84107b4a84033284f64acdf, type: 2}
+  - name: Tree_Poplar
+    mesh: {fileID: 2521083855073233523, guid: 66e1059bf201585498ca1466b1129109, type: 3}
+    materials:
+    - {fileID: 2100000, guid: 2abfff199b32b4a4fb101598b6c52d77, type: 2}
+    - {fileID: 2100000, guid: d48f9504e56a8bd4097e6f42b6f766dc, type: 2}
   grass: {fileID: 2100000, guid: d8d2cc760f51b624b967b506d05000c1, type: 2}
   paving: {fileID: 2100000, guid: fc76aad4686992b43b4d1ac2a1fa0b84, type: 2}
   yard: {fileID: 2100000, guid: e9b325f7ea0af414a89846849248ca50, type: 2}
   wheat: {fileID: 2100000, guid: 76fb8b092b88bac45b9f55a783da7fe5, type: 2}
   greens: {fileID: 2100000, guid: 947bf6a33774c8747b0a7dac72185057, type: 2}
+  water: {fileID: 2100000, guid: 04c3a0ffaadea174ea4745495c90a5f2, type: 2}
+  bank: {fileID: 2100000, guid: 72e154a935333a649ae70034228616ef, type: 2}

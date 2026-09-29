@@ -346,6 +346,26 @@ slots; how existing `GoodsSite.MapX/Z` relate to layout coordinates (the present
 PROTOTYPE presentation only: the city's edge starts 40 m north of the dev site, pieces over the dev site's floor are not
 drawn, and local cameras draw to about 2.4 km while a layout is shown). Not verified: separate-process multiplayer, a player build.
 
+## Implemented: world generator v2 (2026-09-28)
+
+Decision: [0027](decisions/0027-world-generator-v2-land-river-roads.md) (amends 0026; owner request). Verification:
+[record](verification/worldgen-20260928.md). All values are PROTOTYPE.
+
+- Generator: `WorldGenerator.Version` = 2, `WorldLayout.CurrentFormat` = 2. New layout data: `WorldTerrain` (land heights in cm
+  every 20 m; integer and float bilinear samplers, quarter turns), `WorldRiver`, `WorldBridge`, `LevelCrossing`,
+  `RoadNode.Control` (`JunctionControl`), `WorldBuilding.ElevationCm`, `WorldTree` (`TreeKind`). `WorldJunctions.Stops` is the
+  shared who-stops rule. Denser blocks (more local streets, per-district lot gaps, east/west block edges filled, taller
+  downtown). `WorldLayoutText` still reads and writes format 1 unchanged, so v1 worlds load as flat land without the new data.
+  `WorldLayoutValidator` adds the format 2 rules listed in 0027.
+- Presentation: `WorldLayoutPresenter` draws a chunked 5 m terrain mesh with colliders (river channel and banks cut in,
+  cut slightly under roads and rails), water ribbons, roads/rails/junctions/bridges draped over the land, level-crossing
+  panels and signals, traffic lights and stop signs per `JunctionControl`, trees, building plinths, all merged per material
+  per 250 m chunk; the land at the dev site is levelled to its floor. `WorldArtCatalog` gains `water` and `bank`.
+- Art: 14 new Blender pieces and 6 new textures (0027), installed by `AgentScripts/BuildWorldArt.cs` (47 pieces, 50 materials;
+  lamp materials use emission). Road and rail tiles are now cut into segments with skirts so they can follow the land.
+- Not changed: storage (`world_layout` table, write once), replication, the site question, the dev site. Signals are
+  static; nothing simulates traffic or trains.
+
 ## Required Constraints for Future Implementation
 
 - The server owns gameplay state; clients request validated actions through the command contract in decision 0002.
