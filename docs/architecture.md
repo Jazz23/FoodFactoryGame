@@ -415,8 +415,8 @@ farm field extent, station platforms.
 
 ## Implemented: generated worlds start in their own restaurant, piece 2 (2026-09-29)
 
-Decision: [0028](decisions/0028-sites-for-generated-buildings.md). Owner decisions of 2026-09-29: starting cash $5,000
-(PROTOTYPE, `GeneratedWorld.StartingCash` = 500000 cents); bought sites are managed remotely only until piece 3. Evidence:
+Decision: [0028](decisions/0028-sites-for-generated-buildings.md). Owner decisions of 2026-09-29: starting cash $5,000, raised the same day to $1,000,000
+(PROTOTYPE, `GeneratedWorld.StartingCash` = 100,000,000 cents); bought sites are managed remotely only until piece 3. Evidence:
 [verification record](verification/property-piece2-20260929.md).
 
 - World creation (`GeneratedWorld`, Session): when the stored layout has lots (format 3), `SessionRoot.StartServer` calls
@@ -447,8 +447,8 @@ Decision: [0028](decisions/0028-sites-for-generated-buildings.md). Owner decisio
   another company / not for sale, company cash, Buy (pending and server rejection shown like `LogisticsPanel`). An accepted
   purchase makes the client watch the new site. `BuildWorldGenScene.cs` wires the panel and `devSiteOnly`.
 - PROTOTYPE limits: only the primary site is drawn; bought sites are reachable only through remote management
-  (logistics panel). At $5,000 few lots are affordable (seed `piece-two`: 2 of 145 restaurants, from $4,320; factories,
-  farms and stations start at $12,672, $25,200 and $14,400).
+  (logistics panel). $1,000,000 buys many lots (seed `piece-two`: restaurants from $4,320, factories from $12,672, farms
+  from $25,200, stations from $14,400).
   A restaurant's apron is the 2 m setback, so machines wider than 2 cells (the 3x3 oven) do not fit on it; the dock and
   table do. Ownership shows on the map only for restaurants (the only art with an awning); the panel shows it for all.
 

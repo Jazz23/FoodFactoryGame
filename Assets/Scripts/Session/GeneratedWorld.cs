@@ -14,9 +14,9 @@ namespace FoodFactoryGame.Session
 {
     public static class GeneratedWorld
     {
-        // PROTOTYPE starting capital of the one company every player joins (owner, 2026-09-29: $5,000), in whole cents.
+        // PROTOTYPE starting capital of the one company every player joins (owner, 2026-09-29: $1,000,000), in whole cents.
         public const string CompanyId = "company-1";
-        public const long StartingCash = 500000;
+        public const long StartingCash = 100_000_000;
         // Layout format that has lots (decision 0028); older formats keep the dev site beside the map.
         public const int FirstFormat = 3;
 

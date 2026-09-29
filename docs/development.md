@@ -218,7 +218,7 @@ Artifacts are intentionally ignored by Git. Preserve required evidence externall
   keeps its stored layout, and a save made before world generation keeps none (the readout says so). `-save <dir>` and
   `-seed <text>` still work for a launched player.
 - A new world (layout format 3, decision 0028 piece 2) starts you on the apron of your own starting restaurant, with the
-  city around it, $5,000 of company cash and the dev starter goods in your inventory; nothing else is seeded. Aim at a
+  city around it, $1,000,000 of company cash and the dev starter goods in your inventory; nothing else is seeded. Aim at a
   restaurant, factory, farm or station within 60 m and press E for its buy panel (price, owner, Buy). Your company's
   restaurants have green awnings, unowned ones for sale yellow. Bought sites are managed from the logistics screen (L)
   until several sites can be drawn at once. A world saved in format 1 or 2, or first opened before piece 2, keeps the dev
@@ -233,7 +233,7 @@ Artifacts are intentionally ignored by Git. Preserve required evidence externall
 - Tests: `FoodFactoryGame.Session.Tests.GeneratedWorldTests` (EditMode, 4) and
   `FoodFactoryGame.Session.PlayModeTests.WorldGenSessionTests` (PlayMode, 4; loads WorldGen through
   `EditorSceneManager.LoadSceneAsyncInPlayMode`, seed `piece-two`, isolated save). The purchase test tops up cash with
-  `AdjustCashDurably` (internal, test-only) so its chosen restaurant is affordable.
+  `AdjustCashDurably` (internal, test-only) to leave the company one cent short, then exactly enough.
 - Tests: assembly `FoodFactoryGame.World.EditModeTests` (generator v3 with lots, format 1 and 2 compatibility and `world.db` layout storage, temporary databases
   only; property purchase is in `FoodFactoryGame.Goods.Tests.PropertyTests`) and `FoodFactoryGame.Session.Tests.WorldGenerationTests` (4). A change to generator output fails
   `SameSeedProducesAnIdenticalLayout`: bump `WorldGenerator.Version` and re-pin `KnownHash` rather than editing the pin alone.

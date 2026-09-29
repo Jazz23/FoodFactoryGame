@@ -201,21 +201,21 @@ namespace FoodFactoryGame.Session.PlayModeTests
             var interaction = UnityEngine.Object.FindAnyObjectByType<EquipmentInteraction>();
             var panel = UnityEngine.Object.FindAnyObjectByType<PropertyPanel>();
             var forSale = _map.Offers.Values.Where(x => x.ForSale).ToList();
-            var costly = forSale.OrderByDescending(x => x.PriceCents).First();
             var diner = forSale.Where(x => x.Category == GoodsWorld.RestaurantKind).OrderBy(x => x.PriceCents).First();
-            Assert.That(costly.PriceCents, Is.GreaterThan(GeneratedWorld.StartingCash));
             Assert.That(_map.AwningColour(diner.BuildingId), Is.EqualTo((Color?)new Color(0.95f, 0.75f, 0.15f)), "For sale before.");
+            // TEST-ONLY: the company is left one cent short of the diner on this isolated save, so the first attempt is refused.
+            var shortfall = GeneratedWorld.StartingCash - diner.PriceCents + 1;
+            Assert.That(_root.ServerWorld.AdjustCashDurably(GeneratedWorld.CompanyId, -shortfall, _root.Options.WorldPath), Is.Null);
 
-            yield return Until(() => { interaction.OpenProperty(costly.LotId); return interaction.Screen == InteractionScreen.Property; }, "buy panel");
-            yield return null;
-            Assert.That((panel.StateText, panel.CanBuy), Is.EqualTo(("For sale", true)));
+            yield return Until(() => { interaction.OpenProperty(diner.LotId); return interaction.Screen == InteractionScreen.Property; }, "buy panel");
+            yield return Until(() => panel.CanBuy, "Buy enabled");
+            Assert.That(panel.StateText, Is.EqualTo("For sale"));
             panel.Buy();
             yield return Until(() => !panel.HasPendingRequests, "rejection");
             Assert.That(panel.LastRejection, Is.EqualTo("insufficient-funds"));
             interaction.CloseScreen();
 
-            // TEST-ONLY cash on this isolated save, so the cheapest restaurant is affordable.
-            Assert.That(_root.ServerWorld.AdjustCashDurably(GeneratedWorld.CompanyId, diner.PriceCents, _root.Options.WorldPath), Is.Null);
+            Assert.That(_root.ServerWorld.AdjustCashDurably(GeneratedWorld.CompanyId, 1, _root.Options.WorldPath), Is.Null);
             yield return Until(() => { if (interaction.Screen == InteractionScreen.None) interaction.OpenProperty(diner.LotId); return interaction.OpenLotId == diner.LotId; }, "buy panel");
             yield return Until(() => panel.CanBuy, "Buy enabled");
             panel.Buy();
@@ -225,7 +225,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
             interaction.CloseScreen();
 
             var saved = GoodsSnapshotStore.Load(_root.Options.WorldPath);
-            Assert.That(saved.Snapshot().Companies.Single().Cash, Is.EqualTo(GeneratedWorld.StartingCash));
+            Assert.That(saved.Snapshot().Companies.Single().Cash, Is.Zero);
             Assert.That(saved.CanView(remoteId, diner.SiteId), Is.True, "The teammate gains the new site.");
             yield return Until(() => { _remoteSite.Tick(); return _remoteSite.Latest.Properties.Any(x => x.LotId == diner.LotId); }, "remote sees the owner");
             Assert.That(_remoteSite.Latest.Properties.Single(x => x.LotId == diner.LotId).CompanyId, Is.EqualTo(_remoteSite.Latest.Companies.Single().Id));

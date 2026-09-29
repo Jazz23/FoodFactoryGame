@@ -11,7 +11,7 @@ their validation, the property catalog, the server-side purchase (`BuyPropertyDu
 in the starting restaurant's own site (the map is moved so its lot sits at the scene origin), `RequestBuyProperty` over the
 network, teammates' access in the purchase's commit (players granted any of the company's sites; not employees), public
 ownership in every site view, ownership colours and a buy panel. Owner decisions for piece 2: PROTOTYPE starting cash
-$5,000; bought sites are managed remotely only until several sites can be drawn at once (piece 3). Not yet: walking into
+$5,000, raised to $1,000,000 the same day; bought sites are managed remotely only until several sites can be drawn at once (piece 3). Not yet: walking into
 bought sites, customers in generated worlds, competitors linked to lots. Resolved open items:
 format 3 / generator v3; existing format 1 and 2 worlds get no lots and are treated as unsupported development data; PROTOTYPE
 apron depths (factories 12 m, farms 8 m, others the 2 m setback); a lot costs its building's layout price for now.
