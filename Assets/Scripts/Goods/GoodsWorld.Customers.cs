@@ -549,7 +549,7 @@ namespace FoodFactoryGame.Goods
 
         private static void ValidateCustomers(GoodsSnapshot state)
         {
-            var siteIds = new HashSet<string>(state.Locations.Select(x => x.SiteId));
+            var siteIds = new HashSet<string>(state.Locations.Select(x => x.SiteId).Concat(state.Sites.Where(x => x is not null).Select(x => x.Id)));
             var equipmentIds = new HashSet<string>(state.Equipment.Where(x => x is not null).Select(x => x.Id));
             if (state.NextCustomerNumber < 0
                 || state.Districts.Any(x => x is null || string.IsNullOrWhiteSpace(x.Id) || x.Name is null || x.CustomersPerHour < 0

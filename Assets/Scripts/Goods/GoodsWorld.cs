@@ -75,7 +75,7 @@ namespace FoodFactoryGame.Goods
 
     [Serializable] public sealed class GoodsSnapshot
     {
-        public const int CurrentSchema = 13;
+        public const int CurrentSchema = 14;
         public int SchemaVersion = CurrentSchema;
         public string WorldId;
         public long ClockSeconds;
@@ -104,6 +104,8 @@ namespace FoodFactoryGame.Goods
         public List<GoodsDiner> Diners = new();
         public long NextCustomerNumber;
         public long CustomerRandom;
+        // Bought generated buildings (decision 0028, v14): which company owns which lot's site. Never removed.
+        public List<GoodsProperty> Properties = new();
     }
 
     public sealed partial class GoodsWorld
@@ -145,6 +147,7 @@ namespace FoodFactoryGame.Goods
             {
                 var began = Stopwatch.GetTimestamp();
                 Validate(_state);
+                ValidatePropertyCatalog();
                 var validated = Stopwatch.GetTimestamp();
                 var payload = JsonUtility.ToJson(_state);
                 var serialized = Stopwatch.GetTimestamp();
@@ -211,7 +214,7 @@ namespace FoodFactoryGame.Goods
         {
             lock (_gate)
             {
-                if (string.IsNullOrWhiteSpace(playerId) || siteId == RoadSiteId || !_state.Locations.Any(x => x.SiteId == siteId))
+                if (string.IsNullOrWhiteSpace(playerId) || siteId == RoadSiteId || !SiteExists(_state, siteId))
                     throw new ArgumentException("Invalid grant.");
                 if (_state.Grants.All(x => x.PlayerId != playerId || x.SiteId != siteId))
                 {
@@ -232,7 +235,7 @@ namespace FoodFactoryGame.Goods
             lock (_gate)
             {
                 // Invalid grants throw here, before any mutation, rather than masquerading as I/O failure.
-                if (string.IsNullOrWhiteSpace(playerId) || siteId == RoadSiteId || !_state.Locations.Any(x => x.SiteId == siteId))
+                if (string.IsNullOrWhiteSpace(playerId) || siteId == RoadSiteId || !SiteExists(_state, siteId))
                     throw new ArgumentException("Invalid grant.");
                 starterGoods ??= Array.Empty<GoodsLot>();
                 if (starterGoods.Any(x => x == null || string.IsNullOrWhiteSpace(x.ItemId) || x.Quantity < 1 || x.SpoilAfterSeconds < 1)
@@ -627,7 +630,7 @@ namespace FoodFactoryGame.Goods
                 || state.Stations == null || state.Jobs == null || state.Equipment == null || state.SiteLayouts == null || state.Belts == null
                 || state.Companies == null || state.Buildings == null || state.Employees == null || state.Sites == null || state.Trucks == null
                 || state.Routes == null || state.Districts == null || state.Competitors == null || state.Customers == null
-                || state.Diners == null)
+                || state.Diners == null || state.Properties == null)
                 throw new InvalidOperationException("Unsupported or invalid goods snapshot schema.");
             if (state.Locations.Any(x => x == null || string.IsNullOrWhiteSpace(x.Id) || string.IsNullOrWhiteSpace(x.SiteId) || x.Capacity < 1)
                 || state.Locations.GroupBy(x => x.Id).Any(x => x.Count() != 1)
@@ -644,7 +647,7 @@ namespace FoodFactoryGame.Goods
                 || state.Outcomes.Any(x => x == null || string.IsNullOrWhiteSpace(x.RequestId) || string.IsNullOrWhiteSpace(x.PlayerId))
                 || state.Outcomes.GroupBy(x => new { x.PlayerId, x.RequestId }).Any(x => x.Count() != 1)
                 || state.Grants.Any(x => x == null || string.IsNullOrWhiteSpace(x.PlayerId)
-                    || !state.Locations.Any(y => y.SiteId == x.SiteId)))
+                    || !SiteExists(state, x.SiteId)))
                 throw new InvalidOperationException("Goods snapshot violates identity, capacity, or reservation invariants.");
             ValidateProduction(state);
             ValidateEquipment(state);
@@ -654,6 +657,7 @@ namespace FoodFactoryGame.Goods
             ValidateEmployees(state);
             ValidateTrucks(state);
             ValidateCustomers(state);
+            ValidateProperties(state);
         }
     }
 }

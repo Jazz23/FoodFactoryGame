@@ -1,8 +1,10 @@
-// STUB link between generated shells and the site model (decision 0026). Whether each purchasable building becomes its own
-// site with its own SiteGrid is an open owner decision, so nothing calls this at runtime and WorldBuilding.SiteId stays empty.
-// It exists to prove that every generated restaurant and factory shell is a valid decision-0019 GoodsBuilding: the shell is
-// expressed on a site grid exactly its own size, anchored at the grid's origin.
+// Turns a stored world layout's lots into the property catalog (decision 0028): content derived from the layout, never saved.
+// A lot's site grid covers exactly the lot, with site cell (0,0) at the lot's minimum world cell. The whole world grid is
+// axis-aligned, so the mapping is a translation only and the building keeps its offset from the lot's corner. A restaurant or
+// factory shell becomes the site's decision-0019 GoodsBuilding; farms and stations get no shell. Layouts without lots
+// (formats 1 and 2) list nothing.
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using FoodFactoryGame.World;
 
@@ -10,19 +12,42 @@ namespace FoodFactoryGame.Goods
 {
     public static class WorldLayoutShells
     {
-        public static SiteLayout SiteLayoutFor(WorldBuilding building, string siteId) =>
-            new() { SiteId = siteId, Width = building.Width, Depth = building.Depth };
-
-        public static GoodsBuilding ToGoodsBuilding(WorldBuilding building, string siteId)
+        public static List<PropertyOffer> PropertyOffers(WorldLayout layout)
         {
-            if (building == null || !building.IsShell) throw new ArgumentException("Only generated restaurant and factory shells convert.");
-            return new GoodsBuilding
+            var buildings = layout.Buildings.ToDictionary(x => x.Id, StringComparer.Ordinal);
+            return layout.Lots.Select(x => ToOffer(x, buildings[x.BuildingId])).ToList();
+        }
+
+        public static PropertyOffer ToOffer(WorldLot lot, WorldBuilding building)
+        {
+            if (lot == null || building == null || lot.BuildingId != building.Id || !building.HasLot)
+                throw new ArgumentException("A lot converts only with its own property building.");
+            return new PropertyOffer
             {
-                Id = building.Id, SiteId = siteId,
-                Kind = building.Category == BuildingCategory.Factory ? GoodsWorld.FactoryKind : GoodsWorld.RestaurantKind,
-                CellX = 0, CellZ = 0, Width = building.Width, Depth = building.Depth, Floors = building.Floors,
-                Doors = building.Doors.Select(x => new GridCell { X = x.X - building.X, Z = x.Z - building.Z }).ToList()
+                LotId = lot.Id, SiteId = lot.SiteId, BuildingId = building.Id, Category = CategoryOf(building.Category),
+                ForSale = building.Ownership == Ownership.ForSale, PriceCents = building.PriceCents,
+                LotX = lot.X, LotZ = lot.Z, Width = lot.Width, Depth = lot.Depth, AccessX = lot.Access.X, AccessZ = lot.Access.Z,
+                BuildingX = building.X - lot.X, BuildingZ = building.Z - lot.Z, BuildingWidth = building.Width, BuildingDepth = building.Depth,
+                Doors = building.Doors.Select(x => new GridCell { X = x.X - lot.X, Z = x.Z - lot.Z }).ToList(),
+                Floors = building.IsShell ? building.Floors : 1
             };
         }
+
+        public static SiteLayout SiteLayoutFor(WorldLot lot) => new() { SiteId = lot.SiteId, Width = lot.Width, Depth = lot.Depth };
+
+        public static GoodsBuilding ToGoodsBuilding(WorldBuilding building, WorldLot lot)
+        {
+            if (building == null || !building.IsShell) throw new ArgumentException("Only generated restaurant and factory shells convert.");
+            return GoodsWorld.BuildingOf(ToOffer(lot, building));
+        }
+
+        private static string CategoryOf(BuildingCategory category) => category switch
+        {
+            BuildingCategory.Restaurant => GoodsWorld.RestaurantKind,
+            BuildingCategory.Factory => GoodsWorld.FactoryKind,
+            BuildingCategory.Farm => GoodsWorld.FarmCategory,
+            BuildingCategory.Station => GoodsWorld.StationCategory,
+            _ => throw new ArgumentException($"A {category} is never property.")
+        };
     }
 }

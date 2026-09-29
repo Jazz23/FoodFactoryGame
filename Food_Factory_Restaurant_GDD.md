@@ -129,6 +129,14 @@ Owner decisions recorded 2026-09-27:
   - Houses, apartments, and offices are premade, non-enterable Blender models. They are scenery only and hold no population.
 - Property for sale: only buildings are sold; there is no empty land (section 29.5). At world start some restaurants are empty and for sale, and the rest are AI competitors that can become purchasable when they struggle (section 11). Factories, farms, and stations can also be bought.
 - Starting position: the generator gives the player a small, cheap restaurant shell in the residential district with an ingredient supplier reachable by road.
+- Sites (owner decisions 2026-09-29, `docs/decisions/0028-sites-for-generated-buildings.md`):
+  - A. One site per building, shell only.
+  - B. One site per purchasable building plus its lot: the building and a paved area reaching its street, for docks, trucks and outdoor equipment. [SELECTED]
+  - C. One continuous world grid; land ownership decides where players can build.
+  - Each lot's site ID is reserved when the world is generated; the site itself is created when the building is first bought and is never deleted afterwards. A few world-owned sites (such as distributor docks) may exist from the start.
+  - The development test site is not part of generated worlds; the player starts in the generated starting restaurant.
+  - AI competitors stay lightweight records tied to their building's lot; buying one creates its site. Competitor ingredient stock supplied by player deliveries is a planned option for external sales, not yet decided.
+  - Proposal, not decided: later merging neighbouring owned lots into one site (compare section 29.5 option C).
 - Owner request 2026-09-28: a denser city, land at different elevations, a river with bridges, level crossings where rail
   meets roads, traffic lights and stop signs at junctions, and trees. How much of each, where, and the rules for them are
   implementer proposals (decision 0027), not owner decisions; none of them has a gameplay effect yet.
@@ -537,6 +545,8 @@ support them.
 - Roads/rail ownership: LOCKED - roads and rail are generated and cannot be modified; players buy generated stations (section 26, revised 2026-09-27).
 
 - World generation: LOCKED - seeded procedural city with 4 MVP districts, farms outside, industry at the edge of town (section 3).
+
+- Sites for generated buildings: LOCKED - one site per purchasable building and its lot, created on first purchase; competitors stay records (section 3, 2026-09-29).
 
 - How bankruptcy, loans, and recovery work.
 

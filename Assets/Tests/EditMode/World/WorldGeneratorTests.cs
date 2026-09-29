@@ -1,8 +1,9 @@
 // Verifies the world generator (decision 0026) without Unity scenes or saves: the same seed gives the same layout (and a pinned
 // hash, so an output change without a new generator version fails), validation holds across many seeds, districts sit where
 // GDD section 3 puts them, v2 worlds have land relief, a bridged river, level crossings, junction controls, trees and denser
-// blocks, format 1 (v1) layouts still read and write unchanged, retries use derived seeds and are reported, the validator
-// catches broken layouts, and every generated shell is a valid decision-0019 building.
+// blocks, every property has exactly one lot with a reserved site ID (v3, decision 0028), format 1 and 2 layouts still read
+// and write unchanged, retries use derived seeds and are reported, the validator catches broken layouts and lots, and every
+// generated shell's lot is a valid decision-0019 building site.
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,9 +15,9 @@ namespace FoodFactoryGame.World.Tests
     public sealed class WorldGeneratorTests
     {
         private const ulong KnownSeed = 20260927;
-        // WorldLayoutText.Hash of generator v2's layout for KnownSeed (v1's was c8aed6b7…4269). Changing it requires bumping
-        // WorldGenerator.Version.
-        private const string KnownHash = "6e12b0fd73136c383c74d42545df4f85482c41b9063c5ac2178b25d3c80fb598";
+        // WorldLayoutText.Hash of generator v3's layout for KnownSeed (v1's was c8aed6b7…4269, v2's 6e12b0fd…b598). Changing it
+        // requires bumping WorldGenerator.Version.
+        private const string KnownHash = "c8cef1ddd330c5a1a95391844d880f631233a0a0432fec1fd0d70c16eba1db11";
         private const int SeedCount = 120;
 
         private static WorldLayout Generate(ulong seed) => WorldGenerator.Generate(seed.ToString(), seed).Layout;
@@ -27,6 +28,7 @@ namespace FoodFactoryGame.World.Tests
             var first = WorldLayoutText.Write(Generate(KnownSeed));
             var second = WorldLayoutText.Write(Generate(KnownSeed));
             Assert.That(second, Is.EqualTo(first));
+            Assert.That(first, Does.StartWith("food-factory-world-layout 3\ngenerator 3\n").And.Contains("\nlot lot-"), "the same lots and IDs, in format 3");
             TestContext.WriteLine($"seed {KnownSeed}: sha256 {WorldLayoutText.Hash(first)}, {first.Length} chars");
             Assert.That(WorldLayoutText.Hash(first), Is.EqualTo(KnownHash), "Generator output changed: bump WorldGenerator.Version and re-pin.");
         }
@@ -45,6 +47,9 @@ namespace FoodFactoryGame.World.Tests
             var read = WorldLayoutText.Read(text);
             Assert.That(WorldLayoutText.Write(read), Is.EqualTo(text));
             Assert.That(read.RequestedSeed, Is.EqualTo("Sunny Valley"));
+            Assert.That(read.FormatVersion, Is.EqualTo(3));
+            Assert.That(read.Lots.Select(x => (x.Id, x.BuildingId, x.SiteId, x.X, x.Z, x.Width, x.Depth, x.Access.X, x.Access.Z)),
+                Is.EqualTo(layout.Lots.Select(x => (x.Id, x.BuildingId, x.SiteId, x.X, x.Z, x.Width, x.Depth, x.Access.X, x.Access.Z))).And.Not.Empty);
             Assert.That(WorldLayoutValidator.Validate(read), Is.Empty);
             Assert.Throws<FormatException>(() => WorldLayoutText.Read(text.Replace("\nend ", "\nfinish ")));
             Assert.Throws<FormatException>(() => WorldLayoutText.Read(text + "extra\n"));
@@ -61,9 +66,35 @@ namespace FoodFactoryGame.World.Tests
                 if (result.Attempts.Count > 1) retried++;
                 Assert.That(WorldLayoutValidator.Validate(result.Layout), Is.Empty, $"seed {seed}");
                 Assert.That(result.Layout.Seed, Is.EqualTo(WorldRandom.DeriveSeed(seed, result.Layout.Attempt)));
+                AssertOneLotPerProperty(result.Layout, $"seed {seed}");
                 buildings.Add(result.Layout.Buildings.Count);
             }
             TestContext.WriteLine($"{SeedCount} seeds valid; {retried} needed a retry; buildings min {buildings.Min()} max {buildings.Max()}");
+        }
+
+        // Exactly one lot per property and none for scenery; the lot is the footprint extended forward by the category's setback,
+        // its IDs are the building's reserved ones, and its access cell lies just past its street edge (validity is Validate's).
+        private static void AssertOneLotPerProperty(WorldLayout layout, string context)
+        {
+            var settings = WorldSettings.Default;
+            var lots = layout.Lots.GroupBy(x => x.BuildingId).ToDictionary(x => x.Key, x => x.ToList());
+            foreach (var building in layout.Buildings)
+            {
+                if (!building.HasLot)
+                {
+                    Assert.That(lots.ContainsKey(building.Id) || building.SiteId.Length > 0, Is.False, $"{context}: scenery {building.Id} has no lot");
+                    continue;
+                }
+                Assert.That(lots.TryGetValue(building.Id, out var found) ? found.Count : 0, Is.EqualTo(1), $"{context}: {building.Id}");
+                var lot = found[0];
+                Assert.That((lot.Id, lot.SiteId, building.SiteId), Is.EqualTo(("lot-" + building.Id, "site-" + building.Id, "site-" + building.Id)), context);
+                var rect = WorldGeometry.LotRect(building.Footprint, building.Facing, settings.SetbackFor(building.Category));
+                Assert.That((lot.X, lot.Z, lot.Width, lot.Depth), Is.EqualTo((rect.X, rect.Z, rect.Width, rect.Depth)), $"{context}: {building.Id}");
+                var access = WorldGeometry.AccessCell(rect, building.Facing, building.Doors[0]);
+                Assert.That((lot.Access.X, lot.Access.Z), Is.EqualTo((access.X, access.Z)), $"{context}: {building.Id}");
+            }
+            Assert.That(layout.Lots.Count, Is.EqualTo(layout.Buildings.Count(x => x.HasLot)), context);
+            Assert.That(layout.Lots.Any(x => x.BuildingId == layout.StartRestaurantId), context);
         }
 
         [Test]
@@ -163,20 +194,121 @@ namespace FoodFactoryGame.World.Tests
         }
 
         [Test]
-        public void EveryGeneratedShellIsAValidBuildingShell()
+        public void EveryGeneratedShellsLotIsAValidBuildingSite()
         {
             var layout = Generate(KnownSeed);
             var world = new GoodsWorld("shell-check");
+            var lots = layout.Lots.ToDictionary(x => x.BuildingId);
             var shells = layout.Buildings.Where(x => x.IsShell).ToList();
             Assert.That(shells.Count(x => x.Category == BuildingCategory.Factory), Is.GreaterThan(0));
             foreach (var shell in shells)
             {
-                var site = "site-" + shell.Id;
-                world.Bootstrap(WorldLayoutShells.SiteLayoutFor(shell, site));
-                Assert.DoesNotThrow(() => world.Bootstrap(WorldLayoutShells.ToGoodsBuilding(shell, site)), shell.Id);
-                Assert.That(shell.SiteId, Is.Empty, "the site link is undecided");
+                var lot = lots[shell.Id];
+                world.Bootstrap(WorldLayoutShells.SiteLayoutFor(lot));
+                Assert.DoesNotThrow(() => world.Bootstrap(WorldLayoutShells.ToGoodsBuilding(shell, lot)), shell.Id);
             }
-            Assert.That(world.Snapshot().Buildings.Count, Is.EqualTo(shells.Count));
+            var buildings = world.Snapshot().Buildings;
+            Assert.That(buildings.Count, Is.EqualTo(shells.Count));
+            // A factory's apron lies in front of its doors: from the door wall to the lot's street edge is the factory setback.
+            var factory = shells.First(x => x.Category == BuildingCategory.Factory);
+            var placed = buildings.Single(x => x.Id == factory.Id);
+            var site = lots[factory.Id];
+            var door = placed.Doors[0];
+            var apron = factory.Facing switch
+            {
+                Facing.North => site.Depth - 1 - door.Z,
+                Facing.South => door.Z,
+                Facing.East => site.Width - 1 - door.X,
+                _ => door.X
+            };
+            Assert.That(apron, Is.EqualTo(WorldSettings.Default.FactorySetback));
+
+            // The whole catalog (shells, farms and stations) registers as valid property offers.
+            var offers = WorldLayoutShells.PropertyOffers(layout);
+            Assert.That(offers.Count, Is.EqualTo(layout.Lots.Count));
+            Assert.That(offers.Where(x => x.ForSale).Select(x => x.Category).Distinct(),
+                Is.EquivalentTo(new[] { GoodsWorld.RestaurantKind, GoodsWorld.FactoryKind, GoodsWorld.FarmCategory, GoodsWorld.StationCategory }));
+            Assert.That(offers.Single(x => x.BuildingId == layout.StartRestaurantId).ForSale, Is.False, "the starting restaurant is not sold");
+            Assert.DoesNotThrow(() => new GoodsWorld("catalog-check").RegisterPropertyOffers(offers));
+        }
+
+        [Test]
+        public void TheValidatorReportsBrokenLots()
+        {
+            List<string> ProblemsAfter(Action<WorldLayout> damage)
+            {
+                var layout = Generate(3);
+                damage(layout);
+                return WorldLayoutValidator.Validate(layout);
+            }
+            WorldBuilding BuildingOf(WorldLayout layout, WorldLot lot) => layout.Buildings.Single(x => x.Id == lot.BuildingId);
+            WorldLot Restaurant(WorldLayout layout) => layout.Lots.First(x => BuildingOf(layout, x).Category == BuildingCategory.Restaurant);
+
+            Assert.That(ProblemsAfter(x => x.Lots[0].X += 300), Has.Some.Contains("does not contain its building"));
+            Assert.That(ProblemsAfter(x =>
+            {
+                var (a, b) = (x.Lots[0], x.Lots[1]);
+                (b.X, b.Z, b.Width, b.Depth) = (a.X, a.Z, a.Width, a.Depth);
+            }), Has.Some.Contains($": overlaps lot-"));
+            // A lot stretched forward over its street.
+            Assert.That(ProblemsAfter(x =>
+            {
+                var lot = Restaurant(x);
+                switch (BuildingOf(x, lot).Facing)
+                {
+                    case Facing.North: lot.Depth += 4; break;
+                    case Facing.South: lot.Z -= 4; lot.Depth += 4; break;
+                    case Facing.East: lot.Width += 4; break;
+                    default: lot.X -= 4; lot.Width += 4; break;
+                }
+            }), Has.Some.Contains("overlaps a road"));
+            Assert.That(ProblemsAfter(x => x.Lots[0].Access = null), Has.Some.Contains("access is not a cell beside its edge"));
+            Assert.That(ProblemsAfter(x => x.Lots[0].Access = new WorldCell(x.Lots[0].X + 1, x.Lots[0].Z + 1)),
+                Has.Some.Contains("access is not a cell beside its edge"));
+            // The access point moved to the back of the lot, away from any road.
+            Assert.That(ProblemsAfter(x =>
+            {
+                var lot = Restaurant(x);
+                var facing = BuildingOf(x, lot).Facing;
+                var (dx, dz) = WorldGeometry.Step(facing);
+                var length = facing is Facing.North or Facing.South ? lot.Depth : lot.Width;
+                lot.Access = new WorldCell(lot.Access.X - dx * (length + 1), lot.Access.Z - dz * (length + 1));
+            }), Has.Some.Contains("access is not on a road"));
+            Assert.That(ProblemsAfter(x => x.Lots.RemoveAt(0)), Has.Some.Contains("property without a lot"));
+            Assert.That(ProblemsAfter(x => x.Lots.Add(new WorldLot
+            {
+                Id = x.Lots[0].Id, BuildingId = x.Lots[0].BuildingId, SiteId = x.Lots[0].SiteId, X = x.Lots[0].X, Z = x.Lots[0].Z,
+                Width = x.Lots[0].Width, Depth = x.Lots[0].Depth, Access = x.Lots[0].Access
+            })), Has.Some.Contains("has more than one lot").And.Some.StartsWith("id: "));
+            Assert.That(ProblemsAfter(x => x.Lots[0].SiteId = "site-elsewhere"), Has.Some.Contains("IDs not derived from its building"));
+            Assert.That(ProblemsAfter(x => x.Buildings.First(b => !b.HasLot).SiteId = "site-house"), Has.Some.Contains("site ID must be its lot's"));
+            Assert.That(ProblemsAfter(x => x.Lots.Add(new WorldLot
+            {
+                Id = "lot-house", BuildingId = x.Buildings.First(b => !b.HasLot).Id, SiteId = "site-house", Width = 1, Depth = 1, Access = new WorldCell(0, 0)
+            })), Has.Some.Contains("not the lot of a property"));
+        }
+
+        // Stored format 2 worlds (generator v2) have no lots: they still read, write back byte-for-byte and validate, and list
+        // nothing for sale.
+        [Test]
+        public void AFormatTwoLayoutHasNoLotsAndRoundTrips()
+        {
+            var layout = Generate(5);
+            layout.FormatVersion = 2;
+            layout.GeneratorVersion = 2;
+            layout.Lots.Clear();
+            foreach (var building in layout.Buildings) building.SiteId = "";
+            var text = WorldLayoutText.Write(layout);
+            Assert.That(text, Does.StartWith("food-factory-world-layout 2\n").And.Not.Contains("\nlot "));
+            var read = WorldLayoutText.Read(text);
+            Assert.That(WorldLayoutText.Write(read), Is.EqualTo(text));
+            Assert.That(read.Lots, Is.Empty);
+            Assert.That(WorldLayoutValidator.Validate(read), Is.Empty);
+            Assert.That(WorldLayoutShells.PropertyOffers(read), Is.Empty);
+            // Lots are not part of format 2: a format 2 layout carrying them fails validation.
+            var withLots = Generate(5);
+            withLots.FormatVersion = 2;
+            Assert.That(WorldLayoutValidator.Validate(withLots), Has.Some.EqualTo("lot: formats 1 and 2 have no lots"));
         }
 
         [Test]
@@ -240,6 +372,7 @@ namespace FoodFactoryGame.World.Tests
             Assert.That(layout.Nodes.All(x => x.Control == JunctionControl.None));
             Assert.That(layout.Rivers.Count + layout.Bridges.Count + layout.Crossings.Count + layout.Trees.Count, Is.Zero);
             Assert.That(layout.Buildings.Single().ElevationCm, Is.Zero);
+            Assert.That(layout.Lots, Is.Empty, "format 1 has no lots");
             Assert.That(WorldLayoutText.Write(layout), Is.EqualTo(v1));
             Assert.That(WorldLayoutText.Hash(layout), Is.EqualTo(WorldLayoutText.Hash(v1)));
         }

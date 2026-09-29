@@ -219,8 +219,8 @@ Artifacts are intentionally ignored by Git. Preserve required evidence externall
   `-seed <text>` still work for a launched player.
 - The city's edge starts 40 m north of the dev site; tilt the camera up (mouse) to see it. While a layout is shown, local
   cameras draw to about 2.4 km.
-- Tests: assembly `FoodFactoryGame.World.EditModeTests` (19 tests; generator v2, format 1 compatibility and `world.db` layout storage, temporary databases
-  only) and `FoodFactoryGame.Session.Tests.WorldGenerationTests` (4). A change to generator output fails
+- Tests: assembly `FoodFactoryGame.World.EditModeTests` (generator v3 with lots, format 1 and 2 compatibility and `world.db` layout storage, temporary databases
+  only; property purchase is in `FoodFactoryGame.Goods.Tests.PropertyTests`) and `FoodFactoryGame.Session.Tests.WorldGenerationTests` (4). A change to generator output fails
   `SameSeedProducesAnIdenticalLayout`: bump `WorldGenerator.Version` and re-pin `KnownHash` rather than editing the pin alone.
 - World art: regenerate textures and models in Blender, copy them into `Assets/Art/World`, and run
   `AgentScripts/BuildWorldArt.cs` (steps in `ArtSource/World/README.md`; set `WORLD_ART_ROOT` to `ArtSource/World` of this

@@ -91,14 +91,15 @@ namespace FoodFactoryGame.Goods
         public const string RoadSiteId = "road";
         public const int MaxAllowedItems = 16;
 
-        // Server-only: a site's map record. Its ID must be a site with locations, so grants and companies can refer to it.
+        // Server-only: a site's map record. The record itself makes the site exist (SiteExists), so a bought property's empty
+        // site can be granted and owned before anything stands on it.
         public void Bootstrap(GoodsSite site)
         {
             lock (_gate)
             {
                 if (site is null || string.IsNullOrWhiteSpace(site.Id) || site.Id == RoadSiteId || site.Name is null
-                    || _state.Sites.Any(x => x.Id == site.Id) || _state.Locations.All(x => x.SiteId != site.Id))
-                    throw new ArgumentException("Invalid or duplicate site, or a site without locations.");
+                    || _state.Sites.Any(x => x.Id == site.Id))
+                    throw new ArgumentException("Invalid or duplicate site.");
                 _state.Sites.Add(JsonUtility.FromJson<GoodsSite>(JsonUtility.ToJson(site)));
                 InvalidateDiners();
                 _state.Revision++;
@@ -164,7 +165,7 @@ namespace FoodFactoryGame.Goods
             {
                 var company = _state.Companies.FirstOrDefault(x => x.Id == companyId);
                 if (company is null || string.IsNullOrWhiteSpace(siteId) || siteId == RoadSiteId
-                    || _state.Locations.All(x => x.SiteId != siteId) || _state.Companies.Any(x => x.SiteIds.Contains(siteId)))
+                    || !SiteExists(_state, siteId) || _state.Companies.Any(x => x.SiteIds.Contains(siteId)))
                     throw new ArgumentException("Unknown company, or a site that does not exist or is already owned.");
                 company.SiteIds.Add(siteId);
                 InvalidateDiners();
@@ -188,11 +189,16 @@ namespace FoodFactoryGame.Goods
             }
         }
 
-        // Whether any location stands on the site (sites exist through their locations).
+        // Whether the site exists (SiteExists).
         public bool HasSite(string siteId)
         {
-            lock (_gate) return _state.Locations.Any(x => x.SiteId == siteId);
+            lock (_gate) return SiteExists(_state, siteId);
         }
+
+        // A site exists once it has a map record (a bought property's site, decision 0028, starts with nothing on it) or any
+        // location (the dev sites). Grants, company ownership and map records all refer only to existing sites.
+        private static bool SiteExists(GoodsSnapshot state, string siteId) => !string.IsNullOrWhiteSpace(siteId)
+            && (state.Sites.Any(x => x is not null && x.Id == siteId) || state.Locations.Any(x => x is not null && x.SiteId == siteId));
 
         // Road distance in metres between two mapped sites: the public roads form a grid, so it is the Manhattan distance.
         // Null if either site has no map record.
@@ -537,8 +543,7 @@ namespace FoodFactoryGame.Goods
         private static void ValidateTrucks(GoodsSnapshot state)
         {
             var siteIds = new HashSet<string>(state.Sites.Where(x => x is not null).Select(x => x.Id));
-            if (state.Sites.Any(x => x is null || string.IsNullOrWhiteSpace(x.Id) || x.Id == RoadSiteId || x.Name is null
-                    || state.Locations.All(y => y.SiteId != x.Id))
+            if (state.Sites.Any(x => x is null || string.IsNullOrWhiteSpace(x.Id) || x.Id == RoadSiteId || x.Name is null)
                 || state.Sites.GroupBy(x => x.Id).Any(x => x.Count() != 1)
                 || state.Grants.Any(x => x.SiteId == RoadSiteId)
                 || state.Companies.Any(x => x.SiteIds.Contains(RoadSiteId))

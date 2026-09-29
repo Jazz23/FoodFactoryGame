@@ -6,7 +6,8 @@ Status: first slice **implemented** 2026-09-27; generator v2 and layout format 2
 and the [verification record](../verification/worldgen-20260927.md)). The GDD section 3 "World Generation" owner decisions of
 2026-09-27 are the requirements. The storage choice below was the implementer's, as the task allowed; it amends
 [0012](0012-company-cash.md)'s "no mixed storage" rule for write-once data and needs owner confirmation. Every generator number
-(sizes, weights, prices, capacities, demand values) is PROTOTYPE. **One question is escalated, not decided** (last section).
+(sizes, weights, prices, capacities, demand values) is PROTOTYPE. One question was escalated (last section); the owner resolved it on 2026-09-29 in
+[0028](0028-sites-for-generated-buildings.md).
 
 ## Requirements (GDD section 3, owner 2026-09-27)
 
@@ -101,9 +102,13 @@ This is an exception to 0012 for write-once world definition data, not a general
   edge starts 40 m north of DevSite's 40 m floor, pieces over that floor are not drawn, and local cameras draw to about
   2.4 km while a layout is shown.
 
-## Escalated: does each purchasable building become its own site?
+## Escalated (resolved 2026-09-29 by 0028): does each purchasable building become its own site?
 
-Not decided. Options include one site (with its own `SiteGrid` sized to the building) per purchasable building, one site per
+Resolved by [0028](0028-sites-for-generated-buildings.md): one site per purchasable building and its lot, site IDs reserved
+in the layout, sites created on first purchase, the dev site kept off the map, competitors kept as records linked to lots.
+Piece 1 (lots, reserved site IDs, server-side purchase) implemented 2026-09-29. The original question follows.
+
+Options included one site (with its own `SiteGrid` sized to the building) per purchasable building, one site per
 owned plot or company campus, or buildings placed inside larger sites. It affects site IDs, grants, trucks' `GoodsSite.MapX/Z`
 (which today are unrelated dev values, not layout coordinates), customer districts (decision 0024's `GoodsDistrict` is a
 separate dev record) and where the dev site sits on the map.
