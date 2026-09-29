@@ -48,6 +48,11 @@ namespace FoodFactoryGame.World
                 Line("end", layout.Districts.Count, layout.Nodes.Count, layout.Roads.Count, layout.Rails.Count, layout.Buildings.Count);
                 return text.ToString();
             }
+            // Formats 1 and 2 have no lots; they are written exactly as their generators wrote them.
+            var v3 = layout.FormatVersion >= 3;
+            if (v3)
+                foreach (var l in layout.Lots)
+                    Line("lot", l.Id, l.BuildingId, l.SiteId, l.X, l.Z, l.Width, l.Depth, Cells(new[] { l.Access }));
             var terrain = layout.Terrain ?? WorldTerrain.Flat();
             Line("terrain", terrain.Spacing, terrain.Samples);
             for (var row = 0; row < terrain.Samples; row++)
@@ -58,8 +63,12 @@ namespace FoodFactoryGame.World
             for (var first = 0; first < layout.Trees.Count; first += TreesPerLine)
                 Line("trees", JoinList(layout.Trees.Skip(first).Take(TreesPerLine)
                     .Select(t => string.Join(",", Number(t.X), Number(t.Z), Number((int)t.Kind), Number(t.Scale)))));
-            Line("end", layout.Districts.Count, layout.Nodes.Count, layout.Roads.Count, layout.Rails.Count, layout.Buildings.Count,
-                layout.Rivers.Count, layout.Bridges.Count, layout.Crossings.Count, layout.Trees.Count);
+            if (v3)
+                Line("end", layout.Districts.Count, layout.Nodes.Count, layout.Roads.Count, layout.Rails.Count, layout.Buildings.Count,
+                    layout.Rivers.Count, layout.Bridges.Count, layout.Crossings.Count, layout.Trees.Count, layout.Lots.Count);
+            else
+                Line("end", layout.Districts.Count, layout.Nodes.Count, layout.Roads.Count, layout.Rails.Count, layout.Buildings.Count,
+                    layout.Rivers.Count, layout.Bridges.Count, layout.Crossings.Count, layout.Trees.Count);
             return text.ToString();
         }
 
@@ -152,6 +161,17 @@ namespace FoodFactoryGame.World
                 if (row != lines.Length - 1 || lines[row] != "") throw new FormatException("Unexpected text after the world layout.");
                 return layout;
             }
+            var v3 = layout.FormatVersion >= 3;
+            while (v3 && Peek() == "lot")
+            {
+                var p = Next("lot", 8);
+                var access = ReadCells(p[8]);
+                if (access.Count != 1) throw new FormatException("Bad lot access.");
+                layout.Lots.Add(new WorldLot
+                {
+                    Id = p[1], BuildingId = p[2], SiteId = p[3], X = Int(p[4]), Z = Int(p[5]), Width = Int(p[6]), Depth = Int(p[7]), Access = access[0]
+                });
+            }
             var terrainLine = Next("terrain", 2);
             var terrain = new WorldTerrain { Spacing = Int(terrainLine[1]), Samples = Int(terrainLine[2]) };
             if (terrain.Spacing < 0 || terrain.Samples < 0 || (long)terrain.Samples * terrain.Samples > 4_000_000) throw new FormatException("Bad terrain size.");
@@ -192,10 +212,11 @@ namespace FoodFactoryGame.World
                     layout.Trees.Add(new WorldTree { X = v[0], Z = v[1], Kind = (TreeKind)v[2], Scale = v[3] });
                 }
             }
-            var end = Next("end", 9);
+            var end = Next("end", v3 ? 10 : 9);
             if (Int(end[1]) != layout.Districts.Count || Int(end[2]) != layout.Nodes.Count || Int(end[3]) != layout.Roads.Count
                 || Int(end[4]) != layout.Rails.Count || Int(end[5]) != layout.Buildings.Count || Int(end[6]) != layout.Rivers.Count
-                || Int(end[7]) != layout.Bridges.Count || Int(end[8]) != layout.Crossings.Count || Int(end[9]) != layout.Trees.Count)
+                || Int(end[7]) != layout.Bridges.Count || Int(end[8]) != layout.Crossings.Count || Int(end[9]) != layout.Trees.Count
+                || (v3 && Int(end[10]) != layout.Lots.Count))
                 throw new FormatException("World layout counts do not match.");
             if (row != lines.Length - 1 || lines[row] != "") throw new FormatException("Unexpected text after the world layout.");
             return layout;

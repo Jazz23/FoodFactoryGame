@@ -76,7 +76,7 @@ namespace FoodFactoryGame.Session
             _readout.text = $"{session.Mode} | {session.Status}\n"
                 + $"Player: {session.Authenticator.LocalPlayerId ?? "(none)"}\n"
                 + (site == null ? "Site: waiting for dev-site baseline\n"
-                    : $"Site {DevWorld.SiteId}: clock {site.ClockSeconds}s, revision {site.Revision}\n")
+                    : $"Site {session.ClientSiteId}: clock {site.ClockSeconds}s, revision {site.Revision}\n")
                 + (server == null ? "" : $"Server: clock {server.ClockSeconds}s, revision {server.Revision}, players {session.Authenticator.AuthenticatedCount}\n")
                 + WorldLine()
                 + equipment.Status;

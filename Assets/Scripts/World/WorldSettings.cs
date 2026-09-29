@@ -62,8 +62,11 @@ namespace FoodFactoryGame.World
         public int ArterialCapacity = 1800;
         public int LocalCapacity = 600;
         public int RuralCapacity = 400;
-        // Gap between a road's edge and a building's street wall.
+        // Gap between a road's edge and a building's street wall. It is part of a purchasable building's lot (generator v3).
         public int Setback = 2;
+        // Deeper gaps (generator v3) for factories and farms: their lot's apron in front of the building, for docks and trucks.
+        public int FactorySetback = 12;
+        public int FarmSetback = 8;
 
         // Land (generator v2): value noise in centimetres, one octave per lattice size, sampled every TerrainSpacing metres
         // (which must divide the map). Relief is damped to CityReliefPercent inside the city (full relief TerrainCityFade m
@@ -172,6 +175,13 @@ namespace FoodFactoryGame.World
         public static WorldSettings Default => new();
 
         public DistrictProfile Profile(DistrictKind kind) => Districts.Find(x => x.Kind == kind);
+
+        public int SetbackFor(BuildingCategory category) => category switch
+        {
+            BuildingCategory.Factory => FactorySetback,
+            BuildingCategory.Farm => FarmSetback,
+            _ => Setback
+        };
 
         private static List<CuisineWeight> Weights(params (string Cuisine, int Weight)[] weights)
         {

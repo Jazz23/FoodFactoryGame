@@ -24,7 +24,7 @@ namespace FoodFactoryGame.World
             var ids = new HashSet<string>(StringComparer.Ordinal);
             foreach (var id in layout.Districts.Select(x => x.Id).Concat(layout.Nodes.Select(x => x.Id)).Concat(layout.Roads.Select(x => x.Id))
                          .Concat(layout.Rails.Select(x => x.Id)).Concat(layout.Buildings.Select(x => x.Id)).Concat(layout.Rivers.Select(x => x.Id))
-                         .Concat(layout.Bridges.Select(x => x.Id)).Concat(layout.Crossings.Select(x => x.Id)))
+                         .Concat(layout.Bridges.Select(x => x.Id)).Concat(layout.Crossings.Select(x => x.Id)).Concat(layout.Lots.Select(x => x.Id)))
                 if (string.IsNullOrWhiteSpace(id) || id.Any(char.IsWhiteSpace) || !ids.Add(id)) problems.Add($"id: blank, spaced or duplicate '{id}'");
 
             Districts(layout, problems);
@@ -32,6 +32,7 @@ namespace FoodFactoryGame.World
             var roadIndex = Roads(layout, nodes, problems);
             var railIndex = Rails(layout, problems);
             Buildings(layout, settings, roadIndex, railIndex, problems);
+            Lots(layout, roadIndex, railIndex, problems);
             Access(layout, settings, nodes, roadIndex, problems);
             Start(layout, settings, problems);
             FarmsAndStations(layout, problems);
@@ -193,7 +194,6 @@ namespace FoodFactoryGame.World
                 if (!expected) problems.Add($"{name}: ownership {building.Ownership} not allowed for a {building.Category}");
                 if ((building.Ownership == Ownership.Scenery) != (building.PriceCents == 0) || building.PriceCents < 0)
                     problems.Add($"{name}: price must be positive exactly for property");
-                if (!string.IsNullOrEmpty(building.SiteId)) problems.Add($"{name}: site link is undecided and must stay empty");
 
                 var district = DistrictAt(layout, 2 * building.X + building.Width, 2 * building.Z + building.Depth);
                 if ((district?.Id ?? "") != (building.DistrictId ?? "")) problems.Add($"{name}: district does not match its position");
@@ -207,16 +207,66 @@ namespace FoodFactoryGame.World
             }
         }
 
+        // Decision 0028: exactly one lot per property (format 3; none in formats 1 and 2) and none for scenery, with IDs derived
+        // from the building so they stay stable. A lot holds its building and overlaps no other lot or building, road, rail line
+        // (or water, in Rivers); its access cell borders its edge on a road (reachability is checked in Access).
+        private static void Lots(WorldLayout layout, BoxIndex<RoadSegment> roads, BoxIndex<RailLine> rails, List<string> problems)
+        {
+            var buildings = layout.Buildings.GroupBy(x => x.Id ?? "").ToDictionary(x => x.Key, x => x.First(), StringComparer.Ordinal);
+            var footprints = new BoxIndex<WorldBuilding>();
+            foreach (var building in layout.Buildings) footprints.Add(WorldGeometry.Of(building), building);
+            var byBuilding = new Dictionary<string, WorldLot>(StringComparer.Ordinal);
+            var sites = new HashSet<string>(StringComparer.Ordinal);
+            var placed = new BoxIndex<WorldLot>();
+            if (layout.FormatVersion < 3 && layout.Lots.Count > 0) problems.Add("lot: formats 1 and 2 have no lots");
+            foreach (var lot in layout.Lots)
+            {
+                var name = $"lot {lot.Id}";
+                if (!buildings.TryGetValue(lot.BuildingId ?? "", out var building) || !building.HasLot)
+                {
+                    problems.Add($"{name}: not the lot of a property");
+                    continue;
+                }
+                if (!byBuilding.TryAdd(building.Id, lot)) problems.Add($"{name}: {building.Id} has more than one lot");
+                if (lot.Id != WorldLot.IdFor(building.Id) || lot.SiteId != WorldLot.SiteIdFor(building.Id)) problems.Add($"{name}: IDs not derived from its building");
+                if (!sites.Add(lot.SiteId ?? "")) problems.Add($"{name}: duplicate site ID '{lot.SiteId}'");
+                var rect = lot.Rect;
+                var box = WorldGeometry.Of(rect);
+                if (lot.Width < 1 || lot.Depth < 1 || !WorldGeometry.Contains(rect, building.Footprint)) problems.Add($"{name}: does not contain its building");
+                if (roads.Any(box)) problems.Add($"{name}: overlaps a road");
+                if (rails.Any(box)) problems.Add($"{name}: overlaps a rail line");
+                foreach (var other in placed.Overlapping(box)) problems.Add($"{name}: overlaps {other.Id}");
+                foreach (var other in footprints.Overlapping(box).Where(x => x != building)) problems.Add($"{name}: overlaps building {other.Id}");
+                placed.Add(box, lot);
+                if (lot.Access == null || !Borders(rect, lot.Access)) problems.Add($"{name}: access is not a cell beside its edge");
+                else if (!roads.TryFind(2 * lot.Access.X + 1, 2 * lot.Access.Z + 1, out _)) problems.Add($"{name}: access is not on a road");
+            }
+            foreach (var building in layout.Buildings)
+            {
+                byBuilding.TryGetValue(building.Id ?? "", out var lot);
+                if (layout.FormatVersion >= 3 && building.HasLot && lot == null) problems.Add($"building {building.Id}: property without a lot");
+                if ((building.SiteId ?? "") != (lot?.SiteId ?? "")) problems.Add($"building {building.Id}: site ID must be its lot's, and empty without one");
+            }
+        }
+
+        // A cell just outside the rectangle, sharing an edge with it (not a corner).
+        private static bool Borders(WorldRect rect, WorldCell cell)
+        {
+            var alongX = cell.X >= rect.X && cell.X < rect.X + rect.Width;
+            var alongZ = cell.Z >= rect.Z && cell.Z < rect.Z + rect.Depth;
+            return (alongX && (cell.Z == rect.Z - 1 || cell.Z == rect.Z + rect.Depth)) || (alongZ && (cell.X == rect.X - 1 || cell.X == rect.X + rect.Width));
+        }
+
         private static WorldDistrict DistrictAt(WorldLayout layout, int doubledX, int doubledZ) =>
             layout.Districts.FirstOrDefault(x => x.Areas.Any(a =>
                 doubledX >= 2 * a.X && doubledX < 2 * (a.X + a.Width) && doubledZ >= 2 * a.Z && doubledZ < 2 * (a.Z + a.Depth)));
 
-        // The road a building's door opens onto: stepping straight out of a door cell must reach pavement within the setback.
+        // The road a building's door opens onto: stepping straight out of a door cell must reach pavement within its setback.
         public static RoadSegment AccessRoad(WorldBuilding building, WorldSettings settings, Func<int, int, RoadSegment> roadAt)
         {
             var (dx, dz) = WorldGeometry.Step(building.Facing);
             foreach (var door in building.Doors)
-                for (var step = 1; step <= settings.Setback + 2; step++)
+                for (var step = 1; step <= settings.SetbackFor(building.Category) + 2; step++)
                 {
                     var road = roadAt(2 * (door.X + dx * step) + 1, 2 * (door.Z + dz * step) + 1);
                     if (road != null) return road;
@@ -258,6 +308,9 @@ namespace FoodFactoryGame.World
                 if (road == null) problems.Add($"access: building {building.Id} has no road at its door");
                 else if (!reached.Contains(road.FromId)) problems.Add($"access: building {building.Id} is not reachable by road");
             }
+            foreach (var lot in layout.Lots.Where(x => x.Access != null))
+                if (roads.TryFind(2 * lot.Access.X + 1, 2 * lot.Access.Z + 1, out var road) && !reached.Contains(road.FromId))
+                    problems.Add($"access: lot {lot.Id} is not reachable by road");
         }
 
         private static void Start(WorldLayout layout, WorldSettings settings, List<string> problems)
@@ -382,6 +435,8 @@ namespace FoodFactoryGame.World
                 foreach (var box in WorldGeometry.Corridor(river.Points, half)) water.Add(box, 0);
                 foreach (var building in layout.Buildings.Where(b => water.Any(WorldGeometry.Of(b))))
                     problems.Add($"building {building.Id}: stands in river {river.Id}");
+                foreach (var lot in layout.Lots.Where(l => water.Any(WorldGeometry.Of(l.Rect))))
+                    problems.Add($"lot {lot.Id}: lies in river {river.Id}");
                 foreach (var way in ways)
                     foreach (var (along, _, _) in WorldGeometry.Crossings(river.Points, way.Vertical, way.Fixed, way.From, way.To))
                     {
@@ -432,6 +487,8 @@ namespace FoodFactoryGame.World
             var m = layout.MapHalfSize;
             var buildings = new BoxIndex<WorldBuilding>();
             foreach (var building in layout.Buildings) buildings.Add(WorldGeometry.Of(building), building);
+            // A lot is paved ground for its owner's equipment: no tree stands on one.
+            foreach (var lot in layout.Lots) buildings.Add(WorldGeometry.Of(lot.Rect), null);
             var water = layout.Rivers.Select(r => (Points: r.Points.Select(p => new WorldCell(2 * p.X, 2 * p.Z)).ToList(), Radius: r.Width)).ToList();
             var bad = 0;
             string first = null;

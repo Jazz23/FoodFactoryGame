@@ -25,7 +25,7 @@ namespace FoodFactoryGame.Goods
             {
                 if (company is null || string.IsNullOrWhiteSpace(company.Id) || company.Cash < 0 || company.SiteIds is null
                     || _state.Companies.Any(x => x.Id == company.Id)
-                    || company.SiteIds.Any(x => string.IsNullOrWhiteSpace(x) || _state.Locations.All(y => y.SiteId != x))
+                    || company.SiteIds.Any(x => !SiteExists(_state, x))
                     || company.SiteIds.Distinct().Count() != company.SiteIds.Count
                     || company.SiteIds.Any(x => _state.Companies.Any(y => y.SiteIds.Contains(x))))
                     throw new ArgumentException("Invalid or duplicate company, or a site that does not exist or is already owned.");
@@ -39,6 +39,12 @@ namespace FoodFactoryGame.Goods
         public string CompanyOfSite(string siteId)
         {
             lock (_gate) return CompanyOfSiteLocked(siteId);
+        }
+
+        // Every site of the company that owns this site, in its order; empty when no company owns it.
+        public IReadOnlyList<string> CompanySiteIds(string siteId)
+        {
+            lock (_gate) return _state.Companies.FirstOrDefault(x => x.SiteIds.Contains(siteId))?.SiteIds.ToList() ?? new List<string>();
         }
 
         private string CompanyOfSiteLocked(string siteId) => _state.Companies.FirstOrDefault(x => x.SiteIds.Contains(siteId))?.Id;
@@ -82,7 +88,7 @@ namespace FoodFactoryGame.Goods
         {
             var owned = state.Companies.Where(x => x?.SiteIds is not null).SelectMany(x => x.SiteIds).ToList();
             if (state.Companies.Any(x => x is null || string.IsNullOrWhiteSpace(x.Id) || x.Cash < 0 || x.SiteIds is null
-                    || x.SiteIds.Any(y => string.IsNullOrWhiteSpace(y) || state.Locations.All(z => z.SiteId != y)))
+                    || x.SiteIds.Any(y => !SiteExists(state, y)))
                 || state.Companies.GroupBy(x => x.Id).Any(x => x.Count() != 1)
                 || owned.Distinct().Count() != owned.Count
                 // A sale in progress must have a company to pay when it completes.

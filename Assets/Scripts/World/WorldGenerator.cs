@@ -8,7 +8,8 @@
 // arterial grid (5x5 superblocks) -> districts -> river along one superblock row -> local streets (none running along the
 // river) -> road graph -> rail lines -> land heights -> junction controls -> bridges -> level crossings -> stations at level
 // crossings -> buildings along every block edge, doors facing the street, on land flat enough -> farms along rural spurs ->
-// trees -> IDs -> starting restaurant -> turn.
+// trees -> IDs -> starting restaurant -> turn -> lots. Every purchasable building is placed together with its lot (its
+// footprint plus the setback to its street, deeper for factories and farms), and nothing else may stand on a lot.
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -42,7 +43,8 @@ namespace FoodFactoryGame.World
     public static class WorldGenerator
     {
         // 2 (2026-09-28): denser city, land heights, a river with bridges, level crossings, junction controls and trees.
-        public const int Version = 2;
+        // 3 (2026-09-29): lots with reserved site IDs (decision 0028); factories and farms stand behind deeper aprons.
+        public const int Version = 3;
 
         // extraRule adds problems of its own (tests use it to force retries); it cannot waive validator problems.
         public static WorldGenerationResult Generate(string requestedSeed, ulong seed, WorldSettings settings = null,
@@ -152,6 +154,7 @@ namespace FoodFactoryGame.World
                 PickStart();
                 var turns = WorldRandom.Fork(_seed, "orientation").Next(4);
                 for (var turn = 0; turn < turns; turn++) Turn();
+                Lots();
                 return _layout;
             }
 
@@ -639,7 +642,7 @@ namespace FoodFactoryGame.World
                         rect = new WorldRect(x, z, length, depth);
                         facing = alongSide > 0 ? Facing.West : Facing.East;
                     }
-                    var box = WorldGeometry.Of(rect);
+                    var box = WorldGeometry.Of(LotRect(rect, facing, BuildingCategory.Station));
                     if (!InsideRing(rect) || _roadIndex.Any(box) || _reserved.Any(box) || _water.Any(box)) continue;
                     var doors = WorldGeometry.Doors(rect, facing, 1);
                     var level = LevelFor(rect, doors[0]);
@@ -707,7 +710,9 @@ namespace FoodFactoryGame.World
                 {
                     var category = categories[rng.Weighted(weights)];
                     var size = SizeOf(category, kind);
-                    var deepMax = Math.Min(size.MaxDeep, deepLimit);
+                    // A factory stands this much further back than the street line, behind its lot's deeper apron.
+                    var back = _s.SetbackFor(category) - _s.Setback;
+                    var deepMax = Math.Min(size.MaxDeep, deepLimit - back);
                     if (deepMax < size.MinDeep)
                     {
                         cursor += 3;
@@ -716,21 +721,23 @@ namespace FoodFactoryGame.World
                     var along = Math.Min(rng.Range(size.MinAlong, size.MaxAlong), to - cursor);
                     if (along < size.MinAlong) break;
                     var deep = rng.Range(size.MinDeep, deepMax);
+                    var line = facing is Facing.North or Facing.East ? edge - back : edge + back;
                     var rect = facing switch
                     {
-                        Facing.North => new WorldRect(cursor, edge - deep, along, deep),
-                        Facing.South => new WorldRect(cursor, edge, along, deep),
-                        Facing.East => new WorldRect(edge - deep, cursor, deep, along),
-                        _ => new WorldRect(edge, cursor, deep, along)
+                        Facing.North => new WorldRect(cursor, line - deep, along, deep),
+                        Facing.South => new WorldRect(cursor, line, along, deep),
+                        Facing.East => new WorldRect(line - deep, cursor, deep, along),
+                        _ => new WorldRect(line, cursor, deep, along)
                     };
                     var building = Lot(rng, category, kind, rect, facing);
-                    var box = WorldGeometry.Of(rect);
+                    // Property is checked with its whole lot, scenery with its footprint.
+                    var box = WorldGeometry.Of(building.HasLot ? LotRect(rect, facing, category) : rect);
                     if (_placed.Any(Grow(box, 2 * profile.MinGap)))
                     {
                         cursor += 2;
                         continue;
                     }
-                    var level = _reserved.Any(box) || _water.Any(box) ? null : LevelFor(rect, building.Doors[0]);
+                    var level = _reserved.Any(box) || _water.Any(box) || _roadIndex.Any(box) ? null : LevelFor(rect, building.Doors[0]);
                     if (level != null)
                     {
                         building.ElevationCm = level.Value;
@@ -815,12 +822,12 @@ namespace FoodFactoryGame.World
                             var deep = rng.Range(_s.Farm.MinDeep, _s.Farm.MaxDeep);
                             if (cursor + along > high) break;
                             var place = rng.Chance(chance);
-                            var near = spur.Fixed + side * (half + _s.Setback);
+                            var near = spur.Fixed + side * (half + _s.FarmSetback);
                             var rect = spur.Vertical
                                 ? new WorldRect(side > 0 ? near : near - deep, cursor, deep, along)
                                 : new WorldRect(cursor, side > 0 ? near : near - deep, along, deep);
                             var facing = spur.Vertical ? (side > 0 ? Facing.West : Facing.East) : (side > 0 ? Facing.South : Facing.North);
-                            var box = WorldGeometry.Of(rect);
+                            var box = WorldGeometry.Of(LotRect(rect, facing, BuildingCategory.Farm));
                             var variant = Variant(rng, 2);
                             if (place && InsideRing(rect) && !box.Overlaps(city) && !_roadIndex.Any(box) && !_reserved.Any(box) && !_water.Any(box)
                                 && !farms.Any(box))
@@ -846,10 +853,14 @@ namespace FoodFactoryGame.World
                 return rect.X >= -limit && rect.Z >= -limit && rect.X + rect.Width <= limit && rect.Z + rect.Depth <= limit;
             }
 
+            private WorldRect LotRect(WorldRect footprint, Facing facing, BuildingCategory category) =>
+                WorldGeometry.LotRect(footprint, facing, _s.SetbackFor(category));
+
             private void Add(WorldBuilding building)
             {
                 _layout.Buildings.Add(building);
-                var box = WorldGeometry.Of(building);
+                // A property's whole lot is taken, so no building or tree stands on its apron.
+                var box = WorldGeometry.Of(building.HasLot ? LotRect(building.Footprint, building.Facing, building.Category) : building.Footprint);
                 _placed.Add(box, 0);
                 if (building.Category == BuildingCategory.Station) _reserved.Add(box, -1);
                 // The way in: no street tree in front of a door.
@@ -999,6 +1010,22 @@ namespace FoodFactoryGame.World
                 if (start == null) return;
                 start.Ownership = Ownership.Player;
                 _layout.StartRestaurantId = start.Id;
+            }
+
+            // Every property's lot and reserved site ID (decision 0028), from its final (turned) footprint, in building order.
+            private void Lots()
+            {
+                foreach (var building in _layout.Buildings.Where(x => x.HasLot))
+                {
+                    var rect = LotRect(building.Footprint, building.Facing, building.Category);
+                    building.SiteId = WorldLot.SiteIdFor(building.Id);
+                    _layout.Lots.Add(new WorldLot
+                    {
+                        Id = WorldLot.IdFor(building.Id), BuildingId = building.Id, SiteId = building.SiteId,
+                        X = rect.X, Z = rect.Z, Width = rect.Width, Depth = rect.Depth,
+                        Access = WorldGeometry.AccessCell(rect, building.Facing, building.Doors[0])
+                    });
+                }
             }
 
             private DistrictKind? DistrictAt(int doubledX, int doubledZ)

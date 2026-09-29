@@ -196,8 +196,8 @@ namespace FoodFactoryGame.Session.Belts
         private void Refresh(GoodsSnapshot site)
         {
             _shown = site;
-            _layout = site?.SiteLayouts.FirstOrDefault(x => x.SiteId == DevWorld.SiteId);
-            var belts = _layout == null ? new List<GoodsBelt>() : site.Belts.Where(x => x.SiteId == DevWorld.SiteId).ToList();
+            _layout = site?.SiteLayouts.FirstOrDefault(x => x.SiteId == session.ClientSiteId);
+            var belts = _layout == null ? new List<GoodsBelt>() : site.Belts.Where(x => x.SiteId == session.ClientSiteId).ToList();
             // Each floor is its own belt network (decision 0020), joined only by lifts.
             var cells = BeltRules.ByCell(belts);
             _beltById.Clear();

@@ -76,6 +76,27 @@ namespace FoodFactoryGame.World
             return doors;
         }
 
+        // A footprint extended `apron` cells forward, toward its street: a lot (decision 0028).
+        public static WorldRect LotRect(WorldRect footprint, Facing facing, int apron) => facing switch
+        {
+            Facing.North => new WorldRect(footprint.X, footprint.Z, footprint.Width, footprint.Depth + apron),
+            Facing.South => new WorldRect(footprint.X, footprint.Z - apron, footprint.Width, footprint.Depth + apron),
+            Facing.East => new WorldRect(footprint.X, footprint.Z, footprint.Width + apron, footprint.Depth),
+            _ => new WorldRect(footprint.X - apron, footprint.Z, footprint.Width + apron, footprint.Depth)
+        };
+
+        // The cell just outside a lot's street edge, level with the door.
+        public static WorldCell AccessCell(WorldRect lot, Facing facing, WorldCell door) => facing switch
+        {
+            Facing.North => new WorldCell(door.X, lot.Z + lot.Depth),
+            Facing.South => new WorldCell(door.X, lot.Z - 1),
+            Facing.East => new WorldCell(lot.X + lot.Width, door.Z),
+            _ => new WorldCell(lot.X - 1, door.Z)
+        };
+
+        public static bool Contains(WorldRect outer, WorldRect inner) => inner.X >= outer.X && inner.Z >= outer.Z
+            && inner.X + inner.Width <= outer.X + outer.Width && inner.Z + inner.Depth <= outer.Z + outer.Depth;
+
         // A quarter turn clockwise seen from above about the origin: +Z (north) becomes +X (east).
         public static (int X, int Z) TurnPoint(int x, int z) => (z, -x);
 

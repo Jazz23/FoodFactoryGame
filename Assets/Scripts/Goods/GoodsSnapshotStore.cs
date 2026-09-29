@@ -433,6 +433,12 @@ namespace FoodFactoryGame.Goods
                 state.Diners ??= new();
                 state.SchemaVersion = 13;
             }
+            // v13 had no property records (decision 0028): nothing had been bought, and dev sites need none.
+            if (state != null && state.SchemaVersion == 13)
+            {
+                state.Properties ??= new();
+                state.SchemaVersion = 14;
+            }
             GoodsWorld.Validate(state);
             return state;
         }

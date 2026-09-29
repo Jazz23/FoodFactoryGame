@@ -336,10 +336,10 @@ Decision: [0026](decisions/0026-procedural-world-layout.md). GDD section 3 "Worl
   material `Assets/Materials/World/WorldBlockout.mat`), authored by `AgentScripts/BuildWorldGenScene.cs`; not a build scene.
   DevSite, `GamePrefabs.asset` and the dev seed are unchanged, and the dev site and its seed still run in WorldGen.
   `WorldLayoutBridge.prefab` was also appended to the auto-maintained `DefaultPrefabObjects.asset` by FishNet's generator.
-- Stub, **escalated**: whether each purchasable building becomes its own site/`SiteGrid`. `WorldBuilding.SiteId` is always
-  empty; `WorldLayoutShells` converts a shell to a `GoodsBuilding` on a grid of its own size for tests only.
+- The site question is decided in [0028](decisions/0028-sites-for-generated-buildings.md) (2026-09-29); its first piece
+  (lots, reserved site IDs, the server-side purchase) is implemented below under "lots and buying buildings".
 
-Planned / undecided: the site link above; buying property and ownership changes (payload state keyed by layout IDs);
+Planned / undecided: the rest of 0028 (see that section) and its open items;
 customers from district densities and whether district values replace the dev district (decision 0024); competitor
 behaviour; trains; the ingredient supplier near the start; traffic using road capacities; final Blender models for premade
 slots; how existing `GoodsSite.MapX/Z` relate to layout coordinates (the presenter places the map beside the dev site as
@@ -365,6 +365,96 @@ Decision: [0027](decisions/0027-world-generator-v2-land-river-roads.md) (amends 
   lamp materials use emission). Road and rail tiles are now cut into segments with skirts so they can follow the land.
 - Not changed: storage (`world_layout` table, write once), replication, the site question, the dev site. Signals are
   static; nothing simulates traffic or trains.
+
+## Implemented: lots and buying buildings, piece 1 (2026-09-29)
+
+Decision: [0028](decisions/0028-sites-for-generated-buildings.md). Server domain only: no networking, UI or session wiring
+beyond registering the catalog. Goods snapshot schema **v14**. Lot shape values are PROTOTYPE. Verification (batch
+`unity test`, EditMode, run id 2 each, NUnit XML under `TestResults/lots-20260929/`): filter `FoodFactoryGame.World.Tests`
+21/21 (`World-2.xml`; 120 seeds valid with lots, none retried; seed 20260927 re-pinned to `c8cef1dd…db11`),
+`FoodFactoryGame.Goods.Tests` 176/176 including 9 `PropertyTests` (`Goods-2.xml`), `FoodFactoryGame.Session.Tests` 89/89
+(`Session-2.xml`), `FoodFactoryGame.Baseline.Tests` 4/4 (`Baseline-2.xml`). Live Editor (Pipeline `run_tests`, async,
+filter_type assembly; status JSON in the same folder): `FoodFactoryGame.World.EditModeTests` 21/21 (`editor-world-status.json`);
+`FoodFactoryGame.Goods.EditModeTests` 175/176 (`editor-goods-status.json`), all 9 `PropertyTests` passing, the one failure
+being the known nondeterministic `TruckTests.StepSizeDoesNotChangeTheOutcome` (GUID tie-break; it passed in the batch run
+and in 1 of 3 `TruckTests` reruns, `editor-trucks-1..3.json`). Not run: PlayMode and multiplayer suites (no networking changed).
+
+- Generator: `WorldGenerator.Version` = 3, `WorldLayout.CurrentFormat` = 3. Every building that `HasLot` (restaurant and
+  factory shells, farms, stations; ownership ForSale, Competitor or Player) gets one `WorldLot { Id = lot-<building>,
+  BuildingId, SiteId = site-<building>, X, Z, Width, Depth, Access }` and `WorldBuilding.SiteId` = the lot's site ID; scenery
+  gets neither. A lot is the footprint extended forward to its street by `WorldSettings.SetbackFor(category)` (`Setback` 2 m;
+  PROTOTYPE `FactorySetback` 12 m and `FarmSetback` 8 m, so factories and farms stand further back); `Access` is the road cell
+  just past the lot's street edge, level with the first door. Site cell (x, z) = world cell (lot.X + x, lot.Z + z),
+  translation only. Placement reserves whole lots, so no building or tree stands on one; side gaps between lots stay unowned.
+- Format: `WorldLayoutText` format 3 adds `lot` lines after the buildings and a lot count on `end`. Formats 1 and 2 still read
+  and write byte for byte and have no lots, so nothing in those worlds can be bought (development data).
+- Validator (format 3): unique lot IDs and site IDs derived from the building; exactly one lot per property and none for
+  scenery; `SiteId` equals the lot's (empty without one); each lot contains its building and overlaps no other lot,
+  building, road, rail or water; its access cell borders its edge on a road reachable from the network; no tree on a lot.
+  Road access from a door allows the category's setback.
+- Goods (`GoodsWorld.Property.cs`, `WorldLayoutShells`): `GoodsSnapshot.Properties` (`GoodsProperty { LotId, SiteId,
+  CompanyId }`, ownership as its own record; `GoodsCompany.SiteIds` still lists the site and must agree). v13 saves upgrade in
+  memory with none; dev sites need none. `PropertyOffer` is content built from the stored layout by
+  `WorldLayoutShells.PropertyOffers` (lot, site ID, building shape and doors in site cells, category, `ForSale`, price,
+  access) and registered once with `RegisterPropertyOffers` (`SessionRoot.StartServer`, only when a layout exists); never
+  saved. `BuyPropertyDurably(player, request, payingSite, lot, savePath)` checks, in order, `unknown-lot`, `not-for-sale`,
+  `owned`, `no-grant`, `no-company`, `insufficient-funds`, then in one commit debits the price, creates the `GoodsSite`
+  (`MapX/Z` = access point, name = building ID), the lot-sized `SiteLayout` and, for shells, the `GoodsBuilding`, adds the
+  property and the company's site ID, and grants the buyer the new site (`property-bought`). Rejections change and record
+  nothing; a replayed request returns the original outcome; a failed save restores everything (`persistence-unavailable`).
+  Server-only `Bootstrap(PropertyOffer, companyId)` gives a lot without charge or grant (the starting restaurant; wired in piece 2).
+- Site existence: a site exists when it has a `GoodsSite` record or any location (`SiteExists`), used by `Grant`,
+  `TryGrantDurably`, `Bootstrap(GoodsCompany)`, `AddCompanySite`, `HasSite` and validation; `Bootstrap(GoodsSite)` no
+  longer needs locations, so a freshly bought, empty site can be owned and granted.
+- Validation: properties have unique lots and sites, a company that lists the site, a `GoodsSite` and a layout. With a
+  catalog registered (checked at registration and before every save), each property is a listed lot whose site has the
+  lot's size, and every listed lot whose site exists has its property (sites and properties are never removed).
+
+Piece 2 is implemented below. Open: lot prices versus building prices (a lot costs its building's layout price), corner lots,
+farm field extent, station platforms.
+
+## Implemented: generated worlds start in their own restaurant, piece 2 (2026-09-29)
+
+Decision: [0028](decisions/0028-sites-for-generated-buildings.md). Owner decisions of 2026-09-29: starting cash $5,000
+(PROTOTYPE, `GeneratedWorld.StartingCash` = 500000 cents); bought sites are managed remotely only until piece 3. Evidence:
+[verification record](verification/property-piece2-20260929.md).
+
+- World creation (`GeneratedWorld`, Session): when the stored layout has lots (format 3), `SessionRoot.StartServer` calls
+  `GeneratedWorld.LoadOrCreate(worldPath, layout, items)` instead of `DevWorld.LoadOrCreate`. It registers the property catalog,
+  and a new world gets one company `company-1` with the starting cash, `Bootstrap(startOffer, company)` for the starting
+  restaurant, and its first commit; no storage, belts, machines, employees, warehouse, district or competitors. No layout,
+  format 1 or 2, or a format 3 save first opened as a dev world (no starting property; made between pieces 1 and 2) keeps
+  the dev world unchanged.
+- Joining: `SessionAdmission` takes the primary site (the starting site, or `dev-site`) and exposes it as `PrimarySiteId`;
+  a player gets an inventory with the dev starter goods there and a grant on every other site of the company that owns it
+  (PROTOTYPE: everyone joins that one company). The join answer (`JoinResponseBroadcast.SiteId`) names the primary site;
+  `ClientSiteSubscription` subscribes only once it is known (`SetPrimary`), and presenters use `SessionRoot.ClientSiteId`
+  instead of `DevWorld.SiteId`. Players spawn on the starting lot's apron two cells out from the first door, facing it
+  (`SessionRoot.ApronSpawn`); dev worlds keep the scene's spawn points.
+- Purchase over the network (Goods): `GoodsNetworkBridge.RequestBuyProperty(requestId, payingSiteId, lotId)` →
+  `BuyPropertyDurably`, replied to the sender and broadcast when accepted. The same commit now grants the new site to every
+  teammate: each player (not an `employee-` actor) granted any site of the buying company. Views keep all `Properties`
+  (ownership is public map information; cash stays private to the owner's sites). `GoodsWorld.ViewSiteId` names a baseline
+  by its layout's site, so a bought site with no locations still reaches clients.
+- Presentation: `WorldLayoutPresenter` in a generated world puts the starting lot's grid centre at the scene origin and its
+  ground floor at y = 0 (`_layoutOrigin`), levels the land over the lot, skips the starting building's model (its shell comes
+  from site data) and trees or signs on that lot, paves every lot, and hides `devSiteOnly` (DevSite's floor, landmarks and
+  NavMesh; shown again for dev-site worlds). Restaurant awnings tint from `Properties` first (this client's company green,
+  other companies a competitor colour), else from the layout's for-sale or competitor state, and re-tint on each new
+  baseline. Offers on clients come from the replicated layout (`WorldLayoutShells.PropertyOffers`), nothing extra is sent.
+- Buy panel: purchasable buildings carry a `PropertyMarker`; aiming at one within 60 m and pressing Interact (E) opens
+  `PropertyPanel` (`InteractionScreen.Property`): category, price, lot size, for sale / owned by your company / owned by
+  another company / not for sale, company cash, Buy (pending and server rejection shown like `LogisticsPanel`). An accepted
+  purchase makes the client watch the new site. `BuildWorldGenScene.cs` wires the panel and `devSiteOnly`.
+- PROTOTYPE limits: only the primary site is drawn; bought sites are reachable only through remote management
+  (logistics panel). At $5,000 few lots are affordable (seed `piece-two`: 2 of 145 restaurants, from $4,320; factories,
+  farms and stations start at $12,672, $25,200 and $14,400).
+  A restaurant's apron is the 2 m setback, so machines wider than 2 cells (the 3x3 oven) do not fit on it; the dock and
+  table do. Ownership shows on the map only for restaurants (the only art with an awning); the panel shows it for all.
+
+Planned (piece 3 and later): several sites drawn at once so players can walk into bought buildings; customers and districts
+in generated worlds; the ingredient supplier near the start, competitors linked to lots, world-owned docks, merging lots,
+reselling, separate companies per player.
 
 ## Required Constraints for Future Implementation
 

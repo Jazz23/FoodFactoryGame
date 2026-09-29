@@ -17,6 +17,7 @@ namespace FoodFactoryGame.Session
         private readonly IReadOnlyList<GoodsLot> _starterGoods;
         private readonly IReadOnlyList<string> _remoteSiteIds;
 
+        // siteId is the primary site: the dev site, or a generated world's starting restaurant.
         public SessionAdmission(PlayerRegistry registry, GoodsWorld world, string siteId, string savePath, int inventoryCapacity = 0,
             IReadOnlyList<GoodsLot> starterGoods = null, IReadOnlyList<string> remoteSiteIds = null)
         {
@@ -32,10 +33,13 @@ namespace FoodFactoryGame.Session
         }
 
         public PlayerRegistry Registry => _registry;
+        // Sent to each admitted client, which subscribes to it.
+        public string PrimarySiteId => _siteId;
 
-        // PROTOTYPE rule: every authenticated player receives the dev-site grant (GDD ownership is open) and,
-        // when a capacity is configured, an inventory location on it (with any starter goods), committed together with the grant.
-        // Remote sites that exist (decision 0022) are granted too, without an inventory, so the player can manage them from afar.
+        // PROTOTYPE rule: every authenticated player joins the one company that owns the primary site (GDD ownership is open):
+        // it receives the primary site's grant and, when a capacity is configured, an inventory location there (with any
+        // starter goods), committed together with the grant. Every other site of that company, and any listed remote site that
+        // exists (decision 0022), is granted too, without an inventory, so the player can manage it from afar.
         // isConnected is checked against the existing identity before any write, so a rejected duplicate
         // cannot rename or otherwise touch the player who is already connected.
         public PlayerResolution Admit(string displayName, string secret, Func<string, bool> isConnected = null)
@@ -44,8 +48,9 @@ namespace FoodFactoryGame.Session
             if (existing != null && isConnected != null && isConnected(existing)) return PlayerResolution.Rejected("already-connected");
             var identity = _registry.RegisterOrResolve(displayName, secret);
             if (!identity.Accepted) return identity;
+            var others = _world.CompanySiteIds(_siteId).Concat(_remoteSiteIds.Where(_world.HasSite)).Where(x => x != _siteId).Distinct().ToList();
             var granted = _world.TryGrantDurably(identity.PlayerId, _siteId, _savePath, _inventoryCapacity, _starterGoods)
-                && _remoteSiteIds.Where(_world.HasSite).All(x => _world.TryGrantDurably(identity.PlayerId, x, _savePath));
+                && others.All(x => _world.TryGrantDurably(identity.PlayerId, x, _savePath));
             return granted ? identity : PlayerResolution.Rejected("persistence-unavailable");
         }
     }

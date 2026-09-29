@@ -1,7 +1,9 @@
 // Server composition root: commits the world save before FishNet starts, owns the player registry and bridge,
 // spawns one avatar per authenticated connection and one worker per saved employee. The world runs whenever the server runs,
 // observed or not. In a scene with a world layout bridge, a newly created world also gets a generated layout (decision 0026),
-// stored before its first snapshot and replicated to clients for presentation only.
+// stored before its first snapshot and replicated to clients for presentation only. A layout with lots (format 3) makes a
+// generated world whose primary site is its starting restaurant (GeneratedWorld, decision 0028): players join and spawn there,
+// and the join answer tells each client which site to subscribe to. Otherwise the dev world and its dev site are used.
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -64,10 +66,14 @@ namespace FoodFactoryGame.Session
         public GoodsNetworkBridge ServerBridge { get; private set; }
         // Server-only: this world's stored layout, or null (no generation in this scene, or a save from before it).
         public StoredWorldLayout ServerLayout { get; private set; }
+        // Server-only: the starting restaurant's lot when this is a generated world (decision 0028), otherwise null.
+        public PropertyOffer StartOffer { get; private set; }
         public bool GeneratesWorld => worldLayoutBridgePrefab != null;
         public PlayerRegistry ServerRegistry => _registry;
         public GoodsSnapshot ClientSite => _site?.Latest;
         public ClientSiteSubscription ClientSubscription => _site;
+        // The site this client presents (named by the server's join answer); null before joining.
+        public string ClientSiteId => _site?.SiteId;
         public IReadOnlyList<EquipmentDefinition> EquipmentDefinitions => equipmentDefinitions;
         public IReadOnlyList<RecipeAsset> Recipes => recipes;
         public IReadOnlyList<OfferAsset> Offers => offers;
@@ -85,7 +91,7 @@ namespace FoodFactoryGame.Session
             _options = readCommandLine ? SessionOptions.FromCommandLine(Environment.GetCommandLineArgs()) : SessionOptions.FromCommandLine(Array.Empty<string>());
             if (!_options.SaveDirectoryExplicit && SessionOptions.IsValidWorldName(saveFolder))
                 _options.SaveDirectory = Path.Combine(SessionOptions.SavesRoot, saveFolder);
-            _site = new ClientSiteSubscription(networkManager, DevWorld.SiteId);
+            _site = new ClientSiteSubscription(networkManager);
             networkManager.ServerManager.OnServerConnectionState += OnServerState;
             networkManager.ClientManager.OnClientConnectionState += OnClientState;
             networkManager.SceneManager.OnClientLoadedStartScenes += OnClientLoadedStartScenes;
@@ -192,11 +198,15 @@ namespace FoodFactoryGame.Session
                 : null;
             // The world is committed before FishNet listens, so the bridge never serves an uncommitted state.
             // Max stacks are content: capacity counts slots, so they are registered (inside LoadOrCreate, before the seed)
-            // ahead of any request.
-            ServerWorld = DevWorld.LoadOrCreate(_options.WorldPath, equipmentDefinitions.FirstOrDefault(x => x != null && x.Kind == "oven"), items,
+            // ahead of any request. A layout with lots (format 3) makes a generated world that starts in its own restaurant, with
+            // the property catalog registered inside; no layout, or format 1 or 2, keeps the dev world beside the map.
+            ServerWorld = GeneratedWorld.Supports(ServerLayout) ? GeneratedWorld.LoadOrCreate(_options.WorldPath, ServerLayout, items) : null;
+            StartOffer = ServerWorld != null ? GeneratedWorld.StartOffer(ServerLayout.Layout) : null;
+            ServerWorld ??= DevWorld.LoadOrCreate(_options.WorldPath, equipmentDefinitions.FirstOrDefault(x => x != null && x.Kind == "oven"), items,
                 _options.LegacyWorldPath, equipmentDefinitions.FirstOrDefault(x => x != null && x.Kind == DevWorld.CounterKind),
                 employeePrefab != null, equipmentDefinitions.FirstOrDefault(x => x != null && x.Kind == GoodsWorld.DockKind),
                 equipmentDefinitions.FirstOrDefault(x => x != null && x.Kind == DevWorld.TableKind));
+            var primarySite = StartOffer?.SiteId ?? DevWorld.SiteId;
             // Machine buffer slot counts follow content, so a saved machine created with older counts is brought up to date.
             foreach (var definition in equipmentDefinitions.Where(x => x != null))
                 ServerWorld.ApplyEquipmentCapacitiesDurably(definition.Kind, definition.InputCapacity, definition.OutputCapacity, _options.WorldPath);
@@ -204,11 +214,15 @@ namespace FoodFactoryGame.Session
             foreach (var recipe in recipes) ServerWorld.RegisterRecipe(recipe.ToDefinition());
             foreach (var offer in offers) offer.RegisterWith(ServerWorld);
             ServerWorld.RegisterFloorOffer(DevWorld.FloorOffer);
+            // Like floors, the property catalog is content: the stored layout's lots (decision 0028), none without a layout. A
+            // generated world registered its own while loading.
+            if (ServerLayout != null && StartOffer == null) ServerWorld.RegisterPropertyOffers(WorldLayoutShells.PropertyOffers(ServerLayout.Layout));
             // Machines run by themselves, Factorio-style (decision 0008); like recipes, this is configuration, not saved.
             ServerWorld.AutomaticJobs = true;
             _registry = new PlayerRegistry(_options.RegistryPath);
-            authenticator.ConfigureServer(new SessionAdmission(_registry, ServerWorld, DevWorld.SiteId, _options.WorldPath,
-                DevWorld.InventoryCapacity, DevWorld.StarterGoods, DevWorld.RemoteSiteIds));
+            // PROTOTYPE: players start with the dev inventory and starter goods on the primary site in either kind of world.
+            authenticator.ConfigureServer(new SessionAdmission(_registry, ServerWorld, primarySite, _options.WorldPath,
+                DevWorld.InventoryCapacity, DevWorld.StarterGoods, StartOffer == null ? DevWorld.RemoteSiteIds : null));
             SetStatus("Starting server...");
             if (!networkManager.ServerManager.StartConnection()) throw new InvalidOperationException("Transport refused to start the server.");
         }
@@ -284,6 +298,7 @@ namespace FoodFactoryGame.Session
             ServerBridge = null;
             ServerWorld = null;
             ServerLayout = null;
+            StartOffer = null;
             _registry?.Dispose();
             _registry = null;
         }
@@ -300,6 +315,8 @@ namespace FoodFactoryGame.Session
 
         private void OnJoinAnswered(JoinResponseBroadcast response)
         {
+            // Arrives before FishNet marks the connection authenticated, so the site is known before the subscription starts.
+            if (response.Accepted) _site.SetPrimary(string.IsNullOrEmpty(response.SiteId) ? DevWorld.SiteId : response.SiteId);
             SetStatus(response.Accepted ? $"Joined as {response.PlayerId}" : $"Rejected: {response.Reason}");
         }
 
@@ -322,9 +339,29 @@ namespace FoodFactoryGame.Session
 
         private (Vector3 position, Quaternion rotation) NextSpawn()
         {
+            if (StartOffer != null) return ApronSpawn(StartOffer, _nextSpawn++);
             if (spawnPoints.Length == 0) return (Vector3.zero, Quaternion.identity);
             var point = spawnPoints[_nextSpawn++ % spawnPoints.Length];
             return (point.position, point.rotation);
+        }
+
+        // Generated worlds (decision 0028): players arrive on the starting lot's apron two cells out from its first door, facing
+        // it, spread along the wall (0, +2, -2, +4, -4 cells, repeating) and kept on the lot. The site grid is centred on the scene
+        // origin (SiteGridSpace), the presenter moves the map to match.
+        public static (Vector3 position, Quaternion rotation) ApronSpawn(PropertyOffer offer, int index)
+        {
+            var door = offer.Doors[0];
+            var outward = door.Z == offer.BuildingZ + offer.BuildingDepth - 1 ? new Vector2Int(0, 1)
+                : door.Z == offer.BuildingZ ? new Vector2Int(0, -1)
+                : door.X == offer.BuildingX ? new Vector2Int(-1, 0) : new Vector2Int(1, 0);
+            var along = new Vector2Int(outward.y, outward.x);
+            var step = index % 5;
+            var offset = step == 0 ? 0 : (step % 2 == 1 ? 1 : -1) * 2 * ((step + 1) / 2);
+            var x = Mathf.Clamp(door.X + outward.x * 2 + along.x * offset, 0, offer.Width - 1);
+            var z = Mathf.Clamp(door.Z + outward.y * 2 + along.y * offset, 0, offer.Depth - 1);
+            var grid = new SiteLayout { SiteId = offer.SiteId, Width = offer.Width, Depth = offer.Depth };
+            var position = SiteGridSpace.FootprintCenter(grid, x, z, 1, 1) + Vector3.up * 0.05f;
+            return (position, Quaternion.LookRotation(new Vector3(-outward.x, 0f, -outward.y)));
         }
 
         private void SetStatus(string status)

@@ -1,6 +1,8 @@
-// Client side: once authenticated and the bridge is visible, subscribes once to a site, keeps its latest baseline,
-// and forwards this client's command results so presentation can send requests through the same bridge. It can also watch
-// the company's other sites for remote management (decision 0022); their baselines are kept apart from the primary one.
+// Client side: once authenticated and the bridge is visible, subscribes once to this client's primary site, keeps its latest
+// baseline, and forwards this client's command results so presentation can send requests through the same bridge. The server
+// names the primary site in its join answer (the dev site, or a generated world's starting restaurant); nothing is subscribed
+// before it is known. It can also watch the company's other sites for remote management (decision 0022); their baselines are
+// kept apart from the primary one.
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,30 +15,40 @@ namespace FoodFactoryGame.Session
     public sealed class ClientSiteSubscription
     {
         private readonly NetworkManager _manager;
-        private readonly string _siteId;
         private readonly HashSet<string> _watched = new();
         private readonly Dictionary<string, GoodsSnapshot> _remote = new();
+        private string _siteId;
         private GoodsNetworkBridge _bridge;
 
-        public ClientSiteSubscription(NetworkManager manager, string siteId)
+        public ClientSiteSubscription(NetworkManager manager, string siteId = null)
         {
             _manager = manager;
-            _siteId = siteId;
+            _siteId = string.IsNullOrWhiteSpace(siteId) ? null : siteId;
         }
 
         public GoodsSnapshot Latest { get; private set; }
         // Null until subscribed; requests sent through it are resolved to this connection's player by the server.
         public GoodsNetworkBridge Bridge => _bridge;
-        // The site this client subscribes to; requests that name a site (purchases) use it.
+        // The site this client subscribes to (null until the server names it); requests that name a site (purchases) use it.
         public string SiteId => _siteId;
         public event Action<GoodsOutcome> ResultReceived;
         public string LastRejection { get; private set; }
+
+        // Sets the primary site from the server's join answer. A different site (another world) drops the old baselines and
+        // watched sites, which belonged to that world.
+        public void SetPrimary(string siteId)
+        {
+            if (string.IsNullOrWhiteSpace(siteId) || siteId == _siteId) return;
+            Reset();
+            _watched.Clear();
+            _siteId = siteId;
+        }
 
         // Call every frame; cheap once subscribed. Resets when the client connection or bridge goes away.
         public void Tick()
         {
             if (_bridge != null && (!_manager.IsClientStarted || !_bridge.IsClientStarted)) Reset();
-            if (_bridge != null || !_manager.IsClientStarted || !_manager.ClientManager.Connection.IsAuthenticated) return;
+            if (_bridge != null || _siteId == null || !_manager.IsClientStarted || !_manager.ClientManager.Connection.IsAuthenticated) return;
             var spawned = _manager.ClientManager.Objects.Spawned.Values
                 .Select(x => x.GetComponent<GoodsNetworkBridge>()).FirstOrDefault(x => x != null);
             if (spawned == null) return;
@@ -53,6 +65,8 @@ namespace FoodFactoryGame.Session
             if (string.IsNullOrWhiteSpace(siteId) || siteId == _siteId || !_watched.Add(siteId)) return;
             _bridge?.RequestSite(siteId);
         }
+
+        public bool IsWatching(string siteId) => siteId != null && _watched.Contains(siteId);
 
         // Latest baseline of a watched site; null until one arrives.
         public GoodsSnapshot Remote(string siteId) => _remote.TryGetValue(siteId ?? "", out var site) ? site : null;
@@ -72,10 +86,14 @@ namespace FoodFactoryGame.Session
 
         private void OnSite(GoodsSnapshot site)
         {
-            if (site.Locations.Count == 0) return;
-            var siteId = site.Locations[0].SiteId;
+            var siteId = GoodsWorld.ViewSiteId(site);
+            if (siteId == null) return;
             if (siteId == _siteId) Latest = site;
-            else if (_watched.Contains(siteId)) _remote[siteId] = site;
+            else if (_watched.Contains(siteId))
+            {
+                if (!_remote.ContainsKey(siteId)) UnityEngine.Debug.Log($"[Session] Receiving site {siteId} for remote management.");
+                _remote[siteId] = site;
+            }
         }
 
         private void OnResult(GoodsOutcome outcome)

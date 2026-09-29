@@ -3,7 +3,8 @@
 // Coordinates are whole metres on the building cell grid (1 m cells), with the city centre at the origin, +X east, +Z north.
 // A rectangle's X/Z is its minimum cell and Width/Depth count cells along X/Z. Roads and rails are centrelines with a width.
 // Format 2 adds the land surface (WorldTerrain), rivers with bridges, level crossings, junction controls, building elevations
-// and trees; a format 1 layout (generator v1) reads as flat land with none of them.
+// and trees; a format 1 layout (generator v1) reads as flat land with none of them. Format 3 adds lots and reserved site IDs
+// (decision 0028); format 1 and 2 layouts have no lots, so nothing in them can be bought.
 using System.Collections.Generic;
 
 namespace FoodFactoryGame.World
@@ -214,21 +215,45 @@ namespace FoodFactoryGame.World
         public long PriceCents;
         // Stations only.
         public string LineId = "";
-        // Stub: which site (and SiteGrid) a purchasable building becomes is an open owner decision (decision 0026). Always empty.
+        // The reserved site ID of the building's lot (format 3, decision 0028); empty for scenery and in formats 1 and 2.
         public string SiteId = "";
         // Ground-floor level in centimetres: the land height at the entrance (0 in format 1).
         public int ElevationCm;
 
         public bool IsShell => Category == BuildingCategory.Restaurant || Category == BuildingCategory.Factory;
         public bool IsPurchasable => Ownership == Ownership.ForSale || Ownership == Ownership.Competitor;
+        // Property (for sale, a competitor's or the player's) stands on a lot; scenery does not.
+        public bool HasLot => Ownership != Ownership.Scenery;
         public WorldRect Footprint => new(X, Z, Width, Depth);
         public int YawDegrees => (int)Facing * 90;
+    }
+
+    // A purchasable building's lot (format 3, decision 0028): the footprint extended forward to its street, so the gap in
+    // front of the street wall (a factory's or farm's deeper apron) belongs to it. The building's site covers exactly the lot:
+    // site cell (x, z) is world cell (X + x, Z + z), translation only. Access is the street cell in front of the lot, level
+    // with the first door, that trucks drive to. IDs derive from the building ID, so they are stable for a stored layout.
+    public sealed class WorldLot
+    {
+        public string Id;
+        public string BuildingId;
+        public string SiteId;
+        public int X;
+        public int Z;
+        public int Width;
+        public int Depth;
+        public WorldCell Access;
+
+        public WorldRect Rect => new(X, Z, Width, Depth);
+
+        public static string IdFor(string buildingId) => "lot-" + buildingId;
+
+        public static string SiteIdFor(string buildingId) => "site-" + buildingId;
     }
 
     public sealed class WorldLayout
     {
         // Format of WorldLayoutText; the generator version is separate (a new generator may keep the format).
-        public const int CurrentFormat = 2;
+        public const int CurrentFormat = 3;
 
         public int FormatVersion = CurrentFormat;
         public int GeneratorVersion;
@@ -251,5 +276,7 @@ namespace FoodFactoryGame.World
         public List<WorldBridge> Bridges = new();
         public List<LevelCrossing> Crossings = new();
         public List<WorldTree> Trees = new();
+        // Format 3; empty in formats 1 and 2. One per building that HasLot, in building order.
+        public List<WorldLot> Lots = new();
     }
 }

@@ -1,9 +1,11 @@
-// What the crosshair is on that has a screen: an employee, a placed machine or the dev storage, within interactReach of
-// the avatar on its floor. That target is outlined (HoverOutline) while no screen is open, and E (or left click with an empty cursor) opens its screen; E on nothing opens the
-// inventory. Local presentation only: opening a screen never changes gameplay state.
+// What the crosshair is on that has a screen: an employee, a placed machine or the dev storage within interactReach of
+// the avatar on its floor, or a purchasable map building (PropertyMarker) within propertyReach. That target is outlined
+// (HoverOutline; map buildings are not) while no screen is open, and E (or left click with an empty cursor) opens its screen;
+// E on nothing opens the inventory. Local presentation only: opening a screen never changes gameplay state.
 using System.Linq;
 using FoodFactoryGame.Session.Employees;
 using FoodFactoryGame.Session.Player;
+using FoodFactoryGame.Session.WorldMap;
 using UnityEngine;
 
 namespace FoodFactoryGame.Session.Equipment
@@ -12,6 +14,8 @@ namespace FoodFactoryGame.Session.Equipment
     {
         // Outline drawn round the hover target (the employees' prefab brings its own).
         [SerializeField] private Material hoverOutlineMaterial;
+        // Farthest the avatar may stand from a map building (metres across the ground) to open its buy panel.
+        [SerializeField] private float propertyReach = 60f;
 
         // An EmployeeWorker, EquipmentVisual or storage SiteLocationMarker; null when the crosshair is on nothing openable
         // within reach.
@@ -38,7 +42,8 @@ namespace FoodFactoryGame.Session.Equipment
 
         private void SetOutline(Component target, bool on)
         {
-            if (target == null) return;
+            // Map buildings are static-batched and far too large to outline; the hint names them instead.
+            if (target == null || target is PropertyMarker) return;
             HoverOutline.For(target, hoverOutlineMaterial).SetHighlighted(on);
         }
 
@@ -50,7 +55,17 @@ namespace FoodFactoryGame.Session.Equipment
                 .Where(x => x.collider.GetComponentInParent<PlayerAvatar>() == null
                             && (!x.collider.isTrigger || x.collider.GetComponentInParent<EmployeeWorker>() != null))
                 .OrderBy(x => x.distance).FirstOrDefault().collider;
-            if (hit == null || !InReach(hit.bounds)) return null;
+            if (hit == null) return null;
+            // Map buildings are aimed at from the street, so they have their own reach and no floor check.
+            var property = hit.GetComponentInParent<PropertyMarker>();
+            if (property != null)
+            {
+                var position = _avatar == null ? hit.bounds.center : _avatar.transform.position;
+                var nearest = hit.bounds.ClosestPoint(position);
+                return _avatar != null && Vector2.Distance(new Vector2(nearest.x, nearest.z), new Vector2(position.x, position.z)) <= propertyReach
+                    ? property : null;
+            }
+            if (!InReach(hit.bounds)) return null;
             var employee = hit.GetComponentInParent<EmployeeWorker>();
             if (employee != null) return employee;
             var visual = hit.GetComponentInParent<EquipmentVisual>();
@@ -90,6 +105,9 @@ namespace FoodFactoryGame.Session.Equipment
                 case SiteLocationMarker marker when marker != null:
                     OpenStorage();
                     break;
+                case PropertyMarker property when property != null:
+                    OpenProperty(property.LotId);
+                    break;
                 default:
                     ToggleInventory();
                     break;
@@ -101,6 +119,7 @@ namespace FoodFactoryGame.Session.Equipment
             EmployeeWorker => (_held == null ? "Left click or " : "") + "E: give this employee a script. ",
             EquipmentVisual visual => $"E: open the {visual.Kind}. ",
             SiteLocationMarker => "E: open the storage. ",
+            PropertyMarker property => $"E: {property.BuildingId}: price and owner. ",
             _ => ""
         };
     }

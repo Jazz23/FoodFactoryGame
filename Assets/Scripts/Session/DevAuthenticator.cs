@@ -23,6 +23,8 @@ namespace FoodFactoryGame.Session
         public bool Accepted;
         public string Reason;
         public string PlayerId;
+        // The site the player joins on (its inventory and the site the client subscribes to); empty when rejected.
+        public string SiteId;
     }
 
     public sealed class DevAuthenticator : Authenticator
@@ -138,7 +140,7 @@ namespace FoodFactoryGame.Session
             }
             _players[connection] = result.PlayerId;
             _connections[result.PlayerId] = connection;
-            Send(connection, true, result.Reason, result.PlayerId);
+            Send(connection, true, result.Reason, result.PlayerId, _admission.PrimarySiteId);
             OnAuthenticationResult?.Invoke(connection, true);
         }
 
@@ -158,10 +160,10 @@ namespace FoodFactoryGame.Session
             OnAuthenticationResult?.Invoke(connection, false);
         }
 
-        private void Send(NetworkConnection connection, bool accepted, string reason, string playerId)
+        private void Send(NetworkConnection connection, bool accepted, string reason, string playerId, string siteId = null)
         {
             NetworkManager.ServerManager.Broadcast(connection,
-                new JoinResponseBroadcast { Accepted = accepted, Reason = reason ?? "", PlayerId = playerId ?? "" }, false);
+                new JoinResponseBroadcast { Accepted = accepted, Reason = reason ?? "", PlayerId = playerId ?? "", SiteId = siteId ?? "" }, false);
         }
 
         private void OnRemoteConnectionState(NetworkConnection connection, RemoteConnectionStateArgs args)

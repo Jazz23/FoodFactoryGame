@@ -217,10 +217,25 @@ Artifacts are intentionally ignored by Git. Preserve required evidence externall
   (a number is used as is, other text is hashed, blank is random) applies only when a world is created; an existing world
   keeps its stored layout, and a save made before world generation keeps none (the readout says so). `-save <dir>` and
   `-seed <text>` still work for a launched player.
-- The city's edge starts 40 m north of the dev site; tilt the camera up (mouse) to see it. While a layout is shown, local
-  cameras draw to about 2.4 km.
-- Tests: assembly `FoodFactoryGame.World.EditModeTests` (19 tests; generator v2, format 1 compatibility and `world.db` layout storage, temporary databases
-  only) and `FoodFactoryGame.Session.Tests.WorldGenerationTests` (4). A change to generator output fails
+- A new world (layout format 3, decision 0028 piece 2) starts you on the apron of your own starting restaurant, with the
+  city around it, $5,000 of company cash and the dev starter goods in your inventory; nothing else is seeded. Aim at a
+  restaurant, factory, farm or station within 60 m and press E for its buy panel (price, owner, Buy). Your company's
+  restaurants have green awnings, unowned ones for sale yellow. Bought sites are managed from the logistics screen (L)
+  until several sites can be drawn at once. A world saved in format 1 or 2, or first opened before piece 2, keeps the dev
+  site with the city's edge 40 m north of it. While a layout is shown, local cameras draw to about 2.4 km.
+- Rebuilding the scene with `BuildWorldGenScene.cs` also adds the `PropertyPanel` and hands DevSite's floor, landmarks and
+  NavMesh to the presenter (`devSiteOnly`, shown only for dev-site worlds). The rebuild recopies DevSite, which gives
+  `WorldGen.unity` a new GUID and resets the layout bridge prefab's FishNet path hash; restore those two files and
+  `DefaultPrefabObjects.asset` with git if nothing references them. Close or reload `WorldGen.unity` before restoring
+  files under it: an externally changed open scene blocks the Editor with a modal reload prompt.
+- WorldGen player build for separate-process checks: `build` with `scenes: ["Assets/Scenes/WorldGen.unity"]` and
+  `outputPath: "build/WorldGen/FoodFactoryGame.exe"` (the build settings keep DevSite as the only build scene).
+- Tests: `FoodFactoryGame.Session.Tests.GeneratedWorldTests` (EditMode, 4) and
+  `FoodFactoryGame.Session.PlayModeTests.WorldGenSessionTests` (PlayMode, 4; loads WorldGen through
+  `EditorSceneManager.LoadSceneAsyncInPlayMode`, seed `piece-two`, isolated save). The purchase test tops up cash with
+  `AdjustCashDurably` (internal, test-only) so its chosen restaurant is affordable.
+- Tests: assembly `FoodFactoryGame.World.EditModeTests` (generator v3 with lots, format 1 and 2 compatibility and `world.db` layout storage, temporary databases
+  only; property purchase is in `FoodFactoryGame.Goods.Tests.PropertyTests`) and `FoodFactoryGame.Session.Tests.WorldGenerationTests` (4). A change to generator output fails
   `SameSeedProducesAnIdenticalLayout`: bump `WorldGenerator.Version` and re-pin `KnownHash` rather than editing the pin alone.
 - World art: regenerate textures and models in Blender, copy them into `Assets/Art/World`, and run
   `AgentScripts/BuildWorldArt.cs` (steps in `ArtSource/World/README.md`; set `WORLD_ART_ROOT` to `ArtSource/World` of this
