@@ -1,7 +1,7 @@
 // Runs the real WorldGen scene (decision 0028, piece 2) as a host, with a loopback-UDP remote client where needed, on a new
 // generated world in a unique temporary directory: the player starts on the starting restaurant's own site, the map's starting
-// lot lines up with the site grid, a dock (small enough for a restaurant's 2 m apron) places there, and a purchase through the
-// buy panel reaches both clients.
+// lot lines up with the site grid, a dock (small enough for a restaurant's 2 m apron) places there, a purchase through the
+// buy panel reaches both clients, and a whole sale in the pre-equipped starting restaurant (decision 0030) reaches both.
 // The application's saves are never opened.
 using System;
 using System.Collections;
@@ -120,7 +120,9 @@ namespace FoodFactoryGame.Session.PlayModeTests
             Assert.That(site.Companies.Single().Cash, Is.EqualTo(GeneratedWorld.StartingCash));
             Assert.That(site.Properties.Single().LotId, Is.EqualTo(Start.LotId));
             Assert.That(site.Locations.Single(x => x.Id == GoodsWorld.InventoryLocationId(_root.Authenticator.LocalPlayerId)).SiteId, Is.EqualTo(Start.SiteId));
-            Assert.That(site.Equipment.Count + site.Belts.Count + site.Employees.Count, Is.Zero, "No dev seed.");
+            Assert.That(site.Equipment.Select(x => x.Id), Is.EquivalentTo(new[] { GeneratedWorld.StartCounterId, GeneratedWorld.StartTableId }),
+                "Pre-equipped with a counter and a table (decision 0030).");
+            Assert.That(site.Belts.Count + site.Employees.Count, Is.Zero, "No dev seed.");
             Assert.That((GameObject.Find("Navigation"), GameObject.Find("Landmark 1")), Is.EqualTo(((GameObject)null, (GameObject)null)),
                 "The dev site's ground and NavMesh are hidden in a generated world.");
 
@@ -233,6 +235,109 @@ namespace FoodFactoryGame.Session.PlayModeTests
             yield return Until(() => _remoteSite.Remote(diner.SiteId) != null, "remote baseline of the bought site");
             yield return Until(() => _root.ClientSubscription.Remote(diner.SiteId) != null, "buyer watches the bought site");
             yield return Until(() => _map.AwningColour(diner.BuildingId) == new Color(0.18f, 0.62f, 0.26f), "awning turns the owner's green");
+        }
+
+        // A whole sale in the pre-equipped starting restaurant (decision 0030), with a listen-server teammate: the host buys an
+        // oven and dough from the supplier, places the oven inside the shell, bakes bread and puts it on the starting counter; a
+        // customer buys it, the company's cash goes up on both clients (the teammate also sees the customers), and the committed
+        // save matches. The local NavMesh leads from the street through a door to the counter, and customer figures are drawn.
+        [UnityTest]
+        public IEnumerator AWholeSaleInTheStartingRestaurantReachesBothClients()
+        {
+            yield return StartHost();
+            CreateRemote();
+            Assert.That(_remote.ClientManager.StartConnection(), Is.True);
+            yield return Until(() => { _remoteSite.Tick(); return _remoteSite.Latest != null; }, "remote baseline of the starting site");
+            var results = new System.Collections.Generic.Dictionary<string, GoodsOutcome>();
+            _root.ClientSubscription.ResultReceived += x => results[x.RequestId] = x;
+            var me = _root.Authenticator.LocalPlayerId;
+            var bridge = _root.ClientSubscription.Bridge;
+            var inventory = GoodsWorld.InventoryLocationId(me);
+            var startCash = _root.ClientSite.Companies.Single().Cash;
+
+            bridge.RequestPurchase("buy-oven", Start.SiteId, "supplier-oven");
+            bridge.RequestPurchase("buy-dough", Start.SiteId, "supplier-dough-5");
+            yield return Until(() => results.ContainsKey("buy-oven") && results.ContainsKey("buy-dough"), "supplier purchases");
+            Assert.That((results["buy-oven"].Accepted, results["buy-dough"].Accepted), Is.EqualTo((true, true)),
+                results["buy-oven"].Reason + " / " + results["buy-dough"].Reason);
+            yield return Until(() => _root.ClientSite.Equipment.Any(x => x.HolderId == me && x.Kind == "oven"), "held oven");
+            var site = _root.ClientSite;
+            var oven = site.Equipment.Single(x => x.HolderId == me && x.Kind == "oven");
+            var shell = site.Buildings.Single();
+            var anchor = Enumerable.Range(0, Start.Width * Start.Depth).Select(i => (X: i % Start.Width, Z: i / Start.Width))
+                .Where(c => SiteGrid.InsideInterior(shell, c.X, c.Z, oven.Width, oven.Depth) && SiteGrid.PlacementProblem(site, oven, c.X, c.Z, 0, 0) == null)
+                // As far from the doors as possible, so the oven never stands in the customers' way in.
+                .OrderByDescending(c => shell.Doors.Min(d => Mathf.Abs(d.X - (c.X + 1)) + Mathf.Abs(d.Z - (c.Z + 1)))).First();
+            bridge.RequestPlace("place-oven", oven.Id, anchor.X, anchor.Z, 0);
+            yield return Until(() => results.ContainsKey("place-oven"), "oven placement");
+            Assert.That(results["place-oven"].Accepted, Is.True, results["place-oven"].Reason);
+
+            yield return Until(() => _root.ClientSite.Lots.Any(x => x.LocationId == inventory && x.ItemId == DevWorld.DoughItemId), "dough in hand");
+            var dough = _root.ClientSite.Lots.First(x => x.LocationId == inventory && x.ItemId == DevWorld.DoughItemId);
+            bridge.RequestTransfer("load-oven", dough.Id, oven.Id + ":in", 2);
+            yield return Until(() => results.ContainsKey("load-oven"), "dough into the oven");
+            Assert.That(results["load-oven"].Accepted, Is.True, results["load-oven"].Reason);
+            yield return Until(() => _root.ClientSite.Lots.Any(x => x.LocationId == oven.Id + ":out" && x.ItemId == "bread"), "baked bread", 40f);
+            var bread = _root.ClientSite.Lots.First(x => x.LocationId == oven.Id + ":out" && x.ItemId == "bread");
+            bridge.RequestTransfer("stock-counter", bread.Id, GeneratedWorld.StartCounterId + ":in", bread.Quantity);
+            yield return Until(() => results.ContainsKey("stock-counter"), "bread onto the counter");
+            Assert.That(results["stock-counter"].Accepted, Is.True, results["stock-counter"].Reason);
+
+            // TEST-ONLY district standing on the starting site's map point with a 5 m range, so only this restaurant is in its
+            // range and a customer comes within seconds (the map's own districts share each customer among ~100 restaurants).
+            var map = _root.ServerWorld.Snapshot().Sites.Single(x => x.Id == Start.SiteId);
+            _root.ServerWorld.Bootstrap(new GoodsDistrict
+            {
+                Id = "test-district", Name = "Test", MapX = map.MapX, MapZ = map.MapZ, CustomersPerHour = 720, WealthPercent = 40,
+                AppearanceVariants = 1, LikedCuisines = { "bakery" }, DineInPercent = 50, RangeMetres = 5
+            });
+            yield return Until(() => _root.ClientSite.Companies.Single().Cash > startCash - SupplierSpend, "a customer buys bread", 60f);
+            var cash = _root.ClientSite.Companies.Single().Cash;
+            Assert.That(cash, Is.EqualTo(startCash - SupplierSpend + 250 * (_root.ClientSite.Diners.Single(x => x.RestaurantId == Start.SiteId).Served)));
+
+            yield return Until(() => { _remoteSite.Tick(); return _remoteSite.Latest.Companies.Single().Cash >= cash; }, "teammate sees the cash");
+            yield return Until(() => { _remoteSite.Tick(); return _remoteSite.Latest.Customers.Any(x => x.RestaurantId == Start.SiteId); },
+                "teammate sees the customers");
+            yield return Until(() =>
+            {
+                var saved = GoodsSnapshotStore.Load(_root.Options.WorldPath).Snapshot();
+                var live = _root.ServerWorld.Snapshot();
+                return saved.Companies.Single().Cash > startCash - SupplierSpend && saved.Companies.Single().Cash ==
+                    startCash - SupplierSpend + 250 * saved.Diners.Single(x => x.RestaurantId == Start.SiteId).Served
+                    && live.Revision >= saved.Revision;
+            }, "the committed save matches its sales", 30f);
+
+            var navigation = UnityEngine.Object.FindAnyObjectByType<Customers.SiteNavigation>();
+            Assert.That(navigation.BuiltFor, Does.StartWith(Start.SiteId), "The generated lot has a runtime NavMesh.");
+            var layout = _root.ClientSite.SiteLayouts.Single();
+            var counter = _root.ClientSite.Equipment.Single(x => x.Id == GeneratedWorld.StartCounterId);
+            var street = Customers.SiteStreet.Points(layout, Customers.SiteStreet.Outward(layout, _root.ClientSite.Buildings).Value);
+            var goal = SiteGridSpace.Center(layout, counter) + new Vector3(0, 0, -0.9f);
+            var path = new UnityEngine.AI.NavMeshPath();
+            Assert.That(UnityEngine.AI.NavMesh.SamplePosition(street[0], out var from, 1f, UnityEngine.AI.NavMesh.AllAreas), Is.True);
+            Assert.That(UnityEngine.AI.NavMesh.SamplePosition(goal, out var to, 1f, UnityEngine.AI.NavMesh.AllAreas), Is.True);
+            Assert.That(UnityEngine.AI.NavMesh.CalculatePath(from.position, to.position, UnityEngine.AI.NavMesh.AllAreas, path) && path.status == UnityEngine.AI.NavMeshPathStatus.PathComplete,
+                Is.True, "The street connects to the counter.");
+            var doors = shell.Doors.Select(d => SiteGridSpace.FootprintCenter(layout, d.X, d.Z, 1, 1)).ToList();
+            Assert.That(UnityEngine.AI.NavMesh.Raycast(from.position, to.position, out _, UnityEngine.AI.NavMesh.AllAreas), Is.True,
+                "A straight line from the street to the counter is blocked by a wall.");
+            Assert.That(PathPassesNear(path, doors, 1.2f), Is.True, "The path goes through a door.");
+            var figures = UnityEngine.Object.FindAnyObjectByType<Customers.CustomerPresenter>();
+            yield return Until(() => figures.VisibleCount > 0, "customer figures drawn", 20f);
+        }
+
+        // TEST-ONLY expectation from the supplier content: one oven ($150.00) and one pack of dough ($2.50); bread sells for $2.50.
+        private const long SupplierSpend = 15000 + 250;
+
+        private static bool PathPassesNear(UnityEngine.AI.NavMeshPath path, System.Collections.Generic.List<Vector3> points, float distance)
+        {
+            for (var index = 1; index < path.corners.Length; index++)
+                for (var step = 0; step <= 20; step++)
+                {
+                    var p = Vector3.Lerp(path.corners[index - 1], path.corners[index], step / 20f);
+                    if (points.Any(x => new Vector2(x.x - p.x, x.z - p.z).magnitude <= distance)) return true;
+                }
+            return false;
         }
 
         private void CreateRemote()

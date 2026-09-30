@@ -439,6 +439,12 @@ namespace FoodFactoryGame.Goods
                 state.Properties ??= new();
                 state.SchemaVersion = 14;
             }
+            // v14 competitors had no lot (decision 0028 links them in v15); they load unlinked, as dev competitors stay.
+            if (state != null && state.SchemaVersion == 14)
+            {
+                foreach (var competitor in state.Competitors ?? new()) if (competitor != null) competitor.LotId ??= "";
+                state.SchemaVersion = 15;
+            }
             GoodsWorld.Validate(state);
             return state;
         }

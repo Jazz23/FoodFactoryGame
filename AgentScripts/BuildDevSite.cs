@@ -88,7 +88,8 @@ public static class BuildDevSite
         var table = BuildEquipmentDefinition(TableDefinitionPath, GoodsWorld.TableKind, 2, 1, 1, 1, BuildTablePrefab(), ImportIcon("Table"), seats: 4);
         // PROTOTYPE supplier prices (decision 0014): dough at 50 cents a unit leaves $2.00 margin on a $2.50 bread. An oven
         // (decision 0017) costs $150.00, 75 breads of margin, so the $500.00 start can afford one while keeping ingredient money.
-        // A fridge costs $80.00, a loading dock $60.00, a truck (decision 0023) $250.00 and a table (decision 0024) $40.00.
+        // A fridge costs $80.00, a loading dock $60.00, a truck (decision 0023) $250.00, a table (decision 0024) $40.00 and a sell
+        // counter (decision 0030) $50.00.
         var offers = new[]
         {
             BuildOffer("Dough5", "supplier-dough-5", DevWorld.DoughItemId, 5, 250, DevWorld.DoughSpoilAfterSeconds),
@@ -97,6 +98,7 @@ public static class BuildDevSite
             BuildOffer("Fridge1", "supplier-fridge", "", 1, 8000, 1, fridge),
             BuildOffer("Dock1", "supplier-dock", "", 1, 6000, 1, dock),
             BuildOffer("Table1", "supplier-table", "", 1, 4000, 1, table),
+            BuildOffer("Counter1", "supplier-counter", "", 1, 5000, 1, counter),
             BuildOffer("Truck1", "supplier-truck", "", 1, 25000, 1, truck: BuildTruckDefinition())
         };
         // PROTOTYPE stack sizes: dough and bread 20, belts 100 (Factorio's belt stack), lifts 50 (decision 0021).

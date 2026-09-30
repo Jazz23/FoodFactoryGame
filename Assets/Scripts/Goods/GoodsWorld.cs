@@ -76,7 +76,7 @@ namespace FoodFactoryGame.Goods
 
     [Serializable] public sealed class GoodsSnapshot
     {
-        public const int CurrentSchema = 14;
+        public const int CurrentSchema = 15;
         public int SchemaVersion = CurrentSchema;
         public string WorldId;
         public long ClockSeconds;
@@ -100,6 +100,7 @@ namespace FoodFactoryGame.Goods
         // Customers (decision 0024): district and competitor map records, the customers in the world, and each restaurant's
         // reputation and published wait. The counters and random state keep customer IDs and choices deterministic.
         public List<GoodsDistrict> Districts = new();
+        // v15 links a competitor to its generated building's lot (GoodsCompetitor.LotId).
         public List<GoodsCompetitor> Competitors = new();
         public List<GoodsCustomer> Customers = new();
         public List<GoodsDiner> Diners = new();

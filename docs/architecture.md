@@ -452,9 +452,44 @@ Decision: [0028](decisions/0028-sites-for-generated-buildings.md). Owner decisio
   A restaurant's apron is the 2 m setback, so machines wider than 2 cells (the 3x3 oven) do not fit on it; the dock and
   table do. Ownership shows on the map only for restaurants (the only art with an awning); the panel shows it for all.
 
-Planned (piece 3 and later): several sites drawn at once so players can walk into bought buildings; customers and districts
-in generated worlds; the ingredient supplier near the start, competitors linked to lots, world-owned docks, merging lots,
-reselling, separate companies per player.
+Planned (piece 3 and later): several sites drawn at once so players can walk into bought buildings, carrying goods by
+[0029](decisions/0029-carrying-goods-between-owned-sites.md) (accepted, not implemented); the ingredient supplier near the
+start, world-owned docks, merging lots, reselling, separate companies per player. Customers, districts and competitors
+linked to lots are implemented below (decision 0030). (The piece 2 notes above describe new worlds as having no
+district or competitors; that was true until 0030.)
+
+## Implemented: customers in generated worlds (2026-09-30)
+
+Decision: [0030](decisions/0030-customers-in-generated-worlds.md). Owner decision of 2026-09-30: the starting restaurant is
+pre-equipped. Evidence: [verification record](verification/customers-worldgen-20260930.md).
+
+- Derivation (`WorldLayoutCustomers`, Goods): a pure function of the stored layout. One `GoodsDistrict` per block of each
+  layout district, `district-<id>-<block>`, spawning at the block's centre, with the district's customers per hour shared
+  by area (largest remainder). Wealth, dine-in share and range come from a PROTOTYPE table per district kind, and liked
+  cuisines are those weighted at least 25. One `GoodsCompetitor` per competitor-owned lot, `competitor-<building>`, with
+  `LotId` and the lot's access point as its map position; cuisine is drawn from the district's weights, tier is the
+  district's minimum, and price, servers, service time and seats come from an FNV-1a hash of the building ID. Seed
+  `piece-two`: 25 districts, 314 competitors.
+- Goods schema v15: `GoodsCompetitor.LotId` (`""` for dev competitors and upgraded v14 saves). A linked lot is unique
+  among competitors and never a property's lot. With a catalog, it must be listed and not for sale (checked in
+  `Bootstrap(GoodsCompetitor)` and before every save, and a catalog that disagrees is refused at registration).
+- Choice: `Decide` scores only the restaurants within the district's range (the per-district candidate cache in
+  `GoodsWorld.Customers.cs`, rebuilt with the diner catalog or when a district is added), in catalog order, so outcomes
+  equal scoring every restaurant. Diner records are looked up by dictionary.
+- World creation (`GeneratedWorld`): a new world gets the starting counter (`start-counter`) and table (`start-table`)
+  placed inside the shell, plus every derived district and competitor, before its first commit. An existing generated
+  world gains missing districts and competitors by ID, and a counter or table only if it has never had one of that kind,
+  committed before serving. `SessionRoot` passes the counter and table definitions. Dev worlds are unchanged.
+- Content: supplier offer `supplier-counter` ($50.00, `Counter1.asset`), in both scenes and in `BuildDevSite.cs`.
+- Presentation: `SiteNavigation` (on the WorldGen scene, added by `BuildWorldGenScene.cs`) builds a runtime NavMesh for a
+  generated lot. It covers the lot's floor and a 6 m street band reaching 12 m past each side, with the ground-floor walls
+  built in. It is rebuilt when the site, size or buildings change, and equipment still carves it. `SiteStreet` finds the
+  street side: the side on which the shell does not reach the lot's edge. On such lots, `CustomerPresenter` spawns and
+  removes figures on the street band, out of view. Competitors' customers are not drawn.
+- Scale (0025 budgets, `CityCustomerBenchmarkTests`): tick p99 at most 0.68 ms, a 100-customer decision burst 3.3 ms,
+  commit maximum at most 31.7 ms, payload 157 KB.
+- PROTOTYPE limits: about 1,870 customers an hour across about 300 restaurants, so the starting restaurant makes roughly 3
+  sales an hour. The street band is flat. Queue and ordering spots are fixed in site axes.
 
 ## Required Constraints for Future Implementation
 
@@ -473,7 +508,7 @@ These remain accepted contracts; only the bounded goods slice, its station jobs,
 - Physical goods model: selected in GDD section 28 and decision 0003; a logical lot/condition/transfer/recovery slice is implemented. Transport staging, actual placed-world positions, carrier/vehicle handling constraints, and visual projection remain pending.
 - Offline progression, host migration, discovery/lobbies/relay, and the shipped hosting model remain undecided. A direct-IP development host/join flow exists (decision 0005).
 - SQLite is the storage for all persisted data (decision 0011): the goods world (with its write-once world layout, decision 0026), player registry and client identity. MoonSharp runs the prototype employee scripts (above); no wider scripting or modding role is selected.
-- Customers: first build and local visual customers implemented (above, decision 0024); multi-camera out-of-view spawning, menus, customer groups and competitor AI remain open. The benchmarked choice model in the test assembly ([record](verification/customer-choice-benchmark-20260925.md)) is a separate prototype, not the runtime code.
+- Customers: first build and local visual customers implemented (above, decision 0024), and in generated worlds with map districts and lot-linked competitors (decision 0030); multi-camera out-of-view spawning, menus, customer groups, competitor AI, drawing competitors' customers and demand balancing remain open. The benchmarked choice model in the test assembly ([record](verification/customer-choice-benchmark-20260925.md)) is a separate prototype, not the runtime code.
 - Multiplayer smoke tests and representative scale benchmarks follow implementation; current tests do not establish replication correctness or the 60 FPS target.
 
 ## Baseline Test Evolution

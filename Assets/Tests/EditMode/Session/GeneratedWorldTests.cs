@@ -1,5 +1,6 @@
 // Verifies generated worlds (decision 0028, piece 2) with the real generator and item content, on isolated saves: a new world
-// creates the starting restaurant's site once, owned by its one company with the PROTOTYPE cash and nothing else seeded, and
+// creates the starting restaurant's site once, owned by its one company with the PROTOTYPE cash and no dev seed (customers and
+// the starting counter and table: GeneratedWorldCustomersTests), and
 // reloads without changing; layouts without lots, and a format 3 save made before piece 2, keep the dev world; joining grants
 // the starting site with an inventory and every other site of the company without one; players spawn on the starting apron.
 using System;
@@ -53,8 +54,9 @@ namespace FoodFactoryGame.Session.Tests
             Assert.That(created.SiteLayouts.Select(x => (x.SiteId, x.Width, x.Depth)), Is.EqualTo(new[] { (start.SiteId, start.Width, start.Depth) }));
             Assert.That(created.Buildings.Select(x => (x.Id, x.Kind, x.SiteId)), Is.EqualTo(new[] { (start.BuildingId, GoodsWorld.RestaurantKind, start.SiteId) }));
             Assert.That((created.Locations.Count, created.Lots.Count, created.Equipment.Count, created.Belts.Count, created.Employees.Count,
-                created.Trucks.Count, created.Districts.Count, created.Competitors.Count, created.Grants.Count), Is.EqualTo((0, 0, 0, 0, 0, 0, 0, 0, 0)),
-                "Nothing of the dev seed.");
+                created.Trucks.Count, created.Grants.Count), Is.EqualTo((0, 0, 0, 0, 0, 0, 0)),
+                "Nothing of the dev seed (no counter or table definition is passed here).");
+            Assert.That(created.Districts.Select(x => x.Id), Has.None.EqualTo(DevWorld.DistrictId), "Map districts, not the dev one.");
             var committed = JsonUtility.ToJson(GoodsSnapshotStore.Load(WorldPath).Snapshot());
             Assert.That(committed, Is.EqualTo(JsonUtility.ToJson(created)), "Committed before serving.");
 

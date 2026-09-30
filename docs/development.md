@@ -218,7 +218,10 @@ Artifacts are intentionally ignored by Git. Preserve required evidence externall
   keeps its stored layout, and a save made before world generation keeps none (the readout says so). `-save <dir>` and
   `-seed <text>` still work for a launched player.
 - A new world (layout format 3, decision 0028 piece 2) starts you on the apron of your own starting restaurant, with the
-  city around it, $1,000,000 of company cash and the dev starter goods in your inventory; nothing else is seeded. Aim at a
+  city around it, $1,000,000 of company cash and the dev starter goods in your inventory. Since decision 0030 the
+  restaurant has a placed counter and table, and the map's districts send customers who choose between it and about 300
+  competitors. To sell, buy an oven (and dough) from the supplier, bake bread and put it on the counter. Expect only a
+  few customers an hour (PROTOTYPE demand). Aim at a
   restaurant, factory, farm or station within 60 m and press E for its buy panel (price, owner, Buy). Your company's
   restaurants have green awnings, unowned ones for sale yellow. Bought sites are managed from the logistics screen (L)
   until several sites can be drawn at once. A world saved in format 1 or 2, or first opened before piece 2, keeps the dev
@@ -228,12 +231,27 @@ Artifacts are intentionally ignored by Git. Preserve required evidence externall
   `WorldGen.unity` a new GUID and resets the layout bridge prefab's FishNet path hash; restore those two files and
   `DefaultPrefabObjects.asset` with git if nothing references them. Close or reload `WorldGen.unity` before restoring
   files under it: an externally changed open scene blocks the Editor with a modal reload prompt.
+- The rebuild also adds `SiteNavigation` (decision 0030). `run_script` with `file: AgentScripts/BuildWorldGenScene.cs`,
+  `entry: BuildWorldGenScene.Run` works (seen 2026-09-30). Opening a scene unloads assets loaded before it, so a reference
+  assigned from such an asset saves as `{fileID: 0}`. The builder now reloads the art catalog after opening the scene; it
+  had been lost that way twice, and the `WorldArtAuthoringTests` / map terrain failures were the symptom. Wiring assets by
+  hand with `eval` needs the same care: load them after `OpenScene`. To restore the scene's GUID when Unity keeps the new
+  one, `AssetDatabase.DeleteAsset` the scene, then rewrite the scene and its `.meta` (with the old GUID) from disk and
+  `Refresh`.
 - WorldGen player build for separate-process checks: `build` with `scenes: ["Assets/Scenes/WorldGen.unity"]` and
   `outputPath: "build/WorldGen/FoodFactoryGame.exe"` (the build settings keep DevSite as the only build scene).
 - Tests: `FoodFactoryGame.Session.Tests.GeneratedWorldTests` (EditMode, 4) and
   `FoodFactoryGame.Session.PlayModeTests.WorldGenSessionTests` (PlayMode, 4; loads WorldGen through
   `EditorSceneManager.LoadSceneAsyncInPlayMode`, seed `piece-two`, isolated save). The purchase test tops up cash with
   `AdjustCashDurably` (internal, test-only) to leave the company one cent short, then exactly enough.
+- Customers in generated worlds (decision 0030): `FoodFactoryGame.Session.Tests.GeneratedWorldCustomersTests` (EditMode,
+  5), `FoodFactoryGame.Goods.Tests.CompetitorLotTests` (EditMode, 4) and
+  `WorldGenSessionTests.AWholeSaleInTheStartingRestaurantReachesBothClients` (PlayMode, about 21 s). The PlayMode sale
+  adds a TEST-ONLY district with a 5 m range on the starting site, so a customer comes within seconds; the map's own
+  districts spread customers over about 100 restaurants each. City-scale benchmark: `run_tests` `mode: editor`,
+  `filter: CityCustomerBenchmarkTests`, 1 matched. It logs `[Benchmark] city customers` and `city save phases` (in the
+  NUnit XML) and asserts the 0025 budgets (tick p99 and burst tick 16.7 ms, commit 50 ms, payload 1 MB). The
+  `run_tests` `filter` is a plain substring, not a regex: `A|B` matches nothing.
 - Tests: assembly `FoodFactoryGame.World.EditModeTests` (generator v3 with lots, format 1 and 2 compatibility and `world.db` layout storage, temporary databases
   only; property purchase is in `FoodFactoryGame.Goods.Tests.PropertyTests`) and `FoodFactoryGame.Session.Tests.WorldGenerationTests` (4). A change to generator output fails
   `SameSeedProducesAnIdenticalLayout`: bump `WorldGenerator.Version` and re-pin `KnownHash` rather than editing the pin alone.

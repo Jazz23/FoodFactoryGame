@@ -214,6 +214,10 @@ namespace FoodFactoryGame.Goods
             foreach (var offer in catalog.Values)
                 if (used.Contains(offer.SiteId) && !owned.Contains(offer.LotId))
                     return $"Site {offer.SiteId} of lot {offer.LotId} exists without its property record.";
+            // A competitor stands on a listed lot that is not for sale (buying competitors is GDD section 11, later).
+            foreach (var competitor in state.Competitors.Where(x => x.LotId != ""))
+                if (!catalog.TryGetValue(competitor.LotId, out var lot) || lot.ForSale)
+                    return $"Competitor {competitor.Id} does not stand on a listed lot that is not for sale.";
             return null;
         }
 

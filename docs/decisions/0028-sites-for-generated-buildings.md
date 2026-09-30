@@ -11,8 +11,9 @@ their validation, the property catalog, the server-side purchase (`BuyPropertyDu
 in the starting restaurant's own site (the map is moved so its lot sits at the scene origin), `RequestBuyProperty` over the
 network, teammates' access in the purchase's commit (players granted any of the company's sites; not employees), public
 ownership in every site view, ownership colours and a buy panel. Owner decisions for piece 2: PROTOTYPE starting cash
-$5,000, raised to $1,000,000 the same day; bought sites are managed remotely only until several sites can be drawn at once (piece 3). Not yet: walking into
-bought sites, customers in generated worlds, competitors linked to lots. Resolved open items:
+$5,000, raised to $1,000,000 the same day; bought sites are managed remotely only until several sites can be drawn at once (piece 3). Customers in generated worlds
+and competitors linked to lots: implemented 2026-09-30 by [0030](0030-customers-in-generated-worlds.md). Not yet: walking into
+bought sites. Resolved open items:
 format 3 / generator v3; existing format 1 and 2 worlds get no lots and are treated as unsupported development data; PROTOTYPE
 apron depths (factories 12 m, farms 8 m, others the 2 m setback); a lot costs its building's layout price for now.
 
@@ -96,5 +97,6 @@ constraint 3. It relates to GDD 29.5 option C and needs an owner decision before
   (0026).
 - Which world-owned sites exist at creation; the ingredient supplier near the start (0026).
 - Whether an acquired competitor's building starts empty.
-- Customer districts from the layout versus decision 0024's dev district, and visual customers at competitor buildings
+- Resolved by 0030: customer districts come from the layout in generated worlds (dev worlds keep 0024's dev district).
+  Still open: visual customers at competitor buildings
   (presentation only).

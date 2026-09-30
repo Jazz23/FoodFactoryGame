@@ -2,7 +2,7 @@
 // SessionRoot (so a newly created world gets a generated layout) and a WorldLayoutPresenter that draws the replicated layout
 // with the world art (ArtSource/World, installed by BuildWorldArt.cs). WorldGen uses its own spawnable-prefab catalog (DevSite's prefabs plus the layout bridge), so DevSite
 // and GamePrefabs are untouched. DevSite's floor, landmarks and NavMesh are handed to the presenter to show only for dev-site
-// worlds, and a PropertyPanel (buy panel, decision 0028) is added. Not a build scene. Idempotent: the scene is recopied from DevSite on every run; asset GUIDs of
+// worlds, a PropertyPanel (buy panel, decision 0028) and a SiteNavigation (runtime NavMesh, decision 0030) are added. Not a build scene. Idempotent: the scene is recopied from DevSite on every run; asset GUIDs of
 // the bridge prefab and catalog are kept. The scene that was open is reopened at the end.
 // Run the body of Run() with the Unity MCP execute_code tool (C# 6 / CodeDom compatible, no helper methods).
 using UnityEngine;
@@ -67,6 +67,8 @@ public static class BuildWorldGenScene
         var presenter = presenterObject.AddComponent<FoodFactoryGame.Session.WorldMap.WorldLayoutPresenter>();
         var serializedPresenter = new UnityEditor.SerializedObject(presenter);
         serializedPresenter.FindProperty("session").objectReferenceValue = session;
+        // Reloaded here: opening the scene unloads assets loaded before it, which would leave the reference empty.
+        art = UnityEditor.AssetDatabase.LoadMainAssetAtPath(artPath);
         serializedPresenter.FindProperty("art").objectReferenceValue = art;
         // DevSite's floor, landmarks and baked NavMesh belong to the dev site: the presenter shows them only for worlds that keep
         // it (no layout, or layout format 1 or 2). A generated world's ground is the levelled terrain with its lots paved.
@@ -93,6 +95,12 @@ public static class BuildWorldGenScene
         serializedPanel.FindProperty("interaction").objectReferenceValue = interaction;
         serializedPanel.FindProperty("map").objectReferenceValue = presenter;
         serializedPanel.ApplyModifiedPropertiesWithoutUndo();
+
+        // Runtime NavMesh over the drawn generated lot and its street (decision 0030), replacing DevSite's baked one there.
+        var navigation = new GameObject("SiteNavigation").AddComponent<FoodFactoryGame.Session.Customers.SiteNavigation>();
+        var serializedNavigation = new UnityEditor.SerializedObject(navigation);
+        serializedNavigation.FindProperty("session").objectReferenceValue = session;
+        serializedNavigation.ApplyModifiedPropertiesWithoutUndo();
         UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(scene);
         UnityEditor.SceneManagement.EditorSceneManager.SaveScene(scene);
 

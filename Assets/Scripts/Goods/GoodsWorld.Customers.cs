@@ -39,6 +39,8 @@ namespace FoodFactoryGame.Goods
     {
         public string Id;
         public string Name;
+        // The generated building's lot it stands on (decision 0028, v15); empty for a competitor without one (dev worlds).
+        public string LotId = "";
         public int MapX;
         public int MapZ;
         public string Cuisine = "";
@@ -137,11 +139,17 @@ namespace FoodFactoryGame.Goods
         private List<Diner> _cachedDiners;
         private Dictionary<string, Diner> _dinersById;
         private bool _customerIndexDirty = true;
+        // The area lookup: per district ID, the restaurants within its range and their distance, so a decision scores only
+        // nearby candidates (a generated city has hundreds of competitors). Built from the diner catalog and dropped with it.
+        private readonly Dictionary<string, List<(Diner Diner, int Distance)>> _candidates = new(StringComparer.Ordinal);
+        // GoodsDiner records by restaurant ID, rebuilt with the customer index; DinerRecord adds to it.
+        private readonly Dictionary<string, GoodsDiner> _dinerRecords = new(StringComparer.Ordinal);
 
         private void InvalidateDiners()
         {
             _cachedDiners = null;
             _dinersById = null;
+            _candidates.Clear();
             _customerIndexDirty = true;
         }
 
@@ -159,12 +167,13 @@ namespace FoodFactoryGame.Goods
                 if (copy is null || _state.Districts.Any(x => x.Id == copy.Id)) throw new ArgumentException("Invalid or duplicate district.");
                 var before = Snapshot();
                 _state.Districts.Add(copy);
+                InvalidateDiners();
                 _state.Revision++;
                 ValidateOrRestore(before, "district");
             }
         }
 
-        // Server-only: a fixed AI competitor.
+        // Server-only: a fixed AI competitor. With a property catalog registered, a competitor's lot must be listed and not for sale.
         public void Bootstrap(GoodsCompetitor competitor)
         {
             lock (_gate)
@@ -176,6 +185,11 @@ namespace FoodFactoryGame.Goods
                 InvalidateDiners();
                 _state.Revision++;
                 ValidateOrRestore(before, "competitor");
+                var problem = _propertyOffers is null ? null : PropertyCatalogProblem(_state, _propertyOffers);
+                if (problem is null) return;
+                _state = before;
+                InvalidateDiners();
+                throw new ArgumentException("Invalid competitor: " + problem);
             }
         }
 
@@ -317,6 +331,8 @@ namespace FoodFactoryGame.Goods
                 diner.BusyCounters.Clear();
                 diner.OccupiedSeats = diner.BusyServers = 0;
             }
+            _dinerRecords.Clear();
+            foreach (var record in _state.Diners) _dinerRecords[record.RestaurantId] = record;
             foreach (var customer in _state.Customers)
             {
                 if (!_dinersById.TryGetValue(customer.RestaurantId, out var diner)) continue;
@@ -389,11 +405,10 @@ namespace FoodFactoryGame.Goods
             var district = _state.Districts.First(x => x.Id == customer.DistrictId);
             var options = new List<(Diner Diner, string RecipeId, double Weight)>();
             var total = 1.0;
-            foreach (var diner in diners)
+            foreach (var (diner, distance) in Candidates(district, diners))
             {
-                var distance = Math.Abs(diner.MapX - district.MapX) + Math.Abs(diner.MapZ - district.MapZ);
-                if (diner.Id == customer.LeftRestaurantId || distance > district.RangeMetres) continue;
-                var record = _state.Diners.FirstOrDefault(x => x.RestaurantId == diner.Id);
+                if (diner.Id == customer.LeftRestaurantId) continue;
+                _dinerRecords.TryGetValue(diner.Id, out var record);
                 var recipeId = "";
                 double food;
                 if (diner.Player)
@@ -432,6 +447,20 @@ namespace FoodFactoryGame.Goods
                 return true;
             }
             return false;
+        }
+
+        // The restaurants within the district's range, in catalog (ID) order, so the draw matches scoring every restaurant.
+        private List<(Diner Diner, int Distance)> Candidates(GoodsDistrict district, List<Diner> diners)
+        {
+            if (_candidates.TryGetValue(district.Id, out var nearby)) return nearby;
+            nearby = new List<(Diner, int)>();
+            foreach (var diner in diners)
+            {
+                var distance = Math.Abs(diner.MapX - district.MapX) + Math.Abs(diner.MapZ - district.MapZ);
+                if (distance <= district.RangeMetres) nearby.Add((diner, distance));
+            }
+            _candidates.Add(district.Id, nearby);
+            return nearby;
         }
 
         // PROTOTYPE weights: cuisine fit, tier valued by wealth, price minded less by wealth.
@@ -512,10 +541,10 @@ namespace FoodFactoryGame.Goods
 
         private GoodsDiner DinerRecord(string restaurantId)
         {
-            var record = _state.Diners.FirstOrDefault(x => x.RestaurantId == restaurantId);
-            if (record is not null) return record;
+            if (_dinerRecords.TryGetValue(restaurantId, out var record)) return record;
             record = new GoodsDiner { RestaurantId = restaurantId };
             _state.Diners.Add(record);
+            _dinerRecords.Add(restaurantId, record);
             return record;
         }
 
@@ -558,8 +587,10 @@ namespace FoodFactoryGame.Goods
                 || state.Districts.GroupBy(x => x.Id).Any(x => x.Count() != 1)
                 || state.Competitors.Any(x => x is null || string.IsNullOrWhiteSpace(x.Id) || x.Name is null || x.Cuisine is null
                     || x.Tier < 1 || x.PriceCents < 1 || x.Servers < 1 || x.ServiceSeconds < 1 || x.Seats < 0
-                    || siteIds.Contains(x.Id) || equipmentIds.Contains(x.Id))
+                    || siteIds.Contains(x.Id) || equipmentIds.Contains(x.Id) || x.LotId is null
+                    || (x.LotId != "" && state.Properties.Any(y => y?.LotId == x.LotId)))
                 || state.Competitors.GroupBy(x => x.Id).Any(x => x.Count() != 1)
+                || state.Competitors.Where(x => x.LotId != "").GroupBy(x => x.LotId).Any(x => x.Count() != 1)
                 || state.Diners.Any(x => x is null || string.IsNullOrWhiteSpace(x.RestaurantId)
                     || Math.Abs(x.Reputation) > ReputationLimit || x.PublishedWaitSeconds < 0 || x.PublishedFreeSeats < 0
                     || x.Served < 0 || x.WalkedOut < 0)

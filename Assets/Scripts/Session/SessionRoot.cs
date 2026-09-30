@@ -200,7 +200,11 @@ namespace FoodFactoryGame.Session
             // Max stacks are content: capacity counts slots, so they are registered (inside LoadOrCreate, before the seed)
             // ahead of any request. A layout with lots (format 3) makes a generated world that starts in its own restaurant, with
             // the property catalog registered inside; no layout, or format 1 or 2, keeps the dev world beside the map.
-            ServerWorld = GeneratedWorld.Supports(ServerLayout) ? GeneratedWorld.LoadOrCreate(_options.WorldPath, ServerLayout, items) : null;
+            ServerWorld = GeneratedWorld.Supports(ServerLayout)
+                ? GeneratedWorld.LoadOrCreate(_options.WorldPath, ServerLayout, items,
+                    equipmentDefinitions.FirstOrDefault(x => x != null && x.Kind == DevWorld.CounterKind),
+                    equipmentDefinitions.FirstOrDefault(x => x != null && x.Kind == DevWorld.TableKind))
+                : null;
             StartOffer = ServerWorld != null ? GeneratedWorld.StartOffer(ServerLayout.Layout) : null;
             ServerWorld ??= DevWorld.LoadOrCreate(_options.WorldPath, equipmentDefinitions.FirstOrDefault(x => x != null && x.Kind == "oven"), items,
                 _options.LegacyWorldPath, equipmentDefinitions.FirstOrDefault(x => x != null && x.Kind == DevWorld.CounterKind),

@@ -1,5 +1,6 @@
 // Draws nearby site customers from replicated server records; visuals never change simulation or persistence.
-// A bounded set walks along local NavMesh paths, and first appears at a site edge outside the local camera.
+// A bounded set walks along local NavMesh paths, and first appears at a site edge (a generated lot's street, SiteStreet)
+// outside the local camera.
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -91,7 +92,7 @@ namespace FoodFactoryGame.Session.Customers
                 if (active.Contains(id) || visual.Leaving) continue;
                 visual.Leaving = true;
                 visual.LeaveDeadline = Time.time + 12f;
-                if (TryEdge(layout, camera, id, out var exit)) SetTarget(visual, exit);
+                if (TryEdge(layout, site, camera, id, out var exit)) SetTarget(visual, exit);
                 else visual.LeaveDeadline = Time.time + 1f;
             }
             var counters = site.Equipment.Where(x => x.SiteId == siteId && x.State == EquipmentState.Placed && x.Kind == GoodsWorld.CounterKind).ToList();
@@ -110,7 +111,7 @@ namespace FoodFactoryGame.Session.Customers
                     continue;
                 }
                 if (_visuals.Count >= maxVisible || customer.State == CustomerState.Travelling && customer.RemainingSeconds > 12
-                    || !TryEdge(layout, camera, customer.Id, out var spawn)) continue;
+                    || !TryEdge(layout, site, camera, customer.Id, out var spawn)) continue;
                 var root = Instantiate(customerPrefab, spawn, Quaternion.identity, transform);
                 root.name = $"Customer {customer.Id}";
                 var animator = root.GetComponentInChildren<Animator>();
@@ -147,7 +148,8 @@ namespace FoodFactoryGame.Session.Customers
             return true;
         }
 
-        private static bool TryEdge(SiteLayout layout, Camera camera, string id, out Vector3 point)
+        // A generated lot's figures come and go along the street in front of it; other sites use their grid's edges.
+        private static bool TryEdge(SiteLayout layout, GoodsSnapshot site, Camera camera, string id, out Vector3 point)
         {
             if (camera == null)
             {
@@ -156,7 +158,8 @@ namespace FoodFactoryGame.Session.Customers
             }
             var halfX = (layout.Width * 0.5f - 0.5f) * SiteGrid.CellSize;
             var halfZ = (layout.Depth * 0.5f - 0.5f) * SiteGrid.CellSize;
-            var edges = new[]
+            var street = SiteStreet.Outward(layout, site.Buildings);
+            var edges = street != null ? SiteStreet.Points(layout, street.Value).ToArray() : new[]
             {
                 new Vector3(0, 0, halfZ), new Vector3(-halfX, 0, halfZ), new Vector3(halfX, 0, halfZ),
                 new Vector3(-halfX, 0, 0), new Vector3(halfX, 0, 0),

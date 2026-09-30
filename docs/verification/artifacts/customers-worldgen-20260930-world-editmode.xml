@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="21" result="Passed" total="21" passed="21" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-09-30 18:42:03Z" end-time="2026-09-30 18:42:45Z" duration="42.6615775">
+  <test-suite type="TestSuite" id="1390" name="FoodFactoryGame" fullname="FoodFactoryGame" runstate="Runnable" testcasecount="315" result="Passed" start-time="2026-09-30 18:42:03Z" end-time="2026-09-30 18:42:45Z" duration="42.661578" total="21" passed="21" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="EditMode" />
+    </properties>
+    <test-suite type="Assembly" id="1375" name="FoodFactoryGame.World.EditModeTests.dll" fullname="E:/Projects/Unity/FoodFactoryGame/Library/ScriptAssemblies/FoodFactoryGame.World.EditModeTests.dll" runstate="Runnable" testcasecount="21" result="Passed" start-time="2026-09-30 18:42:03Z" end-time="2026-09-30 18:42:45Z" duration="42.641680" total="21" passed="21" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="48272" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="EditMode" />
+        <property name="EditorOnly" value="True" />
+      </properties>
+      <test-suite type="TestSuite" id="1376" name="FoodFactoryGame" fullname="FoodFactoryGame" runstate="Runnable" testcasecount="21" result="Passed" start-time="2026-09-30 18:42:03Z" end-time="2026-09-30 18:42:45Z" duration="42.640762" total="21" passed="21" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-suite type="TestSuite" id="1377" name="World" fullname="FoodFactoryGame.World" runstate="Runnable" testcasecount="21" result="Passed" start-time="2026-09-30 18:42:03Z" end-time="2026-09-30 18:42:45Z" duration="42.639951" total="21" passed="21" failed="0" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <test-suite type="TestSuite" id="1378" name="Tests" fullname="FoodFactoryGame.World.Tests" runstate="Runnable" testcasecount="21" result="Passed" start-time="2026-09-30 18:42:03Z" end-time="2026-09-30 18:42:45Z" duration="42.639064" total="21" passed="21" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-suite type="TestFixture" id="1352" name="WorldGeneratorTests" fullname="FoodFactoryGame.World.Tests.WorldGeneratorTests" classname="FoodFactoryGame.World.Tests.WorldGeneratorTests" runstate="Runnable" testcasecount="16" result="Passed" start-time="2026-09-30 18:42:03Z" end-time="2026-09-30 18:42:44Z" duration="41.177223" total="16" passed="16" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-case id="1358" name="AFailedAttemptRetriesWithADerivedSeedAndIsReported" fullname="FoodFactoryGame.World.Tests.WorldGeneratorTests.AFailedAttemptRetriesWithADerivedSeedAndIsReported" methodname="AFailedAttemptRetriesWithADerivedSeedAndIsReported" classname="FoodFactoryGame.World.Tests.WorldGeneratorTests" runstate="Runnable" seed="1857305001" result="Passed" start-time="2026-09-30 18:42:03Z" end-time="2026-09-30 18:42:04Z" duration="1.380205" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1366" name="AFormatOneLayoutStillReadsAndWritesUnchanged" fullname="FoodFactoryGame.World.Tests.WorldGeneratorTests.AFormatOneLayoutStillReadsAndWritesUnchanged" methodname="AFormatOneLayoutStillReadsAndWritesUnchanged" classname="FoodFactoryGame.World.Tests.WorldGeneratorTests" runstate="Runnable" seed="1111585061" result="Passed" start-time="2026-09-30 18:42:04Z" end-time="2026-09-30 18:42:04Z" duration="0.000983" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1362" name="AFormatTwoLayoutHasNoLotsAndRoundTrips" fullname="FoodFactoryGame.World.Tests.WorldGeneratorTests.AFormatTwoLayoutHasNoLotsAndRoundTrips" methodname="AFormatTwoLayoutHasNoLotsAndRoundTrips" classname="FoodFactoryGame.World.Tests.WorldGeneratorTests" runstate="Runnable" seed="1191399014" result="Passed" start-time="2026-09-30 18:42:04Z" end-time="2026-09-30 18:42:05Z" duration="0.694314" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1354" name="DifferentSeedsProduceDifferentLayouts" fullname="FoodFactoryGame.World.Tests.WorldGeneratorTests.DifferentSeedsProduceDifferentLayouts" methodname="DifferentSeedsProduceDifferentLayouts" classname="FoodFactoryGame.World.Tests.WorldGeneratorTests" runstate="Runnable" seed="503380005" result="Passed" start-time="2026-09-30 18:42:05Z" end-time="2026-09-30 18:42:05Z" duration="0.302822" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1357" name="DistrictsArePlacedAsTheDesignSays" fullname="FoodFactoryGame.World.Tests.WorldGeneratorTests.DistrictsArePlacedAsTheDesignSays" methodname="DistrictsArePlacedAsTheDesignSays" classname="FoodFactoryGame.World.Tests.WorldGeneratorTests" runstate="Runnable" seed="1816625820" result="Passed" start-time="2026-09-30 18:42:05Z" end-time="2026-09-30 18:42:10Z" duration="5.190624" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1360" name="EveryGeneratedShellsLotIsAValidBuildingSite" fullname="FoodFactoryGame.World.Tests.WorldGeneratorTests.EveryGeneratedShellsLotIsAValidBuildingSite" methodname="EveryGeneratedShellsLotIsAValidBuildingSite" classname="FoodFactoryGame.World.Tests.WorldGeneratorTests" runstate="Runnable" seed="510655829" result="Passed" start-time="2026-09-30 18:42:10Z" end-time="2026-09-30 18:42:11Z" duration="0.166930" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1365" name="LandHeightIsTheSameAfterAQuarterTurn" fullname="FoodFactoryGame.World.Tests.WorldGeneratorTests.LandHeightIsTheSameAfterAQuarterTurn" methodname="LandHeightIsTheSameAfterAQuarterTurn" classname="FoodFactoryGame.World.Tests.WorldGeneratorTests" runstate="Runnable" seed="1607003989" result="Passed" start-time="2026-09-30 18:42:11Z" end-time="2026-09-30 18:42:11Z" duration="0.181756" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1355" name="LayoutTextRoundTrips" fullname="FoodFactoryGame.World.Tests.WorldGeneratorTests.LayoutTextRoundTrips" methodname="LayoutTextRoundTrips" classname="FoodFactoryGame.World.Tests.WorldGeneratorTests" runstate="Runnable" seed="1562578727" result="Passed" start-time="2026-09-30 18:42:11Z" end-time="2026-09-30 18:42:11Z" duration="0.272147" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1353" name="SameSeedProducesAnIdenticalLayout" fullname="FoodFactoryGame.World.Tests.WorldGeneratorTests.SameSeedProducesAnIdenticalLayout" methodname="SameSeedProducesAnIdenticalLayout" classname="FoodFactoryGame.World.Tests.WorldGeneratorTests" runstate="Runnable" seed="887809910" result="Passed" start-time="2026-09-30 18:42:11Z" end-time="2026-09-30 18:42:11Z" duration="0.319752" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <output><![CDATA[seed 20260927: sha256 c8cef1ddd330c5a1a95391844d880f631233a0a0432fec1fd0d70c16eba1db11, 423399 chars
+]]></output>
+              </test-case>
+              <test-case id="1368" name="SeedTextIsRepeatable" fullname="FoodFactoryGame.World.Tests.WorldGeneratorTests.SeedTextIsRepeatable" methodname="SeedTextIsRepeatable" classname="FoodFactoryGame.World.Tests.WorldGeneratorTests" runstate="Runnable" seed="784034267" result="Passed" start-time="2026-09-30 18:42:11Z" end-time="2026-09-30 18:42:11Z" duration="0.000579" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1364" name="StopSignsStopTheMinorRoadOrEveryApproach" fullname="FoodFactoryGame.World.Tests.WorldGeneratorTests.StopSignsStopTheMinorRoadOrEveryApproach" methodname="StopSignsStopTheMinorRoadOrEveryApproach" classname="FoodFactoryGame.World.Tests.WorldGeneratorTests" runstate="Runnable" seed="301906837" result="Passed" start-time="2026-09-30 18:42:11Z" end-time="2026-09-30 18:42:11Z" duration="0.001226" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1367" name="TheValidatorReportsBrokenLandRiversCrossingsJunctionsAndTrees" fullname="FoodFactoryGame.World.Tests.WorldGeneratorTests.TheValidatorReportsBrokenLandRiversCrossingsJunctionsAndTrees" methodname="TheValidatorReportsBrokenLandRiversCrossingsJunctionsAndTrees" classname="FoodFactoryGame.World.Tests.WorldGeneratorTests" runstate="Runnable" seed="403397159" result="Passed" start-time="2026-09-30 18:42:11Z" end-time="2026-09-30 18:42:13Z" duration="1.911115" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1359" name="TheValidatorReportsBrokenLayouts" fullname="FoodFactoryGame.World.Tests.WorldGeneratorTests.TheValidatorReportsBrokenLayouts" methodname="TheValidatorReportsBrokenLayouts" classname="FoodFactoryGame.World.Tests.WorldGeneratorTests" runstate="Runnable" seed="84312928" result="Passed" start-time="2026-09-30 18:42:13Z" end-time="2026-09-30 18:42:15Z" duration="2.101679" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1361" name="TheValidatorReportsBrokenLots" fullname="FoodFactoryGame.World.Tests.WorldGeneratorTests.TheValidatorReportsBrokenLots" methodname="TheValidatorReportsBrokenLots" classname="FoodFactoryGame.World.Tests.WorldGeneratorTests" runstate="Runnable" seed="1522504688" result="Passed" start-time="2026-09-30 18:42:15Z" end-time="2026-09-30 18:42:17Z" duration="2.031416" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1356" name="ValidationPassesAcrossManySeeds" fullname="FoodFactoryGame.World.Tests.WorldGeneratorTests.ValidationPassesAcrossManySeeds" methodname="ValidationPassesAcrossManySeeds" classname="FoodFactoryGame.World.Tests.WorldGeneratorTests" runstate="Runnable" seed="350909799" result="Passed" start-time="2026-09-30 18:42:17Z" end-time="2026-09-30 18:42:41Z" duration="23.801269" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <output><![CDATA[120 seeds valid; 0 needed a retry; buildings min 1685 max 1859
+]]></output>
+              </test-case>
+              <test-case id="1363" name="WorldsHaveLandRiverBridgesCrossingsJunctionsAndTrees" fullname="FoodFactoryGame.World.Tests.WorldGeneratorTests.WorldsHaveLandRiverBridgesCrossingsJunctionsAndTrees" methodname="WorldsHaveLandRiverBridgesCrossingsJunctionsAndTrees" classname="FoodFactoryGame.World.Tests.WorldGeneratorTests" runstate="Runnable" seed="1964650451" result="Passed" start-time="2026-09-30 18:42:41Z" end-time="2026-09-30 18:42:44Z" duration="2.816592" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+            </test-suite>
+            <test-suite type="TestFixture" id="1369" name="WorldLayoutStoreTests" fullname="FoodFactoryGame.World.Tests.WorldLayoutStoreTests" classname="FoodFactoryGame.World.Tests.WorldLayoutStoreTests" runstate="Runnable" testcasecount="5" result="Passed" start-time="2026-09-30 18:42:44Z" end-time="2026-09-30 18:42:45Z" duration="1.460139" total="5" passed="5" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-case id="1373" name="ADamagedLayoutIsRefusedAndNotRegenerated" fullname="FoodFactoryGame.World.Tests.WorldLayoutStoreTests.ADamagedLayoutIsRefusedAndNotRegenerated" methodname="ADamagedLayoutIsRefusedAndNotRegenerated" classname="FoodFactoryGame.World.Tests.WorldLayoutStoreTests" runstate="Runnable" seed="689696655" result="Passed" start-time="2026-09-30 18:42:44Z" end-time="2026-09-30 18:42:44Z" duration="0.267906" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1371" name="ALayoutIsWrittenOnceAndNeverReplaced" fullname="FoodFactoryGame.World.Tests.WorldLayoutStoreTests.ALayoutIsWrittenOnceAndNeverReplaced" methodname="ALayoutIsWrittenOnceAndNeverReplaced" classname="FoodFactoryGame.World.Tests.WorldLayoutStoreTests" runstate="Runnable" seed="776878380" result="Passed" start-time="2026-09-30 18:42:44Z" end-time="2026-09-30 18:42:45Z" duration="0.443573" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1372" name="AnExistingWorldCannotGainALayout" fullname="FoodFactoryGame.World.Tests.WorldLayoutStoreTests.AnExistingWorldCannotGainALayout" methodname="AnExistingWorldCannotGainALayout" classname="FoodFactoryGame.World.Tests.WorldLayoutStoreTests" runstate="Runnable" seed="1838457804" result="Passed" start-time="2026-09-30 18:42:45Z" end-time="2026-09-30 18:42:45Z" duration="0.172418" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1374" name="AnOldSaveLoadsUnchangedWithNoLayout" fullname="FoodFactoryGame.World.Tests.WorldLayoutStoreTests.AnOldSaveLoadsUnchangedWithNoLayout" methodname="AnOldSaveLoadsUnchangedWithNoLayout" classname="FoodFactoryGame.World.Tests.WorldLayoutStoreTests" runstate="Runnable" seed="1367625749" result="Passed" start-time="2026-09-30 18:42:45Z" end-time="2026-09-30 18:42:45Z" duration="0.261303" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1370" name="AStoredLayoutReloadsExactlyAlongsideTheWorld" fullname="FoodFactoryGame.World.Tests.WorldLayoutStoreTests.AStoredLayoutReloadsExactlyAlongsideTheWorld" methodname="AStoredLayoutReloadsExactlyAlongsideTheWorld" classname="FoodFactoryGame.World.Tests.WorldLayoutStoreTests" runstate="Runnable" seed="299854724" result="Passed" start-time="2026-09-30 18:42:45Z" end-time="2026-09-30 18:42:45Z" duration="0.309675" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <output><![CDATA[<b><color=#2EA3FF>MCP-FOR-UNITY</color></b>: [TestRunnerNoThrottle] Restored Interaction Mode after test run.
+Saving results to: C:/Users/Deven/AppData/LocalLow/DefaultCompany/FoodFactoryGame\TestResults.xml
+]]></output>
+              </test-case>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

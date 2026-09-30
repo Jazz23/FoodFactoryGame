@@ -150,77 +150,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1273577677}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &86546095
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 86546098}
-  - component: {fileID: 86546097}
-  - component: {fileID: 86546096}
-  m_Layer: 0
-  m_Name: PropertyPanel
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &86546096
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 86546095}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 29d76438324e2d3469c89c47a8f4a525, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: FoodFactoryGame.Session::FoodFactoryGame.Session.WorldMap.PropertyPanel
-  document: {fileID: 86546097}
-  interaction: {fileID: 1162993844}
-  map: {fileID: 658621975}
---- !u!114 &86546097
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 86546095}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 19102, guid: 0000000000000000e000000000000000, type: 0}
-  m_Name: 
-  m_EditorClassIdentifier: UnityEngine.dll::UnityEngine.UIElements.UIDocument
-  m_PanelSettings: {fileID: 11400000, guid: 4ce2abbea3080ac4698637a6f6a2457d, type: 2}
-  m_ParentUI: {fileID: 0}
-  sourceAsset: {fileID: 0}
-  m_SortingOrder: 2
-  m_Position: 0
-  m_WorldSpaceSizeMode: 1
-  m_WorldSpaceWidth: 1920
-  m_WorldSpaceHeight: 1080
-  m_PivotReferenceSize: 0
-  m_Pivot: 0
-  m_WorldSpaceCollider: {fileID: 0}
---- !u!4 &86546098
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 86546095}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &155576262
 GameObject:
   m_ObjectHideFlags: 0
@@ -372,6 +301,61 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 318359893}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &391669104
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 391669106}
+  - component: {fileID: 391669105}
+  m_Layer: 0
+  m_Name: WorldLayoutPresenter
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &391669105
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 391669104}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 94f89110d1b4744418a5444d83308e90, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: FoodFactoryGame.Session::FoodFactoryGame.Session.WorldMap.WorldLayoutPresenter
+  session: {fileID: 1957645435}
+  art: {fileID: 11400000, guid: 1a91b3662e3a1cf4bab72dffe0248057, type: 2}
+  cityGap: 40
+  devSiteClearHalfSize: {x: 24, y: 24}
+  devSiteBlend: 30
+  devSiteOnly:
+  - {fileID: 155576262}
+  - {fileID: 1380603616}
+  - {fileID: 1552420247}
+  - {fileID: 1773651353}
+  - {fileID: 2003899943}
+--- !u!4 &391669106
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 391669104}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -598,7 +582,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1273577677}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &658621974
+--- !u!1 &623849641
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -606,45 +590,61 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 658621976}
-  - component: {fileID: 658621975}
+  - component: {fileID: 623849644}
+  - component: {fileID: 623849643}
+  - component: {fileID: 623849642}
   m_Layer: 0
-  m_Name: WorldLayoutPresenter
+  m_Name: PropertyPanel
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &658621975
+--- !u!114 &623849642
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 658621974}
+  m_GameObject: {fileID: 623849641}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 94f89110d1b4744418a5444d83308e90, type: 3}
+  m_Script: {fileID: 11500000, guid: 29d76438324e2d3469c89c47a8f4a525, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: FoodFactoryGame.Session::FoodFactoryGame.Session.WorldMap.WorldLayoutPresenter
-  session: {fileID: 1957645435}
-  art: {fileID: 11400000, guid: 1a91b3662e3a1cf4bab72dffe0248057, type: 2}
-  cityGap: 40
-  devSiteClearHalfSize: {x: 24, y: 24}
-  devSiteBlend: 30
-  devSiteOnly:
-  - {fileID: 155576262}
-  - {fileID: 1380603616}
-  - {fileID: 1552420247}
-  - {fileID: 1773651353}
-  - {fileID: 2003899943}
---- !u!4 &658621976
+  m_EditorClassIdentifier: FoodFactoryGame.Session::FoodFactoryGame.Session.WorldMap.PropertyPanel
+  document: {fileID: 623849643}
+  interaction: {fileID: 1162993844}
+  map: {fileID: 391669105}
+--- !u!114 &623849643
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 623849641}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 19102, guid: 0000000000000000e000000000000000, type: 0}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.dll::UnityEngine.UIElements.UIDocument
+  m_PanelSettings: {fileID: 11400000, guid: 4ce2abbea3080ac4698637a6f6a2457d, type: 2}
+  m_ParentUI: {fileID: 0}
+  sourceAsset: {fileID: 0}
+  m_SortingOrder: 2
+  m_Position: 0
+  m_WorldSpaceSizeMode: 1
+  m_WorldSpaceWidth: 1920
+  m_WorldSpaceHeight: 1080
+  m_PivotReferenceSize: 0
+  m_Pivot: 0
+  m_WorldSpaceCollider: {fileID: 0}
+--- !u!4 &623849644
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 658621974}
+  m_GameObject: {fileID: 623849641}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -1609,6 +1609,51 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1910108727
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1910108729}
+  - component: {fileID: 1910108728}
+  m_Layer: 0
+  m_Name: SiteNavigation
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1910108728
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1910108727}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 010fc32e3c69c7a4ead63a4305bd6d3f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: FoodFactoryGame.Session::FoodFactoryGame.Session.Customers.SiteNavigation
+  session: {fileID: 1957645435}
+--- !u!4 &1910108729
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1910108727}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1957645434
 GameObject:
   m_ObjectHideFlags: 0
@@ -1663,6 +1708,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 89ee0b7e507eb9f4eb2c997fc68fb360, type: 2}
   - {fileID: 11400000, guid: 20ed99e639553944e9ac71bc4277d1ef, type: 2}
   - {fileID: 11400000, guid: a4defcb709afba0478626fc4cde23744, type: 2}
+  - {fileID: 11400000, guid: da0bea5e5f583064e9e98ab942ea8f96, type: 2}
   - {fileID: 11400000, guid: d98bc09feba26554b9074ed348af0c5c, type: 2}
   items:
   - {fileID: 11400000, guid: dfe5f458c01450b418ac8a5cc0bf9bb3, type: 2}
@@ -1907,5 +1953,6 @@ SceneRoots:
   - {fileID: 1375277386}
   - {fileID: 1776894344}
   - {fileID: 2003899945}
-  - {fileID: 658621976}
-  - {fileID: 86546098}
+  - {fileID: 391669106}
+  - {fileID: 623849644}
+  - {fileID: 1910108729}

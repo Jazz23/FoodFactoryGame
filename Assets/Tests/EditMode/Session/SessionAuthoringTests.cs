@@ -89,7 +89,7 @@ namespace FoodFactoryGame.Session.Tests
                         Is.EqualTo(new[] { OvenDefinitionPath, CounterDefinitionPath, FridgeDefinitionPath, DockDefinitionPath, TableDefinitionPath }));
                     Assert.That(roots[0].Recipes.Select(AssetDatabase.GetAssetPath), Is.EqualTo(new[] { BreadRecipePath, SellBreadRecipePath }));
                     Assert.That(roots[0].Offers.Select(AssetDatabase.GetAssetPath),
-                        Is.EqualTo(new[] { "Assets/Content/Offers/Dough5.asset", "Assets/Content/Offers/Belt10.asset", "Assets/Content/Offers/Oven1.asset", "Assets/Content/Offers/Fridge1.asset", "Assets/Content/Offers/Dock1.asset", "Assets/Content/Offers/Table1.asset", "Assets/Content/Offers/Truck1.asset" }));
+                        Is.EqualTo(new[] { "Assets/Content/Offers/Dough5.asset", "Assets/Content/Offers/Belt10.asset", "Assets/Content/Offers/Oven1.asset", "Assets/Content/Offers/Fridge1.asset", "Assets/Content/Offers/Dock1.asset", "Assets/Content/Offers/Table1.asset", "Assets/Content/Offers/Counter1.asset", "Assets/Content/Offers/Truck1.asset" }));
                 }
                 var panels = objects.SelectMany(x => x.GetComponents<SessionPanel>()).ToArray();
                 Assert.That(panels.Length, Is.EqualTo(1));
@@ -262,6 +262,18 @@ namespace FoodFactoryGame.Session.Tests
         }
 
         // Decision 0017: the oven offer sells the authored oven definition as valid server content, one machine per purchase.
+        [Test]
+        public void SupplierCounterOfferSellsTheCounterDefinition()
+        {
+            // Decision 0030: a counter is needed to sell, so generated worlds can buy more than the one they start with.
+            var offer = AssetDatabase.LoadAssetAtPath<OfferAsset>("Assets/Content/Offers/Counter1.asset");
+            Assert.That(offer, Is.Not.Null);
+            Assert.That((offer.Id, AssetDatabase.GetAssetPath(offer.Equipment), offer.Quantity, offer.PriceCents),
+                Is.EqualTo(("supplier-counter", CounterDefinitionPath, 1, 5000L)));
+            Assert.That(offer.ToEquipmentOffer().Equipment.Kind, Is.EqualTo(GoodsWorld.CounterKind));
+            Assert.DoesNotThrow(() => offer.RegisterWith(new GoodsWorld("authoring-check")));
+        }
+
         [Test]
         public void SupplierOvenOfferSellsTheOvenDefinition()
         {
