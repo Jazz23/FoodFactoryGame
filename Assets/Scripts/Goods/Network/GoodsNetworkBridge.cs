@@ -13,6 +13,8 @@ namespace FoodFactoryGame.Goods.Network
     {
         private GoodsWorld _world;
         private Func<NetworkConnection, string> _resolvePlayer;
+        // Server-only: where a connection's avatar stands on the map (metres), supplied by the session; null when unknown.
+        private Func<NetworkConnection, (float X, float Z)?> _mapPositionOf;
         // A connection may watch several granted sites (its own and, for remote management, the company's other sites).
         private readonly Dictionary<NetworkConnection, HashSet<string>> _subscriptions = new();
         private readonly Dictionary<string, long> _clientRevisions = new();
@@ -33,7 +35,8 @@ namespace FoodFactoryGame.Goods.Network
         public event Action<GoodsSnapshot> SiteReceived;
 
         // Called by the server's session/bootstrap owner after authenticating connection identities.
-        public void InitializeServer(GoodsWorld world, Func<NetworkConnection, string> resolvePlayer, string savePath)
+        public void InitializeServer(GoodsWorld world, Func<NetworkConnection, string> resolvePlayer, string savePath,
+            Func<NetworkConnection, (float X, float Z)?> mapPositionOf = null)
         {
             if (!IsServerStarted || world == null || resolvePlayer == null || string.IsNullOrWhiteSpace(savePath))
                 throw new InvalidOperationException("A running server world, identity resolver and save path are required.");
@@ -43,6 +46,7 @@ namespace FoodFactoryGame.Goods.Network
                 throw new InvalidOperationException("Server world must match its committed snapshot before accepting requests.");
             _world = world;
             _resolvePlayer = resolvePlayer;
+            _mapPositionOf = mapPositionOf;
             _savePath = savePath;
             // The served save commits repeatedly, so it keeps one WAL connection open until the server stops.
             GoodsSnapshotStore.Hold(savePath);
@@ -56,6 +60,7 @@ namespace FoodFactoryGame.Goods.Network
             CloseSave();
             _world = null;
             _resolvePlayer = null;
+            _mapPositionOf = null;
             _savePath = null;
             _clockRemainder = 0;
             _uncommittedSeconds = 0;
@@ -241,6 +246,25 @@ namespace FoodFactoryGame.Goods.Network
         {
             if (!TryIdentify(sender, requestId, out var player)) return;
             var result = _world.BuyPropertyDurably(player, requestId, payingSiteId, lotId, _savePath);
+            Reply(sender, result);
+            if (result.Accepted) Broadcast();
+        }
+
+        // Enters another owned lot, carrying the player's goods and held machines there (decisions 0029, 0031). The position
+        // checked is the server's own copy of this connection's avatar, never a value from the request.
+        public void RequestEnterSite(string requestId, string siteId)
+        {
+            if (IsClientStarted) ServerEnterSite(requestId, siteId);
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        private void ServerEnterSite(string requestId, string siteId, NetworkConnection sender = null)
+        {
+            if (!TryIdentify(sender, requestId, out var player)) return;
+            var position = _mapPositionOf?.Invoke(sender);
+            var result = position == null
+                ? new GoodsOutcome { RequestId = requestId, PlayerId = player, Accepted = false, Reason = "no-position" }
+                : _world.EnterSiteDurably(player, requestId, siteId, position.Value.X, position.Value.Z, _savePath);
             Reply(sender, result);
             if (result.Accepted) Broadcast();
         }

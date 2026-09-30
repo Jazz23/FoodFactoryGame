@@ -55,7 +55,9 @@ namespace FoodFactoryGame.Goods
 
     public sealed partial class GoodsWorld
     {
-        public static string InventoryLocationId(string playerId) => "carried:" + playerId;
+        public const string CarriedPrefix = "carried:";
+
+        public static string InventoryLocationId(string playerId) => CarriedPrefix + playerId;
 
         public void Bootstrap(SiteLayout layout)
         {

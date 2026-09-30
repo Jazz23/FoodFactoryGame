@@ -96,6 +96,8 @@ namespace FoodFactoryGame.Session.Equipment
         private readonly HotbarEntry[] _hotbar = new HotbarEntry[HotbarSize];
         private bool _hotbarSeeded;
         private ClientSiteSubscription _subscription;
+        // The current site when this frame's screens and cursor were last valid.
+        private string _screenSiteId;
         private MaterialPropertyBlock _block;
         private Camera _camera;
         private PlayerAvatar _avatar;
@@ -234,6 +236,16 @@ namespace FoodFactoryGame.Session.Equipment
             _rig = _avatar == null ? null : _avatar.CameraRig;
             _camera = _rig == null ? null : _rig.GetComponentInChildren<Camera>();
             if (_camera == null || site == null) CloseScreen();
+            // Entering another site (decision 0031) closes open screens and drops what the cursor carries back where it was.
+            if (session.ClientSiteId != _screenSiteId)
+            {
+                if (_screenSiteId != null)
+                {
+                    CloseScreen();
+                    ClearCursor();
+                }
+                _screenSiteId = session.ClientSiteId;
+            }
             if (Screen == InteractionScreen.Machine
                 && site?.Equipment.Any(x => x.Id == OpenMachineId && x.State == EquipmentState.Placed) != true)
                 CloseScreen();

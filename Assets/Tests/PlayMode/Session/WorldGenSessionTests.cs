@@ -224,6 +224,110 @@ namespace FoodFactoryGame.Session.PlayModeTests
             Assert.That(navigation.BuiltFor, Does.StartWith(Start.SiteId), "The starting lot keeps its own.");
         }
 
+        // Decision 0031 (piece 3b): walking into a bought restaurant enters it. The server moves the carried goods there in one
+        // commit and the client's current site follows; a counter bought and placed there stands where the site is drawn, and
+        // customers of a TEST-ONLY district next to it are drawn at the second site. Walking back onto the starting lot carries
+        // the same goods home.
+        [UnityTest]
+        public IEnumerator WalkingIntoABoughtRestaurantCarriesTheGoodsThere()
+        {
+            yield return StartHost();
+            var results = new System.Collections.Generic.Dictionary<string, GoodsOutcome>();
+            _root.ClientSubscription.ResultReceived += x => results[x.RequestId] = x;
+            var me = _root.Authenticator.LocalPlayerId;
+            var inventory = GoodsWorld.InventoryLocationId(me);
+            var carried = _root.ClientSite.Lots.Where(x => x.LocationId == inventory).Select(x => (x.Id, x.Quantity)).OrderBy(x => x.Id).ToList();
+            Assert.That(carried, Is.Not.Empty, "The player starts with starter goods.");
+            var diner = NearestForSaleRestaurant();
+            _root.ClientSubscription.Bridge.RequestBuyProperty("buy-near", Start.SiteId, diner.LotId);
+            yield return Until(() => _root.DrawnSites.Find(diner.SiteId) != null, "bought site drawn");
+            yield return Until(() => LocalAvatar() != null, "local avatar");
+
+            LocalAvatar().Teleport(SessionRoot.ApronSpawn(diner, 0).position);
+            yield return Until(() => _root.ClientSiteId == diner.SiteId, "entering the bought restaurant");
+            Assert.That(_root.SiteEntry.LastRejection, Is.Null);
+            yield return Until(() => _root.ClientSite.Lots.Count(x => x.LocationId == inventory) == carried.Count, "the goods in the new site's baseline");
+            Assert.That(_root.ClientSite.Lots.Where(x => x.LocationId == inventory).Select(x => (x.Id, x.Quantity)).OrderBy(x => x.Id), Is.EqualTo(carried),
+                "The same goods, nothing created or lost.");
+            var saved = GoodsSnapshotStore.Load(_root.Options.WorldPath).Snapshot();
+            Assert.That(saved.Locations.Single(x => x.Id == inventory).SiteId, Is.EqualTo(diner.SiteId), "The move is committed.");
+            Assert.That(saved.Lots.Where(x => x.LocationId == inventory).Select(x => x.OwnerId), Has.All.EqualTo(diner.SiteId));
+
+            // A counter bought and placed in the new site stands where that site is drawn.
+            var bridge = _root.ClientSubscription.Bridge;
+            bridge.RequestPurchase("buy-counter", diner.SiteId, "supplier-counter");
+            yield return Until(() => results.ContainsKey("buy-counter"), "counter purchase");
+            Assert.That(results["buy-counter"].Accepted, Is.True, results["buy-counter"].Reason);
+            yield return Until(() => _root.ClientSite.Equipment.Any(x => x.HolderId == me && x.Kind == DevWorld.CounterKind), "held counter");
+            var site = _root.ClientSite;
+            var counter = site.Equipment.Single(x => x.HolderId == me && x.Kind == DevWorld.CounterKind);
+            var shell = site.Buildings.Single();
+            var anchor = Enumerable.Range(0, diner.Width * diner.Depth).Select(i => (X: i % diner.Width, Z: i / diner.Width))
+                .Where(c => SiteGrid.InsideInterior(shell, c.X, c.Z, counter.Width, counter.Depth) && SiteGrid.PlacementProblem(site, counter, c.X, c.Z, 0, 0) == null)
+                .OrderByDescending(c => shell.Doors.Min(d => Mathf.Abs(d.X - c.X) + Mathf.Abs(d.Z - c.Z))).First();
+            bridge.RequestPlace("place-counter", counter.Id, anchor.X, anchor.Z, 0);
+            yield return Until(() => results.ContainsKey("place-counter"), "counter placement");
+            Assert.That(results["place-counter"].Accepted, Is.True, results["place-counter"].Reason);
+            var presenter = UnityEngine.Object.FindAnyObjectByType<EquipmentPresenter>();
+            yield return Until(() => presenter.Visuals.ContainsKey(counter.Id), "counter visual");
+            var layout = _root.ClientSite.SiteLayouts.Single();
+            var placed = _root.ClientSite.Equipment.Single(x => x.Id == counter.Id);
+            var (width, depth) = SiteGrid.Footprint(placed.Width, placed.Depth, placed.Rotation);
+            var elevation = _map.Shown.Buildings.Single(b => b.Id == diner.BuildingId).ElevationCm / 100f;
+            var map = _map.ScenePoint(diner.LotX + placed.CellX + width / 2f, diner.LotZ + placed.CellZ + depth / 2f, elevation);
+            Assert.That(Vector3.Distance(presenter.Visuals[counter.Id].transform.position, map), Is.LessThan(0.01f),
+                "Site cell (x, z) of the lot is map cell (lot.X + x, lot.Z + z).");
+            Assert.That(Vector3.Distance(SiteGridSpace.Center(layout, placed), map), Is.LessThan(0.01f));
+
+            // TEST-ONLY: bread on the new counter and a district on the new site's map point, so a customer comes within seconds.
+            _root.ServerWorld.Bootstrap(new GoodsLot
+            {
+                Id = "test-bread", ItemId = "bread", OwnerId = diner.SiteId, LocationId = counter.Id + ":in", Quantity = 1, SpoilAfterSeconds = 3600
+            });
+            _root.ServerWorld.Bootstrap(new GoodsDistrict
+            {
+                Id = "test-district", Name = "Test", MapX = diner.AccessX, MapZ = diner.AccessZ, CustomersPerHour = 720, WealthPercent = 40,
+                AppearanceVariants = 1, LikedCuisines = { "bakery" }, DineInPercent = 50, RangeMetres = 5
+            });
+            var figures = UnityEngine.Object.FindAnyObjectByType<Customers.CustomerPresenter>();
+            yield return Until(() => _root.ClientSite.Customers.Any(x => x.RestaurantId == diner.SiteId), "a customer heads to the new site", 60f);
+            yield return Until(() => figures.VisibleCount > 0, "customer figures drawn at the second site", 30f);
+
+            // Walking back onto the starting lot carries the goods home.
+            LocalAvatar().Teleport(SessionRoot.ApronSpawn(Start, 0).position);
+            yield return Until(() => _root.ClientSiteId == Start.SiteId, "entering the starting restaurant again");
+            yield return Until(() => _root.ClientSite.Lots.Count(x => x.LocationId == inventory) == carried.Count, "the goods back home");
+            Assert.That(_root.ClientSite.Lots.Where(x => x.LocationId == inventory).Select(x => (x.Id, x.Quantity)).OrderBy(x => x.Id), Is.EqualTo(carried));
+            Assert.That(_root.DrawnSites.Find(diner.SiteId), Is.Not.Null, "The bought site is still drawn from outside.");
+        }
+
+        // Owner decision (0031): a player rejoins where they left, and the inventory stays on the site they last entered.
+        [UnityTest]
+        public IEnumerator RejoiningStartsWhereThePlayerLeftWithTheGoods()
+        {
+            yield return StartHost();
+            var diner = NearestForSaleRestaurant();
+            var me = _root.Authenticator.LocalPlayerId;
+            _root.ClientSubscription.Bridge.RequestBuyProperty("buy-near", Start.SiteId, diner.LotId);
+            yield return Until(() => _root.DrawnSites.Find(diner.SiteId) != null, "bought site drawn");
+            yield return Until(() => LocalAvatar() != null, "local avatar");
+            LocalAvatar().Teleport(SessionRoot.ApronSpawn(diner, 2).position);
+            yield return Until(() => _root.ClientSiteId == diner.SiteId, "entering the bought restaurant");
+            yield return new WaitForSeconds(0.5f);
+            var left = LocalAvatar().transform.position;
+
+            _root.Shutdown();
+            yield return Until(() => _root.CanBegin, "session stopped");
+            yield return StartHost();
+            Assert.That(_root.Authenticator.LocalPlayerId, Is.EqualTo(me));
+            Assert.That(_root.ClientSiteId, Is.EqualTo(diner.SiteId), "The join answer names the site holding the inventory.");
+            Assert.That(_root.ClientSite.Locations.Any(x => x.Id == GoodsWorld.InventoryLocationId(me)), Is.True);
+            yield return Until(() => LocalAvatar() != null, "local avatar again");
+            yield return new WaitForSeconds(0.5f);
+            Assert.That(Vector3.Distance(LocalAvatar().transform.position, left), Is.LessThan(0.5f), "The avatar spawns where it left.");
+            Assert.That(_root.SiteEntry.Pending || _root.SiteEntry.LastRejection != null, Is.False, "Nothing to enter: it already works there.");
+        }
+
         // The cheapest-to-reach restaurant for sale: the one whose lot is nearest the starting lot, well inside the draw radius.
         private PropertyOffer NearestForSaleRestaurant() => _map.Offers.Values
             .Where(x => x.ForSale && x.Category == GoodsWorld.RestaurantKind)

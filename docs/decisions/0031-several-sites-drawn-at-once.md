@@ -7,7 +7,7 @@ Status: **accepted, partly implemented**. Piece 3 of [0028](0028-sites-for-gener
 placeholder tuning chosen by the implementer, not design data.
 
 - 3a, drawing owned sites in place: **implemented** 2026-09-30 (see `docs/architecture.md`).
-- 3b, entering a site and carrying goods (0029), and spawning where the player logged out: **planned**.
+- 3b, entering a site and carrying goods (0029), and spawning where the player logged out: **implemented** 2026-09-30.
 - 3c, the multiplayer check, the presentation cost measurement and visual captures: **planned**.
 
 ## Owner decisions (2026-09-30)
@@ -44,7 +44,7 @@ placeholder tuning chosen by the implementer, not design data.
   **8 m** (PROTOTYPE). Every lot can be bought, so no terrain is rebuilt at runtime. Presentation only: stored layouts do not
   change.
 
-## Planned (3b)
+## Decision: entering a site (3b, implemented)
 
 - `RequestEnterSite(requestId, siteId)` → `EnterSiteDurably(player, requestId, siteId, mapX, mapZ, path)`: accepted only when
   the player is granted the site, the site is a listed lot, the server's copy of the avatar position (supplied by Session and
@@ -63,3 +63,14 @@ placeholder tuning chosen by the implementer, not design data.
 - The exact radius, margin and blend; whether a server-side movement check is ever needed beyond entering a site (0029).
 - Competitors' customers are still not drawn (competitors are not sites). Employees in generated worlds, merging lots and
   resale stay deferred.
+
+## Implementation notes (3b)
+
+- Rejections are `forbidden` (not granted), `unknown-site` (not a listed lot, or no site), `not-on-lot`, `no-inventory`,
+  `already-there` and `reserved`; like property purchases, only an accepted entry is recorded, so it replays.
+- The invariant is checked in `GoodsWorld.Validate` (load and every save). A dry run loaded copies of all five existing
+  saves in the application's saves folder (dev-world, world-1..3, worldgen) with it; all passed. The application's saves
+  were not modified.
+- Poses are kept in the player registry (SQLite, schema v2: `player_poses`), written when a player disconnects and when the
+  server stops. A crash loses only the pose since the last write; the player then spawns at an older point and, standing on
+  another owned lot, simply enters it again, so goods never move without the server's check.

@@ -189,6 +189,39 @@ namespace FoodFactoryGame.Session.Tests
             Assert.Throws<NotSupportedException>(() => new PlayerRegistry(RegistryPath));
         }
 
+        // Decision 0031: the last pose survives reopening, a later save replaces it, and non-finite poses are refused.
+        [Test]
+        public void LastPoseSurvivesReopeningAndIsReplaced()
+        {
+            _registry = new PlayerRegistry(RegistryPath);
+            var id = _registry.RegisterOrResolve("Alice", SecretA).PlayerId;
+            Assert.That(_registry.PoseOf(id), Is.Null, "A new player has no pose.");
+            Assert.That(_registry.SavePose(id, 1.5f, 2f, -3f, 90f), Is.True);
+            Assert.That(_registry.SavePose(id, 4f, 0.25f, 6f, 180f), Is.True);
+            Assert.That(_registry.SavePose(id, float.NaN, 0f, 0f, 0f), Is.False);
+            _registry.Dispose();
+            _registry = new PlayerRegistry(RegistryPath);
+            Assert.That(_registry.PoseOf(id), Is.EqualTo(((float X, float Y, float Z, float Yaw)?)(4f, 0.25f, 6f, 180f)));
+        }
+
+        [Test]
+        public void VersionOneRegistryGainsPosesAndKeepsItsPlayers()
+        {
+            using (var db = new SQLiteConnection(RegistryPath))
+            {
+                db.Execute("CREATE TABLE players (player_id TEXT PRIMARY KEY NOT NULL, display_name TEXT NOT NULL, "
+                    + "secret_hash TEXT NOT NULL UNIQUE, created_utc INTEGER NOT NULL)");
+                db.Execute("INSERT INTO players VALUES ('player-old', 'Old', ?, 0)", PlayerRegistry.HashSecret(SecretA));
+                db.Execute("PRAGMA user_version = 1");
+            }
+            _registry = new PlayerRegistry(RegistryPath);
+            Assert.That(_registry.FindBySecret(SecretA), Is.EqualTo("player-old"));
+            Assert.That(_registry.PoseOf("player-old"), Is.Null);
+            Assert.That(_registry.SavePose("player-old", 1f, 0f, 1f, 0f), Is.True);
+            using var check = new SQLiteConnection(RegistryPath);
+            Assert.That(check.ExecuteScalar<int>("PRAGMA user_version"), Is.EqualTo(PlayerRegistry.SchemaVersion));
+        }
+
         [Test]
         public void DurableGrantRejectsUnknownSiteWithoutWriting()
         {
