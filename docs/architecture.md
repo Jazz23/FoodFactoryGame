@@ -544,8 +544,10 @@ last entered). No goods schema change; the player registry is now schema v2.
   106/106 (new registry pose and v1 upgrade tests). World 21/21, Baseline 4/4. All PlayMode tests 36/36, including
   `WalkingIntoABoughtRestaurantCarriesTheGoodsThere` (enter, goods committed on the new site, a counter bought and placed
   there at its map cell, customer figures at the second site, walking back) and `RejoiningStartsWhereThePlayerLeftWithTheGoods`.
-- Not yet (piece 3c): the separate-client multiplayer check of entering, the presentation cost with ten equipped sites,
-  captures reviewed by someone else. Employees still use the origin for their site (dev worlds only).
+- Piece 3c ([record](verification/several-sites-20260930.md)): a loopback teammate sees the host enter, its goods move and a
+  counter placed in the second site; frame time with 11 drawn sites and 53 ovens is 9.9 ms mean (1 site: 5.5 ms, Editor).
+  Not yet: a separate-process multiplayer check and
+  review of the captures by someone else. Employees still use the origin for their site (dev worlds only).
 
 ## Required Constraints for Future Implementation
 

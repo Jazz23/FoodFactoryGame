@@ -8,7 +8,8 @@ placeholder tuning chosen by the implementer, not design data.
 
 - 3a, drawing owned sites in place: **implemented** 2026-09-30 (see `docs/architecture.md`).
 - 3b, entering a site and carrying goods (0029), and spawning where the player logged out: **implemented** 2026-09-30.
-- 3c, the multiplayer check, the presentation cost measurement and visual captures: **planned**.
+- 3c, the multiplayer check, the presentation cost measurement and visual captures: **done 2026-09-30 except the independent
+  review of the captures** ([verification record](../verification/several-sites-20260930.md)).
 
 ## Owner decisions (2026-09-30)
 

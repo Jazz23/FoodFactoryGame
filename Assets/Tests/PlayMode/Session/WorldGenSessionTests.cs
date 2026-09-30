@@ -328,6 +328,167 @@ namespace FoodFactoryGame.Session.PlayModeTests
             Assert.That(_root.SiteEntry.Pending || _root.SiteEntry.LastRejection != null, Is.False, "Nothing to enter: it already works there.");
         }
 
+        // Listen-server multiplayer (decision 0031, 3c): a remote teammate watches the bought site from its own connection. When
+        // the host walks in, the teammate's baselines show the host's goods leaving the starting site and arriving at the bought
+        // one, and a counter the host places there; the teammate's own DrawnSites lists both sites.
+        [UnityTest]
+        public IEnumerator ATeammateSeesTheHostEnterAndBuildInTheSecondSite()
+        {
+            yield return StartHost();
+            CreateRemote();
+            Assert.That(_remote.ClientManager.StartConnection(), Is.True);
+            yield return Until(() => { _remoteSite.Tick(); return _remoteSite.Latest != null; }, "remote baseline of the starting site");
+            var results = new System.Collections.Generic.Dictionary<string, GoodsOutcome>();
+            _root.ClientSubscription.ResultReceived += x => results[x.RequestId] = x;
+            var me = _root.Authenticator.LocalPlayerId;
+            var inventory = GoodsWorld.InventoryLocationId(me);
+            var diner = NearestForSaleRestaurant();
+            _root.ClientSubscription.Bridge.RequestBuyProperty("buy-near", Start.SiteId, diner.LotId);
+            yield return Until(() => _root.DrawnSites.Find(diner.SiteId) != null, "bought site drawn on the host");
+            var remoteDrawn = new DrawnSites(_remoteSite);
+            yield return Until(() =>
+            {
+                _remoteSite.Tick();
+                remoteDrawn.Tick(Vector3.zero);
+                return remoteDrawn.Find(diner.SiteId) != null;
+            }, "teammate watches and draws the bought site");
+            Assert.That(_remoteSite.Latest.Locations.Any(x => x.Id == inventory), Is.True, "Before: the host's goods are on the starting site.");
+
+            yield return Until(() => LocalAvatar() != null, "local avatar");
+            LocalAvatar().Teleport(SessionRoot.ApronSpawn(diner, 0).position);
+            yield return Until(() => _root.ClientSiteId == diner.SiteId, "host enters the bought restaurant");
+            yield return Until(() =>
+            {
+                _remoteSite.Tick();
+                return _remoteSite.Remote(diner.SiteId)?.Locations.Any(x => x.Id == inventory) == true
+                    && _remoteSite.Latest.Locations.All(x => x.Id != inventory);
+            }, "teammate sees the host's goods move");
+
+            _root.ClientSubscription.Bridge.RequestPurchase("buy-counter", diner.SiteId, "supplier-counter");
+            yield return Until(() => results.ContainsKey("buy-counter"), "counter purchase");
+            Assert.That(results["buy-counter"].Accepted, Is.True, results["buy-counter"].Reason);
+            yield return Until(() => _root.ClientSite.Equipment.Any(x => x.HolderId == me), "held counter");
+            var site = _root.ClientSite;
+            var counter = site.Equipment.Single(x => x.HolderId == me);
+            var anchor = Enumerable.Range(0, diner.Width * diner.Depth).Select(i => (X: i % diner.Width, Z: i / diner.Width))
+                .First(c => SiteGrid.InsideInterior(site.Buildings.Single(), c.X, c.Z, counter.Width, counter.Depth)
+                            && SiteGrid.PlacementProblem(site, counter, c.X, c.Z, 0, 0) == null);
+            _root.ClientSubscription.Bridge.RequestPlace("place-counter", counter.Id, anchor.X, anchor.Z, 0);
+            yield return Until(() =>
+            {
+                _remoteSite.Tick();
+                return _remoteSite.Remote(diner.SiteId)?.Equipment.Any(x => x.Id == counter.Id && x.State == EquipmentState.Placed
+                    && x.CellX == anchor.X && x.CellZ == anchor.Z) == true;
+            }, "teammate sees the placed counter");
+            remoteDrawn.Tick(Vector3.zero);
+            Assert.That(remoteDrawn.Sites.Select(x => x.SiteId), Is.EquivalentTo(new[] { Start.SiteId, diner.SiteId }));
+        }
+
+        // Decision 0031 (3c) evidence, run on request: frame time with only the starting site drawn, then with ten more bought
+        // shells near it, each given TEST-ONLY placed ovens (up to six) straight into the server world, all drawn. Writes the
+        // numbers and two captures (the sites side by side from above, and inside a bought restaurant) to
+        // docs/verification/several-sites-20260930/. Editor frame times include Editor overhead; compare the two runs only.
+        [UnityTest, Explicit("Presentation cost and captures for decision 0031: buys ten lots and renders captures, about a minute.")]
+        public IEnumerator PresentationCostAndCapturesWithTenEquippedSites()
+        {
+            var output = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "docs", "verification", "several-sites-20260930"));
+            Directory.CreateDirectory(output);
+            yield return StartHost();
+            yield return Until(() => LocalAvatar() != null, "local avatar");
+            yield return new WaitForSeconds(2f);
+            var one = new System.Collections.Generic.List<float>();
+            yield return Frames(one, 300);
+
+            var results = new System.Collections.Generic.Dictionary<string, GoodsOutcome>();
+            _root.ClientSubscription.ResultReceived += x => results[x.RequestId] = x;
+            var bought = _map.Offers.Values.Where(x => x.ForSale && x.IsShell)
+                .OrderBy(x => Mathf.Abs(x.LotX + x.Width / 2f - (Start.LotX + Start.Width / 2f)) + Mathf.Abs(x.LotZ + x.Depth / 2f - (Start.LotZ + Start.Depth / 2f)))
+                .Take(10).ToList();
+            foreach (var offer in bought) _root.ClientSubscription.Bridge.RequestBuyProperty("buy-" + offer.LotId, Start.SiteId, offer.LotId);
+            yield return Until(() => bought.All(x => results.ContainsKey("buy-" + x.LotId)), "ten purchases", 60f);
+            Assert.That(bought.Select(x => results["buy-" + x.LotId]).Where(x => !x.Accepted).Select(x => x.Reason), Is.Empty);
+
+            var oven = _root.EquipmentDefinitions.First(x => x != null && x.Kind == "oven");
+            var ovens = 0;
+            foreach (var offer in bought)
+            {
+                var placedHere = 0;
+                for (var z = 1; z < offer.Depth - 1 && placedHere < 6; z += 3)
+                for (var x = 1; x < offer.Width - 1 && placedHere < 6; x += 3)
+                {
+                    var piece = oven.CreatePlaced($"test-oven-{offer.LotId}-{x}-{z}", offer.SiteId, x, z, 0);
+                    if (SiteGrid.PlacementProblem(_root.ServerWorld.Snapshot(), piece, x, z, 0, 0) != null) continue;
+                    _root.ServerWorld.Bootstrap(piece);
+                    placedHere++;
+                    ovens++;
+                }
+            }
+            var presenter = UnityEngine.Object.FindAnyObjectByType<EquipmentPresenter>();
+            yield return Until(() => _root.DrawnSites.Sites.Count == bought.Count + 1, "every bought site drawn", 60f);
+            yield return Until(() => presenter.Visuals.Count >= ovens + 2, $"{ovens} ovens drawn", 60f);
+            Assert.That(bought.Select(x => _map.ModelShown(x.BuildingId)), Has.All.False, "Every bought building is drawn from its site.");
+            yield return new WaitForSeconds(2f);
+            var eleven = new System.Collections.Generic.List<float>();
+            yield return Frames(eleven, 300);
+
+            string Summary(System.Collections.Generic.List<float> frames)
+            {
+                var sorted = frames.OrderBy(x => x).ToList();
+                return $"mean {frames.Average() * 1000f:F2} ms, p95 {sorted[(int)(sorted.Count * 0.95f)] * 1000f:F2} ms, max {sorted.Last() * 1000f:F2} ms";
+            }
+            var report = $"Decision 0031 presentation cost, WorldGen seed {Seed}, Editor PlayMode host, 300 frames each, {DateTime.UtcNow:u}\n"
+                + $"1 site drawn: {Summary(one)}\n"
+                + $"{_root.DrawnSites.Sites.Count} sites drawn ({ovens} test ovens, {presenter.Visuals.Count} machine visuals): {Summary(eleven)}\n"
+                + $"Bought lots: {string.Join(", ", bought.Select(x => x.LotId))}\n";
+            File.WriteAllText(Path.Combine(output, "presentation-cost.txt"), report);
+            Debug.Log("[Benchmark] " + report);
+
+            // Captures: the sites side by side from above, then inside the nearest bought restaurant.
+            var placement = SitePlacement.Active;
+            var near = bought.First(x => x.Category == GoodsWorld.RestaurantKind);
+            var middle = (placement.SiteOrigin(Start.SiteId) + placement.SiteOrigin(near.SiteId)) * 0.5f;
+            var overview = new GameObject("capture-overview").AddComponent<Camera>();
+            overview.farClipPlane = 2000f;
+            overview.transform.SetPositionAndRotation(middle + new Vector3(0f, 55f, -45f), Quaternion.Euler(50f, 0f, 0f));
+            Capture(overview, Path.Combine(output, "sites-side-by-side.png"));
+            yield return null;
+            Capture(overview, Path.Combine(output, "sites-side-by-side.png"));
+            UnityEngine.Object.Destroy(overview.gameObject);
+
+            var grid = new SiteLayout { SiteId = near.SiteId, Width = near.Width, Depth = near.Depth };
+            LocalAvatar().Teleport(SiteGridSpace.FootprintCenter(grid, near.BuildingX + near.BuildingWidth / 2, near.BuildingZ + near.BuildingDepth / 2, 1, 1)
+                + Vector3.up * 0.05f);
+            yield return Until(() => _root.ClientSiteId == near.SiteId, "entering the bought restaurant");
+            yield return new WaitForSeconds(2f);
+            Capture(LocalAvatar().CameraRig.GetComponentInChildren<Camera>(), Path.Combine(output, "inside-bought-restaurant.png"));
+        }
+
+        private static IEnumerator Frames(System.Collections.Generic.List<float> frames, int count)
+        {
+            for (var index = 0; index < count; index++)
+            {
+                yield return null;
+                frames.Add(Time.unscaledDeltaTime);
+            }
+        }
+
+        private static void Capture(Camera camera, string path)
+        {
+            var texture = new RenderTexture(1600, 900, 24);
+            var previous = camera.targetTexture;
+            camera.targetTexture = texture;
+            camera.Render();
+            RenderTexture.active = texture;
+            var image = new Texture2D(1600, 900, TextureFormat.RGB24, false);
+            image.ReadPixels(new Rect(0, 0, 1600, 900), 0, 0);
+            image.Apply();
+            File.WriteAllBytes(path, image.EncodeToPNG());
+            RenderTexture.active = null;
+            camera.targetTexture = previous;
+            UnityEngine.Object.Destroy(texture);
+            UnityEngine.Object.Destroy(image);
+        }
+
         // The cheapest-to-reach restaurant for sale: the one whose lot is nearest the starting lot, well inside the draw radius.
         private PropertyOffer NearestForSaleRestaurant() => _map.Offers.Values
             .Where(x => x.ForSale && x.Category == GoodsWorld.RestaurantKind)
