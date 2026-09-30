@@ -1,4 +1,4 @@
-// Shows the site's belts and the goods riding them from the latest replicated baseline. Each belt is drawn straight or as a
+// Shows every drawn site's belts and the goods riding them from the latest replicated baselines (DrawnSites). Each belt is drawn straight or as a
 // left/right corner from the same shape rule the server moves items by (BeltRules.Shape). Every belt shares one runtime
 // tread material whose texture offset follows one clock at the simulation's speed, so the arrows of all belts line up and
 // move with the items. An item is drawn trailing the server by up to one clock step: it glides along the belt path at belt
@@ -66,7 +66,8 @@ namespace FoodFactoryGame.Session.Belts
         private Material _tread;
         private readonly Dictionary<int, GameObject> _liftModels = new();
         private GameObject _liftModelHolder;
-        private GoodsSnapshot _shown;
+        private int _shown = -1;
+        private readonly Dictionary<string, SiteLayout> _layoutOfBelt = new();
         private SiteLayout _layout;
 
         public IReadOnlyDictionary<string, GameObject> Belts => _belts.ToDictionary(x => x.Key, x => x.Value.Root);
@@ -74,6 +75,7 @@ namespace FoodFactoryGame.Session.Belts
         public Material Tread => _tread;
         public Material ItemMaterial => itemMaterial;
         public float ItemSize => itemSize;
+        // The current site's grid (placement and ghosts work there).
         public SiteLayout Layout => _layout;
 
         // Texture scroll in UV per second: the models map half a UV unit to one tile of travel.
@@ -96,9 +98,9 @@ namespace FoodFactoryGame.Session.Belts
         {
             // One offset for every belt: V increases along travel, so subtracting time moves the arrows forward.
             _tread.SetTextureOffset(BaseMap, new Vector2(0f, -Mathf.Repeat(Time.time * ScrollPerSecond, 1f)));
-            var site = session.ClientSite;
-            if (!ReferenceEquals(site, _shown)) Refresh(site);
-            UpdateItems(site);
+            var drawn = session.DrawnSites;
+            if (drawn.Version != _shown) Refresh(drawn);
+            UpdateItems(drawn);
             // Belts and riding goods on a storey the local view hides (decision 0020) are hidden with it, colliders included.
             // A lift's lower end and frame go with its lower storey, its upper end with the upper one.
             foreach (var (id, view) in _belts)
@@ -116,7 +118,7 @@ namespace FoodFactoryGame.Session.Belts
             }
         }
 
-        private bool Hidden(GoodsBelt belt, int level) => buildings.HidesLevel(belt.CellX, belt.CellZ, level);
+        private bool Hidden(GoodsBelt belt, int level) => buildings.HidesLevel(belt.SiteId, belt.CellX, belt.CellZ, level);
 
         // Belts that take items on one floor (a lift is on the floor it takes items on).
         public static IEnumerable<GoodsBelt> OnLevel(IEnumerable<GoodsBelt> belts, int level) => belts.Where(x => x.Level == level);
@@ -193,30 +195,36 @@ namespace FoodFactoryGame.Session.Belts
 
         public bool IsTread(Material material) => material == treadMaterial;
 
-        private void Refresh(GoodsSnapshot site)
+        // Every drawn site's belts, each at its site's place in the scene (decision 0031). Belt IDs are unique across sites.
+        private void Refresh(DrawnSites drawn)
         {
-            _shown = site;
-            _layout = site?.SiteLayouts.FirstOrDefault(x => x.SiteId == session.ClientSiteId);
-            var belts = _layout == null ? new List<GoodsBelt>() : site.Belts.Where(x => x.SiteId == session.ClientSiteId).ToList();
-            // Each floor is its own belt network (decision 0020), joined only by lifts.
-            var cells = BeltRules.ByCell(belts);
+            _shown = drawn.Version;
+            _layout = drawn.Sites.FirstOrDefault(x => x.Current)?.Layout;
             _beltById.Clear();
             _shapes.Clear();
             _links.Clear();
             _beltOfLocation.Clear();
-            foreach (var belt in belts)
+            _layoutOfBelt.Clear();
+            foreach (var site in drawn.Sites.Where(x => x.Layout != null))
             {
-                _beltById[belt.Id] = belt;
-                _shapes[belt.Id] = BeltRules.Shape(cells, belt);
-                _links[belt.Id] = BeltRules.Link(cells, belt);
-                _beltOfLocation[belt.LocationId] = belt.Id;
+                var siteBelts = site.Snapshot.Belts.Where(x => x.SiteId == site.SiteId).ToList();
+                // Each floor is its own belt network (decision 0020), joined only by lifts.
+                var cells = BeltRules.ByCell(siteBelts);
+                foreach (var belt in siteBelts)
+                {
+                    _beltById[belt.Id] = belt;
+                    _shapes[belt.Id] = BeltRules.Shape(cells, belt);
+                    _links[belt.Id] = BeltRules.Link(cells, belt);
+                    _beltOfLocation[belt.LocationId] = belt.Id;
+                    _layoutOfBelt[belt.Id] = site.Layout;
+                }
             }
             foreach (var id in _belts.Keys.Where(x => !_beltById.ContainsKey(x)).ToList())
             {
                 Destroy(_belts[id].Root);
                 _belts.Remove(id);
             }
-            foreach (var belt in belts)
+            foreach (var belt in _beltById.Values)
             {
                 var shape = _shapes[belt.Id];
                 if (_belts.TryGetValue(belt.Id, out var view) && (view.Shape != shape || view.Lift != belt.Lift))
@@ -232,7 +240,7 @@ namespace FoodFactoryGame.Session.Belts
                     _belts.Add(belt.Id, view);
                 }
                 view.Direction = belt.Direction;
-                view.Root.transform.SetPositionAndRotation(BeltPath.CellCenter(_layout, belt.CellX, belt.CellZ, belt.Level),
+                view.Root.transform.SetPositionAndRotation(BeltPath.CellCenter(_layoutOfBelt[belt.Id], belt.CellX, belt.CellZ, belt.Level),
                     BeltPath.ModelRotation(shape, belt.Direction));
             }
         }
@@ -252,10 +260,10 @@ namespace FoodFactoryGame.Session.Belts
             return root;
         }
 
-        private void UpdateItems(GoodsSnapshot site)
+        private void UpdateItems(DrawnSites drawn)
         {
-            var riding = _layout == null ? new List<GoodsLot>()
-                : site.Lots.Where(x => _beltOfLocation.ContainsKey(x.LocationId)).ToList();
+            var riding = drawn.Sites.Where(x => x.Layout != null)
+                .SelectMany(x => x.Snapshot.Lots.Where(y => _beltOfLocation.ContainsKey(y.LocationId))).ToList();
             foreach (var id in _items.Keys.Where(x => riding.All(y => y.Id != x)).ToList())
             {
                 Destroy(_items[id].Renderer.gameObject);
@@ -273,7 +281,7 @@ namespace FoodFactoryGame.Session.Belts
                 Follow(view, beltId, lot.BeltPosition);
                 var belt = _beltById[view.BeltId];
                 var transformItem = view.Renderer.transform;
-                transformItem.position = BeltPath.WorldPoint(_layout, belt, _shapes[belt.Id], view.Position) + Vector3.up * (itemSize * 0.5f);
+                transformItem.position = BeltPath.WorldPoint(_layoutOfBelt[belt.Id], belt, _shapes[belt.Id], view.Position) + Vector3.up * (itemSize * 0.5f);
                 if (camera != null) transformItem.rotation = camera.transform.rotation;
             }
         }
@@ -371,7 +379,8 @@ namespace FoodFactoryGame.Session.Belts
                 if (view.Renderer != null) Destroy(view.Renderer.gameObject);
             _belts.Clear();
             _items.Clear();
-            _shown = null;
+            _shown = -1;
+            _layoutOfBelt.Clear();
         }
     }
 }

@@ -55,6 +55,12 @@ namespace FoodFactoryGame.Session
         private ClientSiteSubscription _site;
         private int _nextSpawn;
         private bool _stopping;
+        // Server-only: the stored layout's placement (null without a generated world), for the enter-site position check.
+        private SitePlacement _serverPlacement;
+        // Server-only: each connected player's avatar, and its latest pose, saved to the registry when the player leaves.
+        private readonly Dictionary<NetworkConnection, (string PlayerId, PlayerAvatar Avatar)> _avatars = new();
+        private readonly Dictionary<string, (Vector3 Position, float Yaw)> _poses = new();
+        private PlayerAvatar _localAvatar;
 
         public SessionMode Mode { get; private set; }
         public string Status { get; private set; } = "Not connected";
@@ -72,6 +78,10 @@ namespace FoodFactoryGame.Session
         public PlayerRegistry ServerRegistry => _registry;
         public GoodsSnapshot ClientSite => _site?.Latest;
         public ClientSiteSubscription ClientSubscription => _site;
+        // The sites this client draws: the current one and owned ones near the camera (decision 0029).
+        public DrawnSites DrawnSites { get; private set; }
+        // Walking into another owned lot enters it (decision 0031).
+        public SiteEntry SiteEntry { get; private set; }
         // The site this client presents (named by the server's join answer); null before joining.
         public string ClientSiteId => _site?.SiteId;
         public IReadOnlyList<EquipmentDefinition> EquipmentDefinitions => equipmentDefinitions;
@@ -92,7 +102,10 @@ namespace FoodFactoryGame.Session
             if (!_options.SaveDirectoryExplicit && SessionOptions.IsValidWorldName(saveFolder))
                 _options.SaveDirectory = Path.Combine(SessionOptions.SavesRoot, saveFolder);
             _site = new ClientSiteSubscription(networkManager);
+            DrawnSites = new DrawnSites(_site);
+            SiteEntry = new SiteEntry(_site);
             networkManager.ServerManager.OnServerConnectionState += OnServerState;
+            networkManager.ServerManager.OnRemoteConnectionState += OnRemoteState;
             networkManager.ClientManager.OnClientConnectionState += OnClientState;
             networkManager.SceneManager.OnClientLoadedStartScenes += OnClientLoadedStartScenes;
             authenticator.ClientJoinAnswered += OnJoinAnswered;
@@ -103,7 +116,25 @@ namespace FoodFactoryGame.Session
             if (_options.Mode != SessionMode.None) Begin(_options.Mode);
         }
 
-        private void Update() => _site.Tick();
+        private void Update()
+        {
+            if (_avatars.Count > 0) TrackPoses();
+            _site.Tick();
+            var camera = Belts.BeltPresenter.ViewCamera();
+            DrawnSites.Tick(camera != null ? camera.transform.position : (Vector3?)null);
+            var avatar = LocalAvatar();
+            SiteEntry.Tick(avatar != null ? avatar.transform.position : (Vector3?)null);
+        }
+
+        // This client's own avatar, or null before it spawns.
+        private PlayerAvatar LocalAvatar()
+        {
+            if (_localAvatar != null && _localAvatar.IsOwner) return _localAvatar;
+            _localAvatar = networkManager.IsClientStarted
+                ? networkManager.ClientManager.Objects.Spawned.Values.Select(x => x.GetComponent<PlayerAvatar>()).FirstOrDefault(x => x != null && x.IsOwner)
+                : null;
+            return _localAvatar;
+        }
 
         private void OnDestroy()
         {
@@ -111,6 +142,7 @@ namespace FoodFactoryGame.Session
             if (networkManager != null)
             {
                 networkManager.ServerManager.OnServerConnectionState -= OnServerState;
+                networkManager.ServerManager.OnRemoteConnectionState -= OnRemoteState;
                 networkManager.ClientManager.OnClientConnectionState -= OnClientState;
                 networkManager.SceneManager.OnClientLoadedStartScenes -= OnClientLoadedStartScenes;
             }
@@ -181,6 +213,7 @@ namespace FoodFactoryGame.Session
                 }
                 ReleaseServer();
                 _site?.Reset();
+                SiteEntry?.Reset();
                 Mode = SessionMode.None;
             }
             finally
@@ -196,6 +229,7 @@ namespace FoodFactoryGame.Session
             ServerLayout = GeneratesWorld
                 ? WorldGeneration.PrepareLayout(_options.WorldPath, _options.LegacyWorldPath, DevWorld.WorldId, _options.WorldSeed)
                 : null;
+            _serverPlacement = SitePlacement.For(ServerLayout?.Layout);
             // The world is committed before FishNet listens, so the bridge never serves an uncommitted state.
             // Max stacks are content: capacity counts slots, so they are registered (inside LoadOrCreate, before the seed)
             // ahead of any request. A layout with lots (format 3) makes a generated world that starts in its own restaurant, with
@@ -275,7 +309,7 @@ namespace FoodFactoryGame.Session
         {
             while (bridge != null && !bridge.IsServerStarted) yield return null;
             if (bridge == null || ServerWorld == null) yield break;
-            bridge.InitializeServer(ServerWorld, authenticator.PlayerIdOf, _options.WorldPath);
+            bridge.InitializeServer(ServerWorld, authenticator.PlayerIdOf, _options.WorldPath, MapPositionOf);
             ServerBridge = bridge;
             SpawnEmployees(bridge);
         }
@@ -303,6 +337,10 @@ namespace FoodFactoryGame.Session
             ServerWorld = null;
             ServerLayout = null;
             StartOffer = null;
+            SavePoses();
+            _avatars.Clear();
+            _poses.Clear();
+            _serverPlacement = null;
             _registry?.Dispose();
             _registry = null;
         }
@@ -334,11 +372,54 @@ namespace FoodFactoryGame.Session
                 connection.Disconnect(true);
                 return;
             }
-            var spawn = NextSpawn();
+            // A returning player starts where they left (owner decision, 0031); a new one at the next spawn point.
+            var saved = _registry.PoseOf(playerId);
+            var spawn = saved == null ? NextSpawn()
+                : (position: new Vector3(saved.Value.X, saved.Value.Y, saved.Value.Z), rotation: Quaternion.Euler(0f, saved.Value.Yaw, 0f));
             var instance = Instantiate(playerPrefab, spawn.position, spawn.rotation);
             networkManager.ServerManager.Spawn(instance, connection);
             networkManager.SceneManager.AddOwnerToDefaultScene(instance);
-            instance.GetComponent<PlayerAvatar>().SetDisplayName(_registry.DisplayNameOf(playerId));
+            var avatar = instance.GetComponent<PlayerAvatar>();
+            avatar.SetDisplayName(_registry.DisplayNameOf(playerId));
+            _avatars[connection] = (playerId, avatar);
+        }
+
+        // Server: keeps each connected avatar's latest pose, so it can be saved once the avatar is gone.
+        private void TrackPoses()
+        {
+            foreach (var (playerId, avatar) in _avatars.Values)
+                if (avatar != null) _poses[playerId] = (avatar.transform.position, avatar.transform.eulerAngles.y);
+        }
+
+        private void OnRemoteState(NetworkConnection connection, RemoteConnectionStateArgs args)
+        {
+            if (args.ConnectionState != RemoteConnectionState.Stopped || !_avatars.TryGetValue(connection, out var entry)) return;
+            TrackPoses();
+            _avatars.Remove(connection);
+            SavePose(entry.PlayerId);
+        }
+
+        private void SavePoses()
+        {
+            TrackPoses();
+            foreach (var playerId in _poses.Keys.ToList()) SavePose(playerId);
+        }
+
+        private void SavePose(string playerId)
+        {
+            if (_registry == null || !_poses.TryGetValue(playerId, out var pose)) return;
+            if (!_registry.SavePose(playerId, pose.Position.x, pose.Position.y, pose.Position.z, pose.Yaw))
+                Debug.LogWarning($"[Session] Could not save where {playerId} stood; they will rejoin at their previous point.");
+            _poses.Remove(playerId);
+        }
+
+        // Server: where a connection's avatar stands on the map, from the server's own copy of it (decision 0031); null without
+        // a generated world or an avatar. The avatar moves under its owner's control, so this is a sanity check, not anti-cheat.
+        private (float X, float Z)? MapPositionOf(NetworkConnection connection)
+        {
+            if (_serverPlacement == null || connection == null || !_avatars.TryGetValue(connection, out var entry) || entry.Avatar == null) return null;
+            var map = _serverPlacement.ToMap(entry.Avatar.transform.position);
+            return (map.x, map.y);
         }
 
         private (Vector3 position, Quaternion rotation) NextSpawn()

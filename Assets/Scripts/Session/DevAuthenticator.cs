@@ -140,7 +140,7 @@ namespace FoodFactoryGame.Session
             }
             _players[connection] = result.PlayerId;
             _connections[result.PlayerId] = connection;
-            Send(connection, true, result.Reason, result.PlayerId, _admission.PrimarySiteId);
+            Send(connection, true, result.Reason, result.PlayerId, _admission.CurrentSiteOf(result.PlayerId));
             OnAuthenticationResult?.Invoke(connection, true);
         }
 

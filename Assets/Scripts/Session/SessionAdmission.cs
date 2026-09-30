@@ -33,8 +33,12 @@ namespace FoodFactoryGame.Session
         }
 
         public PlayerRegistry Registry => _registry;
-        // Sent to each admitted client, which subscribes to it.
+        // The starting (or dev) site, where new players get their inventory.
         public string PrimarySiteId => _siteId;
+
+        // Sent to each admitted client as its current site, which it subscribes to: the site holding the player's inventory, since
+        // the inventory stays where the player last entered (decisions 0029, 0031); the primary site without one.
+        public string CurrentSiteOf(string playerId) => _world.CarriedSiteOf(playerId) ?? _siteId;
 
         // PROTOTYPE rule: every authenticated player joins the one company that owns the primary site (GDD ownership is open):
         // it receives the primary site's grant and, when a capacity is configured, an inventory location there (with any

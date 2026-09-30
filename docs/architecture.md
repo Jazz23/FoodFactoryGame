@@ -446,7 +446,7 @@ Decision: [0028](decisions/0028-sites-for-generated-buildings.md). Owner decisio
   `PropertyPanel` (`InteractionScreen.Property`): category, price, lot size, for sale / owned by your company / owned by
   another company / not for sale, company cash, Buy (pending and server rejection shown like `LogisticsPanel`). An accepted
   purchase makes the client watch the new site. `BuildWorldGenScene.cs` wires the panel and `devSiteOnly`.
-- PROTOTYPE limits: only the primary site is drawn; bought sites are reachable only through remote management
+- PROTOTYPE limits (until piece 3a, below): only the primary site is drawn; bought sites are reachable only through remote management
   (logistics panel). $1,000,000 buys many lots (seed `piece-two`: restaurants from $4,320, factories from $12,672, farms
   from $25,200, stations from $14,400).
   A restaurant's apron is the 2 m setback, so machines wider than 2 cells (the 3x3 oven) do not fit on it; the dock and
@@ -491,6 +491,64 @@ pre-equipped. Evidence: [verification record](verification/customers-worldgen-20
 - PROTOTYPE limits: about 1,870 customers an hour across about 300 restaurants, so the starting restaurant makes roughly 3
   sales an hour. The street band is flat. Queue and ordering spots are fixed in site axes.
 
+## Implemented: owned sites drawn in place, piece 3a (2026-09-30)
+
+Decision: [0031](decisions/0031-several-sites-drawn-at-once.md). Presentation only; nothing on the server or in saves changed.
+Walking into a bought building (carrying goods by 0029) and spawning where the player logged out: piece 3b, below.
+
+- Placement (`SitePlacement`, Session): the one rule for where sites stand. The starting lot keeps the scene origin; every
+  other lot's grid centre stands at its map position relative to the starting lot's, at its building's elevation minus the
+  starting building's (a shift only). `WorldLayoutPresenter` builds it from the shown layout and activates it;
+  `SiteGridSpace` applies `SitePlacement.OriginOf(siteId)` in `FootprintCenter`, `AnchorAt`, `LevelAt(layout, height)` and
+  `FloorHeight`, so dev worlds and the starting site are unchanged.
+- `DrawnSites` (owned by `SessionRoot`, ticked every frame): watches every site the current site's company owns (from
+  `Properties`), and lists the current site plus watched owned lots within 300 m of the local camera (dropped past 320 m).
+  Its `Version` changes with the set, any drawn baseline or the placement.
+- Presenters loop over drawn sites: `EquipmentPresenter`, `BuildingPresenter` (indoors in any drawn shell; `HidesLevel`
+  now takes the site), `BeltPresenter` (`Layout` stays the current site's), `TruckPresenter`, `CustomerPresenter` (a
+  bound second-client subscription gets its own `DrawnSites`), and `SiteNavigation` (one runtime NavMesh per drawn
+  generated lot; `BuiltForSite`). Machines on a drawn site other than the current one are not hover or pickup targets.
+- Map: every lot is levelled to its building's ground floor (8 m blend) and paved just under it; trees and signs stay off
+  every lot. Restaurant and factory models (including the starting one) are hidden while their site is drawn
+  (`ModelShown`).
+- Evidence (live Editor, 2026-09-30): Session EditMode assembly 104/104 including 5 new `SitePlacementTests`; all PlayMode
+  tests 34/34 including the new `WorldGenSessionTests.ABoughtRestaurantIsDrawnWhereItStands` (a bought restaurant's shell
+  within one cell of its map building at its elevation, map model hidden, its own NavMesh). Not yet: visual captures, the
+  presentation cost with ten equipped sites, multiplayer beyond the existing checks (piece 3c).
+
+## Implemented: walking into owned buildings, piece 3b (2026-09-30)
+
+Decisions: [0029](decisions/0029-carrying-goods-between-owned-sites.md), [0031](decisions/0031-several-sites-drawn-at-once.md).
+Owner decisions of 2026-09-30: players rejoin where they logged out, and the inventory stays with the player (on the site
+last entered). No goods schema change; the player registry is now schema v2.
+
+- Goods (`GoodsWorld.Entering.cs`): `EnterSiteDurably(player, request, siteId, mapX, mapZ, path)` checks, in order,
+  `forbidden`, `unknown-site` (not a listed lot or no site), `not-on-lot` (outside the lot plus `EnterMarginMetres` = 2 m,
+  PROTOTYPE; NaN refused), `no-inventory`, `already-there`, `reserved`; then in one commit moves `carried:<player>` to the site,
+  re-owns its lots by the site (as truck deliveries do) and moves every machine the player holds. Only accepted entries are
+  recorded, so a retry replays; a failed save restores everything. `CarriedSiteOf(player)`.
+- Invariant (`ValidateCarrying`, in `Validate`): every `carried:` location's holder is granted its site, and every held
+  machine is on its holder's carried site. Dry run on copies of all five existing application saves: all load.
+- Network: `GoodsNetworkBridge.RequestEnterSite(requestId, siteId)`. The position is the server's own copy of the
+  connection's avatar, supplied by `SessionRoot` through `InitializeServer(..., mapPositionOf)` and converted with
+  `SitePlacement.ToMap` (`no-position` without a generated world or avatar). Accepted entries are broadcast.
+- Joining: the join answer names `SessionAdmission.CurrentSiteOf(player)`, the site holding the inventory (the primary site
+  for a new player). Players spawn at their saved pose (`PlayerRegistry.PoseOf`, table `player_poses`, written on disconnect
+  and server stop); new players at the apron or scene spawn points as before.
+- Client: `SiteEntry` (owned by `SessionRoot`) sends one enter request when the local avatar stands on an owned lot other
+  than the current site, and on acceptance `ClientSiteSubscription.SwitchTo` makes it current (the old site stays watched).
+  A refused lot is not asked again until the avatar leaves it; the street keeps the last site. `EquipmentInteraction` closes
+  screens and clears the cursor when the current site changes.
+- Evidence (live Editor, 2026-09-30): Goods EditMode assembly 196 tests, 195 passed on the full run with the known flaky
+  `TruckTests.StepSizeDoesNotChangeTheOutcome` failing and passing alone; 13 new `EnterSiteTests` pass. Session EditMode
+  106/106 (new registry pose and v1 upgrade tests). World 21/21, Baseline 4/4. All PlayMode tests 36/36, including
+  `WalkingIntoABoughtRestaurantCarriesTheGoodsThere` (enter, goods committed on the new site, a counter bought and placed
+  there at its map cell, customer figures at the second site, walking back) and `RejoiningStartsWhereThePlayerLeftWithTheGoods`.
+- Piece 3c ([record](verification/several-sites-20260930.md)): a loopback teammate sees the host enter, its goods move and a
+  counter placed in the second site; frame time with 11 drawn sites and 53 ovens is 9.9 ms mean (1 site: 5.5 ms, Editor).
+  Not yet: a separate-process multiplayer check and
+  review of the captures by someone else. Employees still use the origin for their site (dev worlds only).
+
 ## Required Constraints for Future Implementation
 
 - The server owns gameplay state; clients request validated actions through the command contract in decision 0002.
@@ -507,7 +565,7 @@ These remain accepted contracts; only the bounded goods slice, its station jobs,
 - Player count, hosting/disconnect behavior, and exact performance hardware: GDD decisions pending.
 - Physical goods model: selected in GDD section 28 and decision 0003; a logical lot/condition/transfer/recovery slice is implemented. Transport staging, actual placed-world positions, carrier/vehicle handling constraints, and visual projection remain pending.
 - Offline progression, host migration, discovery/lobbies/relay, and the shipped hosting model remain undecided. A direct-IP development host/join flow exists (decision 0005).
-- SQLite is the storage for all persisted data (decision 0011): the goods world (with its write-once world layout, decision 0026), player registry and client identity. MoonSharp runs the prototype employee scripts (above); no wider scripting or modding role is selected.
+- SQLite is the storage for all persisted data (decision 0011): the goods world (with its write-once world layout, decision 0026), player registry (with each player's last pose, decision 0031) and client identity. MoonSharp runs the prototype employee scripts (above); no wider scripting or modding role is selected.
 - Customers: first build and local visual customers implemented (above, decision 0024), and in generated worlds with map districts and lot-linked competitors (decision 0030); multi-camera out-of-view spawning, menus, customer groups, competitor AI, drawing competitors' customers and demand balancing remain open. The benchmarked choice model in the test assembly ([record](verification/customer-choice-benchmark-20260925.md)) is a separate prototype, not the runtime code.
 - Multiplayer smoke tests and representative scale benchmarks follow implementation; current tests do not establish replication correctness or the 60 FPS target.
 

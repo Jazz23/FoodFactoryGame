@@ -44,6 +44,26 @@ namespace FoodFactoryGame.Session
             _siteId = siteId;
         }
 
+        // Makes another subscribed site the current one after the server accepted entering it (decision 0031): the old current
+        // site becomes a watched one, and each keeps its latest baseline. The server keeps sending both.
+        public void SwitchTo(string siteId)
+        {
+            if (string.IsNullOrWhiteSpace(siteId) || siteId == _siteId) return;
+            var oldId = _siteId;
+            var oldLatest = Latest;
+            _watched.Remove(siteId);
+            Latest = _remote.TryGetValue(siteId, out var known) ? known : null;
+            _remote.Remove(siteId);
+            _siteId = siteId;
+            if (oldId != null)
+            {
+                _watched.Add(oldId);
+                if (oldLatest != null) _remote[oldId] = oldLatest;
+            }
+            if (Latest == null) _bridge?.RequestSite(siteId);
+            UnityEngine.Debug.Log($"[Session] Current site is now {siteId}.");
+        }
+
         // Call every frame; cheap once subscribed. Resets when the client connection or bridge goes away.
         public void Tick()
         {

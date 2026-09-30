@@ -661,6 +661,7 @@ namespace FoodFactoryGame.Goods
             ValidateTrucks(state);
             ValidateCustomers(state);
             ValidateProperties(state);
+            ValidateCarrying(state);
         }
     }
 }

@@ -2,7 +2,7 @@
 
 Date: 2026-09-30
 
-Status: **accepted, not implemented** (owner, 2026-09-30). Part of piece 3 of [0028](0028-sites-for-generated-buildings.md):
+Status: **accepted, implemented** 2026-09-30 by [0031](0031-several-sites-drawn-at-once.md) piece 3b (owner, 2026-09-30). Part of piece 3 of [0028](0028-sites-for-generated-buildings.md):
 drawing every owned site in place so players can walk into bought buildings. Customers in generated worlds are built first
 (owner: "whatever you suggest").
 

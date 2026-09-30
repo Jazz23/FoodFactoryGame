@@ -1,4 +1,5 @@
-// Server-only SQLite registry mapping a hashed client secret to a stable player ID; raw secrets are never stored.
+// Server-only SQLite registry mapping a hashed client secret to a stable player ID (raw secrets are never stored), and each
+// player's last pose, so rejoining starts where they left (schema v2, decision 0031).
 using System;
 using System.IO;
 using System.Linq;
@@ -29,7 +30,7 @@ namespace FoodFactoryGame.Session
 
     public sealed class PlayerRegistry : IDisposable
     {
-        public const int SchemaVersion = 1;
+        public const int SchemaVersion = 2;
         public const int MaxNameLength = 32;
         public const int MinSecretLength = 32;
         public const int MaxSecretLength = 128;
@@ -62,6 +63,16 @@ namespace FoodFactoryGame.Session
                             + "display_name TEXT NOT NULL, "
                             + "secret_hash TEXT NOT NULL UNIQUE, "
                             + "created_utc INTEGER NOT NULL)");
+                        CreatePoses();
+                        _db.Execute($"PRAGMA user_version = {SchemaVersion}");
+                    });
+                }
+                else if (version == 1)
+                {
+                    // v1 -> v2: where each player last stood (decision 0031); players without a row spawn at the default point.
+                    _db.RunInTransaction(() =>
+                    {
+                        CreatePoses();
                         _db.Execute($"PRAGMA user_version = {SchemaVersion}");
                     });
                 }
@@ -126,6 +137,54 @@ namespace FoodFactoryGame.Session
         public string DisplayNameOf(string playerId)
         {
             lock (_gate) return _db.ExecuteScalar<string>("SELECT display_name FROM players WHERE player_id = ?", playerId);
+        }
+
+        private void CreatePoses() => _db.Execute("CREATE TABLE IF NOT EXISTS player_poses ("
+            + "player_id TEXT PRIMARY KEY NOT NULL, x REAL NOT NULL, y REAL NOT NULL, z REAL NOT NULL, yaw REAL NOT NULL)");
+
+        // Where a player last stood (scene metres and degrees about up), saved when they leave or the server stops, so they
+        // rejoin there (owner decision, 0031). Non-finite values are refused. Returns false when the store is unavailable.
+        public bool SavePose(string playerId, float x, float y, float z, float yaw)
+        {
+            if (string.IsNullOrWhiteSpace(playerId) || !new[] { x, y, z, yaw }.All(v => !float.IsNaN(v) && !float.IsInfinity(v))) return false;
+            lock (_gate)
+            {
+                try
+                {
+                    _db.Execute("INSERT OR REPLACE INTO player_poses (player_id, x, y, z, yaw) VALUES (?, ?, ?, ?, ?)",
+                        playerId, x, y, z, yaw);
+                    return true;
+                }
+                catch (SQLiteException)
+                {
+                    return false;
+                }
+            }
+        }
+
+        // The player's last saved pose, or null when none was saved (a new player) or the store is unavailable.
+        public (float X, float Y, float Z, float Yaw)? PoseOf(string playerId)
+        {
+            lock (_gate)
+            {
+                try
+                {
+                    var row = _db.Query<PoseRow>("SELECT x AS X, y AS Y, z AS Z, yaw AS Yaw FROM player_poses WHERE player_id = ?", playerId).FirstOrDefault();
+                    return row == null ? null : (row.X, row.Y, row.Z, row.Yaw);
+                }
+                catch (SQLiteException)
+                {
+                    return null;
+                }
+            }
+        }
+
+        private sealed class PoseRow
+        {
+            public float X { get; set; }
+            public float Y { get; set; }
+            public float Z { get; set; }
+            public float Yaw { get; set; }
         }
 
         public int Count

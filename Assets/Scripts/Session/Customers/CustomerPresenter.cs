@@ -1,4 +1,4 @@
-// Draws nearby site customers from replicated server records; visuals never change simulation or persistence.
+// Draws the customers of every drawn site from replicated server records; visuals never change simulation or persistence.
 // A bounded set walks along local NavMesh paths, and first appears at a site edge (a generated lot's street, SiteStreet)
 // outside the local camera.
 using System;
@@ -25,9 +25,9 @@ namespace FoodFactoryGame.Session.Customers
 
         private readonly Dictionary<string, Visual> _visuals = new();
         private readonly List<string> _remove = new();
-        private GoodsSnapshot _shown;
+        private int _shown = -1;
         private float _nextRefresh;
-        private ClientSiteSubscription _bound;
+        private DrawnSites _bound;
 
         private sealed class Visual
         {
@@ -38,27 +38,33 @@ namespace FoodFactoryGame.Session.Customers
             public int Corner;
             public bool Leaving;
             public float LeaveDeadline;
+            public string SiteId;
         }
 
         public int VisibleCount => _visuals.Count;
 
-        // Draws another client connection's replicated site instead of the session's own, e.g. a second client in one process.
+        // Draws another client connection's replicated sites instead of the session's own, e.g. a second client in one process.
         public void Bind(ClientSiteSubscription subscription)
         {
-            _bound = subscription;
+            _bound = subscription == null ? null : new DrawnSites(subscription);
             Clear();
         }
 
-        private ClientSiteSubscription Subscription => _bound ?? session.ClientSubscription;
+        private DrawnSites Drawn => _bound ?? session.DrawnSites;
 
         private void Update()
         {
-            var site = Subscription?.Latest;
-            if (!ReferenceEquals(site, _shown) || Time.time >= _nextRefresh)
+            if (_bound != null)
             {
-                _shown = site;
+                var view = Belts.BeltPresenter.ViewCamera();
+                _bound.Tick(view != null ? view.transform.position : (Vector3?)null);
+            }
+            var drawn = Drawn;
+            if (drawn.Version != _shown || Time.time >= _nextRefresh)
+            {
+                _shown = drawn.Version;
                 _nextRefresh = Time.time + 0.5f;
-                Refresh(site);
+                Refresh(drawn);
             }
             _remove.Clear();
             foreach (var (id, visual) in _visuals)
@@ -74,17 +80,17 @@ namespace FoodFactoryGame.Session.Customers
             foreach (var id in _remove) _visuals.Remove(id);
         }
 
-        private void Refresh(GoodsSnapshot site)
+        // Every drawn restaurant's customers, at its site's place in the scene (decision 0031); visibility is capped overall.
+        private void Refresh(DrawnSites drawn)
         {
-            var siteId = Subscription?.SiteId;
-            var layout = site?.SiteLayouts.FirstOrDefault(x => x.SiteId == siteId);
-            if (layout == null || customerPrefab == null)
+            var sites = drawn.Sites.Where(x => x.Layout != null).ToList();
+            if (sites.Count == 0 || customerPrefab == null)
             {
                 Clear();
                 return;
             }
-            var customers = site.Customers.Where(x => x.RestaurantId == siteId).ToList();
-            var active = new HashSet<string>(customers.Select(x => x.Id));
+            var bySite = sites.ToDictionary(x => x.SiteId);
+            var active = new HashSet<string>(sites.SelectMany(site => site.Snapshot.Customers.Where(x => x.RestaurantId == site.SiteId).Select(x => x.Id)));
             // The player rig's camera is untagged in DevSite, so Camera.main alone misses the actual local view.
             var camera = Camera.main != null ? Camera.main : Camera.allCameras.FirstOrDefault(x => x.isActiveAndEnabled);
             foreach (var (id, visual) in _visuals)
@@ -92,9 +98,18 @@ namespace FoodFactoryGame.Session.Customers
                 if (active.Contains(id) || visual.Leaving) continue;
                 visual.Leaving = true;
                 visual.LeaveDeadline = Time.time + 12f;
-                if (TryEdge(layout, site, camera, id, out var exit)) SetTarget(visual, exit);
+                if (bySite.TryGetValue(visual.SiteId, out var from) && TryEdge(from.Layout, from.Snapshot, camera, id, out var exit)) SetTarget(visual, exit);
                 else visual.LeaveDeadline = Time.time + 1f;
             }
+            foreach (var drawnSite in sites) RefreshSite(drawnSite, camera);
+        }
+
+        private void RefreshSite(DrawnSite drawnSite, Camera camera)
+        {
+            var site = drawnSite.Snapshot;
+            var siteId = drawnSite.SiteId;
+            var layout = drawnSite.Layout;
+            var customers = site.Customers.Where(x => x.RestaurantId == siteId).ToList();
             var counters = site.Equipment.Where(x => x.SiteId == siteId && x.State == EquipmentState.Placed && x.Kind == GoodsWorld.CounterKind).ToList();
             var tables = site.Equipment.Where(x => x.SiteId == siteId && x.State == EquipmentState.Placed && x.Kind == GoodsWorld.TableKind).ToList();
             if (counters.Count == 0) return;
@@ -117,7 +132,7 @@ namespace FoodFactoryGame.Session.Customers
                 var animator = root.GetComponentInChildren<Animator>();
                 animator.cullingMode = AnimatorCullingMode.CullUpdateTransforms;
                 Tint(root, customer);
-                visual = new Visual { Root = root, Animator = animator, Target = spawn };
+                visual = new Visual { Root = root, Animator = animator, Target = spawn, SiteId = siteId };
                 _visuals.Add(customer.Id, visual);
                 SetTarget(visual, target);
             }
@@ -168,7 +183,7 @@ namespace FoodFactoryGame.Session.Customers
             var start = StableHash(id) % edges.Length;
             for (var index = 0; index < edges.Length; index++)
             {
-                var candidate = edges[(start + index) % edges.Length];
+                var candidate = (street != null ? Vector3.zero : SiteGridSpace.Origin(layout)) + edges[(start + index) % edges.Length];
                 point = NavMesh.SamplePosition(candidate, out var hit, 2f, NavMesh.AllAreas) ? hit.position : candidate;
                 var view = camera.WorldToViewportPoint(point + Vector3.up);
                 if (view.z > 0 && view.x > -0.05f && view.x < 1.05f && view.y > -0.05f && view.y < 1.05f) continue;
@@ -245,7 +260,7 @@ namespace FoodFactoryGame.Session.Customers
             foreach (var visual in _visuals.Values)
                 if (visual.Root != null) Destroy(visual.Root);
             _visuals.Clear();
-            _shown = null;
+            _shown = -1;
         }
     }
 }

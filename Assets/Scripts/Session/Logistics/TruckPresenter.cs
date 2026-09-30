@@ -1,4 +1,4 @@
-// Presentation only (decision 0022): a placeholder truck stands behind each placed dock of the local site while a company truck
+// Presentation only (decision 0022): a placeholder truck stands behind each placed dock of every drawn site while a company truck
 // loads or unloads there, lengthwise along the dock's back (local +Z, away from its front). A driving truck is between sites
 // and has no place in this scene. Visuals are keyed by truck ID, never own state, and are cleared without a baseline.
 using System.Collections.Generic;
@@ -19,32 +19,34 @@ namespace FoodFactoryGame.Session.Logistics
         [SerializeField] private GameObject truckPrefab;
 
         private readonly Dictionary<string, GameObject> _visuals = new();
-        private GoodsSnapshot _shown;
+        private int _shown = -1;
 
         public IReadOnlyDictionary<string, GameObject> Visuals => _visuals;
 
         private void Update()
         {
-            var site = session.ClientSite;
-            if (ReferenceEquals(site, _shown)) return;
-            _shown = site;
-            var siteId = session.ClientSubscription?.SiteId;
-            var layout = site?.SiteLayouts.FirstOrDefault(x => x.SiteId == siteId);
-            var parked = new Dictionary<string, GoodsEquipment>();
-            if (layout != null)
+            var drawn = session.DrawnSites;
+            if (drawn.Version == _shown) return;
+            _shown = drawn.Version;
+            var parked = new Dictionary<string, (GoodsEquipment Dock, SiteLayout Layout)>();
+            foreach (var drawnSite in drawn.Sites.Where(x => x.Layout != null))
+            {
+                var site = drawnSite.Snapshot;
+                var siteId = drawnSite.SiteId;
                 foreach (var truck in site.Trucks.Where(x => x.SiteId == siteId && x.State is TruckState.Loading or TruckState.Unloading))
                 {
                     var route = GoodsWorld.RouteOf(site, truck);
                     var dockId = truck.State == TruckState.Loading ? route?.PickupDockId : route?.DropoffDockId;
                     var dock = site.Equipment.FirstOrDefault(x => x.Id == dockId && x.State == EquipmentState.Placed && x.SiteId == siteId);
-                    if (dock != null) parked[truck.Id] = dock;
+                    if (dock != null) parked[truck.Id] = (dock, drawnSite.Layout);
                 }
+            }
             foreach (var id in _visuals.Keys.Where(x => !parked.ContainsKey(x)).ToList())
             {
                 Destroy(_visuals[id]);
                 _visuals.Remove(id);
             }
-            foreach (var (truckId, dock) in parked)
+            foreach (var (truckId, (dock, layout)) in parked)
             {
                 if (!_visuals.TryGetValue(truckId, out var visual))
                 {

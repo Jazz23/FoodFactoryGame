@@ -1,0 +1,4 @@
+Decision 0031 presentation cost, WorldGen seed piece-two, Editor PlayMode host, 300 frames each, 2026-09-30 19:36:35Z
+1 site drawn: mean 5.53 ms, p95 6.81 ms, max 22.57 ms
+11 sites drawn (53 test ovens, 55 machine visuals): mean 9.87 ms, p95 12.30 ms, max 63.35 ms
+Bought lots: lot-restaurant-0140, lot-restaurant-0145, lot-restaurant-0047, lot-restaurant-0154, lot-restaurant-0148, lot-restaurant-0120, lot-restaurant-0026, lot-factory-0004, lot-restaurant-0147, lot-restaurant-0150

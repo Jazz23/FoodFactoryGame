@@ -266,3 +266,10 @@ Artifacts are intentionally ignored by Git. Preserve required evidence externall
   newly created capture camera drew only restaurant awnings once; a second capture was complete (seen once, not reproduced).
 - A stored world never regenerates, so after a generator change host a new world folder (or an isolated `-save` directory)
   to see the change.
+- Several sites drawn (decision 0031): `SitePlacementTests` (EditMode, 5), `EnterSiteTests` (EditMode, 13), and in
+  `WorldGenSessionTests` (PlayMode) `ABoughtRestaurantIsDrawnWhereItStands`, `WalkingIntoABoughtRestaurantCarriesTheGoodsThere`,
+  `RejoiningStartsWhereThePlayerLeftWithTheGoods` and `ATeammateSeesTheHostEnterAndBuildInTheSecondSite`. Tests enter a lot by
+  teleporting the local avatar onto it (`PlayerAvatar.Teleport`, `SessionRoot.ApronSpawn(offer, n)` gives a point on any
+  lot once the map is shown). The frame-time comparison and captures are `[Explicit]`:
+  `PresentationCostAndCapturesWithTenEquippedSites` (`run_tests` with `include_explicit: true`) writes them to
+  `docs/verification/several-sites-20260930/`.
