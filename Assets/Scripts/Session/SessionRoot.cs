@@ -72,6 +72,8 @@ namespace FoodFactoryGame.Session
         public PlayerRegistry ServerRegistry => _registry;
         public GoodsSnapshot ClientSite => _site?.Latest;
         public ClientSiteSubscription ClientSubscription => _site;
+        // The sites this client draws: the current one and owned ones near the camera (decision 0029).
+        public DrawnSites DrawnSites { get; private set; }
         // The site this client presents (named by the server's join answer); null before joining.
         public string ClientSiteId => _site?.SiteId;
         public IReadOnlyList<EquipmentDefinition> EquipmentDefinitions => equipmentDefinitions;
@@ -92,6 +94,7 @@ namespace FoodFactoryGame.Session
             if (!_options.SaveDirectoryExplicit && SessionOptions.IsValidWorldName(saveFolder))
                 _options.SaveDirectory = Path.Combine(SessionOptions.SavesRoot, saveFolder);
             _site = new ClientSiteSubscription(networkManager);
+            DrawnSites = new DrawnSites(_site);
             networkManager.ServerManager.OnServerConnectionState += OnServerState;
             networkManager.ClientManager.OnClientConnectionState += OnClientState;
             networkManager.SceneManager.OnClientLoadedStartScenes += OnClientLoadedStartScenes;
@@ -103,7 +106,12 @@ namespace FoodFactoryGame.Session
             if (_options.Mode != SessionMode.None) Begin(_options.Mode);
         }
 
-        private void Update() => _site.Tick();
+        private void Update()
+        {
+            _site.Tick();
+            var camera = Belts.BeltPresenter.ViewCamera();
+            DrawnSites.Tick(camera != null ? camera.transform.position : (Vector3?)null);
+        }
 
         private void OnDestroy()
         {

@@ -446,7 +446,7 @@ Decision: [0028](decisions/0028-sites-for-generated-buildings.md). Owner decisio
   `PropertyPanel` (`InteractionScreen.Property`): category, price, lot size, for sale / owned by your company / owned by
   another company / not for sale, company cash, Buy (pending and server rejection shown like `LogisticsPanel`). An accepted
   purchase makes the client watch the new site. `BuildWorldGenScene.cs` wires the panel and `devSiteOnly`.
-- PROTOTYPE limits: only the primary site is drawn; bought sites are reachable only through remote management
+- PROTOTYPE limits (until piece 3a, below): only the primary site is drawn; bought sites are reachable only through remote management
   (logistics panel). $1,000,000 buys many lots (seed `piece-two`: restaurants from $4,320, factories from $12,672, farms
   from $25,200, stations from $14,400).
   A restaurant's apron is the 2 m setback, so machines wider than 2 cells (the 3x3 oven) do not fit on it; the dock and
@@ -490,6 +490,31 @@ pre-equipped. Evidence: [verification record](verification/customers-worldgen-20
   commit maximum at most 31.7 ms, payload 157 KB.
 - PROTOTYPE limits: about 1,870 customers an hour across about 300 restaurants, so the starting restaurant makes roughly 3
   sales an hour. The street band is flat. Queue and ordering spots are fixed in site axes.
+
+## Implemented: owned sites drawn in place, piece 3a (2026-09-30)
+
+Decision: [0031](decisions/0031-several-sites-drawn-at-once.md). Presentation only; nothing on the server or in saves changed.
+Walking into a bought building (carrying goods by 0029) and spawning where the player logged out are planned as piece 3b.
+
+- Placement (`SitePlacement`, Session): the one rule for where sites stand. The starting lot keeps the scene origin; every
+  other lot's grid centre stands at its map position relative to the starting lot's, at its building's elevation minus the
+  starting building's (a shift only). `WorldLayoutPresenter` builds it from the shown layout and activates it;
+  `SiteGridSpace` applies `SitePlacement.OriginOf(siteId)` in `FootprintCenter`, `AnchorAt`, `LevelAt(layout, height)` and
+  `FloorHeight`, so dev worlds and the starting site are unchanged.
+- `DrawnSites` (owned by `SessionRoot`, ticked every frame): watches every site the current site's company owns (from
+  `Properties`), and lists the current site plus watched owned lots within 300 m of the local camera (dropped past 320 m).
+  Its `Version` changes with the set, any drawn baseline or the placement.
+- Presenters loop over drawn sites: `EquipmentPresenter`, `BuildingPresenter` (indoors in any drawn shell; `HidesLevel`
+  now takes the site), `BeltPresenter` (`Layout` stays the current site's), `TruckPresenter`, `CustomerPresenter` (a
+  bound second-client subscription gets its own `DrawnSites`), and `SiteNavigation` (one runtime NavMesh per drawn
+  generated lot; `BuiltForSite`). Machines on a drawn site other than the current one are not hover or pickup targets.
+- Map: every lot is levelled to its building's ground floor (8 m blend) and paved just under it; trees and signs stay off
+  every lot. Restaurant and factory models (including the starting one) are hidden while their site is drawn
+  (`ModelShown`).
+- Evidence (live Editor, 2026-09-30): Session EditMode assembly 104/104 including 5 new `SitePlacementTests`; all PlayMode
+  tests 34/34 including the new `WorldGenSessionTests.ABoughtRestaurantIsDrawnWhereItStands` (a bought restaurant's shell
+  within one cell of its map building at its elevation, map model hidden, its own NavMesh). Not yet: visual captures, the
+  presentation cost with ten equipped sites, multiplayer beyond the existing checks (piece 3c).
 
 ## Required Constraints for Future Implementation
 

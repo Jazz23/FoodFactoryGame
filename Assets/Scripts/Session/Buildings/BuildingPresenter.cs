@@ -1,8 +1,8 @@
-// Shows building shells from the latest replicated site baseline (decisions 0019, 0020) and drives the local indoor view.
+// Shows building shells from the latest replicated baselines of every drawn site (decisions 0019, 0020, 0031) and drives the local indoor view.
 // Each storey is its own object: the ground storey has the doorway, floor tint and lintels; every upper storey has a solid
 // slab over the interior (so avatars stand on it) and a closed ring of walls. The elevator cell is marked on every storey.
 // Walls and slabs get colliders; the floor tint, lintels, markers and roof do not, so they never catch aim rays. Visuals
-// never own state. The local avatar's cell and height decide "indoors" and its level: the rig switches to the top-down view,
+// never own state. The local avatar's cell and height on any drawn site decide "indoors" and its level: the rig switches to the top-down view,
 // and that building's roof and every storey above the avatar's level are hidden (colliders too), for this client only.
 using System.Collections.Generic;
 using System.Linq;
@@ -29,7 +29,7 @@ namespace FoodFactoryGame.Session.Buildings
         [SerializeField] private Color elevatorColor = new(0.95f, 0.75f, 0.2f, 1f);
 
         private readonly Dictionary<string, Shell> _shells = new();
-        private GoodsSnapshot _shown;
+        private int _shown = -1;
 
         private sealed class Shell
         {
@@ -39,15 +39,18 @@ namespace FoodFactoryGame.Session.Buildings
             public List<GameObject> Storeys = new();
             // What the visual was built from; a shell is rebuilt when its floors or elevator change.
             public (int Floors, int ElevatorX, int ElevatorZ) Built;
+            public GoodsBuilding Building;
         }
 
         public IReadOnlyCollection<string> Shown => _shells.Keys;
-        // The building the local avatar stands inside, or null outdoors or without a baseline.
+        // The building the local avatar stands inside (on any drawn site), or null outdoors or without a baseline.
         public string LocalBuildingId { get; private set; }
-        // Level the local avatar stands on (0 outdoors), and its cell.
+        // Level the local avatar stands on (0 outdoors), and its cell on the site it stands on.
         public int LocalLevel { get; private set; }
         public (int X, int Z) LocalCell { get; private set; }
         public PlayerAvatar LocalAvatar { get; private set; }
+        // The drawn site whose building the avatar is inside, or else the current site.
+        public DrawnSite LocalSite { get; private set; }
 
         public GameObject ShellOf(string buildingId) => _shells.TryGetValue(buildingId, out var shell) ? shell.Root : null;
 
@@ -56,37 +59,46 @@ namespace FoodFactoryGame.Session.Buildings
 
         public bool RoofVisible(string buildingId) => _shells.TryGetValue(buildingId, out var shell) && shell.Roof.enabled;
 
-        public GoodsBuilding LocalBuilding => LocalBuildingId == null ? null : _shown?.Buildings.FirstOrDefault(x => x.Id == LocalBuildingId);
-        public SiteLayout Layout => _shown?.SiteLayouts.FirstOrDefault(x => x.SiteId == session.ClientSiteId);
+        public GoodsBuilding LocalBuilding => LocalBuildingId != null && _shells.TryGetValue(LocalBuildingId, out var shell) ? shell.Building : null;
+        public SiteLayout Layout => LocalSite?.Layout;
 
-        // True when something at this cell and level is inside the local avatar's building above its level, so this client
-        // hides it with the storeys it stands on.
-        public bool HidesLevel(int cellX, int cellZ, int level)
+        // True when something at this cell and level of a site is inside the local avatar's building above its level, so this
+        // client hides it with the storeys it stands on.
+        public bool HidesLevel(string siteId, int cellX, int cellZ, int level)
         {
             var building = LocalBuilding;
-            return building != null && level > LocalLevel
+            return building != null && level > LocalLevel && building.SiteId == siteId
                 && SiteGrid.Overlaps(cellX, cellZ, 1, 1, building.CellX, building.CellZ, building.Width, building.Depth);
         }
 
         private void Update()
         {
-            var site = session.ClientSite;
-            var layout = site?.SiteLayouts.FirstOrDefault(x => x.SiteId == session.ClientSiteId);
-            if (!ReferenceEquals(site, _shown))
+            var drawn = session.DrawnSites;
+            if (drawn.Version != _shown)
             {
-                _shown = site;
-                Rebuild(site, layout);
+                _shown = drawn.Version;
+                Rebuild(drawn);
             }
             LocalAvatar = FindLocalAvatar();
             LocalBuildingId = null;
             LocalLevel = 0;
-            if (LocalAvatar != null && layout != null)
+            LocalSite = drawn.Sites.FirstOrDefault(x => x.Current);
+            if (LocalAvatar != null)
             {
+                // Indoors in any drawn shell (decision 0031), not only the current site's; outdoors the current site's grid.
                 var position = LocalAvatar.transform.position;
-                LocalCell = SiteGridSpace.AnchorAt(layout, position, 1, 1);
-                LocalLevel = SiteGridSpace.LevelAt(position.y);
-                var (x, z) = LocalCell;
-                LocalBuildingId = site.Buildings.FirstOrDefault(b => b.SiteId == layout.SiteId && SiteGrid.IsInterior(b, x, z) && LocalLevel < b.Floors)?.Id;
+                foreach (var site in drawn.Sites.Where(x => x.Layout != null))
+                {
+                    var (x, z) = SiteGridSpace.AnchorAt(site.Layout, position, 1, 1);
+                    var level = SiteGridSpace.LevelAt(site.Layout, position.y);
+                    var inside = site.Snapshot.Buildings.FirstOrDefault(b => b.SiteId == site.SiteId && SiteGrid.IsInterior(b, x, z) && level < b.Floors);
+                    if (inside == null && !(site.Current && LocalBuildingId == null)) continue;
+                    LocalSite = site;
+                    LocalCell = (x, z);
+                    LocalLevel = level;
+                    LocalBuildingId = inside?.Id;
+                    if (inside != null) break;
+                }
             }
             foreach (var (id, shell) in _shells)
             {
@@ -100,13 +112,18 @@ namespace FoodFactoryGame.Session.Buildings
             }
             if (LocalAvatar != null) LocalAvatar.CameraRig.SetIndoors(LocalBuildingId != null);
             // Other players on a hidden storey are hidden with it.
-            if (layout != null)
-                foreach (var avatar in Avatars().Where(x => !x.IsOwner))
+            var localSite = LocalBuilding == null ? null : drawn.Find(LocalBuilding.SiteId);
+            foreach (var avatar in Avatars().Where(x => !x.IsOwner))
+            {
+                var position = avatar.transform.position;
+                var hidden = false;
+                if (localSite?.Layout != null)
                 {
-                    var position = avatar.transform.position;
-                    var (x, z) = SiteGridSpace.AnchorAt(layout, position, 1, 1);
-                    avatar.SetHidden(HidesLevel(x, z, SiteGridSpace.LevelAt(position.y)));
+                    var (x, z) = SiteGridSpace.AnchorAt(localSite.Layout, position, 1, 1);
+                    hidden = HidesLevel(localSite.SiteId, x, z, SiteGridSpace.LevelAt(localSite.Layout, position.y));
                 }
+                avatar.SetHidden(hidden);
+            }
         }
 
         private void OnDisable() => Clear();
@@ -116,23 +133,29 @@ namespace FoodFactoryGame.Session.Buildings
             foreach (var shell in _shells.Values)
                 if (shell.Root != null) Destroy(shell.Root);
             _shells.Clear();
-            _shown = null;
+            _shown = -1;
             LocalBuildingId = null;
             LocalLevel = 0;
+            LocalSite = null;
         }
 
-        // A shell is kept while its floors and elevator are unchanged, and rebuilt when a floor is added.
-        private void Rebuild(GoodsSnapshot site, SiteLayout layout)
+        // Every drawn site's shells, each at its site's place in the scene (decision 0031). A shell is kept while its floors and
+        // elevator are unchanged, and rebuilt when a floor is added.
+        private void Rebuild(DrawnSites drawn)
         {
-            var buildings = layout == null ? new List<GoodsBuilding>() : site.Buildings.Where(x => x.SiteId == layout.SiteId).ToList();
-            foreach (var id in _shells.Keys.Where(x => buildings.All(y => y.Id != x || y.Floors != _shells[x].Built.Floors
-                         || y.ElevatorX != _shells[x].Built.ElevatorX || y.ElevatorZ != _shells[x].Built.ElevatorZ)).ToList())
+            var buildings = drawn.Sites.Where(x => x.Layout != null)
+                .SelectMany(site => site.Snapshot.Buildings.Where(x => x.SiteId == site.SiteId).Select(x => (Site: site, Building: x))).ToList();
+            foreach (var id in _shells.Keys.Where(x => buildings.All(y => y.Building.Id != x || y.Building.Floors != _shells[x].Built.Floors
+                         || y.Building.ElevatorX != _shells[x].Built.ElevatorX || y.Building.ElevatorZ != _shells[x].Built.ElevatorZ)).ToList())
             {
                 Destroy(_shells[id].Root);
                 _shells.Remove(id);
             }
-            foreach (var building in buildings.Where(x => !_shells.ContainsKey(x.Id)))
-                _shells.Add(building.Id, Create(layout, building));
+            foreach (var (site, building) in buildings)
+            {
+                if (!_shells.TryGetValue(building.Id, out var shell)) _shells.Add(building.Id, shell = Create(site.Layout, building));
+                shell.Building = building;
+            }
         }
 
         private Shell Create(SiteLayout layout, GoodsBuilding building)

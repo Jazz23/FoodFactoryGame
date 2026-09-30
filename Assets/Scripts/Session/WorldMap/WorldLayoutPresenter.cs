@@ -6,9 +6,11 @@
 // writes no state, and nothing in the simulation reads it or depends on whether it exists. Tiles, furniture and trees are
 // merged into one mesh per material per 250 m chunk and the buildings are static-batched, so a ~1,800-building city with
 // ~6,000 trees stays a few hundred draw calls. Format 1 layouts (generator v1) show as flat land with no river or trees.
-// Generated worlds (format 3, decision 0028) are drawn around this client's site: the starting lot's grid centre stands at the
-// scene origin and its building's ground floor at y = 0, where SiteGridSpace puts the site, the land over the lot is levelled to
-// that floor, and the starting building's own model is left out because BuildingPresenter draws its shell from the site data.
+// Generated worlds (format 3, decisions 0028, 0031) are drawn by SitePlacement, which this presenter activates: the starting
+// lot's grid centre stands at the scene origin with its building's ground floor at y = 0, and every lot stands where
+// SiteGridSpace puts its site. The land over every lot is levelled to its building's ground floor, so any lot can be drawn
+// from site data without terrain showing through, and a restaurant or factory model is hidden while BuildingPresenter draws
+// its site's shell (DrawnSites), and shown again when that site stops being drawn.
 // Every lot gets a pavement surface and every purchasable building a PropertyMarker, and restaurant awnings are tinted by the
 // replicated ownership records (GoodsProperty) before the layout's own for-sale or competitor state. Older formats keep the
 // PROTOTYPE placement beside the dev site, whose floor and NavMesh (devSiteOnly) are shown only then.
@@ -118,7 +120,14 @@ namespace FoodFactoryGame.Session.WorldMap
         private WorldTerrain _terrain;
         private float _devHeight;
         private bool _generated;
-        private string _startBuildingId;
+        // PROTOTYPE (decision 0031): the land around every lot of a generated world blends back to the terrain over this many
+        // metres; lots are indexed in square map cells of LotBucket metres.
+        private const float LotBlend = 8f;
+        private const float LotBucket = 64f;
+        private readonly Dictionary<(int X, int Z), List<(Rect Rect, float Elevation)>> _lotBuckets = new();
+        // Restaurant and factory models by building ID; each is hidden while its site is drawn from site data.
+        private readonly Dictionary<string, GameObject> _shellModels = new();
+        private int _hiddenFor = -1;
         // Restaurant awnings by building ID, re-tinted when a new baseline brings ownership records.
         private readonly Dictionary<string, (MeshRenderer Renderer, int Index, WorldBuilding Building)> _awnings = new();
         private readonly Dictionary<string, Color> _awningColours = new();
@@ -157,7 +166,20 @@ namespace FoodFactoryGame.Session.WorldMap
                 _tintedFrom = site;
                 foreach (var awning in _awnings.Values) TintAwning(awning.Renderer, awning.Index, awning.Building, site);
             }
+            var drawn = session.DrawnSites;
+            if (Shown != null && drawn.Version != _hiddenFor)
+            {
+                _hiddenFor = drawn.Version;
+                // A drawn site's shell comes from its site data (BuildingPresenter), so the map's own model steps aside; it
+                // returns when the site stops being drawn.
+                var fromSites = new HashSet<string>(drawn.Sites.SelectMany(x => x.Snapshot.Buildings.Where(b => b.SiteId == x.SiteId).Select(b => b.Id)));
+                foreach (var (id, model) in _shellModels)
+                    if (model.activeSelf == fromSites.Contains(id)) model.SetActive(!fromSites.Contains(id));
+            }
         }
+
+        // True while the map's own model of a restaurant or factory is drawn (false while its site draws the shell instead).
+        public bool ModelShown(string buildingId) => _shellModels.TryGetValue(buildingId, out var model) && model.activeSelf;
 
         // PROTOTYPE presentation: the map is about 2 km across and starts beside the dev site, past the player camera's
         // 1 km far plane, so while a layout is shown every local camera draws far enough to see all of it.
@@ -181,6 +203,10 @@ namespace FoodFactoryGame.Session.WorldMap
             _awnings.Clear();
             _awningColours.Clear();
             _tintedFrom = null;
+            _lotBuckets.Clear();
+            _shellModels.Clear();
+            _hiddenFor = -1;
+            SitePlacement.Use(null);
             BuildingCount = 0;
         }
 
@@ -199,15 +225,15 @@ namespace FoodFactoryGame.Session.WorldMap
             _terrain = layout.Terrain ?? WorldTerrain.Flat();
             if (_generated)
             {
-                // The starting lot's grid centre goes to the scene origin and its building's ground floor to y = 0.
-                _startBuildingId = start.BuildingId;
-                _clear = new Rect(start.X, start.Z, start.Width, start.Depth);
-                _devHeight = layout.Buildings.First(x => x.Id == start.BuildingId).ElevationCm / 100f;
-                _layoutOrigin = new Vector3(-(start.X + start.Width / 2f), -_devHeight, -(start.Z + start.Depth / 2f));
+                // The starting lot's grid centre goes to the scene origin and its building's ground floor to y = 0, and every
+                // other lot stands where SitePlacement puts its site (decision 0031). Every lot is levelled to its building.
+                var placement = SitePlacement.For(layout);
+                SitePlacement.Use(placement);
+                _layoutOrigin = placement.LayoutOrigin;
+                IndexLots(layout);
             }
             else
             {
-                _startBuildingId = null;
                 var planar = new Vector3(0f, 0f, devSiteClearHalfSize.y + cityGap + layout.CityHalfSize);
                 // The dev site's floor in layout-local coordinates, and the land height the map is levelled to there.
                 _clear = new Rect(-devSiteClearHalfSize.x - planar.x, -devSiteClearHalfSize.y - planar.z, 2f * devSiteClearHalfSize.x, 2f * devSiteClearHalfSize.y);
@@ -231,7 +257,7 @@ namespace FoodFactoryGame.Session.WorldMap
             var districts = layout.Districts.ToDictionary(x => x.Id);
             foreach (var building in layout.Buildings)
             {
-                if (_generated ? building.Id == _startBuildingId : Overlaps(building.X, building.Z, building.Width, building.Depth)) continue;
+                if (!_generated && Overlaps(building.X, building.Z, building.Width, building.Depth)) continue;
                 Building(building, districts.TryGetValue(building.DistrictId ?? "", out var district) ? district.Kind : null);
                 BuildingCount++;
             }
@@ -241,10 +267,55 @@ namespace FoodFactoryGame.Session.WorldMap
 
         // ------------------------------------------------------------------ land
 
-        // Land height (layout-local metres) with the ground around the dev site levelled to its floor.
+        // Every lot of a generated world by LotBucket-sized map cell, reaching LotBlend past each lot, for Land and LotAt.
+        private void IndexLots(WorldLayout layout)
+        {
+            var elevations = layout.Buildings.ToDictionary(x => x.Id, x => x.ElevationCm / 100f);
+            foreach (var lot in layout.Lots)
+            {
+                var entry = (Rect: new Rect(lot.X, lot.Z, lot.Width, lot.Depth), Elevation: elevations[lot.BuildingId]);
+                for (var i = Mathf.FloorToInt((lot.X - LotBlend) / LotBucket); i <= Mathf.FloorToInt((lot.X + lot.Width + LotBlend) / LotBucket); i++)
+                for (var j = Mathf.FloorToInt((lot.Z - LotBlend) / LotBucket); j <= Mathf.FloorToInt((lot.Z + lot.Depth + LotBlend) / LotBucket); j++)
+                {
+                    if (!_lotBuckets.TryGetValue((i, j), out var list)) _lotBuckets[(i, j)] = list = new List<(Rect, float)>();
+                    list.Add(entry);
+                }
+            }
+        }
+
+        // The nearest lot's elevation and how far outside it a point lies (0 inside); false when none is within LotBlend.
+        private bool NearestLot(float x, float z, out float elevation, out float outside)
+        {
+            elevation = 0f;
+            outside = float.MaxValue;
+            if (!_lotBuckets.TryGetValue((Mathf.FloorToInt(x / LotBucket), Mathf.FloorToInt(z / LotBucket)), out var list)) return false;
+            foreach (var (rect, height) in list)
+            {
+                var distance = Mathf.Max(Mathf.Max(0f, Mathf.Max(rect.xMin - x, x - rect.xMax)), Mathf.Max(0f, Mathf.Max(rect.yMin - z, z - rect.yMax)));
+                if (distance >= outside) continue;
+                outside = distance;
+                elevation = height;
+            }
+            return outside < LotBlend;
+        }
+
+        private bool OnAnyLot(Rect footprint)
+        {
+            if (!_lotBuckets.TryGetValue((Mathf.FloorToInt(footprint.center.x / LotBucket), Mathf.FloorToInt(footprint.center.y / LotBucket)), out var list))
+                return false;
+            return list.Any(x => x.Rect.Overlaps(footprint));
+        }
+
+        // Land height (layout-local metres): in a generated world every lot is levelled to its building's ground floor, blending
+        // back to the terrain within LotBlend; otherwise the ground around the dev site is levelled to its floor.
         private float Land(float x, float z)
         {
             var raw = _terrain.Height(x, z);
+            if (_generated)
+            {
+                if (!NearestLot(x, z, out var elevation, out var fromLot)) return raw;
+                return Mathf.Lerp(elevation, raw, Mathf.SmoothStep(0f, 1f, fromLot / LotBlend));
+            }
             var dx = Mathf.Max(0f, Mathf.Abs(x - _clear.center.x) - _clear.width / 2f);
             var dz = Mathf.Max(0f, Mathf.Abs(z - _clear.center.y) - _clear.height / 2f);
             var outside = Mathf.Max(dx, dz);
@@ -338,8 +409,12 @@ namespace FoodFactoryGame.Session.WorldMap
                 var z = -half + j * TerrainCell;
                 var h = Land(x, z) - Carve(layout, x, z);
                 if (carved[j * size + i]) h -= RoadCarve;
-                // Keep the land just under the dev site's own floor.
-                if (_clear.Contains(new Vector2(x, z))) h = _devHeight - 0.05f;
+                // Keep the land just under each lot's floor in a generated world, or the dev site's own floor.
+                if (_generated)
+                {
+                    if (NearestLot(x, z, out var floor, out var outside) && outside == 0f) h = floor - 0.05f;
+                }
+                else if (_clear.Contains(new Vector2(x, z))) h = _devHeight - 0.05f;
                 heights[j * size + i] = h;
             }
             // Cover per cell, by the cell's centre.
@@ -462,8 +537,8 @@ namespace FoodFactoryGame.Session.WorldMap
             {
                 var xs = Grid(lot.X, lot.X + lot.Width);
                 var zs = Grid(lot.Z, lot.Z + lot.Depth);
-                // The starting lot's pavement stays just under the site floor (y = 0), below the shell's floor tint and ghosts.
-                var lift = lot.BuildingId == _startBuildingId ? -0.02f : 0.03f;
+                // A lot's pavement stays just under its site's floor (its building's ground floor), below floor tints and ghosts.
+                const float lift = -0.02f;
                 var buffer = Buffer(art.paving, lot.X + lot.Width / 2f, lot.Z + lot.Depth / 2f, false);
                 var first = buffer.Vertices.Count;
                 foreach (var z in zs)
@@ -487,7 +562,7 @@ namespace FoodFactoryGame.Session.WorldMap
         {
             foreach (var farm in layout.Buildings.Where(x => x.Category == BuildingCategory.Farm))
             {
-                if (Overlaps(farm.X, farm.Z, farm.Width, farm.Depth)) continue;
+                if (!_generated && Overlaps(farm.X, farm.Z, farm.Width, farm.Depth)) continue;
                 var material = Variant(farm) == "a" ? art.wheat : art.greens;
                 var xs = Grid(farm.X, farm.X + farm.Width);
                 var zs = Grid(farm.Z, farm.Z + farm.Depth);
@@ -784,8 +859,9 @@ namespace FoodFactoryGame.Session.WorldMap
         // Queues a piece into the merged meshes (one per material and chunk), unless it would cover the dev site.
         private void Merge(WorldArtCatalog.Piece piece, Matrix4x4 matrix, Drape drape, bool collide, Rect footprint)
         {
-            // Generated worlds keep everything but trees and signs off the starting lot; roads and tiles merely touch it.
-            if ((!_generated || drape == Drape.Rigid) && Overlaps(footprint.x, footprint.y, footprint.width, footprint.height)) return;
+            // Generated worlds keep trees and signs off every lot (roads and tiles merely touch lots); older ones keep everything off
+            // the dev site.
+            if (_generated ? drape == Drape.Rigid && OnAnyLot(footprint) : Overlaps(footprint.x, footprint.y, footprint.width, footprint.height)) return;
             var origin = matrix.GetColumn(3);
             var lift = drape == Drape.Rigid ? Land(origin.x, origin.z) : 0f;
             var data = Data(piece.mesh);
@@ -836,7 +912,8 @@ namespace FoodFactoryGame.Session.WorldMap
         // Where a building's ground floor stands: its recorded elevation, levelled like the land near the dev site.
         private float Base(WorldBuilding building)
         {
-            if (building.Doors.Count == 0) return building.ElevationCm / 100f;
+            // A generated lot is levelled to its building's ground floor, where its site stands (SitePlacement).
+            if (building.Doors.Count == 0 || _generated && building.HasLot) return building.ElevationCm / 100f;
             var door = building.Doors[0];
             return building.ElevationCm / 100f + Land(door.X + 0.5f, door.Z + 0.5f) - _terrain.Height(door.X + 0.5f, door.Z + 0.5f);
         }
@@ -887,6 +964,7 @@ namespace FoodFactoryGame.Session.WorldMap
             var visual = Place(pieceName, piece.mesh, piece.materials, holder, Vector3.zero, Quaternion.identity, Vector3.one);
             AddCollider(holder, size, Heights[sizeKey]);
             if (building.HasLot) Mark(holder.gameObject, building);
+            if (_generated && building.IsShell) _shellModels[building.Id] = holder.gameObject;
             var awning = System.Array.FindIndex(piece.materials, x => x != null && x.name == "WG_Awning");
             if (building.Category != BuildingCategory.Restaurant || awning < 0) return;
             var renderer = visual.GetComponent<MeshRenderer>();

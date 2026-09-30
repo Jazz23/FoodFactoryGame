@@ -155,8 +155,9 @@ namespace FoodFactoryGame.Session.PlayModeTests
             var max = _map.ScenePoint(building.X + building.Width, building.Z + building.Depth);
             Assert.That(new[] { bounds.min.x - min.x, bounds.min.z - min.z, bounds.max.x - max.x, bounds.max.z - max.z }.Select(Mathf.Abs),
                 Has.All.LessThanOrEqualTo(SiteGrid.CellSize), $"Shell bounds {bounds.min}-{bounds.max} against the map's {min}-{max}.");
+            yield return Until(() => !_map.ModelShown(Start.BuildingId), "starting model hidden while its site is drawn");
             Assert.That(UnityEngine.Object.FindObjectsByType<PropertyMarker>().Any(m => m.BuildingId == Start.BuildingId), Is.False,
-                "The map leaves out the starting building's own model.");
+                "The map hides the starting building's own model (and its marker) while the site draws the shell.");
             Assert.That(UnityEngine.Object.FindObjectsByType<PropertyMarker>().Length, Is.GreaterThan(10), "Other property is marked.");
         }
 
@@ -188,6 +189,46 @@ namespace FoodFactoryGame.Session.PlayModeTests
                 Is.LessThan(0.01f));
             Assert.That(GoodsSnapshotStore.Load(_root.Options.WorldPath).Snapshot().Equipment.Single(x => x.Id == dock.Id).State, Is.EqualTo(EquipmentState.Placed));
         }
+
+        // Decision 0031 (piece 3a): a bought restaurant near the camera is drawn in place from its site data. Its shell stands
+        // within one cell of the map's building, at the building's elevation; the map hides its own model, and the lot gets
+        // its own runtime NavMesh.
+        [UnityTest]
+        public IEnumerator ABoughtRestaurantIsDrawnWhereItStands()
+        {
+            yield return StartHost();
+            var results = new System.Collections.Generic.Dictionary<string, GoodsOutcome>();
+            _root.ClientSubscription.ResultReceived += x => results[x.RequestId] = x;
+            var diner = NearestForSaleRestaurant();
+            Assert.That(_map.ModelShown(diner.BuildingId), Is.True, "Its map model is drawn before the purchase.");
+            _root.ClientSubscription.Bridge.RequestBuyProperty("buy-near", Start.SiteId, diner.LotId);
+            yield return Until(() => results.ContainsKey("buy-near"), "purchase reply");
+            Assert.That(results["buy-near"].Accepted, Is.True, results["buy-near"].Reason);
+
+            var buildings = UnityEngine.Object.FindAnyObjectByType<BuildingPresenter>();
+            yield return Until(() => buildings.ShellOf(diner.BuildingId) != null, "bought shell drawn from site data");
+            Assert.That(_root.DrawnSites.Find(diner.SiteId), Is.Not.Null, "The bought site is drawn.");
+            var layout = _map.Shown;
+            var building = layout.Buildings.Single(b => b.Id == diner.BuildingId);
+            var renderers = buildings.ShellOf(diner.BuildingId).GetComponentsInChildren<Renderer>();
+            var bounds = renderers[0].bounds;
+            foreach (var renderer in renderers) bounds.Encapsulate(renderer.bounds);
+            var min = _map.ScenePoint(building.X, building.Z, building.ElevationCm / 100f);
+            var max = _map.ScenePoint(building.X + building.Width, building.Z + building.Depth);
+            Assert.That(new[] { bounds.min.x - min.x, bounds.min.z - min.z, bounds.max.x - max.x, bounds.max.z - max.z }.Select(Mathf.Abs),
+                Has.All.LessThanOrEqualTo(SiteGrid.CellSize), $"Shell bounds {bounds.min}-{bounds.max} against the map's {min}-{max}.");
+            Assert.That(Mathf.Abs(bounds.min.y - min.y), Is.LessThan(0.5f), "The shell stands at its building's elevation.");
+            yield return Until(() => !_map.ModelShown(diner.BuildingId), "map model hidden while the site is drawn");
+            var navigation = UnityEngine.Object.FindAnyObjectByType<Customers.SiteNavigation>();
+            yield return Until(() => navigation.BuiltForSite(diner.SiteId) != "", "the bought lot's NavMesh");
+            Assert.That(navigation.BuiltFor, Does.StartWith(Start.SiteId), "The starting lot keeps its own.");
+        }
+
+        // The cheapest-to-reach restaurant for sale: the one whose lot is nearest the starting lot, well inside the draw radius.
+        private PropertyOffer NearestForSaleRestaurant() => _map.Offers.Values
+            .Where(x => x.ForSale && x.Category == GoodsWorld.RestaurantKind)
+            .OrderBy(x => Mathf.Abs(x.LotX + x.Width / 2f - (Start.LotX + Start.Width / 2f)) + Mathf.Abs(x.LotZ + x.Depth / 2f - (Start.LotZ + Start.Depth / 2f)))
+            .First();
 
         // Listen-server multiplayer: the host buys a restaurant through the buy panel; the remote teammate's baseline shows the
         // new owner and it gains the new site, and the host's map re-tints the awning and its client watches the new site.

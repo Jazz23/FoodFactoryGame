@@ -1,5 +1,6 @@
-// Shows placed equipment from the latest replicated site baseline: one local visual per placed piece, keyed by equipment ID.
-// Visuals never own state; held equipment has no visual, and a missing baseline clears the scene rather than guessing.
+// Shows placed equipment from the latest replicated baselines of every drawn site (DrawnSites): one local visual per placed
+// piece, keyed by equipment ID (unique across sites). Visuals never own state; held equipment has no visual, and a missing
+// baseline clears the scene rather than guessing.
 // A visual shows "running" exactly while the baseline has a running (not blocked) job on its station.
 using System.Collections.Generic;
 using System.Linq;
@@ -18,36 +19,38 @@ namespace FoodFactoryGame.Session.Equipment
 
         private readonly Dictionary<string, EquipmentVisual> _visuals = new();
         private readonly Dictionary<string, GoodsEquipment> _placed = new();
-        private GoodsSnapshot _shown;
+        private int _shown = -1;
 
         public IReadOnlyDictionary<string, EquipmentVisual> Visuals => _visuals;
 
         private void Update()
         {
-            var site = session.ClientSite;
-            if (!ReferenceEquals(site, _shown)) Refresh(site);
+            var drawn = session.DrawnSites;
+            if (drawn.Version != _shown) Refresh(drawn);
             // Machines on a storey the local view hides (decision 0020) are hidden with it, colliders included.
             foreach (var (id, visual) in _visuals)
             {
                 var equipment = _placed[id];
-                var shown = !buildings.HidesLevel(equipment.CellX, equipment.CellZ, equipment.Level);
+                var shown = !buildings.HidesLevel(equipment.SiteId, equipment.CellX, equipment.CellZ, equipment.Level);
                 if (visual.gameObject.activeSelf != shown) visual.gameObject.SetActive(shown);
             }
         }
 
-        private void Refresh(GoodsSnapshot site)
+        // Every drawn site's placed machines, each at its own site's place in the scene (decision 0031).
+        private void Refresh(DrawnSites drawn)
         {
-            _shown = site;
-            var layout = site?.SiteLayouts.FirstOrDefault(x => x.SiteId == session.ClientSiteId);
-            var placed = layout == null ? new List<GoodsEquipment>()
-                : site.Equipment.Where(x => x.State == EquipmentState.Placed).ToList();
-            foreach (var id in _visuals.Keys.Where(x => placed.All(y => y.Id != x)).ToList())
+            _shown = drawn.Version;
+            var placed = drawn.Sites.Where(x => x.Layout != null)
+                .SelectMany(site => site.Snapshot.Equipment.Where(x => x.State == EquipmentState.Placed && x.SiteId == site.SiteId)
+                    .Select(x => (Site: site, Equipment: x))).ToList();
+            var ids = new HashSet<string>(placed.Select(x => x.Equipment.Id));
+            foreach (var id in _visuals.Keys.Where(x => !ids.Contains(x)).ToList())
             {
                 Destroy(_visuals[id].gameObject);
                 _visuals.Remove(id);
                 _placed.Remove(id);
             }
-            foreach (var equipment in placed)
+            foreach (var (site, equipment) in placed)
             {
                 if (!_visuals.TryGetValue(equipment.Id, out var visual))
                 {
@@ -56,8 +59,8 @@ namespace FoodFactoryGame.Session.Equipment
                     _visuals.Add(equipment.Id, visual);
                 }
                 _placed[equipment.Id] = equipment;
-                visual.transform.SetPositionAndRotation(SiteGridSpace.Center(layout, equipment), SiteGridSpace.Rotation(equipment.Rotation));
-                visual.SetRunning(site.Jobs.Any(x => x.StationId == equipment.Id && x.State == StationJobState.Running));
+                visual.transform.SetPositionAndRotation(SiteGridSpace.Center(site.Layout, equipment), SiteGridSpace.Rotation(equipment.Rotation));
+                visual.SetRunning(site.Snapshot.Jobs.Any(x => x.StationId == equipment.Id && x.State == StationJobState.Running));
             }
         }
 
@@ -69,7 +72,7 @@ namespace FoodFactoryGame.Session.Equipment
                 if (visual != null) Destroy(visual.gameObject);
             _visuals.Clear();
             _placed.Clear();
-            _shown = null;
+            _shown = -1;
         }
 
         private EquipmentVisual Create(GoodsEquipment equipment)

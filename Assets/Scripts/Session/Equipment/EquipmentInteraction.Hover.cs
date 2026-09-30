@@ -69,7 +69,8 @@ namespace FoodFactoryGame.Session.Equipment
             var employee = hit.GetComponentInParent<EmployeeWorker>();
             if (employee != null) return employee;
             var visual = hit.GetComponentInParent<EquipmentVisual>();
-            if (visual != null) return visual;
+            // Machines on another drawn site are visible but not usable until the player enters that site (decision 0031).
+            if (visual != null) return OnCurrentSite(visual) ? visual : null;
             var marker = hit.GetComponentInParent<SiteLocationMarker>();
             return marker != null && marker.LocationId == DevWorld.StorageId ? marker : null;
         }
