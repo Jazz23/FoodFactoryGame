@@ -98,5 +98,6 @@ No limit was exceeded, so the ranges were not tightened.
   scoring are PROTOTYPE, and balancing them is an owner decision.
 - The street band is flat at floor height and ignores the terrain and road beyond the lot. Queue and ordering positions
   are still fixed in site axes (south of the counter) whatever the building faces.
-- Competitors' customers are not drawn; that waits for piece 3 (several sites drawn at once). Employees in generated
+- Competitors' customers are not drawn; that waits for piece 3 (several sites drawn at once). Resolved by
+  [0033](0033-drawing-competitors-customers.md) on 2026-09-30. Employees in generated
   worlds would use the same runtime NavMesh, but none are spawned there yet.

@@ -62,7 +62,8 @@ placeholder tuning chosen by the implementer, not design data.
 ## Open
 
 - The exact radius, margin and blend; whether a server-side movement check is ever needed beyond entering a site (0029).
-- Competitors' customers are still not drawn (competitors are not sites). Employees in generated worlds, merging lots and
+- Competitors' customers are still not drawn (competitors are not sites). Resolved by
+  [0033](0033-drawing-competitors-customers.md) on 2026-09-30. Employees in generated worlds, merging lots and
   resale stay deferred.
 
 ## Implementation notes (3b)

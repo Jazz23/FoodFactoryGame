@@ -32,12 +32,16 @@ namespace FoodFactoryGame.Session.Customers
 
         // Scene points on the street in front of the lot (around the site's origin, SiteGridSpace), from past one side of
         // the lot to past the other, Band / 2 out from its street edge.
-        public static List<Vector3> Points(SiteLayout layout, Vector2Int outward, int count = 9)
+        public static List<Vector3> Points(SiteLayout layout, Vector2Int outward, int count = 9) =>
+            Points(SiteGridSpace.Origin(layout), layout.Width, layout.Depth, outward, count);
+
+        // The same points for any lot (a competitor's too, decision 0033), given its grid centre in the scene and its size in cells.
+        public static List<Vector3> Points(Vector3 origin, int width, int depth, Vector2Int outward, int count = 9)
         {
-            var halfX = layout.Width * 0.5f * SiteGrid.CellSize;
-            var halfZ = layout.Depth * 0.5f * SiteGrid.CellSize;
+            var halfX = width * 0.5f * SiteGrid.CellSize;
+            var halfZ = depth * 0.5f * SiteGrid.CellSize;
             var along = outward.x == 0 ? new Vector3(1, 0, 0) : new Vector3(0, 0, 1);
-            var edge = SiteGridSpace.Origin(layout) + new Vector3(outward.x * (halfX + Band * 0.5f), 0, outward.y * (halfZ + Band * 0.5f));
+            var edge = origin + new Vector3(outward.x * (halfX + Band * 0.5f), 0, outward.y * (halfZ + Band * 0.5f));
             var reach = (outward.x == 0 ? halfX : halfZ) + Reach - 1f;
             return Enumerable.Range(0, count).Select(i => edge + along * Mathf.Lerp(-reach, reach, i / (count - 1f))).ToList();
         }

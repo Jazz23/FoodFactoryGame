@@ -171,5 +171,53 @@ namespace FoodFactoryGame.Benchmarks.Tests
                 missed.Add($"payload {stats.LastPayloadBytes / 1024} KB exceeds the decision 0012 signal (1024 KB)");
             Assert.That(missed, Is.Empty);
         }
+
+        // Decision 0033's crowd budget: after the same warm-up (volatile Advance, nothing saved), every clock second builds one
+        // crowd view per connection. Eight
+        // connections stand at the starting lot and at the seven competitors nearest it (the densest rival rows), measured over
+        // MeasuredSeconds seconds. Reports the cost per view and the JSON a client would receive per send.
+        [Test]
+        public void CrowdViewsForEightConnectionsStayUnderTheirBudget()
+        {
+            const double ViewBudgetMs = 0.5;
+            const int Connections = 8;
+            var (world, siteId) = CreateCity();
+            for (var second = 0; second < WarmupSeconds; second++) world.Advance(1);
+            var snapshot = world.Snapshot();
+            var site = snapshot.Sites.Single(x => x.Id == siteId);
+            var points = new[] { (X: (float)site.MapX, Z: (float)site.MapZ) }.Concat(snapshot.Competitors.Where(x => x.LotId != "")
+                    .OrderBy(x => Math.Abs(x.MapX - site.MapX) + Math.Abs(x.MapZ - site.MapZ)).ThenBy(x => x.Id, StringComparer.Ordinal)
+                    .Take(Connections - 1).Select(x => (X: (float)x.MapX, Z: (float)x.MapZ))).ToArray();
+            for (var index = 0; index < 50; index++) world.CrowdNear(points[0].X, points[0].Z);
+
+            var views = new List<double>();
+            var bytes = new List<int>();
+            var restaurants = new List<int>();
+            var customers = new List<int>();
+            for (var second = 0; second < MeasuredSeconds; second++)
+            {
+                world.Advance(1);
+                foreach (var (x, z) in points)
+                {
+                    var began = Stopwatch.GetTimestamp();
+                    var crowd = world.CrowdNear(x, z);
+                    views.Add(Ms(began));
+                    bytes.Add(JsonUtility.ToJson(crowd).Length);
+                    restaurants.Add(crowd.Restaurants.Count);
+                    customers.Add(crowd.Restaurants.Sum(r => r.Customers.Count));
+                }
+            }
+            var sorted = views.OrderBy(x => x).ToList();
+            var p99 = sorted[(int)(sorted.Count * 0.99)];
+            var line = $"[Benchmark] crowd views: {Connections} connections x {MeasuredSeconds} s after {WarmupSeconds} s warm-up, " +
+                $"radius {GoodsWorld.CrowdRadiusMetres} m | view mean={views.Average():F3}ms p99={p99:F3}ms max={sorted.Last():F3}ms " +
+                $"per second (all connections) mean={views.Average() * Connections:F3}ms | competitors with customers mean={restaurants.Average():F1} " +
+                $"max={restaurants.Max()} | customers sent mean={customers.Average():F1} max={customers.Max()} | " +
+                $"json mean={bytes.Average():F0}B max={bytes.Max()}B | cpu=\"{SystemInfo.processorType}\" unity={Application.unityVersion} editor-mono";
+            TestContext.WriteLine(line);
+            Debug.Log(line);
+            Assert.That(restaurants.Max(), Is.GreaterThan(0), "Customers stood at competitors within range of the measured points.");
+            Assert.That(p99, Is.LessThanOrEqualTo(ViewBudgetMs), $"A crowd view's p99 exceeds its {ViewBudgetMs} ms budget.");
+        }
     }
 }

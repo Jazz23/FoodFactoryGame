@@ -98,5 +98,5 @@ constraint 3. It relates to GDD 29.5 option C and needs an owner decision before
 - Which world-owned sites exist at creation; the ingredient supplier near the start (0026).
 - Whether an acquired competitor's building starts empty.
 - Resolved by 0030: customer districts come from the layout in generated worlds (dev worlds keep 0024's dev district).
-  Still open: visual customers at competitor buildings
+  Resolved by [0033](0033-drawing-competitors-customers.md): visual customers at competitor buildings
   (presentation only).

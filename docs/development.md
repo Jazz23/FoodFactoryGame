@@ -273,3 +273,10 @@ Artifacts are intentionally ignored by Git. Preserve required evidence externall
   lot once the map is shown). The frame-time comparison and captures are `[Explicit]`:
   `PresentationCostAndCapturesWithTenEquippedSites` (`run_tests` with `include_explicit: true`) writes them to
   `docs/verification/several-sites-20260930/`.
+- Competitors' customers (decision 0033): `CrowdTests` (Goods EditMode, 3), `CompetitorFrontageTests` (Session EditMode, 1),
+  `CityCustomerBenchmarkTests.CrowdViewsForEightConnectionsStayUnderTheirBudget` (Benchmarks EditMode; logs a `[Benchmark]`
+  line) and `CompetitorCustomerTests` (PlayMode, 3, WorldGen scene). These seed TEST-ONLY customers with
+  `ServerWorld.Bootstrap(GoodsCustomer)` at the competitor nearest the starting restaurant. Competitors serve and seat
+  customers within seconds, and seated customers are hidden, so seed more than a competitor's servers (and seats) to keep a
+  queue. The frame-time comparison and captures are `[Explicit]`: `PresentationCostAndCapturesWithTheCapFull` (about two
+  minutes) writes them to `docs/verification/competitor-customers-20260930/`.

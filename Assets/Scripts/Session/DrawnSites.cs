@@ -39,6 +39,9 @@ namespace FoodFactoryGame.Session
 
         public DrawnSite Find(string siteId) => siteId == null ? null : _sites.FirstOrDefault(x => x.SiteId == siteId);
 
+        // The latest crowd near this client's avatar (decision 0033), straight from the subscription; never part of Version.
+        public GoodsCrowdView Crowd => _subscription.LatestCrowd;
+
         // Sites owned by the current site's company, from its latest baseline (ownership records are public, decision 0028).
         public static IEnumerable<string> OwnedSites(GoodsSnapshot current, string currentSiteId)
         {

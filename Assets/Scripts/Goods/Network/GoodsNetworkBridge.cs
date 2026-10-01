@@ -1,4 +1,4 @@
-// Transports intent and authorized site baselines; FishNet connections, not payloads, determine identity.
+// Transports intent, authorized site baselines and nearby competitor crowds; FishNet connections, not payloads, determine identity.
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -33,6 +33,10 @@ namespace FoodFactoryGame.Goods.Network
 
         public event Action<GoodsOutcome> ResultReceived;
         public event Action<GoodsSnapshot> SiteReceived;
+        // The customers at competitors near this client's avatar (decision 0033); presentation only.
+        public event Action<GoodsCrowdView> CrowdReceived;
+        // Server: the crowd signature each connection last received, so an unchanged crowd is not resent.
+        private readonly Dictionary<NetworkConnection, string> _crowdSent = new();
 
         // Called by the server's session/bootstrap owner after authenticating connection identities.
         public void InitializeServer(GoodsWorld world, Func<NetworkConnection, string> resolvePlayer, string savePath,
@@ -57,6 +61,7 @@ namespace FoodFactoryGame.Goods.Network
         public override void OnStopServer()
         {
             _subscriptions.Clear();
+            _crowdSent.Clear();
             CloseSave();
             _world = null;
             _resolvePlayer = null;
@@ -111,12 +116,34 @@ namespace FoodFactoryGame.Goods.Network
                 _serverEpoch++;
                 Debug.LogError($"[Goods] Clock step failed; restored the last committed world: {error}");
                 Broadcast();
+                _crowdSent.Clear();
+                SendCrowds();
                 return;
             }
             _clockRemainder -= seconds;
             _uncommittedSeconds += seconds;
             if (_uncommittedSeconds >= CommitIntervalSeconds) TryCommit();
             Broadcast();
+            SendCrowds();
+        }
+
+        // Once per clock step (at most once a second): each subscribed connection gets the customers at competitors within
+        // GoodsWorld.CrowdRadiusMetres of the server's copy of its avatar (decision 0033), or an empty crowd without a position.
+        // Only a changed crowd is sent. This decides what a client is told, never what the simulation does.
+        private void SendCrowds()
+        {
+            foreach (var connection in new List<NetworkConnection>(_subscriptions.Keys))
+            {
+                if (connection == null || !connection.IsActive) continue;
+                var position = _mapPositionOf?.Invoke(connection);
+                var crowd = position == null ? new GoodsCrowdView() : _world.CrowdNear(position.Value.X, position.Value.Z);
+                var signature = GoodsWorld.CrowdSignature(crowd);
+                if (_crowdSent.TryGetValue(connection, out var sent) && sent == signature) continue;
+                _crowdSent[connection] = signature;
+                TargetCrowd(connection, JsonUtility.ToJson(crowd), _serverEpoch);
+            }
+            foreach (var gone in new List<NetworkConnection>(_crowdSent.Keys))
+                if (!_subscriptions.ContainsKey(gone)) _crowdSent.Remove(gone);
         }
 
         // Also a no-op when a player command has already saved the pending ticks.
@@ -588,6 +615,14 @@ namespace FoodFactoryGame.Goods.Network
             if (_clientRevisions.TryGetValue(siteId, out var revision) && state.Revision < revision) return;
             _clientRevisions[siteId] = state.Revision;
             SiteReceived?.Invoke(state);
+        }
+
+        // Crowds arrive in order on the reliable channel; one from an older epoch is dropped. Site baselines own the epoch.
+        [TargetRpc]
+        private void TargetCrowd(NetworkConnection connection, string json, long epoch)
+        {
+            if (epoch < _clientEpoch) return;
+            CrowdReceived?.Invoke(JsonUtility.FromJson<GoodsCrowdView>(json));
         }
     }
 }

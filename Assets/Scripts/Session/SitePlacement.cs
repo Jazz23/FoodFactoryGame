@@ -7,6 +7,7 @@
 // the simulation reads scene positions except that check, which converts a scene point back to map metres.
 using System.Collections.Generic;
 using System.Linq;
+using FoodFactoryGame.Goods;
 using FoodFactoryGame.World;
 using UnityEngine;
 
@@ -16,6 +17,7 @@ namespace FoodFactoryGame.Session
     {
         private readonly Dictionary<string, WorldLot> _lots = new();
         private readonly Dictionary<string, Vector3> _origins = new();
+        private readonly Dictionary<string, PropertyOffer> _offers = new();
 
         // The placement presenters use while a generated world's layout is shown on this client (set by WorldLayoutPresenter);
         // null otherwise, when every site stands at the origin. SiteGridSpace reads it, so all site presentation follows it.
@@ -34,6 +36,7 @@ namespace FoodFactoryGame.Session
             var startElevation = elevations[start.BuildingId];
             LayoutOrigin = new Vector3(-(start.X + start.Width / 2f), -startElevation, -(start.Z + start.Depth / 2f));
             StartSiteId = start.SiteId;
+            foreach (var offer in WorldLayoutShells.PropertyOffers(layout)) _offers[offer.LotId] = offer;
             foreach (var lot in layout.Lots)
             {
                 _lots[lot.SiteId] = lot;
@@ -52,6 +55,9 @@ namespace FoodFactoryGame.Session
         public Vector3 SiteOrigin(string siteId) => siteId != null && _origins.TryGetValue(siteId, out var origin) ? origin : Vector3.zero;
 
         public WorldLot LotOf(string siteId) => siteId != null && _lots.TryGetValue(siteId, out var lot) ? lot : null;
+
+        // A lot's building and doors in its site cells (WorldLayoutShells), for any lot, owned or not; null for an unknown lot.
+        public PropertyOffer OfferOf(string lotId) => lotId != null && _offers.TryGetValue(lotId, out var offer) ? offer : null;
 
         // Scene point of a map point (metres) at a layout height.
         public Vector3 ToScene(float mapX, float mapZ, float height = 0f) => LayoutOrigin + new Vector3(mapX, height, mapZ);

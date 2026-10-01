@@ -485,7 +485,7 @@ pre-equipped. Evidence: [verification record](verification/customers-worldgen-20
   generated lot. It covers the lot's floor and a 6 m street band reaching 12 m past each side, with the ground-floor walls
   built in. It is rebuilt when the site, size or buildings change, and equipment still carves it. `SiteStreet` finds the
   street side: the side on which the shell does not reach the lot's edge. On such lots, `CustomerPresenter` spawns and
-  removes figures on the street band, out of view. Competitors' customers are not drawn.
+  removes figures on the street band, out of view. Competitors' customers: drawn since decision 0033 (below).
 - Scale (0025 budgets, `CityCustomerBenchmarkTests`): tick p99 at most 0.68 ms, a 100-customer decision burst 3.3 ms,
   commit maximum at most 31.7 ms, payload 157 KB.
 - PROTOTYPE limits: about 1,870 customers an hour across about 300 restaurants, so the starting restaurant makes roughly 3
@@ -549,6 +549,39 @@ last entered). No goods schema change; the player registry is now schema v2.
   Not yet: a separate-process multiplayer check and
   review of the captures by someone else. Employees still use the origin for their site (dev worlds only).
 
+## Implemented: competitors' customers drawn (2026-09-30)
+
+Decision: [0033](decisions/0033-drawing-competitors-customers.md). Presentation and replication only: the simulation, saves and
+the goods schema (v15) are unchanged. Evidence: [verification record](verification/competitor-customers-20260930.md).
+
+- Goods (`GoodsWorld.Crowd.cs`): `CrowdNear(mapX, mapZ, radius = CrowdRadiusMetres)` returns a read-only `GoodsCrowdView`.
+  It lists competitors with a lot within 150 m (Manhattan, PROTOTYPE) that have customers to draw, in catalog order, with
+  `Servers` and `Seats`. For each customer it carries ID, district, appearance, dine-in, state, ticket, travel time if
+  travelling, and whether they walked out elsewhere. Travelling customers are included only in their last 12 s
+  (`CrowdTravelSeconds`), unless they walked out of another restaurant. `CrowdSignature` decides whether a crowd changed.
+  It is never stored, validated or read by the simulation; a test checks that asking for it changes nothing.
+- Network (`GoodsNetworkBridge`): after each clock step, every connection with a site subscription gets
+  `TargetCrowd(json, epoch)` for its avatar's map position (`mapPositionOf`, the server's copy), only when its signature
+  changed. Without a position it gets an empty crowd. Crowds are dropped on an older epoch but never move it. Clients raise
+  `CrowdReceived`; `ClientSiteSubscription.LatestCrowd` keeps the latest (cleared on reset), and `DrawnSites.Crowd` exposes
+  it outside `Version`.
+- Geometry (`CompetitorFrontage`, Session): for a lot from `SitePlacement.OfferOf(lotId)`, a door point just outside its first
+  door, an apron point on the lot's street edge, a kerb point on the street band, the `SiteStreet.Points` band for any lot,
+  and `QueueSpot(rank)`: 8 places (PROTOTYPE) along the facade toward the side with more room, bending back in a second row.
+  `Arrive` and `Depart` give the fixed lines figures walk. Competitor lots get no NavMesh.
+- Presenter (`CustomerPresenter`): candidates come from every drawn site (unchanged targets) and from the crowd (travelling:
+  the apron point; queued: their queue place, none past 8; ordering or eating: the door, then hidden). Owner decision 4:
+  the current site's customers take places first, then everyone else by camera distance to their restaurant. Within a
+  restaurant, customers using it come before arriving ones, then by ticket. The cap stays 100. Hidden figures take no place.
+  A figure that loses its place is removed only if off screen; otherwise it walks out of view first, and new figures wait
+  for its place. Figures stay keyed by customer ID across both sources. New crowd figures appear at street points out of
+  the local camera's view; a competitor whose whole street is on screen gets none until the camera turns.
+- Evidence (2026-09-30): Goods EditMode 199/199, Session EditMode 110/110, World 21/21, Baseline 4/4, Goods PlayMode 2/2,
+  Session PlayMode 38/38 (3 new `CompetitorCustomerTests`, including a loopback two-client check). Crowd view p99 0.195 ms,
+  mean 1.1 KB per send. Frame time with the cap full: 19.1 ms mean with 92 mixed figures, 23.7 ms with 100 at the starting
+  restaurant, 10.7 ms with none (Editor). **The 100-figure cap does not fit 16.7 ms in the Editor**, with or without this
+  change. That is open for the owner, as is the independent review of the captures.
+
 ## Required Constraints for Future Implementation
 
 - The server owns gameplay state; clients request validated actions through the command contract in decision 0002.
@@ -566,7 +599,7 @@ These remain accepted contracts; only the bounded goods slice, its station jobs,
 - Physical goods model: selected in GDD section 28 and decision 0003; a logical lot/condition/transfer/recovery slice is implemented. Transport staging, actual placed-world positions, carrier/vehicle handling constraints, and visual projection remain pending.
 - Offline progression, host migration, discovery/lobbies/relay, and the shipped hosting model remain undecided. A direct-IP development host/join flow exists (decision 0005).
 - SQLite is the storage for all persisted data (decision 0011): the goods world (with its write-once world layout, decision 0026), player registry (with each player's last pose, decision 0031) and client identity. MoonSharp runs the prototype employee scripts (above); no wider scripting or modding role is selected.
-- Customers: first build and local visual customers implemented (above, decision 0024), and in generated worlds with map districts and lot-linked competitors (decision 0030); multi-camera out-of-view spawning, menus, customer groups, competitor AI, drawing competitors' customers and demand balancing remain open. The benchmarked choice model in the test assembly ([record](verification/customer-choice-benchmark-20260925.md)) is a separate prototype, not the runtime code.
+- Customers: first build and local visual customers implemented (above, decision 0024), and in generated worlds with map districts and lot-linked competitors (decision 0030); multi-camera out-of-view spawning, menus, customer groups, competitor AI and demand balancing remain open; competitors' customers are drawn (decision 0033, above), with the 100-figure cap over the Editor frame budget open. The benchmarked choice model in the test assembly ([record](verification/customer-choice-benchmark-20260925.md)) is a separate prototype, not the runtime code.
 - Multiplayer smoke tests and representative scale benchmarks follow implementation; current tests do not establish replication correctness or the 60 FPS target.
 
 ## Baseline Test Evolution

@@ -1,0 +1,5 @@
+Decision 0033 presentation cost, WorldGen seed piece-two, Editor PlayMode host, 300 frames each, 2026-10-01 03:55:44Z
+0 figures: mean 10.73 ms, p95 15.88 ms, max 94.25 ms
+92 figures (50 at the starting restaurant, the rest at competitors): mean 19.13 ms, p95 22.54 ms, max 45.60 ms
+Figures per busy competitor: competitor-restaurant-0141 (12 m): 8, competitor-restaurant-0119 (20 m): 8, competitor-restaurant-0139 (30 m): 0, competitor-restaurant-0153 (54 m): 8, competitor-restaurant-0049 (67 m): 0, competitor-restaurant-0117 (68 m): 8, competitor-restaurant-0144 (72 m): 10; quiet: competitor-restaurant-0048
+100 figures, all at the starting restaurant: mean 23.67 ms, p95 27.13 ms, max 62.31 ms

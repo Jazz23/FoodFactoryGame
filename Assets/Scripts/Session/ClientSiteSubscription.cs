@@ -2,7 +2,7 @@
 // baseline, and forwards this client's command results so presentation can send requests through the same bridge. The server
 // names the primary site in its join answer (the dev site, or a generated world's starting restaurant); nothing is subscribed
 // before it is known. It can also watch the company's other sites for remote management (decision 0022); their baselines are
-// kept apart from the primary one.
+// kept apart from the primary one. It also keeps the latest crowd: the customers at competitors near its avatar (decision 0033).
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -27,6 +27,8 @@ namespace FoodFactoryGame.Session
         }
 
         public GoodsSnapshot Latest { get; private set; }
+        // Null until the server sends one; replaced whole by each send, so presenters can compare references.
+        public GoodsCrowdView LatestCrowd { get; private set; }
         // Null until subscribed; requests sent through it are resolved to this connection's player by the server.
         public GoodsNetworkBridge Bridge => _bridge;
         // The site this client subscribes to (null until the server names it); requests that name a site (purchases) use it.
@@ -74,6 +76,7 @@ namespace FoodFactoryGame.Session
             if (spawned == null) return;
             _bridge = spawned;
             _bridge.SiteReceived += OnSite;
+            _bridge.CrowdReceived += OnCrowd;
             _bridge.ResultReceived += OnResult;
             _bridge.RequestSite(_siteId);
             foreach (var site in _watched) _bridge.RequestSite(site);
@@ -96,10 +99,12 @@ namespace FoodFactoryGame.Session
             if (_bridge != null)
             {
                 _bridge.SiteReceived -= OnSite;
+                _bridge.CrowdReceived -= OnCrowd;
                 _bridge.ResultReceived -= OnResult;
             }
             _bridge = null;
             Latest = null;
+            LatestCrowd = null;
             _remote.Clear();
             LastRejection = null;
         }
@@ -115,6 +120,8 @@ namespace FoodFactoryGame.Session
                 _remote[siteId] = site;
             }
         }
+
+        private void OnCrowd(GoodsCrowdView crowd) => LatestCrowd = crowd;
 
         private void OnResult(GoodsOutcome outcome)
         {
