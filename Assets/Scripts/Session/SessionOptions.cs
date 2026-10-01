@@ -1,5 +1,6 @@
 // Resolves session mode and save/identity locations from command-line switches, with persistentDataPath defaults.
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEngine;
@@ -48,6 +49,20 @@ namespace FoodFactoryGame.Session
         // A world's save folder name: letters, digits, '-' and '_' only, so it can never leave the saves directory.
         public static bool IsValidWorldName(string name) =>
             !string.IsNullOrWhiteSpace(name) && name.Length <= 64 && name.All(x => char.IsLetterOrDigit(x) || x == '-' || x == '_');
+        // The saved worlds in a saves directory, most recently played first: folders with a valid world name that hold a world
+        // save (or a pre-SQLite one still to import). Last played is the newest write to any file in the folder.
+        public static IReadOnlyList<SavedWorld> SavedWorlds(string savesRoot)
+        {
+            if (string.IsNullOrEmpty(savesRoot) || !Directory.Exists(savesRoot)) return Array.Empty<SavedWorld>();
+            return new DirectoryInfo(savesRoot).GetDirectories()
+                .Where(x => IsValidWorldName(x.Name)
+                    && (File.Exists(Path.Combine(x.FullName, WorldFileName)) || File.Exists(Path.Combine(x.FullName, LegacyWorldFileName))))
+                .Select(x => new SavedWorld(x.Name, x.GetFiles().Max(file => file.LastWriteTimeUtc)))
+                .OrderByDescending(x => x.LastPlayedUtc)
+                .ThenBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
         public static string DefaultIdentityPath => Path.Combine(Application.persistentDataPath, "Identity", "identity.db");
         public static string DefaultLegacyIdentityPath => Path.Combine(Application.persistentDataPath, "Identity", LegacyIdentityFileName);
 
@@ -76,6 +91,18 @@ namespace FoodFactoryGame.Session
                 }
             }
             return options;
+        }
+    }
+
+    public readonly struct SavedWorld
+    {
+        public readonly string Name;
+        public readonly DateTime LastPlayedUtc;
+
+        public SavedWorld(string name, DateTime lastPlayedUtc)
+        {
+            Name = name;
+            LastPlayedUtc = lastPlayedUtc;
         }
     }
 }

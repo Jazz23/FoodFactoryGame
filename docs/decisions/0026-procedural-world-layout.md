@@ -98,7 +98,8 @@ This is an exception to 0012 for write-once world definition data, not a general
   `Assets/Network/WorldGenPrefabs.asset`; built by `AgentScripts/BuildWorldGenScene.cs`. Not a build scene. DevSite, its
   catalog and the dev seed are unchanged, and the dev world is still seeded in WorldGen. WorldGen saves under its own
   folder (`Saves/worldgen`; amended 2026-09-27 after the owner found Host loading the DevSite save, which can never gain a
-  layout); the panel's World field and New world button choose or create a world folder. PROTOTYPE placement: the city's
+  layout); the panel's World field and New world button choose or create a world folder, and a Saved worlds list (folders
+  holding a world save, most recently played first; added 2026-09-30) fills the World field on a click. PROTOTYPE placement: the city's
   edge starts 40 m north of DevSite's 40 m floor, pieces over that floor are not drawn, and local cameras draw to about
   2.4 km while a layout is shown.
 

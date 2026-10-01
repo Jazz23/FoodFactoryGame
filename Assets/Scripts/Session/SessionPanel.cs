@@ -1,5 +1,6 @@
 // Development host/join panel and in-session readout (player ID, server clock, site revision, equipment hint) built in UI Toolkit.
-// In a scene that generates worlds it also takes the seed for a new world and shows the stored layout's seed (decision 0026).
+// In a scene that generates worlds it also lists the saved worlds to pick from, takes the seed for a new world and shows the
+// stored layout's seed (decision 0026).
 // Presentation only: it reads session state and calls SessionRoot; it never decides admission or simulation.
 using FoodFactoryGame.Session.Equipment;
 using UnityEngine;
@@ -19,8 +20,10 @@ namespace FoodFactoryGame.Session
         private TextField _address;
         private TextField _seed;
         private TextField _world;
+        private ScrollView _savedWorlds;
         private Label _menuStatus;
         private Label _readout;
+        private bool _wasRunning;
 
         // Start, not OnEnable: SessionRoot.Awake must have resolved command-line options first.
         private void Start()
@@ -50,8 +53,14 @@ namespace FoodFactoryGame.Session
                 _seed = new TextField("World seed") { name = "session-seed", value = session.Options.WorldSeed };
                 _world.labelElement.style.color = Color.white;
                 _seed.labelElement.style.color = Color.white;
+                _world.RegisterValueChangedCallback(_ => HighlightSelectedWorld());
+                // Saved worlds, most recently played first: a click puts the name in the World field, ready to Host.
+                _savedWorlds = new ScrollView { name = "session-saved-worlds", style = { maxHeight = 160, marginTop = 4, marginBottom = 4 } };
                 _menu.Add(_world);
+                _menu.Add(new Label("Saved worlds") { style = { color = Color.white, marginTop = 4 } });
+                _menu.Add(_savedWorlds);
                 _menu.Add(_seed);
+                RefreshSavedWorlds();
                 buttons.Add(new Button(NewWorld) { name = "session-new-world", text = "New world" });
             }
             _menu.Add(buttons);
@@ -70,6 +79,9 @@ namespace FoodFactoryGame.Session
             _menu.style.display = running ? DisplayStyle.None : DisplayStyle.Flex;
             _readout.style.display = running ? DisplayStyle.Flex : DisplayStyle.None;
             _menuStatus.text = session.Status;
+            // Back at the menu after a session: the world just played moved to the top, or a new one now exists.
+            if (_wasRunning && !running) RefreshSavedWorlds();
+            _wasRunning = running;
             if (!running) return;
             var site = session.ClientSite;
             var server = session.ServerWorld?.Snapshot();
@@ -98,6 +110,43 @@ namespace FoodFactoryGame.Session
         {
             _world.value = session.NextNewWorldName();
             Host();
+        }
+
+        // Rebuilds the saved-world list from the saves directory; called while the menu shows, never during a session.
+        private void RefreshSavedWorlds()
+        {
+            if (_savedWorlds == null) return;
+            _savedWorlds.Clear();
+            var worlds = session.SavedWorlds();
+            if (worlds.Count == 0)
+            {
+                _savedWorlds.Add(new Label("None yet. Press New world.") { style = { color = new Color(0.7f, 0.7f, 0.7f) } });
+                return;
+            }
+            foreach (var world in worlds)
+            {
+                var name = world.Name;
+                var button = new Button(() => _world.value = name)
+                {
+                    name = $"session-saved-world-{name}",
+                    text = $"{name}  ·  {world.LastPlayedUtc.ToLocalTime():yyyy-MM-dd HH:mm}",
+                    userData = name,
+                    style = { unityTextAlign = TextAnchor.MiddleLeft, marginLeft = 0, marginRight = 0 }
+                };
+                _savedWorlds.Add(button);
+            }
+            HighlightSelectedWorld();
+        }
+
+        private void HighlightSelectedWorld()
+        {
+            if (_savedWorlds == null) return;
+            foreach (var button in _savedWorlds.Query<Button>().ToList())
+            {
+                var selected = string.Equals(button.userData as string, _world.value?.Trim(), System.StringComparison.OrdinalIgnoreCase);
+                button.style.backgroundColor = selected ? new StyleColor(new Color(0.35f, 0.55f, 0.9f)) : new StyleColor(StyleKeyword.Null);
+                button.style.unityFontStyleAndWeight = selected ? FontStyle.Bold : FontStyle.Normal;
+            }
         }
 
         private string WorldLine()

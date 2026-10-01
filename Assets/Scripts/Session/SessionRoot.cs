@@ -163,19 +163,23 @@ namespace FoodFactoryGame.Session
         public bool SelectWorld(string name)
         {
             if (IsRunning || !SessionOptions.IsValidWorldName(name)) return false;
-            var parent = Path.GetDirectoryName(_options.SaveDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
-            _options.SaveDirectory = Path.Combine(parent, name.Trim());
+            _options.SaveDirectory = Path.Combine(WorldsDirectory, name.Trim());
             return true;
         }
 
         // First unused "world-N" beside the current save folder.
         public string NextNewWorldName()
         {
-            var parent = Path.GetDirectoryName(_options.SaveDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
             var number = 1;
-            while (Directory.Exists(Path.Combine(parent, $"world-{number}"))) number++;
+            while (Directory.Exists(Path.Combine(WorldsDirectory, $"world-{number}"))) number++;
             return $"world-{number}";
         }
+
+        // The worlds SelectWorld can open, most recently played first.
+        public IReadOnlyList<SavedWorld> SavedWorlds() => SessionOptions.SavedWorlds(WorldsDirectory);
+
+        // The folder holding the current save folder and its sibling worlds.
+        private string WorldsDirectory => Path.GetDirectoryName(_options.SaveDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
 
         public bool Begin(SessionMode mode, string displayName = null, string address = null)
         {
