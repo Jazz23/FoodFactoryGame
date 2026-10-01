@@ -327,6 +327,18 @@ namespace FoodFactoryGame.Session.PlayModeTests
             yield return new WaitForSeconds(0.5f);
             Assert.That(Vector3.Distance(LocalAvatar().transform.position, left), Is.LessThan(0.5f), "The avatar spawns where it left.");
             Assert.That(_root.SiteEntry.Pending || _root.SiteEntry.LastRejection != null, Is.False, "Nothing to enter: it already works there.");
+
+            // A pose saved after falling through the world (seen in play, 2026-09-30) is put back on the lot's floor.
+            _root.Shutdown();
+            yield return Until(() => _root.CanBegin, "session stopped again");
+            using (var registry = new PlayerRegistry(_root.Options.RegistryPath))
+                Assert.That(registry.SavePose(me, left.x, -5006f, left.z, 0f), Is.True);
+            yield return StartHost();
+            yield return Until(() => LocalAvatar() != null, "local avatar after the bad pose");
+            yield return new WaitForSeconds(1f);
+            var floor = SitePlacement.Active.SiteOrigin(diner.SiteId).y;
+            Assert.That(Mathf.Abs(LocalAvatar().transform.position.y - floor), Is.LessThan(0.5f), "The avatar stands on the lot's floor.");
+            Assert.That(new Vector2(LocalAvatar().transform.position.x - left.x, LocalAvatar().transform.position.z - left.z).magnitude, Is.LessThan(0.5f));
         }
 
         // Listen-server multiplayer (decision 0031, 3c): a remote teammate watches the bought site from its own connection. When

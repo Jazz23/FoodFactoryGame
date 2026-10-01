@@ -373,9 +373,7 @@ namespace FoodFactoryGame.Session
                 return;
             }
             // A returning player starts where they left (owner decision, 0031); a new one at the next spawn point.
-            var saved = _registry.PoseOf(playerId);
-            var spawn = saved == null ? NextSpawn()
-                : (position: new Vector3(saved.Value.X, saved.Value.Y, saved.Value.Z), rotation: Quaternion.Euler(0f, saved.Value.Yaw, 0f));
+            var spawn = SpawnFor(playerId);
             var instance = Instantiate(playerPrefab, spawn.position, spawn.rotation);
             networkManager.ServerManager.Spawn(instance, connection);
             networkManager.SceneManager.AddOwnerToDefaultScene(instance);
@@ -383,6 +381,33 @@ namespace FoodFactoryGame.Session
             avatar.SetDisplayName(_registry.DisplayNameOf(playerId));
             _avatars[connection] = (playerId, avatar);
         }
+
+        // A returning player starts where they left (owner decision, 0031), but a saved pose is checked first, since a client
+        // can save one after falling through the world: on a lot, the height is set to that building's ground floor unless it
+        // is plausibly on one of its storeys; off every lot and far below the starting floor, the player goes to the apron of
+        // the site holding their inventory. New players use the next spawn point.
+        private (Vector3 position, Quaternion rotation) SpawnFor(string playerId)
+        {
+            var saved = _registry.PoseOf(playerId);
+            if (saved == null) return NextSpawn();
+            var position = new Vector3(saved.Value.X, saved.Value.Y, saved.Value.Z);
+            var rotation = Quaternion.Euler(0f, saved.Value.Yaw, 0f);
+            if (_serverPlacement == null) return position.y > -LostDepth ? (position, rotation) : NextSpawn();
+            var lot = _serverPlacement.SiteAt(position);
+            if (lot != null)
+            {
+                var floor = _serverPlacement.SiteOrigin(lot).y;
+                if (position.y < floor - 1f || position.y > floor + 10 * SiteGridSpace.LevelHeight) position.y = floor + 0.05f;
+                return (position, rotation);
+            }
+            if (position.y > -LostDepth) return (position, rotation);
+            var home = ServerWorld.CarriedSiteOf(playerId);
+            var offer = home == null ? null : WorldLayoutShells.PropertyOffers(ServerLayout.Layout).FirstOrDefault(x => x.SiteId == home);
+            return offer == null ? NextSpawn() : ApronSpawn(offer, 0, _serverPlacement.SiteOrigin(home));
+        }
+
+        // Metres below the starting floor at which a saved pose off every lot counts as lost under the world.
+        private const float LostDepth = 50f;
 
         // Server: keeps each connected avatar's latest pose, so it can be saved once the avatar is gone.
         private void TrackPoses()
@@ -433,7 +458,8 @@ namespace FoodFactoryGame.Session
         // Generated worlds (decision 0028): players arrive on the starting lot's apron two cells out from its first door, facing
         // it, spread along the wall (0, +2, -2, +4, -4 cells, repeating) and kept on the lot. The site grid is centred on the scene
         // origin (SiteGridSpace), the presenter moves the map to match.
-        public static (Vector3 position, Quaternion rotation) ApronSpawn(PropertyOffer offer, int index)
+        // origin: where the lot's site stands; by default the active placement's (the server passes its own, decision 0031).
+        public static (Vector3 position, Quaternion rotation) ApronSpawn(PropertyOffer offer, int index, Vector3? origin = null)
         {
             var door = offer.Doors[0];
             var outward = door.Z == offer.BuildingZ + offer.BuildingDepth - 1 ? new Vector2Int(0, 1)
@@ -445,7 +471,8 @@ namespace FoodFactoryGame.Session
             var x = Mathf.Clamp(door.X + outward.x * 2 + along.x * offset, 0, offer.Width - 1);
             var z = Mathf.Clamp(door.Z + outward.y * 2 + along.y * offset, 0, offer.Depth - 1);
             var grid = new SiteLayout { SiteId = offer.SiteId, Width = offer.Width, Depth = offer.Depth };
-            var position = SiteGridSpace.FootprintCenter(grid, x, z, 1, 1) + Vector3.up * 0.05f;
+            var position = SiteGridSpace.FootprintCenter(grid, x, z, 1, 1) - SiteGridSpace.Origin(grid) + (origin ?? SiteGridSpace.Origin(grid))
+                + Vector3.up * 0.05f;
             return (position, Quaternion.LookRotation(new Vector3(-outward.x, 0f, -outward.y)));
         }
 
