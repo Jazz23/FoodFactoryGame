@@ -1,0 +1,497 @@
+[
+  {
+    "model": "RT_Doorway_Single_2m",
+    "position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_DoorFrame_Single",
+    "position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_DoorLeaf_Panel",
+    "position": [
+      -0.4749999940395355,
+      0.0,
+      0.004999999888241291
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Doorway_Single_2m",
+    "position": [
+      3.0,
+      0.0,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_DoorFrame_Single",
+    "position": [
+      3.0,
+      0.0,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_DoorLeaf_Glazed",
+    "position": [
+      2.5250000953674316,
+      0.0,
+      0.004999999888241291
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Doorway_Single_2m",
+    "position": [
+      6.0,
+      0.0,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_DoorFrame_Single",
+    "position": [
+      6.0,
+      0.0,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_DoorLeaf_Kitchen",
+    "position": [
+      5.525000095367432,
+      0.0,
+      0.004999999888241291
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_WindowOpening_2m",
+    "position": [
+      9.0,
+      0.0,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Window_Picture",
+    "position": [
+      9.0,
+      0.0,
+      0.8500000238418579
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Plant_Floor",
+    "position": [
+      9.0,
+      0.6499999761581421,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_WindowOpening_2m",
+    "position": [
+      12.0,
+      0.0,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Window_Mullioned",
+    "position": [
+      12.0,
+      0.0,
+      0.8500000238418579
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Plant_Floor",
+    "position": [
+      12.0,
+      0.6499999761581421,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Doorway_Double_3m",
+    "position": [
+      15.0,
+      0.0,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_DoorFrame_Double",
+    "position": [
+      15.0,
+      0.0,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_DoorLeaf_Glazed",
+    "position": [
+      14.029999732971191,
+      0.0,
+      0.004999999888241291
+    ],
+    "angle": -69.99999967119774
+  },
+  {
+    "model": "RT_DoorLeaf_Glazed",
+    "position": [
+      15.970000267028809,
+      0.0,
+      0.004999999888241291
+    ],
+    "angle": 180.00000500895632
+  },
+  {
+    "model": "RT_Floor_Terracotta_1m",
+    "position": [
+      -1.0,
+      -0.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Terracotta_1m",
+    "position": [
+      -1.0,
+      0.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Terracotta_1m",
+    "position": [
+      0.0,
+      -0.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Terracotta_1m",
+    "position": [
+      0.0,
+      0.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Terracotta_1m",
+    "position": [
+      1.0,
+      -0.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Terracotta_1m",
+    "position": [
+      1.0,
+      0.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Terracotta_1m",
+    "position": [
+      2.0,
+      -0.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Terracotta_1m",
+    "position": [
+      2.0,
+      0.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Terracotta_1m",
+    "position": [
+      3.0,
+      -0.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Terracotta_1m",
+    "position": [
+      3.0,
+      0.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Terracotta_1m",
+    "position": [
+      4.0,
+      -0.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Terracotta_1m",
+    "position": [
+      4.0,
+      0.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Terracotta_1m",
+    "position": [
+      5.0,
+      -0.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Terracotta_1m",
+    "position": [
+      5.0,
+      0.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Terracotta_1m",
+    "position": [
+      6.0,
+      -0.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Terracotta_1m",
+    "position": [
+      6.0,
+      0.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Terracotta_1m",
+    "position": [
+      7.0,
+      -0.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Terracotta_1m",
+    "position": [
+      7.0,
+      0.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Terracotta_1m",
+    "position": [
+      8.0,
+      -0.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Terracotta_1m",
+    "position": [
+      8.0,
+      0.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Terracotta_1m",
+    "position": [
+      9.0,
+      -0.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Terracotta_1m",
+    "position": [
+      9.0,
+      0.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Terracotta_1m",
+    "position": [
+      10.0,
+      -0.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Terracotta_1m",
+    "position": [
+      10.0,
+      0.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Terracotta_1m",
+    "position": [
+      11.0,
+      -0.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Terracotta_1m",
+    "position": [
+      11.0,
+      0.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Terracotta_1m",
+    "position": [
+      12.0,
+      -0.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Terracotta_1m",
+    "position": [
+      12.0,
+      0.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Terracotta_1m",
+    "position": [
+      13.0,
+      -0.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Terracotta_1m",
+    "position": [
+      13.0,
+      0.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Terracotta_1m",
+    "position": [
+      14.0,
+      -0.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Terracotta_1m",
+    "position": [
+      14.0,
+      0.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Terracotta_1m",
+    "position": [
+      15.0,
+      -0.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Terracotta_1m",
+    "position": [
+      15.0,
+      0.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Terracotta_1m",
+    "position": [
+      16.0,
+      -0.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Terracotta_1m",
+    "position": [
+      16.0,
+      0.5,
+      0.0
+    ],
+    "angle": 0.0
+  }
+]

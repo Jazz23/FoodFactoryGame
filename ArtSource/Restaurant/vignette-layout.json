@@ -1,0 +1,794 @@
+[
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      0.5,
+      0.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      0.5,
+      1.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      0.5,
+      2.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      0.5,
+      3.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      0.5,
+      4.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      0.5,
+      5.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      1.5,
+      0.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      1.5,
+      1.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      1.5,
+      2.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      1.5,
+      3.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      1.5,
+      4.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      1.5,
+      5.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      2.5,
+      0.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      2.5,
+      1.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      2.5,
+      2.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      2.5,
+      3.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      2.5,
+      4.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      2.5,
+      5.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      3.5,
+      0.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      3.5,
+      1.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      3.5,
+      2.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      3.5,
+      3.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      3.5,
+      4.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      3.5,
+      5.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      4.5,
+      0.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      4.5,
+      1.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      4.5,
+      2.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      4.5,
+      3.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      4.5,
+      4.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      4.5,
+      5.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      5.5,
+      0.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      5.5,
+      1.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      5.5,
+      2.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      5.5,
+      3.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      5.5,
+      4.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      5.5,
+      5.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      6.5,
+      0.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      6.5,
+      1.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      6.5,
+      2.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      6.5,
+      3.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      6.5,
+      4.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      6.5,
+      5.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      7.5,
+      0.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      7.5,
+      1.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      7.5,
+      2.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      7.5,
+      3.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      7.5,
+      4.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Floor_Checker_1m",
+    "position": [
+      7.5,
+      5.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Wall_Wainscot_2m",
+    "position": [
+      1.0,
+      6.0,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Wall_Wainscot_2m",
+    "position": [
+      3.0,
+      6.0,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Wall_Wainscot_2m",
+    "position": [
+      5.0,
+      6.0,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Wall_Wainscot_2m",
+    "position": [
+      7.0,
+      6.0,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Wall_Brick_2m",
+    "position": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "angle": 90.00000250447816
+  },
+  {
+    "model": "RT_Wall_Brick_2m",
+    "position": [
+      0.0,
+      3.0,
+      0.0
+    ],
+    "angle": 90.00000250447816
+  },
+  {
+    "model": "RT_Wall_Brick_2m",
+    "position": [
+      0.0,
+      5.0,
+      0.0
+    ],
+    "angle": 90.00000250447816
+  },
+  {
+    "model": "RT_Booth_Straight_2m",
+    "position": [
+      1.0,
+      5.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Booth_Straight_2m",
+    "position": [
+      3.0,
+      5.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Table_BistroRound",
+    "position": [
+      1.0,
+      4.650000095367432,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Table_Caddy",
+    "position": [
+      1.0,
+      4.650000095367432,
+      0.75
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Chair_Upholstered",
+    "position": [
+      1.0,
+      3.799999952316284,
+      0.0
+    ],
+    "angle": 180.00000500895632
+  },
+  {
+    "model": "RT_Table_BistroRound",
+    "position": [
+      3.0,
+      4.650000095367432,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Table_Caddy",
+    "position": [
+      3.0,
+      4.650000095367432,
+      0.75
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Chair_Upholstered",
+    "position": [
+      3.0,
+      3.799999952316284,
+      0.0
+    ],
+    "angle": 180.00000500895632
+  },
+  {
+    "model": "RT_Table_Communal",
+    "position": [
+      2.200000047683716,
+      1.7999999523162842,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Chair_Spindle",
+    "position": [
+      1.4500000476837158,
+      1.0499999523162842,
+      0.0
+    ],
+    "angle": 180.00000500895632
+  },
+  {
+    "model": "RT_Chair_Spindle",
+    "position": [
+      1.4500000476837158,
+      2.549999952316284,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Chair_Spindle",
+    "position": [
+      2.200000047683716,
+      1.0499999523162842,
+      0.0
+    ],
+    "angle": 180.00000500895632
+  },
+  {
+    "model": "RT_Chair_Spindle",
+    "position": [
+      2.200000047683716,
+      2.549999952316284,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Chair_Spindle",
+    "position": [
+      2.950000047683716,
+      1.0499999523162842,
+      0.0
+    ],
+    "angle": 180.00000500895632
+  },
+  {
+    "model": "RT_Chair_Spindle",
+    "position": [
+      2.950000047683716,
+      2.549999952316284,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Vase_Ceramic",
+    "position": [
+      2.200000047683716,
+      1.7999999523162842,
+      0.75
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Planter_Divider_1_6m",
+    "position": [
+      4.5,
+      2.700000047683716,
+      0.0
+    ],
+    "angle": 90.00000250447816
+  },
+  {
+    "model": "RT_Plant_Floor",
+    "position": [
+      0.6000000238418579,
+      0.6499999761581421,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Plant_Floor",
+    "position": [
+      4.800000190734863,
+      5.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_WallArt_Abstract",
+    "position": [
+      1.0,
+      5.860000133514404,
+      1.4500000476837158
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_WallArt_Abstract",
+    "position": [
+      3.0,
+      5.860000133514404,
+      1.4500000476837158
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Light_Sconce",
+    "position": [
+      2.0,
+      5.860000133514404,
+      1.9500000476837158
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Light_Sconce",
+    "position": [
+      4.0,
+      5.860000133514404,
+      1.9500000476837158
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_MenuBoard_Wall",
+    "position": [
+      6.5,
+      5.860000133514404,
+      1.850000023841858
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_StorageShelf_1_2m",
+    "position": [
+      7.0,
+      5.5,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Sink_Single",
+    "position": [
+      5.550000190734863,
+      5.449999809265137,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_PrepTable_1_5m",
+    "position": [
+      6.5,
+      3.5999999046325684,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Trolley_TwoShelf",
+    "position": [
+      7.25,
+      2.0999999046325684,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_WasteBin",
+    "position": [
+      7.5,
+      4.650000095367432,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_MenuBoard_AFrame",
+    "position": [
+      6.0,
+      0.6499999761581421,
+      0.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Light_Pendant",
+    "position": [
+      1.0,
+      4.650000095367432,
+      3.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Light_Pendant",
+    "position": [
+      3.0,
+      4.650000095367432,
+      3.0
+    ],
+    "angle": 0.0
+  },
+  {
+    "model": "RT_Light_Pendant",
+    "position": [
+      2.200000047683716,
+      1.7999999523162842,
+      3.0
+    ],
+    "angle": 0.0
+  }
+]

@@ -602,6 +602,14 @@ These remain accepted contracts; only the bounded goods slice, its station jobs,
 - Customers: first build and local visual customers implemented (above, decision 0024), and in generated worlds with map districts and lot-linked competitors (decision 0030); multi-camera out-of-view spawning, menus, customer groups, competitor AI and demand balancing remain open; competitors' customers are drawn (decision 0033, above), with the 100-figure cap over the Editor frame budget open. The benchmarked choice model in the test assembly ([record](verification/customer-choice-benchmark-20260925.md)) is a separate prototype, not the runtime code.
 - Multiplayer smoke tests and representative scale benchmarks follow implementation; current tests do not establish replication correctness or the 60 FPS target.
 
+## Standalone restaurant art kit (2026-10-01)
+
+Implemented **art only**: 59 modular restaurant models and 16 shared URP materials in `Assets/Art/Restaurant`, editable
+source in `ArtSource/Restaurant/Restaurant_Kit.blend`. Import and authoring checks live outside the game under `AgentScripts`.
+The kit supplements existing equipment and exterior art; it adds no gameplay components, catalog entries, or scene wiring.
+Restaurant-building behavior from decision 0034 remains planned. Placement conventions and reuse inventory:
+`ArtSource/Restaurant/README.md`; evidence: `docs/verification/restaurant-art-20261001.md`.
+
 ## Baseline Test Evolution
 
 The starter tests intentionally check the current scene/input/catalog authoring. When real bootstrap/additive scenes or a game-specific prefab catalog replace it, update the tests to validate the new accepted contract. Do not put cameras into intentionally camera-free scenes or restore demo prefabs simply to retain these starter assumptions.

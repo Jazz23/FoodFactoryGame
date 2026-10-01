@@ -207,6 +207,18 @@ Required by the development constraints (`AGENTS.md`), not optional design:
 - Construction that would cover placed equipment, belts, or goods is rejected, or those items are moved to a recorded location first. They are never silently destroyed.
 - Construction in progress is saved in SQLite and continues while the world simulation runs, whether or not any client is viewing the site.
 
+## Restaurant Building
+
+Owner decisions, 2026-10-01 (details: `docs/decisions/0034-restaurant-building.md`):
+
+- **Resizable shell.** The player buys a generated building (section 29.5 is unchanged) and may resize the restaurant's rectangular shell within that purchased lot, and place or remove interior walls, doors, and windows.
+- **Instant.** Restaurant structural changes take effect as soon as they are paid for (29.2 A for restaurants).
+- **Full refund.** Removing or shrinking structure, and selling equipment, tables, registers, decor, and docks, refunds the amount charged, in full, at any time (29.6 for restaurants). Goods inside a removed piece move to a recorded location; they are never deleted.
+- **Furniture is equipment.** Tables, registers, and decor are purchased equipment that the player places directly, with no contractor.
+- **Decor.** Floor and wall finishes, props, and lighting are cosmetic and add to one ambience score per restaurant (section 7). Decor has no upkeep.
+- **Docks.** A restaurant may have any number of docks, anywhere in its lot (inside or outside the shell) as long as the dock can be reached from the street (section 9).
+- **Floors.** Extra floors for restaurants are deferred, not forbidden (29.8).
+
 Proposal - what counts as construction (not yet approved):
 
 - **Construction:** building shells (outer walls, doors, footprint), interior walls, extra floors, demolition, elevator and conveyor-lift shafts, and loading infrastructure.
@@ -315,6 +327,15 @@ seating if applicable, pay, and leave.
 
 - Delivery/replenishment reliability.
 
+## Registers, Seats & Ambience
+
+Owner decisions, 2026-10-01; numbers and formulas are PROTOTYPE and open (`docs/decisions/0034-restaurant-building.md`):
+
+- A register is the sale point. A customer pays at a register staffed by an employee or the player. A restaurant without a staffed register makes no sales.
+- A table supplies seats. A seat counts as free for customer choice only if a customer can walk from the door to a register and to that seat.
+- Each restaurant has one ambience score, summed from its placed decor. Ambience is one more input to customer choice and spend, alongside cuisine fit, price, reputation, and waiting time.
+- Decor takes floor space, so ambience trades against seats and kitchen area (section 5).
+
 # 8. Factories & Production
 
 - Factories process ingredients into intermediate or finished foods.
@@ -340,6 +361,10 @@ seating if applicable, pay, and leave.
 - Best for short routes, mixed cargo, and lower volume.
 
 - Affected by road distance and congestion.
+
+- A restaurant may place any number of docks, each serving one truck at a time. A dock may stand anywhere in the restaurant's lot, inside or outside the shell, if it is reachable from the street.
+
+- Loading is automatic: the truck arrives from the street and goods move between truck and dock at a limited rate. There is no loading animation, and the player makes no loading decisions beyond where the dock stands and which route it serves. Goods are real inventory throughout.
 
 ## Roads
 
@@ -506,7 +531,7 @@ support them.
 
 - One farm type, several ingredients, several recipes.
 
-- One restaurant type with editable kitchen/dining layout.
+- One restaurant type with editable kitchen/dining layout: resizable shell within the lot, interior walls, doors, windows, tables, registers, decor with an ambience score, and docks.
 
 - Basic food factory processing plus the ability to sell output to
   outside restaurants/distributors.
@@ -729,7 +754,7 @@ The accepted development starting point is an authoritative server with a listen
 
 # 29. Open Decisions: Construction
 
-None of 29.1-29.4 or 29.6-29.7 is selected. Land (29.5) is decided, and the owner's decisions on adding floors are recorded in 29.8. Section 5 records the confirmed construction requirements and the current proposals. Existing implementation: building shells exist as server data with walls on grid cells, created only by the server (`docs/decisions/0019-building-shells-and-indoor-camera.md`), and a factory can buy extra floors (`docs/decisions/0020-factory-floors-and-elevator.md`); buildings cannot be bought yet. Implementation choices made for those slices, including prototype prices, do not select any option below.
+None of 29.1, 29.3, or 29.7 is selected. 29.2, 29.4, and 29.6 are selected for restaurants only (owner, 2026-10-01; see section 5, Restaurant Building). Land (29.5) is decided, and the owner's decisions on adding floors are recorded in 29.8. Section 5 records the confirmed construction requirements and the current proposals. Existing implementation: building shells exist as server data with walls on grid cells, created only by the server (`docs/decisions/0019-building-shells-and-indoor-camera.md`), and a factory can buy extra floors (`docs/decisions/0020-factory-floors-and-elevator.md`); buildings cannot be bought yet. Implementation choices made for those slices, including prototype prices, do not select any option below.
 
 ## 29.1 Construction Scope
 
@@ -742,6 +767,8 @@ None of 29.1-29.4 or 29.6-29.7 is selected. Land (29.5) is decided, and the owne
 - A. Instant - the structure appears as soon as the order is paid.
 - B. Build time - each order takes simulated time scaled by its size; a construction site is visible until it completes.
 - C. Build time with rush - as B, but the player can pay extra to shorten or skip the wait.
+
+Owner decision, 2026-10-01: restaurant structural changes are instant (A). Factory construction timing stays open.
 
 ## 29.3 Disruption During Construction
 
@@ -756,6 +783,8 @@ Owner direction (2026-09-24): buildings are procedurally generated and some are 
 - A. Catalog shells - the player chooses from predefined building shells and floor plans that fit a lot.
 - B. Rectangular shells - the player sizes a rectangular shell on owned land, then places doors and interior walls freely.
 - C. Freeform walls - the player draws any wall layout on the grid, including non-rectangular buildings.
+
+Owner decision, 2026-10-01: for restaurants, option B (rectangular shells). The player resizes the shell within the lot of a bought generated building, then places interior walls, doors, and windows. This does not add buying empty land (29.5 D stands) and does not select B for factories or other buildings. [SELECTED for restaurants]
 
 Related open detail: walls currently occupy whole cells. Interior walls on cell edges would keep more floor area usable but need a separate occupancy rule (decision 0019).
 
@@ -775,6 +804,8 @@ Status: selected - Buildings only (owner, 2026-09-27). Revisit together with 29.
 - A. Demolition costs money and returns nothing.
 - B. Demolition costs money; selling land with buildings returns part of the construction value.
 - C. Demolition is free; buildings add to resale value, supporting the recovery options in section 14.
+
+Owner decision, 2026-10-01: for restaurants, removing or shrinking structure and selling equipment, tables, registers, decor, and docks refund the amount charged in full, at any time. Selling land with buildings and factory demolition stay open. [SELECTED for restaurants]
 
 ## 29.7 Cancellation and Payment
 
@@ -801,3 +832,5 @@ Selected by the project owner on 2026-09-24 for the first floors slice:
 
 Status: selected and implemented (`docs/decisions/0020-factory-floors-and-elevator.md`). Where the elevator goes, floor
 prices, the height limit, and storey height are implementation prototype values, not design decisions.
+
+Owner note, 2026-10-01: extra floors for restaurants are deferred for now. The factories-only selection above has not changed, and restaurants may be added later.

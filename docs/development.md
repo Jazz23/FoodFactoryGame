@@ -259,6 +259,10 @@ Artifacts are intentionally ignored by Git. Preserve required evidence externall
   `AgentScripts/BuildWorldArt.cs` (steps in `ArtSource/World/README.md`; set `WORLD_ART_ROOT` to `ArtSource/World` of this
   checkout before running the Blender scripts, and run the installer body with the MCP file-eval tool). Keep object names stable so the catalog's mesh
   references survive; `WorldArtAuthoringTests` fails if a piece the presenter needs is missing.
+- Restaurant model kit (art only, 2026-10-01): regeneration/import instructions are in `ArtSource/Restaurant/README.md`.
+  `AgentScripts/ImportRestaurantArt.cs` imports the individual FBXs and shared URP materials; `ValidateRestaurantArt.cs`
+  checks all 59 against the Blender manifest; `PreviewRestaurantArt.cs` renders in a disposable Editor preview scene.
+  These scripts do not register equipment or implement restaurant-building behavior. Evidence: `docs/verification/restaurant-art-20261001.md`.
 - Captures of the whole map need a camera high above it with a far plane of a few km (see the
   [verification record](verification/worldgen-20260927.md)).
 - Capture tips (2026-09-28): the MCP capture tool refuses `..` in `save_path` and saves under `Assets/`; save into

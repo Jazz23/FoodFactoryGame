@@ -1,0 +1,1361 @@
+{
+  "units": "metres",
+  "front": "Blender -Y / Unity +Z",
+  "assets": [
+    {
+      "name": "RT_Wall_Plaster_1m",
+      "category": "Architecture",
+      "path": "Assets/Art/Restaurant/Models/Architecture/RT_Wall_Plaster_1m.fbx",
+      "dimensions_blender_m": [
+        1.0,
+        0.267,
+        3.0
+      ],
+      "triangles": 324,
+      "materials": [
+        "RT_Cream"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "3 m high; centerline pivot. Visual thickness only, no occupancy rule."
+    },
+    {
+      "name": "RT_Wall_Plaster_2m",
+      "category": "Architecture",
+      "path": "Assets/Art/Restaurant/Models/Architecture/RT_Wall_Plaster_2m.fbx",
+      "dimensions_blender_m": [
+        2.0,
+        0.267,
+        3.0
+      ],
+      "triangles": 324,
+      "materials": [
+        "RT_Cream"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "3 m high; centerline pivot. Visual thickness only, no occupancy rule."
+    },
+    {
+      "name": "RT_WallEnd_Plaster",
+      "category": "Architecture",
+      "path": "Assets/Art/Restaurant/Models/Architecture/RT_WallEnd_Plaster.fbx",
+      "dimensions_blender_m": [
+        0.24,
+        0.24,
+        3.0
+      ],
+      "triangles": 108,
+      "materials": [
+        "RT_Cream"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "0.24 m junction post conceals straight/corner/T joints; base pivot."
+    },
+    {
+      "name": "RT_Wall_Brick_1m",
+      "category": "Architecture",
+      "path": "Assets/Art/Restaurant/Models/Architecture/RT_Wall_Brick_1m.fbx",
+      "dimensions_blender_m": [
+        1.0,
+        0.267,
+        3.0
+      ],
+      "triangles": 8316,
+      "materials": [
+        "RT_Grout",
+        "RT_Brick",
+        "RT_Cream"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "3 m high; centerline pivot. Visual thickness only, no occupancy rule."
+    },
+    {
+      "name": "RT_Wall_Brick_2m",
+      "category": "Architecture",
+      "path": "Assets/Art/Restaurant/Models/Architecture/RT_Wall_Brick_2m.fbx",
+      "dimensions_blender_m": [
+        2.0,
+        0.267,
+        3.0
+      ],
+      "triangles": 14796,
+      "materials": [
+        "RT_Grout",
+        "RT_Brick",
+        "RT_Cream"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "3 m high; centerline pivot. Visual thickness only, no occupancy rule."
+    },
+    {
+      "name": "RT_WallEnd_Brick",
+      "category": "Architecture",
+      "path": "Assets/Art/Restaurant/Models/Architecture/RT_WallEnd_Brick.fbx",
+      "dimensions_blender_m": [
+        0.24,
+        0.24,
+        3.0
+      ],
+      "triangles": 108,
+      "materials": [
+        "RT_Brick"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "0.24 m junction post conceals straight/corner/T joints; base pivot."
+    },
+    {
+      "name": "RT_Wall_Wainscot_1m",
+      "category": "Architecture",
+      "path": "Assets/Art/Restaurant/Models/Architecture/RT_Wall_Wainscot_1m.fbx",
+      "dimensions_blender_m": [
+        1.0,
+        0.3009,
+        3.0
+      ],
+      "triangles": 1404,
+      "materials": [
+        "RT_Cream",
+        "RT_Teal",
+        "RT_Oak",
+        "RT_Walnut"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "3 m high; centerline pivot. Visual thickness only, no occupancy rule."
+    },
+    {
+      "name": "RT_Wall_Wainscot_2m",
+      "category": "Architecture",
+      "path": "Assets/Art/Restaurant/Models/Architecture/RT_Wall_Wainscot_2m.fbx",
+      "dimensions_blender_m": [
+        2.0,
+        0.3009,
+        3.0
+      ],
+      "triangles": 2268,
+      "materials": [
+        "RT_Cream",
+        "RT_Teal",
+        "RT_Oak",
+        "RT_Walnut"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "3 m high; centerline pivot. Visual thickness only, no occupancy rule."
+    },
+    {
+      "name": "RT_WallEnd_Wainscot",
+      "category": "Architecture",
+      "path": "Assets/Art/Restaurant/Models/Architecture/RT_WallEnd_Wainscot.fbx",
+      "dimensions_blender_m": [
+        0.26,
+        0.26,
+        3.0
+      ],
+      "triangles": 216,
+      "materials": [
+        "RT_Cream",
+        "RT_Teal"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "0.24 m junction post conceals straight/corner/T joints; base pivot."
+    },
+    {
+      "name": "RT_Wall_Tile_1m",
+      "category": "Architecture",
+      "path": "Assets/Art/Restaurant/Models/Architecture/RT_Wall_Tile_1m.fbx",
+      "dimensions_blender_m": [
+        1.0,
+        0.267,
+        3.0
+      ],
+      "triangles": 5508,
+      "materials": [
+        "RT_Cream",
+        "RT_Ivory",
+        "RT_Teal"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "3 m high; centerline pivot. Visual thickness only, no occupancy rule."
+    },
+    {
+      "name": "RT_Wall_Tile_2m",
+      "category": "Architecture",
+      "path": "Assets/Art/Restaurant/Models/Architecture/RT_Wall_Tile_2m.fbx",
+      "dimensions_blender_m": [
+        2.0,
+        0.267,
+        3.0
+      ],
+      "triangles": 10692,
+      "materials": [
+        "RT_Cream",
+        "RT_Ivory",
+        "RT_Teal"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "3 m high; centerline pivot. Visual thickness only, no occupancy rule."
+    },
+    {
+      "name": "RT_WallEnd_Tile",
+      "category": "Architecture",
+      "path": "Assets/Art/Restaurant/Models/Architecture/RT_WallEnd_Tile.fbx",
+      "dimensions_blender_m": [
+        0.24,
+        0.24,
+        3.0
+      ],
+      "triangles": 108,
+      "materials": [
+        "RT_Cream"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "0.24 m junction post conceals straight/corner/T joints; base pivot."
+    },
+    {
+      "name": "RT_Partition_HalfHeight_2m",
+      "category": "Architecture",
+      "path": "Assets/Art/Restaurant/Models/Architecture/RT_Partition_HalfHeight_2m.fbx",
+      "dimensions_blender_m": [
+        2.0,
+        0.3009,
+        1.26
+      ],
+      "triangles": 2376,
+      "materials": [
+        "RT_Cream",
+        "RT_Teal",
+        "RT_Oak",
+        "RT_Walnut"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": ""
+    },
+    {
+      "name": "RT_Partition_Slatted_1m",
+      "category": "Architecture",
+      "path": "Assets/Art/Restaurant/Models/Architecture/RT_Partition_Slatted_1m.fbx",
+      "dimensions_blender_m": [
+        1.0,
+        0.16,
+        2.5
+      ],
+      "triangles": 1188,
+      "materials": [
+        "RT_Walnut",
+        "RT_Oak"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": ""
+    },
+    {
+      "name": "RT_Doorway_Single_2m",
+      "category": "Architecture",
+      "path": "Assets/Art/Restaurant/Models/Architecture/RT_Doorway_Single_2m.fbx",
+      "dimensions_blender_m": [
+        2.0,
+        0.2,
+        3.003
+      ],
+      "triangles": 307,
+      "materials": [
+        "RT_Cream"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "Real empty opening; frame/leaf supplied separately."
+    },
+    {
+      "name": "RT_Doorway_Double_3m",
+      "category": "Architecture",
+      "path": "Assets/Art/Restaurant/Models/Architecture/RT_Doorway_Double_3m.fbx",
+      "dimensions_blender_m": [
+        3.0,
+        0.2,
+        3.003
+      ],
+      "triangles": 307,
+      "materials": [
+        "RT_Cream"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "Real empty opening; frame/leaf supplied separately."
+    },
+    {
+      "name": "RT_WindowOpening_2m",
+      "category": "Architecture",
+      "path": "Assets/Art/Restaurant/Models/Architecture/RT_WindowOpening_2m.fbx",
+      "dimensions_blender_m": [
+        2.0,
+        0.2,
+        3.0051
+      ],
+      "triangles": 399,
+      "materials": [
+        "RT_Cream",
+        "RT_Teal"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "Real empty opening; frame/leaf supplied separately."
+    },
+    {
+      "name": "RT_ServingHatch_2m",
+      "category": "Architecture",
+      "path": "Assets/Art/Restaurant/Models/Architecture/RT_ServingHatch_2m.fbx",
+      "dimensions_blender_m": [
+        2.0,
+        0.55,
+        3.0051
+      ],
+      "triangles": 507,
+      "materials": [
+        "RT_Cream",
+        "RT_Teal",
+        "RT_Oak"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "Real empty opening; frame/leaf supplied separately."
+    },
+    {
+      "name": "RT_DoorFrame_Single",
+      "category": "Architecture",
+      "path": "Assets/Art/Restaurant/Models/Architecture/RT_DoorFrame_Single.fbx",
+      "dimensions_blender_m": [
+        1.046,
+        0.26,
+        2.243
+      ],
+      "triangles": 304,
+      "materials": [
+        "RT_Walnut"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "Opening match: outer width; inner clear width is 0.08 m less."
+    },
+    {
+      "name": "RT_DoorFrame_Double",
+      "category": "Architecture",
+      "path": "Assets/Art/Restaurant/Models/Architecture/RT_DoorFrame_Double.fbx",
+      "dimensions_blender_m": [
+        2.046,
+        0.26,
+        2.243
+      ],
+      "triangles": 304,
+      "materials": [
+        "RT_Walnut"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "Opening match: outer width; inner clear width is 0.08 m less."
+    },
+    {
+      "name": "RT_DoorLeaf_Panel",
+      "category": "Architecture",
+      "path": "Assets/Art/Restaurant/Models/Architecture/RT_DoorLeaf_Panel.fbx",
+      "dimensions_blender_m": [
+        0.9595,
+        0.1569,
+        2.18
+      ],
+      "triangles": 1236,
+      "materials": [
+        "RT_Walnut",
+        "RT_Oak",
+        "RT_Brass"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "Hinge pivot at left edge, floor height. 0.95 x 2.18 m; fits single frame or paired in double."
+    },
+    {
+      "name": "RT_DoorLeaf_Glazed",
+      "category": "Architecture",
+      "path": "Assets/Art/Restaurant/Models/Architecture/RT_DoorLeaf_Glazed.fbx",
+      "dimensions_blender_m": [
+        0.9595,
+        0.1569,
+        2.18
+      ],
+      "triangles": 1668,
+      "materials": [
+        "RT_Teal",
+        "RT_Glass",
+        "RT_Brass"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "Hinge pivot at left edge, floor height. 0.95 x 2.18 m; fits single frame or paired in double."
+    },
+    {
+      "name": "RT_DoorLeaf_Kitchen",
+      "category": "Architecture",
+      "path": "Assets/Art/Restaurant/Models/Architecture/RT_DoorLeaf_Kitchen.fbx",
+      "dimensions_blender_m": [
+        0.9595,
+        0.1569,
+        2.18
+      ],
+      "triangles": 1344,
+      "materials": [
+        "RT_Steel",
+        "RT_Charcoal",
+        "RT_Glass",
+        "RT_Brass"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "Hinge pivot at left edge, floor height. 0.95 x 2.18 m; fits single frame or paired in double."
+    },
+    {
+      "name": "RT_Window_Picture",
+      "category": "Architecture",
+      "path": "Assets/Art/Restaurant/Models/Architecture/RT_Window_Picture.fbx",
+      "dimensions_blender_m": [
+        1.7,
+        0.34,
+        1.6745
+      ],
+      "triangles": 610,
+      "materials": [
+        "RT_Teal",
+        "RT_Glass",
+        "RT_Oak"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "1.6 x 1.65 m; pivot bottom center. Place at opening sill height 0.85 m."
+    },
+    {
+      "name": "RT_Window_Mullioned",
+      "category": "Architecture",
+      "path": "Assets/Art/Restaurant/Models/Architecture/RT_Window_Mullioned.fbx",
+      "dimensions_blender_m": [
+        1.7,
+        0.34,
+        1.6745
+      ],
+      "triangles": 826,
+      "materials": [
+        "RT_Teal",
+        "RT_Glass",
+        "RT_Oak"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "1.6 x 1.65 m; pivot bottom center. Place at opening sill height 0.85 m."
+    },
+    {
+      "name": "RT_Floor_Checker_1m",
+      "category": "Surfaces",
+      "path": "Assets/Art/Restaurant/Models/Surfaces/RT_Floor_Checker_1m.fbx",
+      "dimensions_blender_m": [
+        1.0,
+        1.0,
+        0.07
+      ],
+      "triangles": 540,
+      "materials": [
+        "RT_Grout",
+        "RT_Charcoal",
+        "RT_Ivory"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "1 m repeat; top surface at Z=0; thickness below pivot."
+    },
+    {
+      "name": "RT_Floor_Terracotta_1m",
+      "category": "Surfaces",
+      "path": "Assets/Art/Restaurant/Models/Surfaces/RT_Floor_Terracotta_1m.fbx",
+      "dimensions_blender_m": [
+        1.0,
+        1.0,
+        0.07
+      ],
+      "triangles": 540,
+      "materials": [
+        "RT_Grout",
+        "RT_Terracotta"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "1 m repeat; top surface at Z=0; thickness below pivot."
+    },
+    {
+      "name": "RT_Floor_OakPlank_1m",
+      "category": "Surfaces",
+      "path": "Assets/Art/Restaurant/Models/Surfaces/RT_Floor_OakPlank_1m.fbx",
+      "dimensions_blender_m": [
+        1.0,
+        1.0,
+        0.07
+      ],
+      "triangles": 648,
+      "materials": [
+        "RT_Grout",
+        "RT_Walnut",
+        "RT_Oak"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "1 m repeat; top surface at Z=0; thickness below pivot."
+    },
+    {
+      "name": "RT_Floor_KitchenTile_1m",
+      "category": "Surfaces",
+      "path": "Assets/Art/Restaurant/Models/Surfaces/RT_Floor_KitchenTile_1m.fbx",
+      "dimensions_blender_m": [
+        1.0,
+        1.0,
+        0.07
+      ],
+      "triangles": 1836,
+      "materials": [
+        "RT_Grout",
+        "RT_Ivory"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "1 m repeat; top surface at Z=0; thickness below pivot."
+    },
+    {
+      "name": "RT_Ceiling_Panel_1m",
+      "category": "Surfaces",
+      "path": "Assets/Art/Restaurant/Models/Surfaces/RT_Ceiling_Panel_1m.fbx",
+      "dimensions_blender_m": [
+        1.0,
+        1.0,
+        0.07
+      ],
+      "triangles": 108,
+      "materials": [
+        "RT_Cream"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "1 m panel; underside at pivot, extends upwards."
+    },
+    {
+      "name": "RT_Cornice_1m",
+      "category": "Architecture",
+      "path": "Assets/Art/Restaurant/Models/Architecture/RT_Cornice_1m.fbx",
+      "dimensions_blender_m": [
+        1.0,
+        0.25,
+        0.18
+      ],
+      "triangles": 324,
+      "materials": [
+        "RT_Cream"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "Wall attachment pivot at lower rear edge; projects towards -Y."
+    },
+    {
+      "name": "RT_Table_BistroRound",
+      "category": "Furniture",
+      "path": "Assets/Art/Restaurant/Models/Furniture/RT_Table_BistroRound.fbx",
+      "dimensions_blender_m": [
+        0.96,
+        0.96,
+        0.75
+      ],
+      "triangles": 1188,
+      "materials": [
+        "RT_Ivory",
+        "RT_Brass",
+        "RT_Charcoal"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "Standalone table; seating authored separately. Distinct from existing four-seat Table prefab."
+    },
+    {
+      "name": "RT_Table_Communal",
+      "category": "Furniture",
+      "path": "Assets/Art/Restaurant/Models/Furniture/RT_Table_Communal.fbx",
+      "dimensions_blender_m": [
+        2.4,
+        0.894,
+        0.75
+      ],
+      "triangles": 864,
+      "materials": [
+        "RT_Oak",
+        "RT_Charcoal"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "Standalone table; seating authored separately. Distinct from existing four-seat Table prefab."
+    },
+    {
+      "name": "RT_Table_HighRound",
+      "category": "Furniture",
+      "path": "Assets/Art/Restaurant/Models/Furniture/RT_Table_HighRound.fbx",
+      "dimensions_blender_m": [
+        0.76,
+        0.76,
+        1.05
+      ],
+      "triangles": 1188,
+      "materials": [
+        "RT_Oak",
+        "RT_Brass",
+        "RT_Charcoal"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "Standalone table; seating authored separately. Distinct from existing four-seat Table prefab."
+    },
+    {
+      "name": "RT_Chair_Spindle",
+      "category": "Furniture",
+      "path": "Assets/Art/Restaurant/Models/Furniture/RT_Chair_Spindle.fbx",
+      "dimensions_blender_m": [
+        0.47,
+        0.4975,
+        0.9425
+      ],
+      "triangles": 2684,
+      "materials": [
+        "RT_Walnut",
+        "RT_Oak"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "Front faces -Y; ground-center pivot. Seats are separate from tables."
+    },
+    {
+      "name": "RT_Chair_Upholstered",
+      "category": "Furniture",
+      "path": "Assets/Art/Restaurant/Models/Furniture/RT_Chair_Upholstered.fbx",
+      "dimensions_blender_m": [
+        0.47,
+        0.505,
+        0.9314
+      ],
+      "triangles": 1536,
+      "materials": [
+        "RT_Walnut",
+        "RT_Teal"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "Front faces -Y; ground-center pivot. Seats are separate from tables."
+    },
+    {
+      "name": "RT_Chair_BarStool",
+      "category": "Furniture",
+      "path": "Assets/Art/Restaurant/Models/Furniture/RT_Chair_BarStool.fbx",
+      "dimensions_blender_m": [
+        0.46,
+        0.46,
+        0.78
+      ],
+      "triangles": 1828,
+      "materials": [
+        "RT_Walnut",
+        "RT_Teal",
+        "RT_Brass"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "Front faces -Y; ground-center pivot. Seats are separate from tables."
+    },
+    {
+      "name": "RT_Booth_Straight_2m",
+      "category": "Furniture",
+      "path": "Assets/Art/Restaurant/Models/Furniture/RT_Booth_Straight_2m.fbx",
+      "dimensions_blender_m": [
+        2.0,
+        0.775,
+        1.25
+      ],
+      "triangles": 1512,
+      "materials": [
+        "RT_Walnut",
+        "RT_Teal",
+        "RT_Brass"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "Two-person banquette module; front -Y."
+    },
+    {
+      "name": "RT_Bench_Slatted_1_6m",
+      "category": "Furniture",
+      "path": "Assets/Art/Restaurant/Models/Furniture/RT_Bench_Slatted_1_6m.fbx",
+      "dimensions_blender_m": [
+        1.6,
+        0.465,
+        0.4725
+      ],
+      "triangles": 1376,
+      "materials": [
+        "RT_Oak",
+        "RT_Charcoal"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": ""
+    },
+    {
+      "name": "RT_Plant_Floor",
+      "category": "Decor",
+      "path": "Assets/Art/Restaurant/Models/Decor/RT_Plant_Floor.fbx",
+      "dimensions_blender_m": [
+        0.958,
+        0.9489,
+        1.8502
+      ],
+      "triangles": 2364,
+      "materials": [
+        "RT_Terracotta",
+        "RT_Walnut",
+        "RT_Leaf",
+        "RT_Sage"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": ""
+    },
+    {
+      "name": "RT_Plant_Table",
+      "category": "Decor",
+      "path": "Assets/Art/Restaurant/Models/Decor/RT_Plant_Table.fbx",
+      "dimensions_blender_m": [
+        0.2175,
+        0.2174,
+        0.334
+      ],
+      "triangles": 2428,
+      "materials": [
+        "RT_Terracotta",
+        "RT_Walnut",
+        "RT_Leaf",
+        "RT_Sage"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "Pivot sits on tabletop."
+    },
+    {
+      "name": "RT_Planter_Divider_1_6m",
+      "category": "Decor",
+      "path": "Assets/Art/Restaurant/Models/Decor/RT_Planter_Divider_1_6m.fbx",
+      "dimensions_blender_m": [
+        1.65,
+        0.4801,
+        1.3246
+      ],
+      "triangles": 6777,
+      "materials": [
+        "RT_Teal",
+        "RT_Oak",
+        "RT_Terracotta",
+        "RT_Walnut",
+        "RT_Leaf",
+        "RT_Sage"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": ""
+    },
+    {
+      "name": "RT_WallArt_Abstract",
+      "category": "Decor",
+      "path": "Assets/Art/Restaurant/Models/Decor/RT_WallArt_Abstract.fbx",
+      "dimensions_blender_m": [
+        0.72,
+        0.066,
+        1.0
+      ],
+      "triangles": 540,
+      "materials": [
+        "RT_Walnut",
+        "RT_Cream",
+        "RT_Terracotta",
+        "RT_Teal",
+        "RT_Oak"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "Rear attachment plane Y=0; projects towards -Y; pivot bottom center."
+    },
+    {
+      "name": "RT_MenuBoard_Wall",
+      "category": "Decor",
+      "path": "Assets/Art/Restaurant/Models/Decor/RT_MenuBoard_Wall.fbx",
+      "dimensions_blender_m": [
+        1.1,
+        0.0715,
+        0.8
+      ],
+      "triangles": 1056,
+      "materials": [
+        "RT_Oak",
+        "RT_Charcoal",
+        "RT_Chalk"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "Blank decorative menu; attachment at rear bottom."
+    },
+    {
+      "name": "RT_MenuBoard_AFrame",
+      "category": "Decor",
+      "path": "Assets/Art/Restaurant/Models/Decor/RT_MenuBoard_AFrame.fbx",
+      "dimensions_blender_m": [
+        0.6512,
+        0.5239,
+        1.1286
+      ],
+      "triangles": 1536,
+      "materials": [
+        "RT_Oak",
+        "RT_Charcoal",
+        "RT_Chalk"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": ""
+    },
+    {
+      "name": "RT_WallClock",
+      "category": "Decor",
+      "path": "Assets/Art/Restaurant/Models/Decor/RT_WallClock.fbx",
+      "dimensions_blender_m": [
+        0.5,
+        0.0898,
+        0.5
+      ],
+      "triangles": 2880,
+      "materials": [
+        "RT_Brass",
+        "RT_Cream",
+        "RT_Charcoal"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "Pivot lower rear; face points -Y."
+    },
+    {
+      "name": "RT_CoatStand",
+      "category": "Decor",
+      "path": "Assets/Art/Restaurant/Models/Decor/RT_CoatStand.fbx",
+      "dimensions_blender_m": [
+        0.48,
+        0.48,
+        1.7078
+      ],
+      "triangles": 2008,
+      "materials": [
+        "RT_Charcoal",
+        "RT_Walnut",
+        "RT_Brass"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": ""
+    },
+    {
+      "name": "RT_WasteBin",
+      "category": "Decor",
+      "path": "Assets/Art/Restaurant/Models/Decor/RT_WasteBin.fbx",
+      "dimensions_blender_m": [
+        0.46,
+        0.47,
+        0.66
+      ],
+      "triangles": 676,
+      "materials": [
+        "RT_Teal",
+        "RT_Charcoal"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": ""
+    },
+    {
+      "name": "RT_Table_Caddy",
+      "category": "Decor",
+      "path": "Assets/Art/Restaurant/Models/Decor/RT_Table_Caddy.fbx",
+      "dimensions_blender_m": [
+        0.3,
+        0.2,
+        0.21
+      ],
+      "triangles": 1012,
+      "materials": [
+        "RT_Walnut",
+        "RT_Steel",
+        "RT_Ivory",
+        "RT_Charcoal"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "Tabletop prop: napkin holder and salt/pepper shakers."
+    },
+    {
+      "name": "RT_Vase_Ceramic",
+      "category": "Decor",
+      "path": "Assets/Art/Restaurant/Models/Decor/RT_Vase_Ceramic.fbx",
+      "dimensions_blender_m": [
+        0.2035,
+        0.1972,
+        0.5005
+      ],
+      "triangles": 1094,
+      "materials": [
+        "RT_Teal",
+        "RT_Leaf",
+        "RT_Sage"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "Tabletop prop."
+    },
+    {
+      "name": "RT_Rug_Bordered_2x3m",
+      "category": "Decor",
+      "path": "Assets/Art/Restaurant/Models/Decor/RT_Rug_Bordered_2x3m.fbx",
+      "dimensions_blender_m": [
+        2.0,
+        3.0,
+        0.025
+      ],
+      "triangles": 324,
+      "materials": [
+        "RT_Terracotta",
+        "RT_Cream",
+        "RT_Teal"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": ""
+    },
+    {
+      "name": "RT_Light_Pendant",
+      "category": "Lighting",
+      "path": "Assets/Art/Restaurant/Models/Lighting/RT_Light_Pendant.fbx",
+      "dimensions_blender_m": [
+        0.557,
+        0.557,
+        0.825
+      ],
+      "triangles": 1264,
+      "materials": [
+        "RT_Charcoal",
+        "RT_Teal",
+        "RT_Glow"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "Mesh only; no light component. Pendant/strip pivot at ceiling; sconce at rear lower edge."
+    },
+    {
+      "name": "RT_Light_Sconce",
+      "category": "Lighting",
+      "path": "Assets/Art/Restaurant/Models/Lighting/RT_Light_Sconce.fbx",
+      "dimensions_blender_m": [
+        0.2291,
+        0.3545,
+        0.4
+      ],
+      "triangles": 912,
+      "materials": [
+        "RT_Brass",
+        "RT_Ivory",
+        "RT_Glow"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "Mesh only; no light component. Pendant/strip pivot at ceiling; sconce at rear lower edge."
+    },
+    {
+      "name": "RT_Light_FloorLamp",
+      "category": "Lighting",
+      "path": "Assets/Art/Restaurant/Models/Lighting/RT_Light_FloorLamp.fbx",
+      "dimensions_blender_m": [
+        0.5382,
+        0.5382,
+        1.61
+      ],
+      "triangles": 1232,
+      "materials": [
+        "RT_Charcoal",
+        "RT_Brass",
+        "RT_Ivory",
+        "RT_Glow"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "Mesh only; no light component. Pendant/strip pivot at ceiling; sconce at rear lower edge."
+    },
+    {
+      "name": "RT_Light_CeilingStrip",
+      "category": "Lighting",
+      "path": "Assets/Art/Restaurant/Models/Lighting/RT_Light_CeilingStrip.fbx",
+      "dimensions_blender_m": [
+        1.2,
+        0.2,
+        0.095
+      ],
+      "triangles": 216,
+      "materials": [
+        "RT_Steel",
+        "RT_Glow"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "Mesh only; no light component. Pendant/strip pivot at ceiling; sconce at rear lower edge."
+    },
+    {
+      "name": "RT_PrepTable_1_5m",
+      "category": "Service",
+      "path": "Assets/Art/Restaurant/Models/Service/RT_PrepTable_1_5m.fbx",
+      "dimensions_blender_m": [
+        1.5047,
+        0.7,
+        1.02
+      ],
+      "triangles": 1140,
+      "materials": [
+        "RT_Steel"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "Unpowered stainless preparation furniture."
+    },
+    {
+      "name": "RT_Sink_Single",
+      "category": "Service",
+      "path": "Assets/Art/Restaurant/Models/Service/RT_Sink_Single.fbx",
+      "dimensions_blender_m": [
+        1.2,
+        0.702,
+        1.1878
+      ],
+      "triangles": 2566,
+      "materials": [
+        "RT_Steel",
+        "RT_Charcoal"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": "Open basin built from rim, inner floor, and sides; no working plumbing."
+    },
+    {
+      "name": "RT_StorageShelf_1_2m",
+      "category": "Service",
+      "path": "Assets/Art/Restaurant/Models/Service/RT_StorageShelf_1_2m.fbx",
+      "dimensions_blender_m": [
+        1.2,
+        0.5,
+        1.85
+      ],
+      "triangles": 1376,
+      "materials": [
+        "RT_Steel"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": ""
+    },
+    {
+      "name": "RT_Trolley_TwoShelf",
+      "category": "Service",
+      "path": "Assets/Art/Restaurant/Models/Service/RT_Trolley_TwoShelf.fbx",
+      "dimensions_blender_m": [
+        0.85,
+        0.53,
+        0.9425
+      ],
+      "triangles": 2020,
+      "materials": [
+        "RT_Charcoal",
+        "RT_Steel",
+        "RT_Teal"
+      ],
+      "pivot_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "note": ""
+    }
+  ],
+  "palette": {
+    "Cream": [
+      "#eadfc9",
+      0.78,
+      0
+    ],
+    "Teal": [
+      "#285d59",
+      0.55,
+      0
+    ],
+    "Walnut": [
+      "#67402c",
+      0.52,
+      0
+    ],
+    "Oak": [
+      "#ba8954",
+      0.6,
+      0
+    ],
+    "Charcoal": [
+      "#293237",
+      0.52,
+      0.25
+    ],
+    "Brass": [
+      "#ba9150",
+      0.3,
+      0.7
+    ],
+    "Steel": [
+      "#adbcbf",
+      0.3,
+      0.75
+    ],
+    "Terracotta": [
+      "#b86143",
+      0.8,
+      0
+    ],
+    "Brick": [
+      "#985a44",
+      0.85,
+      0
+    ],
+    "Sage": [
+      "#6c8760",
+      0.8,
+      0
+    ],
+    "Leaf": [
+      "#315b3e",
+      0.8,
+      0
+    ],
+    "Ivory": [
+      "#f5efdc",
+      0.4,
+      0
+    ],
+    "Grout": [
+      "#a69984",
+      0.9,
+      0
+    ],
+    "Glow": [
+      "#ffdda1",
+      0.3,
+      0
+    ],
+    "Glass": [
+      "#91bcb9",
+      0.12,
+      0
+    ],
+    "Chalk": [
+      "#d8d5b9",
+      0.85,
+      0
+    ]
+  }
+}
