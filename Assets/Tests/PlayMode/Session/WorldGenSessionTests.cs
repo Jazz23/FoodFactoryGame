@@ -107,8 +107,9 @@ namespace FoodFactoryGame.Session.PlayModeTests
 
         private PropertyOffer Start => _root.StartOffer;
 
-        private static PlayerAvatar LocalAvatar() =>
-            UnityEngine.Object.FindObjectsByType<PlayerAvatar>().FirstOrDefault(x => x.IsOwner);
+        // The host's own avatar: a remote client in the same process owns one too, so ownership alone is ambiguous.
+        private PlayerAvatar LocalAvatar() =>
+            UnityEngine.Object.FindObjectsByType<PlayerAvatar>().FirstOrDefault(x => x.IsOwner && x.NetworkManager == _root.NetworkManager);
 
         [UnityTest]
         public IEnumerator ANewWorldStartsThePlayerOnItsOwnRestaurant()

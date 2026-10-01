@@ -25,9 +25,14 @@ namespace FoodFactoryGame.Session.Player
         [SerializeField] private float jumpHeight = 1.2f;
         [SerializeField] private float turnDegreesPerSecond = 720f;
         [SerializeField] private float gravity = -20f;
+        // How far below its feet (plus 1 m above) the avatar looks for ground before it starts moving.
+        private const float GroundSearch = 4f;
 
         private readonly SyncVar<string> _displayName = new();
         private float _verticalSpeed;
+        // False until ground has been found under the avatar after spawning: the map and site shells are built after the
+        // avatar spawns, and a saved position away from the dev floor has nothing under it until then (decision 0031).
+        private bool _groundFound;
 
         public string DisplayName => _displayName.Value;
         public OrbitCameraRig CameraRig => cameraRig;
@@ -64,6 +69,12 @@ namespace FoodFactoryGame.Session.Player
         private void Update()
         {
             if (!IsOwner) return;
+            if (!_groundFound)
+            {
+                if (!Physics.Raycast(transform.position + Vector3.up, Vector3.down, GroundSearch, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+                    return;
+                _groundFound = true;
+            }
             var input = Vector2.ClampMagnitude(moveAction.action.ReadValue<Vector2>(), 1f);
             var direction = Quaternion.Euler(0f, cameraRig.Yaw, 0f) * new Vector3(input.x, 0f, input.y);
             if (controller.isGrounded)
