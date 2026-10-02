@@ -464,6 +464,19 @@ namespace FoodFactoryGame.Goods
                 }
                 state.SchemaVersion = 16;
             }
+            // v16 trucks had no road legs (decision 0032): one driving keeps its abstract trip and drives the roads from its next
+            // departure. A stored world never had view-only road trucks.
+            if (state != null && state.SchemaVersion == 16)
+            {
+                foreach (var truck in state.Trucks ?? new())
+                    if (truck != null)
+                    {
+                        truck.LegSegmentId ??= "";
+                        truck.NextSegmentId ??= "";
+                    }
+                state.RoadTrucks ??= new();
+                state.SchemaVersion = 17;
+            }
             GoodsWorld.Validate(state);
             return state;
         }

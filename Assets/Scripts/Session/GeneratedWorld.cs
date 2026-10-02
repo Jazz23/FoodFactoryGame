@@ -2,7 +2,8 @@
 // catalog is registered first, then a new world gets one company with the PROTOTYPE starting cash, which is given the starting
 // restaurant's lot (its site, layout and shell) without charge, a placed counter and table inside that shell (owner decision
 // 2026-09-30: pre-equipped), and the customer districts and competitors derived from the layout, and the first save is
-// committed. A world made before these existed gains each missing part once, by ID or by kind, committed before serving.
+// committed. The layout's road network is registered with the catalog, so trucks drive the generated roads (decision 0032).
+// A world made before these existed gains each missing part once, by ID or by kind, committed before serving.
 // Nothing else is seeded: no storage, belts, machines, employees or warehouse. A save made in this scene before piece 2 (a
 // format 3 layout beside a dev-world snapshot, which never got its starting restaurant) is left untouched and not opened as a
 // generated world.
@@ -55,6 +56,7 @@ namespace FoodFactoryGame.Session
                 }
                 Register(loaded, items);
                 loaded.RegisterPropertyOffers(catalog);
+                loaded.RegisterRoads(RoadNetwork.For(stored.Layout));
                 var revision = loaded.Snapshot().Revision;
                 Equip(loaded, start, counter, table);
                 AddCustomers(loaded, stored.Layout);
@@ -68,6 +70,7 @@ namespace FoodFactoryGame.Session
             var world = new GoodsWorld(stored.WorldId);
             Register(world, items);
             world.RegisterPropertyOffers(catalog);
+            world.RegisterRoads(RoadNetwork.For(stored.Layout));
             world.Bootstrap(new GoodsCompany { Id = CompanyId, Cash = StartingCash });
             world.Bootstrap(start, CompanyId);
             Equip(world, start, counter, table);

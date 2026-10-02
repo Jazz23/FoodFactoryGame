@@ -10,6 +10,12 @@
 // lot IDs, exposure and owner while aboard (trucks are not refrigerated, so goods age in transit) and takes the dropoff
 // site as owner when it is unloaded. A dock that is picked up, or a full or empty buffer, makes the truck wait there; goods
 // are never dropped or duplicated.
+// Generated worlds (decision 0032): with the layout's road network registered, a truck between two sites on the network drives
+// the real roads one leg (a straight piece of one segment) at a time, choosing the quickest way on at every junction from the
+// current traffic (RoadTraffic): a leg's time comes from the road kind, the load of city cars and trucks on it, and the wait at
+// its end node. A truck can find the next segment full and wait at the end of its leg. A redirected truck finishes its leg and
+// reroutes; parking a driving truck sends it on to the nearer of its route's two sites. Sites off the network (dev worlds)
+// keep the abstract Manhattan trip above.
 // Restaurant docks (decision 0034, slice 5): a dock on a restaurant's site serves one truck at a time (the truck holding it is
 // Docked; others wait their turn in ID order) and is usable only while a walkable path reaches it from the lot's street edge
 // (PROTOTYPE dock rule). The truck arrives from the street after the abstract trip time and goods move at its LoadUnitsPerSecond
@@ -17,6 +23,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using FoodFactoryGame.World;
 using UnityEngine;
 
 namespace FoodFactoryGame.Goods
@@ -37,7 +44,9 @@ namespace FoodFactoryGame.Goods
         ToPickup,
         Loading,
         ToDropoff,
-        Unloading
+        Unloading,
+        // No route: driving to DestinationSiteId, where it parks (decision 0032: a truck parked while driving the roads).
+        ToPark
     }
 
     [Serializable] public sealed class GoodsTruck
@@ -60,9 +69,27 @@ namespace FoodFactoryGame.Goods
         public long RemainingSeconds;
         // True while this truck holds the restaurant dock it is loading or unloading at (decision 0034, v16); other trucks wait.
         public bool Docked;
+        // Road trips (decision 0032, v17). While driving the network: the segment of the leg being driven (empty on an
+        // abstract trip and whenever the truck is not driving), the leg's ends in metres from the segment's From node, its
+        // driving time and its whole time including the wait at its end node (both fixed when the leg starts).
+        // RemainingSeconds is then the time left in the leg; 0 means the truck stands at the leg's end waiting to enter the
+        // next segment, and QueuedSeconds counts that wait.
+        public string LegSegmentId = "";
+        public int LegFrom;
+        public int LegTo;
+        public long LegDriveSeconds;
+        public long LegSeconds;
+        public long QueuedSeconds;
+        // While queued (RemainingSeconds 0 on the road): the leg it waits to enter, kept so each retry only asks the segment
+        // again instead of planning anew; empty otherwise. NextFinal marks the last leg of the trip (no junction wait).
+        public string NextSegmentId = "";
+        public int NextFrom;
+        public int NextTo;
+        public bool NextFinal;
 
         public string CargoLocationId => Id + ":cargo";
-        public bool Driving => State is TruckState.ToPickup or TruckState.ToDropoff;
+        public bool Driving => State is TruckState.ToPickup or TruckState.ToDropoff or TruckState.ToPark;
+        public bool OnRoad => !string.IsNullOrEmpty(LegSegmentId);
     }
 
     // What the trucks assigned to it repeat: load at one dock, deliver to a dock on another site of the same company.
@@ -189,6 +216,7 @@ namespace FoodFactoryGame.Goods
                 if (site.MapX == mapX && site.MapZ == mapZ) return false;
                 site.MapX = mapX;
                 site.MapZ = mapZ;
+                _sitePoints.Remove(siteId);
                 InvalidateDiners();
                 _state.Revision++;
                 return true;
@@ -369,15 +397,32 @@ namespace FoodFactoryGame.Goods
         public static GoodsRoute RouteOf(GoodsSnapshot state, GoodsTruck truck) =>
             string.IsNullOrEmpty(truck?.RouteId) ? null : state.Routes?.FirstOrDefault(x => x.Id == truck.RouteId);
 
-        // A parked truck stands where it is or, if it was driving, at the site it left (PROTOTYPE, like a redirect). Cargo
-        // stays aboard.
-        private static void Park(GoodsTruck truck)
+        // A parked truck stands where it is. One driving the roads goes on to whichever of its route's two sites is quicker to
+        // reach from the end of its leg and parks there (decision 0032); one on an abstract trip parks at the site it left
+        // (PROTOTYPE, like a redirect). Cargo stays aboard.
+        private void Park(GoodsTruck truck)
         {
+            var route = RouteOf(_state, truck);
             truck.RouteId = "";
+            truck.Docked = false;
+            if (truck.Driving && truck.OnRoad)
+            {
+                // Already on its way to park (no route), it keeps going.
+                if (route is not null)
+                {
+                    var pickup = DockSite(route.PickupDockId);
+                    var dropoff = DockSite(route.DropoffDockId);
+                    var nearer = EstimateMillis(truck, dropoff) < EstimateMillis(truck, pickup) ? dropoff : pickup;
+                    if (nearer != truck.DestinationSiteId) ClearNext(truck);
+                    truck.DestinationSiteId = nearer;
+                }
+                truck.State = TruckState.ToPark;
+                return;
+            }
             truck.State = TruckState.Parked;
             truck.DestinationSiteId = "";
             truck.RemainingSeconds = 0;
-            truck.Docked = false;
+            ClearLeg(truck);
         }
 
 
@@ -410,21 +455,60 @@ namespace FoodFactoryGame.Goods
             else Drive(truck, DockSite(Route(truck).PickupDockId), TruckState.ToPickup, TruckState.Loading);
         }
 
-        // A redirected truck restarts from the site it left (PROTOTYPE: no position between sites is kept).
+        // Sends a truck toward a site. One standing at a site leaves it: by road when both sites are on the registered network,
+        // otherwise on an abstract trip that restarts from the site it left (PROTOTYPE, dev worlds). One already driving the
+        // roads keeps its current leg and reroutes from the leg's end (decision 0032).
         private void Drive(GoodsTruck truck, string destinationSiteId, TruckState driving, TruckState arrived)
         {
+            truck.Docked = false;
+            if (truck.Driving && truck.OnRoad)
+            {
+                truck.State = driving;
+                if (truck.DestinationSiteId != destinationSiteId) ClearNext(truck);
+                truck.DestinationSiteId = destinationSiteId;
+                return;
+            }
+            var from = SitePoint(truck.SiteId);
+            var to = SitePoint(destinationSiteId);
+            if (truck.SiteId != destinationSiteId && from is { } start && to is not null)
+            {
+                truck.State = driving;
+                truck.DestinationSiteId = destinationSiteId;
+                truck.RemainingSeconds = 0;
+                // A zero-length leg at the site's road point: the truck enters the network like any leg's end, and waits there
+                // if the first segment is full.
+                SetLeg(truck, start.Segment, start.Offset, start.Offset, 0, 0);
+                ContinueOnRoad(truck, departing: true);
+                return;
+            }
+            ClearLeg(truck);
             var seconds = RoadSeconds(_state, truck.SiteId, destinationSiteId, truck.SpeedMetresPerSecond);
             truck.State = seconds == 0 ? arrived : driving;
             truck.SiteId = seconds == 0 ? destinationSiteId : truck.SiteId;
             truck.DestinationSiteId = seconds == 0 ? "" : destinationSiteId;
             truck.RemainingSeconds = seconds;
-            truck.Docked = false;
         }
 
-        // Runs inside Advance. Trucks act one simulated second at a time in ID order, so two trucks at one dock share it the
-        // same way whatever the step size; while every active truck is driving, time skips ahead to the next arrival. A truck
-        // that cannot work (nothing to load and no cargo, a full buffer, a dock not placed) waits: nothing else in the step
-        // can change that, so it is left alone until the next step.
+        // A driving truck reaches DestinationSiteId: it starts loading or unloading there, or parks.
+        private static void Arrive(GoodsTruck truck)
+        {
+            truck.SiteId = truck.DestinationSiteId;
+            truck.DestinationSiteId = "";
+            truck.RemainingSeconds = 0;
+            truck.State = truck.State switch
+            {
+                TruckState.ToPickup => TruckState.Loading,
+                TruckState.ToDropoff => TruckState.Unloading,
+                _ => TruckState.Parked
+            };
+            ClearLeg(truck);
+        }
+
+        // Runs inside Advance. Trucks act one simulated second at a time in ID order, so two trucks at one dock (or one
+        // segment) share it the same way whatever the step size; while every active truck is driving a leg, time skips ahead to
+        // the next leg end, the only moment a truck chooses or is refused anything. A truck that cannot work (nothing to load
+        // and no cargo, a full buffer, a dock not placed) waits: nothing else in the step can change that, so it is left alone
+        // until the next step. A truck queued at a full segment retries every second.
         private void MoveTrucks(long seconds)
         {
             if (_state.Trucks.Count == 0) return;
@@ -433,31 +517,252 @@ namespace FoodFactoryGame.Goods
             // Nothing in a clock step changes walls or placed pieces, so street reachability is worked out once per step.
             _usableDocks.Clear();
             var left = seconds;
-            while (left > 0)
+            try
             {
-                var working = trucks.Where(x => x.State is TruckState.Loading or TruckState.Unloading && !waiting.Contains(x)).ToList();
-                var driving = trucks.Where(x => x.Driving).ToList();
-                if (working.Count == 0 && driving.Count == 0) return;
-                var step = working.Count > 0 ? 1 : Math.Min(left, driving.Min(x => x.RemainingSeconds));
-                foreach (var truck in trucks)
+                while (left > 0)
                 {
-                    if (truck.Driving)
+                    _truckSecond = _state.ClockSeconds - left;
+                    var working = trucks.Where(x => x.State is TruckState.Loading or TruckState.Unloading && !waiting.Contains(x)).ToList();
+                    var driving = trucks.Where(x => x.Driving).ToList();
+                    if (working.Count == 0 && driving.Count == 0) return;
+                    var queued = driving.Any(x => x.RemainingSeconds == 0);
+                    var step = working.Count > 0 || queued ? 1 : Math.Min(left, driving.Min(x => x.RemainingSeconds));
+                    // Choices made in this step (entering a leg, a light's phase) happen at its end.
+                    _truckNow = _truckSecond + step;
+                    foreach (var truck in trucks)
                     {
-                        truck.RemainingSeconds -= step;
-                        if (truck.RemainingSeconds > 0) continue;
-                        truck.SiteId = truck.DestinationSiteId;
-                        truck.DestinationSiteId = "";
-                        truck.State = truck.State == TruckState.ToPickup ? TruckState.Loading : TruckState.Unloading;
+                        if (truck.Driving)
+                        {
+                            if (truck.RemainingSeconds > 0)
+                            {
+                                truck.RemainingSeconds -= step;
+                                if (truck.RemainingSeconds > 0) continue;
+                            }
+                            else truck.QueuedSeconds += step;
+                            if (truck.OnRoad) ContinueOnRoad(truck, departing: false);
+                            else Arrive(truck);
+                        }
+                        else if (working.Contains(truck))
+                        {
+                            // A restaurant dock serves one truck at a time: wait (rechecked every second) while another holds it.
+                            if (!TakeDock(truck, trucks)) continue;
+                            if (!(truck.State == TruckState.Loading ? LoadSecond(truck) : UnloadSecond(truck))) waiting.Add(truck);
+                        }
                     }
-                    else if (working.Contains(truck))
-                    {
-                        // A restaurant dock serves one truck at a time: wait (rechecked every second) while another holds it.
-                        if (!TakeDock(truck, trucks)) continue;
-                        if (!(truck.State == TruckState.Loading ? LoadSecond(truck) : UnloadSecond(truck))) waiting.Add(truck);
-                    }
+                    left -= step;
                 }
-                left -= step;
             }
+            finally { _truckNow = null; }
+        }
+
+        // The time road choices are made at: the end of the truck step being worked through, or the clock for a command.
+        private long Now => _truckNow ?? _state.ClockSeconds;
+        private long? _truckNow;
+
+        // Server content, registered once at start for a generated world: its road network (decision 0032). Without it every
+        // trip is abstract. A saved truck must be on one of its segments.
+        public void RegisterRoads(RoadNetwork network)
+        {
+            lock (_gate)
+            {
+                if (network is null || _roads is not null) throw new ArgumentException("Missing or duplicate road network.");
+                var problem = RoadsProblem(_state, network);
+                if (problem is not null) throw new InvalidOperationException(problem);
+                _roads = network;
+                _sitePoints.Clear();
+            }
+        }
+
+        public bool HasRoads
+        {
+            get { lock (_gate) return _roads is not null; }
+        }
+
+        private RoadNetwork _roads;
+        private readonly Dictionary<string, RoadPoint?> _sitePoints = new(StringComparer.Ordinal);
+
+        // Null when every truck leg names a segment of the network and lies on it.
+        private static string RoadsProblem(GoodsSnapshot state, RoadNetwork network)
+        {
+            foreach (var truck in state.Trucks.Where(x => x.OnRoad))
+                if (!network.TryGetSegment(truck.LegSegmentId, out var index)
+                    || Math.Max(truck.LegFrom, truck.LegTo) > network.Segments[index].Length
+                    || (truck.NextSegmentId != "" && (!network.TryGetSegment(truck.NextSegmentId, out var next)
+                        || Math.Max(truck.NextFrom, truck.NextTo) > network.Segments[next].Length)))
+                    return $"Truck {truck.Id} drives a leg that is not on the road network.";
+            return null;
+        }
+
+        private void ValidateRoads()
+        {
+            if (_roads is null) return;
+            var problem = RoadsProblem(_state, _roads);
+            if (problem is not null) throw new InvalidOperationException(problem);
+        }
+
+        // Where a site meets the road network: the point nearest its map position (a bought lot's access cell), or null
+        // without a network or when the site is off it.
+        private RoadPoint? SitePoint(string siteId)
+        {
+            if (_roads is null || string.IsNullOrEmpty(siteId)) return null;
+            if (_sitePoints.TryGetValue(siteId, out var point)) return point;
+            var site = _state.Sites.FirstOrDefault(x => x.Id == siteId);
+            point = site is null ? null : _roads.Locate(site.MapX, site.MapZ);
+            _sitePoints[siteId] = point;
+            return point;
+        }
+
+        // At the end of its leg (or leaving a site), a truck on the road arrives if it stands at its destination's road point;
+        // otherwise it picks the quickest way on from the current traffic and enters that way's first leg if the segment
+        // admits it, or waits where it is. A destination with no route on the network (never in a validated world) finishes
+        // as an abstract trip.
+        private void ContinueOnRoad(GoodsTruck truck, bool departing)
+        {
+            var target = SitePoint(truck.DestinationSiteId);
+            if (_roads is null || !_roads.TryGetSegment(truck.LegSegmentId, out var segment) || target is null)
+            {
+                FinishAbstractly(truck);
+                return;
+            }
+            var here = new RoadPoint(segment, truck.LegTo);
+            var arrived = here.Equals(target.Value) || (_roads.AtNode(here) >= 0 && _roads.AtNode(here) == _roads.AtNode(target.Value));
+            if (arrived && !departing)
+            {
+                Arrive(truck);
+                return;
+            }
+            var occupancy = Occupancy(truck);
+            var now = Now;
+            RoadLeg leg;
+            bool final;
+            // A truck already queued for a leg keeps waiting for it; otherwise it plans the quickest way on.
+            if (_roads.TryGetSegment(truck.NextSegmentId, out var waitingFor))
+            {
+                leg = new RoadLeg(waitingFor, truck.NextFrom, truck.NextTo);
+                final = truck.NextFinal;
+            }
+            else
+            {
+                var route = _roads.Route(here, target.Value,
+                    (index, forward) => RoadTraffic.DriveMillis(_roads.Segments[index], _roads.Segments[index].Length, truck.SpeedMetresPerSecond,
+                        RoadTraffic.LoadPercent(_roads.Segments[index], now, occupancy.GetValueOrDefault((index, forward)))),
+                    (index, forward) => RoadTraffic.JunctionEstimateMillis(_roads, index, forward, now));
+                if (route is null || route.Count == 0)
+                {
+                    FinishAbstractly(truck);
+                    return;
+                }
+                leg = route[0];
+                final = route.Count == 1;
+            }
+            var road = _roads.Segments[leg.Segment];
+            var others = occupancy.GetValueOrDefault((leg.Segment, leg.Forward));
+            var load = RoadTraffic.LoadPercent(road, now, others + 1);
+            if (!RoadTraffic.Admits(load, others, truck.QueuedSeconds))
+            {
+                truck.RemainingSeconds = 0;
+                truck.NextSegmentId = road.Id;
+                truck.NextFrom = leg.From;
+                truck.NextTo = leg.To;
+                truck.NextFinal = final;
+                return;
+            }
+            ClearNext(truck);
+            // A zero-length leg (two sites sharing a road point) still takes a second, like any trip between different sites.
+            var drive = Math.Max(1, (RoadTraffic.DriveMillis(road, leg.Length, truck.SpeedMetresPerSecond, load) + 999) / 1000);
+            var wait = final ? 0 : RoadTraffic.JunctionWaitSeconds(_roads, leg.Segment, leg.Forward, now + drive);
+            SetLeg(truck, leg.Segment, leg.From, leg.To, drive, drive + wait);
+            truck.RemainingSeconds = drive + wait;
+            truck.QueuedSeconds = 0;
+        }
+
+        // A road trip that cannot go on by road ends as an abstract trip from the site it left.
+        private void FinishAbstractly(GoodsTruck truck)
+        {
+            ClearLeg(truck);
+            var seconds = RoadSeconds(_state, truck.SiteId, truck.DestinationSiteId, truck.SpeedMetresPerSecond);
+            if (seconds == 0) Arrive(truck);
+            else truck.RemainingSeconds = seconds;
+        }
+
+        // Trucks on each direction of each segment, other than the one deciding.
+        private Dictionary<(int Segment, bool Forward), int> Occupancy(GoodsTruck except)
+        {
+            var counts = new Dictionary<(int, bool), int>();
+            foreach (var truck in _state.Trucks)
+            {
+                if (truck == except || !truck.OnRoad || !_roads.TryGetSegment(truck.LegSegmentId, out var index)) continue;
+                var key = (index, truck.LegTo >= truck.LegFrom);
+                counts[key] = counts.GetValueOrDefault(key) + 1;
+            }
+            return counts;
+        }
+
+        // Free-flow-plus-traffic estimate of how long a truck on the road needs from the end of its leg to a site; used to
+        // choose where a truck parked while driving goes. Long.MaxValue when it cannot get there by road.
+        private long EstimateMillis(GoodsTruck truck, string siteId)
+        {
+            var target = SitePoint(siteId);
+            if (_roads is null || target is null || !_roads.TryGetSegment(truck.LegSegmentId, out var segment)) return long.MaxValue;
+            var occupancy = Occupancy(truck);
+            var now = Now;
+            var route = _roads.Route(new RoadPoint(segment, truck.LegTo), target.Value,
+                (index, forward) => RoadTraffic.DriveMillis(_roads.Segments[index], _roads.Segments[index].Length, truck.SpeedMetresPerSecond,
+                    RoadTraffic.LoadPercent(_roads.Segments[index], now, occupancy.GetValueOrDefault((index, forward)))),
+                (index, forward) => RoadTraffic.JunctionEstimateMillis(_roads, index, forward, now));
+            if (route is null) return long.MaxValue;
+            return route.Sum(x => RoadTraffic.DriveMillis(_roads.Segments[x.Segment], x.Length, truck.SpeedMetresPerSecond,
+                RoadTraffic.LoadPercent(_roads.Segments[x.Segment], now, occupancy.GetValueOrDefault((x.Segment, x.Forward)))));
+        }
+
+        // For screens: about how many seconds a truck on the road still needs to reach its destination, from what a site view
+        // carries (the truck, the company's map records, the clock): the rest of its leg plus the quickest way on at the
+        // current city traffic, without other trucks. Null for a truck that is not driving the network.
+        public static long? EstimateRoadSeconds(GoodsSnapshot view, RoadNetwork network, GoodsTruck truck)
+        {
+            if (view is null || network is null || truck is null || !truck.Driving || !truck.OnRoad
+                || !network.TryGetSegment(truck.LegSegmentId, out var segment)) return null;
+            var site = view.Sites.FirstOrDefault(x => x.Id == truck.DestinationSiteId);
+            var target = site is null ? null : network.Locate(site.MapX, site.MapZ);
+            if (target is null) return truck.RemainingSeconds;
+            var clock = view.ClockSeconds;
+            var route = network.Route(new RoadPoint(segment, truck.LegTo), target.Value,
+                (index, _) => RoadTraffic.DriveMillis(network.Segments[index], network.Segments[index].Length, truck.SpeedMetresPerSecond,
+                    RoadTraffic.LoadPercent(network.Segments[index], clock, 0)),
+                (index, forward) => RoadTraffic.JunctionEstimateMillis(network, index, forward, clock));
+            if (route is null) return truck.RemainingSeconds;
+            var millis = route.Sum(x => RoadTraffic.DriveMillis(network.Segments[x.Segment], x.Length, truck.SpeedMetresPerSecond,
+                RoadTraffic.LoadPercent(network.Segments[x.Segment], clock, 0)));
+            for (var i = 0; i + 1 < route.Count; i++) millis += RoadTraffic.JunctionEstimateMillis(network, route[i].Segment, route[i].Forward, clock);
+            return truck.RemainingSeconds + (millis + 999) / 1000;
+        }
+
+        private void SetLeg(GoodsTruck truck, int segment, int from, int to, long driveSeconds, long legSeconds)
+        {
+            truck.LegSegmentId = _roads.Segments[segment].Id;
+            truck.LegFrom = from;
+            truck.LegTo = to;
+            truck.LegDriveSeconds = driveSeconds;
+            truck.LegSeconds = legSeconds;
+        }
+
+        private static void ClearNext(GoodsTruck truck)
+        {
+            truck.NextSegmentId = "";
+            truck.NextFrom = 0;
+            truck.NextTo = 0;
+            truck.NextFinal = false;
+        }
+
+        private static void ClearLeg(GoodsTruck truck)
+        {
+            ClearNext(truck);
+            truck.LegSegmentId = "";
+            truck.LegFrom = 0;
+            truck.LegTo = 0;
+            truck.LegDriveSeconds = 0;
+            truck.LegSeconds = 0;
+            truck.QueuedSeconds = 0;
         }
 
         // One second at the pickup dock: loads up to the truck's rate of allowed, unreserved goods from the dock's outgoing
@@ -558,12 +863,39 @@ namespace FoodFactoryGame.Goods
                 return;
             }
             lot.Quantity -= quantity;
+            // The part joins an equivalent lot already there (decision 0003: same item, owner, condition and spoilage history,
+            // unreserved; GoodsWorld.Merge's rule), so a truck loading a few units a second does not leave a new lot behind every
+            // second (decision 0032 scale benchmark). Whole lots above keep their IDs.
+            var same = _state.Lots.FirstOrDefault(x => x.LocationId == locationId && x.ItemId == lot.ItemId && x.OwnerId == ownerId
+                && x.ExposureSeconds == lot.ExposureSeconds && x.SpoilAfterSeconds == lot.SpoilAfterSeconds && x.Spoiled == lot.Spoiled
+                && !_state.Reservations.Any(r => r.Active && r.LotId == x.Id));
+            if (same is not null)
+            {
+                checked { same.Quantity += quantity; }
+                return;
+            }
             _state.Lots.Add(new GoodsLot
             {
-                Id = Guid.NewGuid().ToString("N"), ItemId = lot.ItemId, OwnerId = ownerId, LocationId = locationId, Quantity = quantity,
+                Id = SplitLotId(lot.Id, locationId), ItemId = lot.ItemId, OwnerId = ownerId, LocationId = locationId, Quantity = quantity,
                 ExposureSeconds = lot.ExposureSeconds, SpoilAfterSeconds = lot.SpoilAfterSeconds, Spoiled = lot.Spoiled
             });
         }
+
+        // A split's ID comes from the lot, the destination and the truck second, not from a random GUID: lot IDs break ties in
+        // loading order, so random IDs made one long clock step differ from many short ones. A lot moves to one location at
+        // most once a truck second, so the inputs are unique; a hash collision still takes the next free suffix.
+        private string SplitLotId(string lotId, string locationId)
+        {
+            using var hash = System.Security.Cryptography.SHA256.Create();
+            var bytes = hash.ComputeHash(System.Text.Encoding.UTF8.GetBytes($"{lotId}\n{locationId}\n{_truckSecond}"));
+            var id = string.Concat(bytes.Take(16).Select(x => x.ToString("x2")));
+            var candidate = id;
+            for (var suffix = 1; _state.Lots.Any(x => x.Id == candidate); suffix++) candidate = $"{id}-{suffix}";
+            return candidate;
+        }
+
+        // The clock second the truck simulation is working through (MoveTrucks).
+        private long _truckSecond;
 
         // A site's baseline carries its company's routes and fleet (with each truck's cargo), and the map records of the
         // company's sites, so the route screen can show every truck wherever it is.
@@ -576,11 +908,25 @@ namespace FoodFactoryGame.Goods
                 : _state.Routes.Where(x => x.CompanyId == company.Id).Select(x => JsonUtility.FromJson<GoodsRoute>(JsonUtility.ToJson(x))).ToList();
             view.Trucks = company is null ? new List<GoodsTruck>()
                 : _state.Trucks.Where(x => x.CompanyId == company.Id).Select(x => JsonUtility.FromJson<GoodsTruck>(JsonUtility.ToJson(x))).ToList();
+            // Every other company's truck on the road is public, like a vehicle seen in the street (decision 0032): where it is
+            // and where it goes, never its route or cargo.
+            view.RoadTrucks = _state.Trucks.Where(x => x.CompanyId != company?.Id && x.Driving && x.OnRoad)
+                .Select(x =>
+                {
+                    var copy = JsonUtility.FromJson<GoodsTruck>(JsonUtility.ToJson(x));
+                    copy.RouteId = "";
+                    return copy;
+                }).ToList();
             // Appended after the site's own locations: a baseline names its site by its first location.
             var cargoIds = new HashSet<string>(view.Trucks.Select(x => x.CargoLocationId));
             view.Locations.AddRange(_state.Locations.Where(x => cargoIds.Contains(x.Id)).Select(x => JsonUtility.FromJson<GoodsLocation>(JsonUtility.ToJson(x))));
             view.Lots.AddRange(_state.Lots.Where(x => cargoIds.Contains(x.LocationId)).Select(x => JsonUtility.FromJson<GoodsLot>(JsonUtility.ToJson(x))));
         }
+
+        private static bool NoLeg(GoodsTruck truck) => truck.LegSegmentId == "" && truck.LegFrom == 0 && truck.LegTo == 0
+            && truck.LegDriveSeconds == 0 && truck.LegSeconds == 0 && truck.QueuedSeconds == 0 && NoNext(truck);
+
+        private static bool NoNext(GoodsTruck truck) => truck.NextSegmentId == "" && truck.NextFrom == 0 && truck.NextTo == 0 && !truck.NextFinal;
 
         private static void ValidateTrucks(GoodsSnapshot state)
         {
@@ -607,13 +953,21 @@ namespace FoodFactoryGame.Goods
                     && cargo is not null && cargo.Kind == VehicleLocationKind && cargo.SiteId == RoadSiteId && cargo.Capacity == truck.CargoSlots
                     && !cargo.Refrigerated
                     && siteIds.Contains(truck.SiteId)
-                    && truck.State is TruckState.Parked or TruckState.ToPickup or TruckState.Loading or TruckState.ToDropoff or TruckState.Unloading
-                    && (truck.State == TruckState.Parked
+                    && truck.State is TruckState.Parked or TruckState.ToPickup or TruckState.Loading or TruckState.ToDropoff
+                        or TruckState.Unloading or TruckState.ToPark
+                    && (truck.State is TruckState.Parked or TruckState.ToPark
                         ? string.IsNullOrEmpty(truck.RouteId)
                         : route is not null && route.CompanyId == truck.CompanyId)
+                    && truck.LegSegmentId is not null
                     && (truck.Driving
-                        ? siteIds.Contains(truck.DestinationSiteId) && truck.RemainingSeconds >= 1
-                        : string.IsNullOrEmpty(truck.DestinationSiteId) && truck.RemainingSeconds == 0)
+                        ? siteIds.Contains(truck.DestinationSiteId)
+                          && (truck.OnRoad
+                              ? truck.LegFrom >= 0 && truck.LegTo >= 0 && truck.LegDriveSeconds >= 0
+                                && truck.LegSeconds >= truck.LegDriveSeconds && truck.RemainingSeconds >= 0
+                                && truck.RemainingSeconds <= truck.LegSeconds && truck.QueuedSeconds >= 0 && truck.NextSegmentId is not null
+                                && (truck.RemainingSeconds == 0 || NoNext(truck)) && truck.NextFrom >= 0 && truck.NextTo >= 0
+                              : truck.RemainingSeconds >= 1 && NoLeg(truck))
+                        : string.IsNullOrEmpty(truck.DestinationSiteId) && truck.RemainingSeconds == 0 && NoLeg(truck))
                     && (!truck.Docked || truck.State is TruckState.Loading or TruckState.Unloading);
                 if (!valid) throw new InvalidOperationException($"Truck {truck.Id} is inconsistent.");
             }
@@ -624,6 +978,9 @@ namespace FoodFactoryGame.Goods
                     return x.State == TruckState.Loading ? route?.PickupDockId : route?.DropoffDockId;
                 }).Any(x => x.Count() != 1))
                 throw new InvalidOperationException("Goods snapshot has two trucks holding one dock.");
+            // Other companies' trucks reach a view only (ViewLogistics); a world never stores them.
+            if (state.RoadTrucks is null || state.RoadTrucks.Count != 0)
+                throw new InvalidOperationException("Goods snapshot stores view-only road trucks.");
             // Every vehicle location is one truck's cargo; nothing else stands on the road.
             var cargoIds = new HashSet<string>(state.Trucks.Select(x => x.CargoLocationId));
             if (state.Locations.Any(x => (x.Kind == VehicleLocationKind || x.SiteId == RoadSiteId) && !cargoIds.Contains(x.Id)))

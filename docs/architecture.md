@@ -341,7 +341,7 @@ Decision: [0026](decisions/0026-procedural-world-layout.md). GDD section 3 "Worl
 
 Planned / undecided: the rest of 0028 (see that section) and its open items;
 customers from district densities and whether district values replace the dev district (decision 0024); competitor
-behaviour; trains; the ingredient supplier near the start; traffic using road capacities; final Blender models for premade
+behaviour; trains; the ingredient supplier near the start; traffic using road capacities (since implemented, decision 0032); final Blender models for premade
 slots; how existing `GoodsSite.MapX/Z` relate to layout coordinates (the presenter places the map beside the dev site as
 PROTOTYPE presentation only: the city's edge starts 40 m north of the dev site, pieces over the dev site's floor are not
 drawn, and local cameras draw to about 2.4 km while a layout is shown). Not verified: separate-process multiplayer, a player build.
@@ -590,7 +590,7 @@ the goods schema (v15) are unchanged. Evidence: [verification record](verificati
 - Player and employee operational rules should be shared; input and AI choose actions through those rules.
 - Visual objects must not become the sole owners of authoritative simulation state.
 
-These remain accepted contracts; only the bounded goods slice, its station jobs, equipment placement, the working oven, conveyor belts, company cash, the sell counter, supplier purchases, equipment purchases, spoilage timing/refrigeration, building shells, factory floors, conveyor lifts, trucks with loading docks, truck routes and fleet, customers, the procedural world layout and restaurant building above have a runtime interface. Customer purchases credit cash inside the clock tick; supplier purchases, floor orders, shell orders, buy-and-place orders and sales are the player payment commands. Trucks move goods between sites only inside the clock tick, through their own cargo locations.
+These remain accepted contracts; only the bounded goods slice, its station jobs, equipment placement, the working oven, conveyor belts, company cash, the sell counter, supplier purchases, equipment purchases, spoilage timing/refrigeration, building shells, factory floors, conveyor lifts, trucks with loading docks, truck routes and fleet, customers, the procedural world layout, restaurant building, and trucks on generated roads with city traffic above have a runtime interface. Customer purchases credit cash inside the clock tick; supplier purchases, floor orders, shell orders, buy-and-place orders and sales are the player payment commands. Trucks move goods between sites only inside the clock tick, through their own cargo locations.
 
 ## Planned / Undecided
 
@@ -636,7 +636,7 @@ Goods snapshot schema **v16**. Evidence: [verification record](verification/rest
   ambience points, one more term in customer choice (PROTOTYPE weight 0.6). Competitors have none; spend is unchanged.
 - Restaurant docks (slice 5): on a site with a restaurant shell a dock must be reachable from the lot's street edge
   (`no-street-access` at placement; trucks wait at an unreachable dock) and serves one truck at a time (`GoodsTruck.Docked`).
-  Transfer uses the truck's `LoadUnitsPerSecond`; trip time stays abstract (decision 0032 open). Other sites' docks unchanged.
+  Transfer uses the truck's `LoadUnitsPerSecond`; trip time was abstract until decision 0032 (below). Other sites' docks unchanged.
   The truck stands at the kerb in front of the lot, level with the dock; the logistics screen says when a truck waits for the dock.
 - Network (`GoodsNetworkBridge`): `RequestShellOrder`, `RequestBuyAndPlace` (JSON payloads), `RequestSell`, `RequestStaff`;
   results carry `Cents`. Accepted orders rebroadcast full baselines as before.
@@ -656,6 +656,48 @@ Goods snapshot schema **v16**. Evidence: [verification record](verification/rest
 Not done or open: independent visual review of the captures; a separate-process multiplayer check; `SampleScene` not updated;
 apron spawn uses the bought building's original first door (a resized shell may cover it); no restaurant floors (deferred);
 owner questions in decision 0035.
+
+## Implemented: trucks on generated roads and city traffic (2026-10-02)
+
+Decision: [0032](decisions/0032-trucks-on-generated-roads.md) (owner answers and the implementation notes). Goods snapshot
+schema **v17**. Evidence: [verification record](verification/trucks-roads-20261002.md). Every value is PROTOTYPE.
+
+- World (`Assets/Scripts/World`, no Unity references): `RoadNetwork` (built once per stored layout, `RoadNetwork.For`):
+  nodes, two-way segments with length, lanes per direction and the district's traffic level at the midpoint; `Locate` (a lot's
+  access cell to a `RoadPoint`, within 20 m of a centreline), `Position`, `Stops` (`WorldJunctions` rules), and `Route`
+  (deterministic A* between two points under caller costs, returned as `RoadLeg`s). `RoadTraffic`: time of day (a game hour =
+  60 s), background load by road kind, district and hour (capped at 90%), truck load (PCE 250%), the BPR delay curve, road
+  speeds (arterial 14, local 10, rural 20 m/s), admission (120% load, 30 s patience), traffic-light cycles per node (30 s,
+  X axis green 0-13 s, Z axis 15-28 s) and junction waits.
+- Goods (`GoodsWorld.Trucks.cs`): `RegisterRoads(network)` (server content, generated worlds only; checked against every
+  saved leg). With roads, a truck between two sites on the network drives legs: on each leg end it plans the quickest way on
+  (A*, current loads) and enters the first leg if the segment admits it, otherwise waits there (`RemainingSeconds` 0,
+  `QueuedSeconds`, the awaited leg in `Next*`); a leg's time is fixed when it starts (road speed and load, plus the light's red
+  time or a stop at its end). `MoveTrucks` skips ahead to the next leg end while all active trucks drive, and steps a second at
+  a time while any loads, unloads or queues; one long step equals many short ones (tested). A redirected truck finishes its
+  leg; parking a driving truck (`TruckState.ToPark`) goes on to the quicker of its route's sites. Sites off the network keep
+  the abstract Manhattan trip. `EstimateRoadSeconds` (screens). Partial lot moves join an equivalent lot at the destination
+  (decision 0003 merge rule); other splits get IDs hashed from lot, destination and truck second (no GUIDs).
+  `View` adds `RoadTrucks`: other companies' trucks on the road without route or cargo (never stored). `Advance` looks up
+  refrigeration once per step.
+- Schema: `GoodsSnapshotStore` upgrades v16 trucks with empty legs (a driving one finishes its abstract trip).
+- Session: `GeneratedWorld.LoadOrCreate` registers the layout's network. `SitePlacement` exposes `Layout`, `Roads`, `Ground`
+  (the map presenter's levelled land) and `OnGround`. `TruckPresenter` (generated worlds) draws trucks on legs in the
+  right-hand kerb lane between baselines (`RoadPose`), nose to tail at a leg end, at docks, and parked at the kerb, eased
+  between frames and painted in the company colour (own company green). `CityTrafficPresenter` draws `CityCars` (deterministic
+  lane streams from the hour's background flow: halts at stop signs, queues at red lights, waits behind trucks; nearest 150
+  within 300 m; pooled, painted per car). The logistics screen shows road estimates, "in traffic" and parking trips; the dock
+  screen warns about a dock on a non-restaurant lot that no path from the street reaches.
+- Content: `ArtSource/Vehicles/build_vehicle_models.py` (Blender, headless) builds the box truck, hatchback, sedan, van,
+  pickup, taxi and bus (332-528 triangles, flat VH_* materials); `AgentScripts/BuildVehicleArt.cs` imports them with URP Lit
+  materials, makes prefabs in `Assets/Prefabs/Vehicles` and installs the truck and the city traffic presenter in DevSite,
+  SampleScene and WorldGen (re-run after `BuildDevSite.cs` or `BuildWorldGenScene.cs`).
+- Scale (Editor, 100 trucks, 20 sites, seed 20260927, lunch rush): mean 3 ms and p99 10-16 ms per clock second over three
+  runs (budget 16.7 ms); 150 drawn cars with the truck: 8.6 ms mean frame.
+
+Not done or open: a separate-process multiplayer check; independent review of the captures; city cars do not turn at
+junctions (each lane's stream ends at its node); traffic-light lamps do not show the simulated phase; no supplier deliveries,
+running costs or refrigerated trucks (see decision 0032 Out of scope).
 
 ## Baseline Test Evolution
 

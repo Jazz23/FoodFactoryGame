@@ -468,6 +468,8 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 95674000aedac4a4c8b426b0ae974bc8, type: 2}
   - {fileID: 11400000, guid: 2253f4f7713fb4f489e518720832924e, type: 2}
   employeePrefab: {fileID: 3871209734584190898, guid: d675bfae1b7b45c4eb3bf2b6d4169b0e, type: 3}
+  worldLayoutBridgePrefab: {fileID: 0}
+  saveFolder: dev-world
   readCommandLine: 1
 --- !u!4 &174642230
 Transform:
@@ -1647,6 +1649,73 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &862066230
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 862066232}
+  - component: {fileID: 862066231}
+  m_Layer: 0
+  m_Name: CityTrafficPresenter
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &862066231
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 862066230}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6ab3ea245c4705145bb2cff6fa9915ce, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: FoodFactoryGame.Session::FoodFactoryGame.Session.Logistics.CityTrafficPresenter
+  session: {fileID: 174642229}
+  carPrefabs:
+  - {fileID: 5244862083911821851, guid: 11de69a359558e14698375cd4b635b85, type: 3}
+  - {fileID: 4021455406369469436, guid: 45d70def380528c4c9658bfdc7f4deb2, type: 3}
+  - {fileID: 5244862083911821851, guid: 11de69a359558e14698375cd4b635b85, type: 3}
+  - {fileID: 4021455406369469436, guid: 45d70def380528c4c9658bfdc7f4deb2, type: 3}
+  - {fileID: 5244862083911821851, guid: 11de69a359558e14698375cd4b635b85, type: 3}
+  - {fileID: 1583709337716885432, guid: 8183f00aa083a984abda4f6c00b289b6, type: 3}
+  - {fileID: 4516599056857343348, guid: 4f451fa4f39a0fd4594b7a3e9e0c91de, type: 3}
+  - {fileID: 4021455406369469436, guid: 45d70def380528c4c9658bfdc7f4deb2, type: 3}
+  - {fileID: 4356382868394337278, guid: 6b1b80472bc8bc241aa934b8e52d5935, type: 3}
+  - {fileID: 3747085237801763940, guid: f1c1ada8f5bf93e4eaca7a5e84815f2a, type: 3}
+  tints:
+  - {r: 0.85, g: 0.85, b: 0.83, a: 1}
+  - {r: 0.12, g: 0.12, b: 0.13, a: 1}
+  - {r: 0.55, g: 0.57, b: 0.6, a: 1}
+  - {r: 0.62, g: 0.1, b: 0.1, a: 1}
+  - {r: 0.12, g: 0.25, b: 0.5, a: 1}
+  - {r: 0.3, g: 0.45, b: 0.62, a: 1}
+  - {r: 0.2, g: 0.36, b: 0.22, a: 1}
+  - {r: 0.72, g: 0.66, b: 0.52, a: 1}
+  - {r: 0.45, g: 0.3, b: 0.2, a: 1}
+  - {r: 0.9, g: 0.9, b: 0.88, a: 1}
+--- !u!4 &862066232
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 862066230}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &974653844
 GameObject:
   m_ObjectHideFlags: 0
@@ -1677,7 +1746,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: FoodFactoryGame.Session::FoodFactoryGame.Session.Logistics.TruckPresenter
   session: {fileID: 174642229}
-  truckPrefab: {fileID: 4785532765865948706, guid: 75239aa7266bd9741a57c0ee6c30a23f, type: 3}
+  truckPrefab: {fileID: 1165282015846426929, guid: e0899f8cd4d97cd4a98ac41e5460a264, type: 3}
 --- !u!4 &974653846
 Transform:
   m_ObjectHideFlags: 0
@@ -1841,6 +1910,7 @@ MonoBehaviour:
   roofMaterial: {fileID: 2100000, guid: 94f6cfb2df23bd145a4fb6dba9a501ed, type: 2}
   doorHeight: 2.2
   elevatorColor: {r: 0.95, g: 0.75, b: 0.2, a: 1}
+  restaurantStyles: {fileID: 0}
 --- !u!114 &1063332617
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2146,6 +2216,7 @@ MonoBehaviour:
   placeItemAction: {fileID: -5323955772092899608, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   takeItemAction: {fileID: -2323420383534807687, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   hoverOutlineMaterial: {fileID: 2100000, guid: 63c6299bfbcad5742a91f14aeaf6cf39, type: 2}
+  propertyReach: 60
   session: {fileID: 174642229}
   buildings: {fileID: 1063332616}
   ghost: {fileID: 279533075}
@@ -2597,3 +2668,4 @@ SceneRoots:
   - {fileID: 459258570}
   - {fileID: 811443488}
   - {fileID: 25735028}
+  - {fileID: 862066232}

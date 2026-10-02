@@ -29,6 +29,12 @@ namespace FoodFactoryGame.Session
         public Vector3 LayoutOrigin { get; }
         public string StartSiteId { get; }
         public IReadOnlyDictionary<string, WorldLot> Lots => _lots;
+        public WorldLayout Layout { get; }
+        // The drivable road graph of the layout (decision 0032), shared with the server's truck simulation.
+        public RoadNetwork Roads => RoadNetwork.For(Layout);
+        // Height of the drawn ground (layout-local metres) at a map point: set by WorldLayoutPresenter, which levels lots; the raw
+        // terrain until then. Vehicles stand on it, as the road tiles do.
+        public System.Func<float, float, float> Ground { get; set; }
 
         private SitePlacement(WorldLayout layout, WorldLot start)
         {
@@ -36,6 +42,7 @@ namespace FoodFactoryGame.Session
             var startElevation = elevations[start.BuildingId];
             LayoutOrigin = new Vector3(-(start.X + start.Width / 2f), -startElevation, -(start.Z + start.Depth / 2f));
             StartSiteId = start.SiteId;
+            Layout = layout;
             foreach (var offer in WorldLayoutShells.PropertyOffers(layout)) _offers[offer.LotId] = offer;
             foreach (var lot in layout.Lots)
             {
@@ -61,6 +68,10 @@ namespace FoodFactoryGame.Session
 
         // Scene point of a map point (metres) at a layout height.
         public Vector3 ToScene(float mapX, float mapZ, float height = 0f) => LayoutOrigin + new Vector3(mapX, height, mapZ);
+
+        // Scene point on the drawn ground at a map point (metres).
+        public Vector3 OnGround(float mapX, float mapZ) =>
+            ToScene(mapX, mapZ, Ground?.Invoke(mapX, mapZ) ?? (Layout.Terrain ?? WorldTerrain.Flat()).Height(mapX, mapZ));
 
         // Map point (metres) under a scene point.
         public Vector2 ToMap(Vector3 scene) => new(scene.x - LayoutOrigin.x, scene.z - LayoutOrigin.z);

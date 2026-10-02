@@ -401,7 +401,7 @@ namespace FoodFactoryGame.Goods.Tests
             var oldPath = Path.Combine(_saveDirectory, "old.db");
             GoodsSnapshotStore.Save(plain, oldPath);
             var json = JsonUtility.ToJson(plain.Snapshot()).Replace($"\"SchemaVersion\":{GoodsSnapshot.CurrentSchema}", "\"SchemaVersion\":10")
-                .Replace(",\"Sites\":[]", "").Replace(",\"Trucks\":[]", "").Replace(",\"Routes\":[]", "");
+                .Replace(",\"Sites\":[]", "").Replace(",\"Trucks\":[]", "").Replace(",\"Routes\":[]", "").Replace(",\"RoadTrucks\":[]", "");
             Assert.That(json, Does.Not.Contain("Trucks"));
             SnapshotDatabase.WritePayload(oldPath, json);
             var upgraded = GoodsSnapshotStore.Load(oldPath).Snapshot();

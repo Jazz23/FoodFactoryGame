@@ -1,0 +1,177 @@
+{
+  "success": true,
+  "command": "command run_tests",
+  "data": {
+    "command": "run_tests",
+    "parameters": {
+      "mode": "editor",
+      "filter": "FoodFactoryGame.Goods.Tests.TruckTests",
+      "filter_type": "testName"
+    },
+    "result": {
+      "Summary": {
+        "Total": 20,
+        "Passed": 20,
+        "Failed": 0,
+        "Skipped": 0,
+        "Inconclusive": 0
+      },
+      "Results": [
+        {
+          "FullName": "FoodFactoryGame.Goods.Tests.TruckTests.AcceptedRouteCommandsReplayAndSurviveReload",
+          "Status": "Passed",
+          "Duration": 0.0524332,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Goods.Tests.TruckTests.BuyingATruckChargesOnceAndParksItAtTheSite",
+          "Status": "Passed",
+          "Duration": 0.0811631,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Goods.Tests.TruckTests.CargoFilterLoadsOnlyAllowedItems",
+          "Status": "Passed",
+          "Duration": 0.0506459,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Goods.Tests.TruckTests.DeletingARouteParksItsTrucksWithTheirCargo",
+          "Status": "Passed",
+          "Duration": 0.0726679,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Goods.Tests.TruckTests.EditedRouteRedirectsItsLoadedTruck",
+          "Status": "Passed",
+          "Duration": 0.058967,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Goods.Tests.TruckTests.EleventhSchemaTruckRoutesBecomeRouteRecords",
+          "Status": "Passed",
+          "Duration": 0.0469887,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Goods.Tests.TruckTests.FailedCommitLeavesRoutesAndTrucksUnchanged",
+          "Status": "Passed",
+          "Duration": 0.058198,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Goods.Tests.TruckTests.FullCargoLeavesTheRestAtTheDock",
+          "Status": "Passed",
+          "Duration": 0.0504217,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Goods.Tests.TruckTests.FullDropoffOrMissingDockMakesTheTruckWaitWithoutLosingGoods",
+          "Status": "Passed",
+          "Duration": 0.0838839,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Goods.Tests.TruckTests.GoodsAgeInTransitAndCanSpoil",
+          "Status": "Passed",
+          "Duration": 0.0455836,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Goods.Tests.TruckTests.NobodyButTheTruckReachesItsCargo",
+          "Status": "Passed",
+          "Duration": 0.0829544,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Goods.Tests.TruckTests.ParkingADrivingTruckLeavesItAtTheSiteItLeft",
+          "Status": "Passed",
+          "Duration": 0.0811011,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Goods.Tests.TruckTests.RoadTimeIsTheManhattanDistanceOverSpeed",
+          "Status": "Passed",
+          "Duration": 0.0345956,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Goods.Tests.TruckTests.RouteCommandsAreValidatedAndChangeNothingWhenRefused",
+          "Status": "Passed",
+          "Duration": 0.0461543,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Goods.Tests.TruckTests.RoutedTruckCarriesGoodsFromDockToDockAndReturns",
+          "Status": "Passed",
+          "Duration": 0.0563702,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Goods.Tests.TruckTests.SeveralTrucksShareARouteAndItsDocks",
+          "Status": "Passed",
+          "Duration": 0.0587991,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Goods.Tests.TruckTests.SiteViewCarriesTheCompanyRoutesFleetAndCargo",
+          "Status": "Passed",
+          "Duration": 0.0446344,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Goods.Tests.TruckTests.StepSizeDoesNotChangeTheOutcome",
+          "Status": "Passed",
+          "Duration": 0.0612281,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Goods.Tests.TruckTests.TenthSchemaSaveUpgradesWithoutSitesOrTrucks",
+          "Status": "Passed",
+          "Duration": 0.0563954,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Goods.Tests.TruckTests.ValidationRejectsInconsistentRoutesAndTrucks",
+          "Status": "Passed",
+          "Duration": 0.0503574,
+          "Message": null,
+          "StackTrace": null
+        }
+      ],
+      "Duration": 1.4,
+      "StatusPath": null,
+      "Mode": "EditMode",
+      "FilterApplied": "testname: FoodFactoryGame.Goods.Tests.TruckTests",
+      "success": true,
+      "result": null
+    },
+    "target": {
+      "host": "127.0.0.1",
+      "port": 7800,
+      "projectPath": "E:\\Projects\\Unity\\FoodFactoryGame"
+    },
+    "success": true
+  },
+  "errors": [],
+  "warnings": []
+}

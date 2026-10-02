@@ -483,11 +483,17 @@ namespace FoodFactoryGame.Session.Logistics
             if (truck == null) return "";
             var here = SiteName(truck.SiteId);
             var there = SiteName(truck.DestinationSiteId);
+            // On the generated roads (decision 0032) the time left is an estimate at the current traffic.
+            var estimate = SitePlacement.Active == null ? null : GoodsWorld.EstimateRoadSeconds(Primary, SitePlacement.Active.Roads, truck);
+            var left = estimate is { } seconds
+                ? $"about {PlayerHud.FormatDuration(seconds, false)}{(truck.RemainingSeconds == 0 ? " (in traffic)" : "")}"
+                : PlayerHud.FormatDuration(truck.RemainingSeconds, false);
             return truck.State switch
             {
                 TruckState.Parked => $"Parked at {here}: no route",
-                TruckState.ToPickup => $"Driving to {there} to load: {PlayerHud.FormatDuration(truck.RemainingSeconds, false)}",
-                TruckState.ToDropoff => $"Driving to {there} with cargo: {PlayerHud.FormatDuration(truck.RemainingSeconds, false)}",
+                TruckState.ToPickup => $"Driving to {there} to load: {left}",
+                TruckState.ToDropoff => $"Driving to {there} with cargo: {left}",
+                TruckState.ToPark => $"Driving to {there} to park: {left}",
                 TruckState.Loading => $"Loading at {here}" + DockNote(truck, RouteOf(truck)?.PickupDockId),
                 TruckState.Unloading => $"Unloading at {here}" + DockNote(truck, RouteOf(truck)?.DropoffDockId),
                 _ => ""

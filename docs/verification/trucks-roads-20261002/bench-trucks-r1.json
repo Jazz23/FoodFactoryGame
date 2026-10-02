@@ -1,0 +1,44 @@
+{
+  "success": true,
+  "command": "command run_tests",
+  "data": {
+    "command": "run_tests",
+    "parameters": {
+      "mode": "editor",
+      "filter": "FoodFactoryGame.Benchmarks.Tests.TruckRoadBenchmarkTests",
+      "filter_type": "testName"
+    },
+    "result": {
+      "Summary": {
+        "Total": 1,
+        "Passed": 1,
+        "Failed": 0,
+        "Skipped": 0,
+        "Inconclusive": 0
+      },
+      "Results": [
+        {
+          "FullName": "FoodFactoryGame.Benchmarks.Tests.TruckRoadBenchmarkTests.HundredTrucksOnTheGeneratedRoads",
+          "Status": "Passed",
+          "Duration": 5.0723891,
+          "Message": null,
+          "StackTrace": null
+        }
+      ],
+      "Duration": 6.13,
+      "StatusPath": null,
+      "Mode": "EditMode",
+      "FilterApplied": "testname: FoodFactoryGame.Benchmarks.Tests.TruckRoadBenchmarkTests",
+      "success": true,
+      "result": null
+    },
+    "target": {
+      "host": "127.0.0.1",
+      "port": 7800,
+      "projectPath": "E:\\Projects\\Unity\\FoodFactoryGame"
+    },
+    "success": true
+  },
+  "errors": [],
+  "warnings": []
+}

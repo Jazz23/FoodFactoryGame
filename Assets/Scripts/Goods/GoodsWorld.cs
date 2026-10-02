@@ -78,7 +78,7 @@ namespace FoodFactoryGame.Goods
 
     [Serializable] public sealed class GoodsSnapshot
     {
-        public const int CurrentSchema = 16;
+        public const int CurrentSchema = 17;
         public int SchemaVersion = CurrentSchema;
         public string WorldId;
         public long ClockSeconds;
@@ -99,6 +99,8 @@ namespace FoodFactoryGame.Goods
         public List<GoodsSite> Sites = new();
         public List<GoodsTruck> Trucks = new();
         public List<GoodsRoute> Routes = new();
+        // View-only (decision 0032): other companies' trucks driving the roads near a viewer. Always empty in a stored world.
+        public List<GoodsTruck> RoadTrucks = new();
         // Customers (decision 0024): district and competitor map records, the customers in the world, and each restaurant's
         // reputation and published wait. The counters and random state keep customer IDs and choices deterministic.
         public List<GoodsDistrict> Districts = new();
@@ -152,6 +154,7 @@ namespace FoodFactoryGame.Goods
                 var began = Stopwatch.GetTimestamp();
                 Validate(_state);
                 ValidatePropertyCatalog();
+                ValidateRoads();
                 var validated = Stopwatch.GetTimestamp();
                 var payload = JsonUtility.ToJson(_state);
                 var serialized = Stopwatch.GetTimestamp();
@@ -324,9 +327,14 @@ namespace FoodFactoryGame.Goods
                 checked { _state.ClockSeconds += seconds; }
                 // Blocked outputs emit before exposure so they age with this step, like any lot already present.
                 EmitBlockedOutputs();
+                // Looked up once per step rather than per lot; a lot in an unknown location still fails the tick.
+                var refrigerated = new Dictionary<string, bool>();
+                foreach (var location in _state.Locations) refrigerated[location.Id] = location.Refrigerated;
                 foreach (var lot in _state.Lots)
                 {
-                    if (lot.Spoiled || _state.Locations.First(x => x.Id == lot.LocationId).Refrigerated) continue;
+                    if (!refrigerated.TryGetValue(lot.LocationId, out var cold))
+                        throw new InvalidOperationException($"Lot {lot.Id} is in unknown location {lot.LocationId}.");
+                    if (lot.Spoiled || cold) continue;
                     lot.ExposureSeconds += Math.Min(seconds, lot.SpoilAfterSeconds - lot.ExposureSeconds);
                     lot.Spoiled = lot.ExposureSeconds >= lot.SpoilAfterSeconds;
                 }

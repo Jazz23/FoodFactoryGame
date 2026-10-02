@@ -293,7 +293,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: FoodFactoryGame.Session::FoodFactoryGame.Session.Logistics.TruckPresenter
   session: {fileID: 1957645435}
-  truckPrefab: {fileID: 4785532765865948706, guid: 75239aa7266bd9741a57c0ee6c30a23f, type: 3}
+  truckPrefab: {fileID: 1165282015846426929, guid: e0899f8cd4d97cd4a98ac41e5460a264, type: 3}
 --- !u!4 &318359895
 Transform:
   m_ObjectHideFlags: 0
@@ -603,6 +603,73 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 661710639}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &697686322
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 697686324}
+  - component: {fileID: 697686323}
+  m_Layer: 0
+  m_Name: CityTrafficPresenter
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &697686323
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 697686322}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6ab3ea245c4705145bb2cff6fa9915ce, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: FoodFactoryGame.Session::FoodFactoryGame.Session.Logistics.CityTrafficPresenter
+  session: {fileID: 1957645435}
+  carPrefabs:
+  - {fileID: 5244862083911821851, guid: 11de69a359558e14698375cd4b635b85, type: 3}
+  - {fileID: 4021455406369469436, guid: 45d70def380528c4c9658bfdc7f4deb2, type: 3}
+  - {fileID: 5244862083911821851, guid: 11de69a359558e14698375cd4b635b85, type: 3}
+  - {fileID: 4021455406369469436, guid: 45d70def380528c4c9658bfdc7f4deb2, type: 3}
+  - {fileID: 5244862083911821851, guid: 11de69a359558e14698375cd4b635b85, type: 3}
+  - {fileID: 1583709337716885432, guid: 8183f00aa083a984abda4f6c00b289b6, type: 3}
+  - {fileID: 4516599056857343348, guid: 4f451fa4f39a0fd4594b7a3e9e0c91de, type: 3}
+  - {fileID: 4021455406369469436, guid: 45d70def380528c4c9658bfdc7f4deb2, type: 3}
+  - {fileID: 4356382868394337278, guid: 6b1b80472bc8bc241aa934b8e52d5935, type: 3}
+  - {fileID: 3747085237801763940, guid: f1c1ada8f5bf93e4eaca7a5e84815f2a, type: 3}
+  tints:
+  - {r: 0.85, g: 0.85, b: 0.83, a: 1}
+  - {r: 0.12, g: 0.12, b: 0.13, a: 1}
+  - {r: 0.55, g: 0.57, b: 0.6, a: 1}
+  - {r: 0.62, g: 0.1, b: 0.1, a: 1}
+  - {r: 0.12, g: 0.25, b: 0.5, a: 1}
+  - {r: 0.3, g: 0.45, b: 0.62, a: 1}
+  - {r: 0.2, g: 0.36, b: 0.22, a: 1}
+  - {r: 0.72, g: 0.66, b: 0.52, a: 1}
+  - {r: 0.45, g: 0.3, b: 0.2, a: 1}
+  - {r: 0.9, g: 0.9, b: 0.88, a: 1}
+--- !u!4 &697686324
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 697686322}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -1940,3 +2007,4 @@ SceneRoots:
   - {fileID: 1776894344}
   - {fileID: 2003899945}
   - {fileID: 661710642}
+  - {fileID: 697686324}

@@ -506,6 +506,154 @@ namespace FoodFactoryGame.Session.PlayModeTests
             UnityEngine.Object.Destroy(image);
         }
 
+        // Decision 0032 set-up, mostly over the network: buys the nearest restaurant for sale, moves the TEST-ONLY world clock to
+        // the lunch rush, places TEST-ONLY docks within the street's reach on both aprons with ten bread at the start's, buys a
+        // truck and routes it start -> bought restaurant. Leaves the truck ID in _truckId and the docks in _docks.
+        private string _truckId;
+        private (string Start, string Diner) _docks;
+
+        private IEnumerator TruckOnARoute(PropertyOffer diner, int hour)
+        {
+            var results = new System.Collections.Generic.Dictionary<string, GoodsOutcome>();
+            _root.ClientSubscription.ResultReceived += x => results[x.RequestId] = x;
+            var me = _root.Authenticator.LocalPlayerId;
+            var bridge = _root.ClientSubscription.Bridge;
+            bridge.RequestBuyProperty("buy-near", Start.SiteId, diner.LotId);
+            yield return Until(() => _root.DrawnSites.Find(diner.SiteId) != null, "bought site drawn");
+            var clock = _root.ServerWorld.Snapshot().ClockSeconds % World.RoadTraffic.DaySeconds;
+            _root.ServerWorld.Advance((hour * World.RoadTraffic.HourSeconds - clock + World.RoadTraffic.DaySeconds) % World.RoadTraffic.DaySeconds + 1);
+            var definition = _root.EquipmentDefinitions.First(x => x != null && x.Kind == GoodsWorld.DockKind);
+            string Dock(PropertyOffer offer)
+            {
+                var state = _root.ServerWorld.Snapshot();
+                foreach (var rotation in new[] { 0, 1, 2, 3 })
+                for (var z = 0; z < offer.Depth; z++)
+                for (var x = 0; x < offer.Width; x++)
+                {
+                    var piece = definition.CreatePlaced($"test-dock-{offer.LotId}", offer.SiteId, x, z, rotation);
+                    if (SiteGrid.PlacementProblem(state, piece, x, z, rotation) != null
+                        || RestaurantRules.DockProblem(state, piece, x, z, rotation, offer) != null) continue;
+                    _root.ServerWorld.Bootstrap(piece);
+                    return piece.Id;
+                }
+                Assert.Fail($"No street-reachable dock cell on {offer.LotId}.");
+                return null;
+            }
+            _docks = (Dock(Start), Dock(diner));
+            _root.ServerWorld.Bootstrap(new GoodsLot
+            {
+                Id = "test-bread", ItemId = "bread", OwnerId = Start.SiteId, LocationId = _docks.Start + ":in", Quantity = 10, SpoilAfterSeconds = 36000
+            });
+            bridge.RequestPurchase("buy-truck", Start.SiteId, "supplier-truck");
+            yield return Until(() => results.ContainsKey("buy-truck"), "truck purchase");
+            Assert.That(results["buy-truck"].Accepted, Is.True, results["buy-truck"].Reason);
+            _truckId = _root.ServerWorld.Snapshot().Trucks.Single().Id;
+            bridge.RequestCreateRoute("make-route", _docks.Start, _docks.Diner, new string[0]);
+            yield return Until(() => results.ContainsKey("make-route"), "route");
+            Assert.That(results["make-route"].Accepted, Is.True, results["make-route"].Reason);
+            bridge.RequestAssignTruck("assign-truck", _truckId, GoodsWorld.RouteIdFor(me, "make-route"));
+            yield return Until(() => results.ContainsKey("assign-truck"), "assignment");
+            Assert.That(results["assign-truck"].Accepted, Is.True, results["assign-truck"].Reason);
+        }
+
+        // Decision 0032: in a generated world a truck drives the generated roads. Its drawn model stays on the road leg the
+        // server's simulation reports (within a few metres along it and inside the road's width), facing along it; a loopback
+        // teammate's baseline carries the same truck on the roads; the bread arrives at the bought restaurant's dock.
+        [UnityTest]
+        public IEnumerator ATruckDrivesTheGeneratedRoadsWhereItIsDrawn()
+        {
+            yield return StartHost();
+            CreateRemote();
+            Assert.That(_remote.ClientManager.StartConnection(), Is.True);
+            yield return Until(() => { _remoteSite.Tick(); return _remoteSite.Latest != null; }, "remote baseline");
+            var diner = NearestForSaleRestaurant();
+            yield return TruckOnARoute(diner, 3);
+            yield return Until(() => _root.ClientSite.Trucks.Any(x => x.Id == _truckId && x.OnRoad && x.State == TruckState.ToDropoff),
+                "the loaded truck on the road", 60f);
+            var presenter = UnityEngine.Object.FindAnyObjectByType<Logistics.TruckPresenter>();
+            var placement = SitePlacement.Active;
+            var network = placement.Roads;
+            var samples = 0;
+            var onLeg = 0;
+            var segments = new System.Collections.Generic.HashSet<string>();
+            var teammateSaw = false;
+            for (var t = 0f; t < 20f && _root.ServerWorld.Snapshot().Trucks.Single().State == TruckState.ToDropoff; t += 0.25f)
+            {
+                yield return new WaitForSeconds(0.25f);
+                _remoteSite.Tick();
+                var truck = _root.ServerWorld.Snapshot().Trucks.Single();
+                teammateSaw |= _remoteSite.Latest?.Trucks.Any(x => x.Id == _truckId && x.LegSegmentId == truck.LegSegmentId && x.OnRoad) == true;
+                if (!truck.OnRoad || !presenter.Visuals.TryGetValue(_truckId, out var visual)) continue;
+                samples++;
+                segments.Add(truck.LegSegmentId);
+                network.TryGetSegment(truck.LegSegmentId, out var index);
+                var segment = network.Segments[index];
+                var map = placement.ToMap(visual.transform.position);
+                var start = network.Nodes[segment.From];
+                var along = segment.Dx != 0 ? (map.x - start.X) * segment.Dx : (map.y - start.Z) * segment.Dz;
+                var across = segment.Dx != 0 ? Mathf.Abs(map.y - start.Z) : Mathf.Abs(map.x - start.X);
+                var low = Mathf.Min(truck.LegFrom, truck.LegTo) - 8f;
+                var high = Mathf.Max(truck.LegFrom, truck.LegTo) + 8f;
+                var heading = new Vector2(visual.transform.forward.x, visual.transform.forward.z).normalized;
+                var direction = new Vector2(segment.Dx, segment.Dz) * (truck.LegTo >= truck.LegFrom ? 1f : -1f);
+                if (along >= low && along <= high && across <= segment.Width / 2f + 0.5f && Vector2.Dot(heading, direction) > 0.7f) onLeg++;
+            }
+            Assert.That(samples, Is.GreaterThanOrEqualTo(8), "The truck was drawn while driving.");
+            Assert.That(onLeg, Is.GreaterThanOrEqualTo(samples * 8 / 10), $"{onLeg} of {samples} samples on the server's leg (turns ease).");
+            Assert.That(teammateSaw, Is.True, "The teammate's baseline carries the truck on the same leg.");
+            Debug.Log($"[Trucks] drove {string.Join(" ", segments)}; {onLeg}/{samples} drawn samples on the leg");
+            yield return Until(() => _root.ServerWorld.Snapshot().Lots.Where(x => x.LocationId == _docks.Diner + ":out").Sum(x => x.Quantity) == 10,
+                "the bread delivered at the bought restaurant", 300f);
+            Assert.That(_root.ServerWorld.Snapshot().Lots.Where(x => x.ItemId == "bread").Sum(x => x.Quantity), Is.EqualTo(10), "Nothing lost or duplicated.");
+        }
+
+        // Decision 0032 evidence, run on request (create Temp/truck-captures.flag, then run this test by name): at the lunch
+        // rush a truck drives between two restaurants among the city cars. Writes captures (the truck from above and behind,
+        // a junction from street level) and the drawn car count and frame time to docs/verification/trucks-roads-20261002/.
+        [UnityTest]
+        public IEnumerator TrucksAndCityTrafficCaptures()
+        {
+            var flag = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Temp", "truck-captures.flag"));
+            if (!File.Exists(flag)) Assert.Ignore("Captures run on request: create Temp/truck-captures.flag.");
+            var output = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "docs", "verification", "trucks-roads-20261002"));
+            Directory.CreateDirectory(output);
+            yield return StartHost();
+            var diner = NearestForSaleRestaurant();
+            yield return TruckOnARoute(diner, 12);
+            yield return Until(() => _root.ClientSite.Trucks.Any(x => x.Id == _truckId && x.OnRoad && x.State == TruckState.ToDropoff), "truck on the road", 60f);
+            var presenter = UnityEngine.Object.FindAnyObjectByType<Logistics.TruckPresenter>();
+            var traffic = UnityEngine.Object.FindAnyObjectByType<Logistics.CityTrafficPresenter>();
+            yield return Until(() => presenter.Visuals.ContainsKey(_truckId), "truck drawn");
+            yield return new WaitForSeconds(3f);
+            var frames = new System.Collections.Generic.List<float>();
+            yield return Frames(frames, 300);
+            var camera = new GameObject("capture-camera").AddComponent<Camera>();
+            camera.farClipPlane = 2000f;
+            var truck = presenter.Visuals[_truckId].transform;
+            camera.transform.SetPositionAndRotation(truck.position - truck.forward * 18f + Vector3.up * 11f,
+                Quaternion.LookRotation(truck.position + truck.forward * 6f - (truck.position - truck.forward * 18f + Vector3.up * 11f)));
+            Capture(camera, Path.Combine(output, "truck-on-the-road.png"));
+            camera.transform.SetPositionAndRotation(truck.position + Vector3.up * 70f - truck.forward * 30f, Quaternion.LookRotation(truck.position - (truck.position + Vector3.up * 70f - truck.forward * 30f)));
+            Capture(camera, Path.Combine(output, "truck-and-traffic-from-above.png"));
+            // A traffic light near the truck, from the kerb.
+            var placement = SitePlacement.Active;
+            var map = placement.ToMap(truck.position);
+            var junction = placement.Roads.Nodes.Where(x => x.Control == World.JunctionControl.TrafficLight)
+                .OrderBy(x => (new Vector2(x.X, x.Z) - map).sqrMagnitude).First();
+            var corner = placement.OnGround(junction.X + 12f, junction.Z - 12f) + Vector3.up * 4f;
+            camera.transform.SetPositionAndRotation(corner, Quaternion.LookRotation(placement.OnGround(junction.X - 20f, junction.Z + 20f) - corner));
+            yield return new WaitForSeconds(1f);
+            Capture(camera, Path.Combine(output, "junction-street-level.png"));
+            UnityEngine.Object.Destroy(camera.gameObject);
+            var sorted = frames.OrderBy(x => x).ToList();
+            var report = $"Decision 0032 captures, WorldGen seed {Seed}, Editor PlayMode host, hour 12, {DateTime.UtcNow:u}\n"
+                + $"cars drawn {traffic.Shown} (cap {Logistics.CityTrafficPresenter.MaxCars}), truck leg {_root.ClientSite.Trucks.Single().LegSegmentId}\n"
+                + $"300 frames: mean {frames.Average() * 1000f:F2} ms, p95 {sorted[(int)(sorted.Count * 0.95f)] * 1000f:F2} ms, max {sorted.Last() * 1000f:F2} ms\n";
+            File.WriteAllText(Path.Combine(output, "capture-report.txt"), report);
+            Debug.Log("[Benchmark] " + report);
+            Assert.That(traffic.Shown, Is.GreaterThan(0), "City cars are drawn at the lunch rush.");
+        }
+
         // The cheapest-to-reach restaurant for sale: the one whose lot is nearest the starting lot, well inside the draw radius.
         private PropertyOffer NearestForSaleRestaurant() => _map.Offers.Values
             .Where(x => x.ForSale && x.Category == GoodsWorld.RestaurantKind)

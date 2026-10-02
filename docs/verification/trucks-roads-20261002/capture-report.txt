@@ -1,0 +1,3 @@
+Decision 0032 captures, WorldGen seed piece-two, Editor PlayMode host, hour 12, 2026-10-02 15:56:57Z
+cars drawn 150 (cap 150), truck leg road-0130
+300 frames: mean 8.60 ms, p95 9.90 ms, max 28.83 ms

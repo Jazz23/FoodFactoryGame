@@ -231,6 +231,7 @@ namespace FoodFactoryGame.Session.WorldMap
                 SitePlacement.Use(placement);
                 _layoutOrigin = placement.LayoutOrigin;
                 IndexLots(layout);
+                placement.Ground = Land;
             }
             else
             {

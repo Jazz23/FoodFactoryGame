@@ -121,6 +121,10 @@ namespace FoodFactoryGame.Goods
             return Touches(reached, cellX, cellZ, width, depth) ? null : "no-street-access";
         }
 
+        // True when a walkable path reaches a placed dock from its lot's street edge (any site; restaurants require it).
+        public static bool ReachesStreet(GoodsSnapshot state, GoodsEquipment dock, PropertyOffer offer) =>
+            Touches(Reached(Walkable(state, dock.SiteId), StreetCells(state.SiteLayouts.FirstOrDefault(x => x.SiteId == dock.SiteId), offer)), dock);
+
         // One restaurant's ambience score from the ambience points of everything placed on its site.
         public static int Ambience(GoodsSnapshot state, string siteId)
         {

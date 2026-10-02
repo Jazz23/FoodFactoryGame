@@ -666,6 +666,16 @@ namespace FoodFactoryGame.Session.Equipment
                 : string.Join("\n", trucks.Select(x => $"{x.Truck.Name}: {(x.Route.PickupDockId == equipment.Id ? "picks up here" : "delivers here")}")), 12, Muted, 6);
             note.name = "hud-dock-trucks";
             window.Add(note);
+            // Docks on a generated lot that is not a restaurant are never refused for this (decision 0032, owner: warn only);
+            // restaurant docks cannot be placed out of the street's reach at all (decision 0034).
+            var lot = SitePlacement.Active?.LotOf(equipment.SiteId);
+            var offer = lot == null ? null : SitePlacement.Active.OfferOf(lot.Id);
+            if (offer != null && !RestaurantRules.IsRestaurantSite(site, equipment.SiteId) && !RestaurantRules.ReachesStreet(site, equipment, offer))
+            {
+                var warning = Caption("Warning: no clear path from the street to this dock. Trucks still use it.", 12, new Color(1f, 0.75f, 0.3f), 6);
+                warning.name = "hud-dock-street-warning";
+                window.Add(warning);
+            }
             return window;
         }
 
