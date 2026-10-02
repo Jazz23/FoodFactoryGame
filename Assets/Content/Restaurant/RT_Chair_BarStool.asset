@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9c77d3e4774f0c945971924e55f4e458, type: 3}
+  m_Name: RT_Chair_BarStool
+  m_EditorClassIdentifier: FoodFactoryGame.Session::FoodFactoryGame.Session.Equipment.EquipmentDefinition
+  kind: rt-chair-stool
+  width: 1
+  depth: 1
+  inputCapacity: 1
+  outputCapacity: 1
+  inputRefrigerated: 0
+  outputRefrigerated: 0
+  seats: 0
+  visualPrefab: {fileID: 2423572891818322800, guid: abc7ce34dbaf1924b81b3242478855d7, type: 3}
+  icon: {fileID: 21300000, guid: 5e67be3e7c1b8f74c98bdd548acf1168, type: 3}
+  layer: 
+  ambience: 1
+  displayName: Bar stool
+  category: Furniture
+  mount: 0
+  mountHeight: 1.5
+  hideFromAbove: 0
+  opensScreen: 0

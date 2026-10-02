@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9c77d3e4774f0c945971924e55f4e458, type: 3}
+  m_Name: RT_Planter_Divider_1_6m
+  m_EditorClassIdentifier: FoodFactoryGame.Session::FoodFactoryGame.Session.Equipment.EquipmentDefinition
+  kind: rt-planter
+  width: 2
+  depth: 1
+  inputCapacity: 1
+  outputCapacity: 1
+  inputRefrigerated: 0
+  outputRefrigerated: 0
+  seats: 0
+  visualPrefab: {fileID: 5481554192338696752, guid: 947f2ee248649c04e80396e038a57d3e, type: 3}
+  icon: {fileID: 21300000, guid: 41bda8a43d1945440985b25da6686b2d, type: 3}
+  layer: 
+  ambience: 4
+  displayName: Planter divider
+  category: Decor
+  mount: 0
+  mountHeight: 1.5
+  hideFromAbove: 0
+  opensScreen: 0

@@ -445,6 +445,25 @@ namespace FoodFactoryGame.Goods
                 foreach (var competitor in state.Competitors ?? new()) if (competitor != null) competitor.LotId ??= "";
                 state.SchemaVersion = 15;
             }
+            // v15 had no restaurant building (decision 0034): shells had no structure records and plaster walls, equipment sat on
+            // the object layer with no ambience, no recorded price (sold for nothing) and no staff, so every existing counter
+            // becomes an unstaffed register under the same ID, and no truck held a dock. IDs are unchanged.
+            if (state != null && state.SchemaVersion == 15)
+            {
+                foreach (var building in state.Buildings ?? new())
+                {
+                    if (building == null) continue;
+                    building.Structures ??= new();
+                    building.WallStyle ??= "";
+                }
+                foreach (var equipment in state.Equipment ?? new())
+                {
+                    if (equipment == null) continue;
+                    equipment.Layer ??= "";
+                    equipment.StaffId ??= "";
+                }
+                state.SchemaVersion = 16;
+            }
             GoodsWorld.Validate(state);
             return state;
         }

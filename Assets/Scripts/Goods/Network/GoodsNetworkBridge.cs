@@ -277,6 +277,80 @@ namespace FoodFactoryGame.Goods.Network
             if (result.Accepted) Broadcast();
         }
 
+        // Restaurant building (decision 0034): a shell order (resize, interior walls, doors, windows, removals, wall finish), sent
+        // as the JSON of a ShellOrder; the server plans it again and pays or refunds once (OrderShellDurably).
+        public void RequestShellOrder(string requestId, ShellOrder order)
+        {
+            if (IsClientStarted && order != null) ServerShellOrder(requestId, JsonUtility.ToJson(order));
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        private void ServerShellOrder(string requestId, string orderJson, NetworkConnection sender = null)
+        {
+            if (!TryIdentify(sender, requestId, out var player)) return;
+            var result = _world.OrderShellDurably(player, requestId, Parse<ShellOrder>(orderJson), _savePath);
+            Reply(sender, result);
+            if (result.Accepted) Broadcast();
+        }
+
+        // Buys an equipment offer once per placement and places the pieces at once (BuyAndPlaceDurably), as the JSON of a FurnishOrder.
+        public void RequestBuyAndPlace(string requestId, FurnishOrder order)
+        {
+            if (IsClientStarted && order != null) ServerBuyAndPlace(requestId, JsonUtility.ToJson(order));
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        private void ServerBuyAndPlace(string requestId, string orderJson, NetworkConnection sender = null)
+        {
+            if (!TryIdentify(sender, requestId, out var player)) return;
+            var result = _world.BuyAndPlaceDurably(player, requestId, Parse<FurnishOrder>(orderJson), _savePath);
+            Reply(sender, result);
+            if (result.Accepted) Broadcast();
+        }
+
+        // Sells a placed or held piece back for exactly what it was charged; its goods go to the seller's inventory (SellDurably).
+        public void RequestSell(string requestId, string equipmentId)
+        {
+            if (IsClientStarted) ServerSell(requestId, equipmentId);
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        private void ServerSell(string requestId, string equipmentId, NetworkConnection sender = null)
+        {
+            if (!TryIdentify(sender, requestId, out var player)) return;
+            var result = _world.SellDurably(player, requestId, equipmentId, _savePath);
+            Reply(sender, result);
+            if (result.Accepted) Broadcast();
+        }
+
+        // Sets who works a register: the requester's own player ID, an employee, or empty to leave it (StaffDurably).
+        public void RequestStaff(string requestId, string registerId, string staffId)
+        {
+            if (IsClientStarted) ServerStaff(requestId, registerId, staffId ?? "");
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        private void ServerStaff(string requestId, string registerId, string staffId, NetworkConnection sender = null)
+        {
+            if (!TryIdentify(sender, requestId, out var player)) return;
+            var result = _world.StaffDurably(player, requestId, registerId, staffId, _savePath);
+            Reply(sender, result);
+            if (result.Accepted) Broadcast();
+        }
+
+        // Server-only: a player who left stops working their register (decision 0034); the change is committed and broadcast.
+        public void ReleaseStaff(string playerId)
+        {
+            if (IsServing && !string.IsNullOrWhiteSpace(playerId) && _world.ReleaseStaffDurably(playerId, _savePath)) Broadcast();
+        }
+
+        // A malformed payload reads as null, which every command rejects.
+        private static T Parse<T>(string json) where T : class
+        {
+            try { return string.IsNullOrEmpty(json) ? null : JsonUtility.FromJson<T>(json); }
+            catch (ArgumentException) { return null; }
+        }
+
         // Enters another owned lot, carrying the player's goods and held machines there (decisions 0029, 0031). The position
         // checked is the server's own copy of this connection's avatar, never a value from the request.
         public void RequestEnterSite(string requestId, string siteId)
@@ -540,7 +614,7 @@ namespace FoodFactoryGame.Goods.Network
             if (string.IsNullOrWhiteSpace(player) || !_world.CanView(player, siteId))
             {
                 Unsubscribe(sender, siteId);
-                TargetResult(sender, "", false, "subscription-forbidden", "", "", 0);
+                TargetResult(sender, "", false, "subscription-forbidden", "", "", 0, 0);
                 return;
             }
             if (!_subscriptions.TryGetValue(sender, out var sites)) _subscriptions[sender] = sites = new HashSet<string>();
@@ -579,7 +653,7 @@ namespace FoodFactoryGame.Goods.Network
             if (string.IsNullOrWhiteSpace(player) || _persistenceFailed)
             {
                 TargetResult(sender, requestId, false,
-                    _persistenceFailed ? "persistence-unavailable" : "unauthenticated", "", "", 0);
+                    _persistenceFailed ? "persistence-unavailable" : "unauthenticated", "", "", 0, 0);
                 return false;
             }
             return true;
@@ -587,16 +661,16 @@ namespace FoodFactoryGame.Goods.Network
 
         private void Reply(NetworkConnection connection, GoodsOutcome result) => TargetResult(connection,
             result.RequestId ?? "", result.Accepted, result.Reason ?? "", result.MovedLotId ?? "",
-            result.ReservationId ?? "", result.Revision);
+            result.ReservationId ?? "", result.Revision, result.Cents);
 
         [TargetRpc]
         private void TargetResult(NetworkConnection connection, string requestId, bool accepted, string reason,
-            string movedLotId, string reservationId, long revision)
+            string movedLotId, string reservationId, long revision, long cents)
         {
             ResultReceived?.Invoke(new GoodsOutcome
             {
                 RequestId = requestId, Accepted = accepted, Reason = reason,
-                MovedLotId = movedLotId, ReservationId = reservationId, Revision = revision
+                MovedLotId = movedLotId, ReservationId = reservationId, Revision = revision, Cents = cents
             });
         }
 

@@ -1,0 +1,41 @@
+﻿{
+  "status": "completed",
+  "duration": 0.04,
+  "summary": {
+    "total": 4,
+    "passed": 4,
+    "failed": 0,
+    "skipped": 0,
+    "inconclusive": 0
+  },
+  "results": [
+    {
+      "FullName": "FoodFactoryGame.Baseline.Tests.ProjectBaselineTests.DefaultNetworkPrefabReferencesResolve",
+      "Status": "Passed",
+      "Duration": 0.002353,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "FoodFactoryGame.Baseline.Tests.ProjectBaselineTests.EnabledBuildScenesLoadWithoutMissingScriptsAndHaveCameraSource",
+      "Status": "Passed",
+      "Duration": 0.0266696,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "FoodFactoryGame.Baseline.Tests.ProjectBaselineTests.FishNetRuntimeIsAvailable",
+      "Status": "Passed",
+      "Duration": 0.0003416,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "FoodFactoryGame.Baseline.Tests.ProjectBaselineTests.StarterInputActionsImportWithPlayerAndUiMaps",
+      "Status": "Passed",
+      "Duration": 0.0014743,
+      "Message": null,
+      "StackTrace": null
+    }
+  ]
+}

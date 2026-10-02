@@ -62,6 +62,10 @@ namespace FoodFactoryGame.Session.Customers
             {
                 text.Append($"|{building.Id}:{building.CellX},{building.CellZ},{building.Width},{building.Depth},{building.Floors}");
                 foreach (var door in building.Doors) text.Append($";{door.X},{door.Z}");
+                // Interior walls, their doors and windows (decision 0034) change where figures can walk.
+                foreach (var piece in building.Structures ?? new System.Collections.Generic.List<GoodsStructure>())
+                    if (piece.Kind is GoodsWorld.PartitionStructure or GoodsWorld.DoorStructure or GoodsWorld.WindowStructure)
+                        text.Append($";{piece.Kind[0]}{piece.X},{piece.Z},{piece.Axis}");
             }
             return text.ToString();
         }

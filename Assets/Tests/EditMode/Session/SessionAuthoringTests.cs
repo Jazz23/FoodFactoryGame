@@ -85,11 +85,14 @@ namespace FoodFactoryGame.Session.Tests
                     Assert.That(serialized.FindProperty("authenticator").objectReferenceValue, Is.SameAs(server.GetAuthenticator()));
                     Assert.That(AssetDatabase.GetAssetPath(serialized.FindProperty("playerPrefab").objectReferenceValue), Is.EqualTo(PlayerPath));
                     Assert.That(AssetDatabase.GetAssetPath(serialized.FindProperty("bridgePrefab").objectReferenceValue), Is.EqualTo(BridgePath));
-                    Assert.That(roots[0].EquipmentDefinitions.Select(AssetDatabase.GetAssetPath),
+                    // The machines first, then the restaurant furnishings (decision 0034, RestaurantContentTests checks those).
+                    Assert.That(roots[0].EquipmentDefinitions.Take(5).Select(AssetDatabase.GetAssetPath),
                         Is.EqualTo(new[] { OvenDefinitionPath, CounterDefinitionPath, FridgeDefinitionPath, DockDefinitionPath, TableDefinitionPath }));
+                    Assert.That(roots[0].EquipmentDefinitions.Skip(5).Select(AssetDatabase.GetAssetPath), Is.All.StartsWith("Assets/Content/Restaurant/"));
                     Assert.That(roots[0].Recipes.Select(AssetDatabase.GetAssetPath), Is.EqualTo(new[] { BreadRecipePath, SellBreadRecipePath }));
-                    Assert.That(roots[0].Offers.Select(AssetDatabase.GetAssetPath),
+                    Assert.That(roots[0].Offers.Take(8).Select(AssetDatabase.GetAssetPath),
                         Is.EqualTo(new[] { "Assets/Content/Offers/Dough5.asset", "Assets/Content/Offers/Belt10.asset", "Assets/Content/Offers/Oven1.asset", "Assets/Content/Offers/Fridge1.asset", "Assets/Content/Offers/Dock1.asset", "Assets/Content/Offers/Table1.asset", "Assets/Content/Offers/Counter1.asset", "Assets/Content/Offers/Truck1.asset" }));
+                    Assert.That(roots[0].Offers.Skip(8).Select(AssetDatabase.GetAssetPath), Is.All.StartsWith("Assets/Content/Offers/Restaurant/"));
                 }
                 var panels = objects.SelectMany(x => x.GetComponents<SessionPanel>()).ToArray();
                 Assert.That(panels.Length, Is.EqualTo(1));

@@ -193,7 +193,7 @@ namespace FoodFactoryGame.Session.Customers
                 var siteId = drawnSite.SiteId;
                 var counters = site.Equipment.Where(x => x.SiteId == siteId && x.State == EquipmentState.Placed && x.Kind == GoodsWorld.CounterKind).ToList();
                 if (counters.Count == 0) continue;
-                var tables = site.Equipment.Where(x => x.SiteId == siteId && x.State == EquipmentState.Placed && x.Kind == GoodsWorld.TableKind).ToList();
+                var tables = site.Equipment.Where(x => x.SiteId == siteId && x.State == EquipmentState.Placed && GoodsWorld.IsTable(x)).ToList();
                 var customers = site.Customers.Where(x => x.RestaurantId == siteId).ToList();
                 var ranks = Ranks(customers.Where(x => x.State == CustomerState.Queued).Select(x => (x.Id, x.Ticket)));
                 var distance = drawnSite.Current ? 0f : Flat(eye, SiteGridSpace.Origin(drawnSite.Layout));

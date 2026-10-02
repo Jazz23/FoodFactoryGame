@@ -98,7 +98,11 @@ namespace FoodFactoryGame.Session.PlayModeTests
             // Collider bounds follow transforms only after a physics sync.
             Physics.SyncTransforms();
             var walls = shell.GetComponentsInChildren<BoxCollider>().Where(x => x.name.StartsWith("Wall")).ToList();
-            Assert.That(walls.Count, Is.EqualTo(5), "South, west and east walls, plus the north wall split by the doorway.");
+            // A restaurant is drawn with the art kit (decision 0034): one solid, invisible collider per wall cell, doorways open.
+            var building0 = _root.ClientSite.Buildings.Single(x => x.Id == DevWorld.RestaurantId);
+            Assert.That(walls.Count, Is.EqualTo(2 * building0.Width + 2 * (building0.Depth - 2) - building0.Doors.Count),
+                "Every perimeter cell but the doorway is a solid wall.");
+            Assert.That(shell.GetComponentsInChildren<Transform>().Any(x => x.name.StartsWith("RT_Wall_Plaster")), Is.True, "Plaster kit walls are drawn.");
             Assert.That(shell.GetComponentsInChildren<Collider>().Count(), Is.EqualTo(walls.Count), "Only walls are solid; floor, lintels and roof never catch aim rays.");
             var layout = _root.ClientSite.SiteLayouts.Single();
             var building = _root.ClientSite.Buildings.Single(x => x.Id == DevWorld.RestaurantId);

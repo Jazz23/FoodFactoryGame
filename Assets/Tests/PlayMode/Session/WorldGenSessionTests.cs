@@ -269,6 +269,10 @@ namespace FoodFactoryGame.Session.PlayModeTests
             bridge.RequestPlace("place-counter", counter.Id, anchor.X, anchor.Z, 0);
             yield return Until(() => results.ContainsKey("place-counter"), "counter placement");
             Assert.That(results["place-counter"].Accepted, Is.True, results["place-counter"].Reason);
+            // A register sells only while someone works it (decision 0034): the host, now on this site, works it.
+            bridge.RequestStaff("staff-counter", counter.Id, me);
+            yield return Until(() => results.ContainsKey("staff-counter"), "staffing the new register");
+            Assert.That(results["staff-counter"].Accepted, Is.True, results["staff-counter"].Reason);
             var presenter = UnityEngine.Object.FindAnyObjectByType<EquipmentPresenter>();
             yield return Until(() => presenter.Visuals.ContainsKey(counter.Id), "counter visual");
             var layout = _root.ClientSite.SiteLayouts.Single();
@@ -601,6 +605,11 @@ namespace FoodFactoryGame.Session.PlayModeTests
             bridge.RequestTransfer("stock-counter", bread.Id, GeneratedWorld.StartCounterId + ":in", bread.Quantity);
             yield return Until(() => results.ContainsKey("stock-counter"), "bread onto the counter");
             Assert.That(results["stock-counter"].Accepted, Is.True, results["stock-counter"].Reason);
+
+            // A register sells only while someone works it (decision 0034): the host staffs the starting counter.
+            bridge.RequestStaff("staff", GeneratedWorld.StartCounterId, me);
+            yield return Until(() => results.ContainsKey("staff"), "staffing the register");
+            Assert.That(results["staff"].Accepted, Is.True, results["staff"].Reason);
 
             // TEST-ONLY district standing on the starting site's map point with a 5 m range, so only this restaurant is in its
             // range and a customer comes within seconds (the map's own districts share each customer among ~100 restaurants).

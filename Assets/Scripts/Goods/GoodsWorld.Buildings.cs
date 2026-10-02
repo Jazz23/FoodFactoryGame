@@ -3,6 +3,9 @@
 // cells. Shells are created only by the server and are never moved or removed. A factory can gain floors (decision 0020):
 // each upper floor covers the interior at a higher level, walls surround every floor, and one elevator cell, fixed by the
 // first added floor, runs through all of them and never holds equipment or belts. Floors are never removed.
+// A restaurant's owner may reshape its shell (decision 0034, GoodsWorld.Shell.cs): every piece of structure an order built is a
+// GoodsStructure carrying the cents it was charged, so removing it refunds exactly that; structure that came with the bought
+// building has no record and refunds nothing.
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,6 +17,23 @@ namespace FoodFactoryGame.Goods
     {
         public int X;
         public int Z;
+    }
+
+    // One piece of a restaurant's structure (decision 0034, schema v16). Interior walls, interior doors and windows exist only as
+    // these records. Floor and wall records only remember what an order paid for a footprint cell or a perimeter wall cell, and
+    // a perimeter door's record what it cost (the door itself is in GoodsBuilding.Doors); a cell without a record was not paid for.
+    [Serializable] public sealed class GoodsStructure
+    {
+        // GoodsWorld.FloorStructure, WallStructure, PartitionStructure, DoorStructure or WindowStructure.
+        public string Kind;
+        public int X;
+        public int Z;
+        // Windows only: a window covers (X, Z) and the next cell along X (0) or Z (1).
+        public int Axis;
+        // Presentation choice from GoodsWorld's style lists (wall finish of a partition, door leaf, window type); empty otherwise.
+        public string Style = "";
+        // Whole cents charged when it was built, including any order fee assigned to it; refunded in full when it goes.
+        public long ChargedCents;
     }
 
     [Serializable] public sealed class GoodsBuilding
@@ -34,6 +54,9 @@ namespace FoodFactoryGame.Goods
         // Elevator shaft cell, an interior cell; meaningful only while Floors > 1.
         public int ElevatorX;
         public int ElevatorZ;
+        // Restaurants only (decision 0034, v16): the structure orders built, and the perimeter walls' finish (empty is plaster).
+        public List<GoodsStructure> Structures = new();
+        public string WallStyle = "";
 
         public bool HasElevator => Floors > 1;
     }
@@ -151,10 +174,13 @@ namespace FoodFactoryGame.Goods
             if (building.Doors.Any(x => x == null || !SiteGrid.IsDoorCell(building, x.X, x.Z))
                 || building.Doors.GroupBy(x => (x.X, x.Z)).Any(x => x.Count() != 1))
                 return "invalid-door";
+            var structureProblem = StructureProblem(building);
+            if (structureProblem != null) return structureProblem;
             if (state.Buildings.Any(x => x.Id != building.Id && x.SiteId == building.SiteId
                     && SiteGrid.Overlaps(building.CellX, building.CellZ, building.Width, building.Depth, x.CellX, x.CellZ, x.Width, x.Depth)))
                 return "blocked";
-            foreach (var equipment in state.Equipment.Where(x => x.SiteId == building.SiteId && x.State == EquipmentState.Placed))
+            // Decor layers have their own rules (SiteGrid.CellProblem); only the object layer may never stand on a wall.
+            foreach (var equipment in state.Equipment.Where(x => x.SiteId == building.SiteId && x.State == EquipmentState.Placed && string.IsNullOrEmpty(x.Layer)))
             {
                 var (width, depth) = SiteGrid.Footprint(equipment.Width, equipment.Depth, equipment.Rotation);
                 if (SiteGrid.CoversWall(building, equipment.CellX, equipment.CellZ, width, depth)
@@ -165,6 +191,52 @@ namespace FoodFactoryGame.Goods
                         || SiteGrid.CoversShaft(building, x.CellX, x.CellZ, 1, 1, x.ExitLevel))))
                 return "blocked";
             return null;
+        }
+
+        // Null when the structure records are well formed (decision 0034): only restaurants have any; floor records inside the
+        // footprint, wall records on the perimeter, partitions strictly inside; a door record on a perimeter door or a partition;
+        // a window on two wall cells of one perimeter side or of partitions, never on a door or another window; known styles.
+        private static string StructureProblem(GoodsBuilding building)
+        {
+            if (building.Structures == null || building.WallStyle == null) return "invalid-structure";
+            if (building.Structures.Count == 0 && building.WallStyle == "") return null;
+            if (building.Kind != RestaurantKind || (building.WallStyle != "" && !WallStyles.Contains(building.WallStyle))) return "invalid-structure";
+            foreach (var piece in building.Structures)
+            {
+                if (piece == null || piece.ChargedCents < 0 || piece.Style == null) return "invalid-structure";
+                var valid = piece.Kind switch
+                {
+                    FloorStructure => SiteGrid.Overlaps(piece.X, piece.Z, 1, 1, building.CellX, building.CellZ, building.Width, building.Depth),
+                    WallStructure => SiteGrid.OnPerimeter(building, piece.X, piece.Z),
+                    PartitionStructure => SiteGrid.IsInterior(building, piece.X, piece.Z) && WallStyles.Contains(piece.Style),
+                    DoorStructure => DoorStyles.Contains(piece.Style) && (building.Doors.Any(x => x.X == piece.X && x.Z == piece.Z)
+                        || SiteGrid.IsPartition(building, piece.X, piece.Z)),
+                    WindowStructure => WindowStyles.Contains(piece.Style) && (piece.Axis == 0 || piece.Axis == 1) && WindowFits(building, piece),
+                    _ => false
+                };
+                if (!valid) return "invalid-structure";
+            }
+            if (building.Structures.Where(x => x.Kind != WindowStructure).GroupBy(x => (x.Kind, x.X, x.Z)).Any(x => x.Count() != 1))
+                return "invalid-structure";
+            var windows = building.Structures.Where(x => x.Kind == WindowStructure).ToList();
+            foreach (var window in windows)
+                if (windows.Any(other => other != window && (SiteGrid.WindowCovers(other, window.X, window.Z) || SiteGrid.WindowCovers(window, other.X, other.Z)))
+                    || building.Structures.Any(x => x.Kind == DoorStructure && SiteGrid.WindowCovers(window, x.X, x.Z)))
+                    return "invalid-structure";
+            return null;
+        }
+
+        // Both cells of a window are walls of one perimeter side (non-corner, not doors) or both are interior walls without a door.
+        internal static bool WindowFits(GoodsBuilding building, GoodsStructure window)
+        {
+            var (x2, z2) = window.Axis == 0 ? (window.X + 1, window.Z) : (window.X, window.Z + 1);
+            bool PerimeterWall(int x, int z) => SiteGrid.IsDoorCell(building, x, z) && !building.Doors.Any(d => d.X == x && d.Z == z);
+            var sameSide = window.Axis == 0
+                ? window.Z == building.CellZ || window.Z == building.CellZ + building.Depth - 1
+                : window.X == building.CellX || window.X == building.CellX + building.Width - 1;
+            if (sameSide && PerimeterWall(window.X, window.Z) && PerimeterWall(x2, z2)) return true;
+            return SiteGrid.IsWall(building, window.X, window.Z) && SiteGrid.IsWall(building, x2, z2)
+                && SiteGrid.IsPartition(building, window.X, window.Z) && SiteGrid.IsPartition(building, x2, z2);
         }
 
         private static void ValidateBuildings(GoodsSnapshot state)

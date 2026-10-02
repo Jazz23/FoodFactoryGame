@@ -1,0 +1,62 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 812dee317b36c5645b8c70a8bc8da702, type: 3}
+  m_Name: RestaurantStyles
+  m_EditorClassIdentifier: FoodFactoryGame.Session::FoodFactoryGame.Session.Buildings.RestaurantStyleCatalog
+  wallFinishes:
+  - style: plaster
+    displayName: Plaster
+    wall1m: {fileID: 919132149155446097, guid: 489e1c4fcd5bf534fa821c4ef1d7f04c, type: 3}
+    wall2m: {fileID: 919132149155446097, guid: f1eb7cd0c9a3f18428fd14df31e72317, type: 3}
+    end: {fileID: 919132149155446097, guid: ecb9b28ecc362484aa7f0bc589242230, type: 3}
+  - style: brick
+    displayName: Exposed brick
+    wall1m: {fileID: 919132149155446097, guid: 5ff74b97e8ec20d40b455d8835833fde, type: 3}
+    wall2m: {fileID: 919132149155446097, guid: 1ba01fdb8defa1d46b2b3f39ae649190, type: 3}
+    end: {fileID: 919132149155446097, guid: f0eb21c21194dfd4b91303e30108a92e, type: 3}
+  - style: wainscot
+    displayName: Teal wainscot
+    wall1m: {fileID: 919132149155446097, guid: 05cd1737e426c4a49b98da0391a4cbbf, type: 3}
+    wall2m: {fileID: 919132149155446097, guid: 41dde6a341d0703459e3b5f2f784eacb, type: 3}
+    end: {fileID: 919132149155446097, guid: 4e45959a18032e640a1f6a2ede9453ac, type: 3}
+  - style: tile
+    displayName: Kitchen tile
+    wall1m: {fileID: 919132149155446097, guid: a186445eee37a0a45a2072951723b564, type: 3}
+    wall2m: {fileID: 919132149155446097, guid: 606a57f8b5f806e47bfc5f02a971cdf3, type: 3}
+    end: {fileID: 919132149155446097, guid: a73b7b2a412149749b234543d547c455, type: 3}
+  doorLeaves:
+  - style: panel
+    displayName: Panel door
+    leaf: {fileID: 919132149155446097, guid: d37a0be9db0207f49a96539371674c7a, type: 3}
+  - style: glazed
+    displayName: Glazed door
+    leaf: {fileID: 919132149155446097, guid: 042681eaad115d943a5d4f157d63df2b, type: 3}
+  - style: kitchen
+    displayName: Kitchen swing door
+    leaf: {fileID: 919132149155446097, guid: ed90a1e094e288f49b3c09eec3258c02, type: 3}
+  windowStyles:
+  - style: picture
+    displayName: Picture window
+    bay: {fileID: 919132149155446097, guid: 12e08a292ae2ef44da2c6e4bc1728aad, type: 3}
+    window: {fileID: 919132149155446097, guid: a20f0b24cf1d9f844af7c1cf1eec6f91, type: 3}
+  - style: mullioned
+    displayName: Mullioned window
+    bay: {fileID: 919132149155446097, guid: 12e08a292ae2ef44da2c6e4bc1728aad, type: 3}
+    window: {fileID: 919132149155446097, guid: 57053db6ac87df340b56b3bb5481679a, type: 3}
+  - style: hatch
+    displayName: Serving hatch
+    bay: {fileID: 919132149155446097, guid: da0b2d07278410947829cd7c01e5678d, type: 3}
+    window: {fileID: 0}
+  singleDoorway: {fileID: 919132149155446097, guid: 04d35159eb0a11e4cb412cde5063b59c, type: 3}
+  doubleDoorway: {fileID: 919132149155446097, guid: 374497a0756016e4e833c65c62a88fb6, type: 3}
+  singleFrame: {fileID: 919132149155446097, guid: a92ed4f0b11cb3744bdedb0563beaf49, type: 3}
+  doubleFrame: {fileID: 919132149155446097, guid: 402b6832ef9a1f84991395ab57a357f9, type: 3}

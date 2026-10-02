@@ -56,6 +56,8 @@ namespace FoodFactoryGame.Goods
         public string JobId;
         // Machine or truck created by the request (an equipment or truck purchase, decisions 0017, 0023); empty otherwise.
         public string EquipmentId;
+        // Cash the accepted order moved (decision 0034): positive when the company paid, negative for a refund; 0 otherwise.
+        public long Cents;
         public long Revision;
     }
 
@@ -76,7 +78,7 @@ namespace FoodFactoryGame.Goods
 
     [Serializable] public sealed class GoodsSnapshot
     {
-        public const int CurrentSchema = 15;
+        public const int CurrentSchema = 16;
         public int SchemaVersion = CurrentSchema;
         public string WorldId;
         public long ClockSeconds;

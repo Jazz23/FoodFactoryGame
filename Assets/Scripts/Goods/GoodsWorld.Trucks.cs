@@ -10,6 +10,10 @@
 // lot IDs, exposure and owner while aboard (trucks are not refrigerated, so goods age in transit) and takes the dropoff
 // site as owner when it is unloaded. A dock that is picked up, or a full or empty buffer, makes the truck wait there; goods
 // are never dropped or duplicated.
+// Restaurant docks (decision 0034, slice 5): a dock on a restaurant's site serves one truck at a time (the truck holding it is
+// Docked; others wait their turn in ID order) and is usable only while a walkable path reaches it from the lot's street edge
+// (PROTOTYPE dock rule). The truck arrives from the street after the abstract trip time and goods move at its LoadUnitsPerSecond
+// (PROTOTYPE transfer rate). Docks on other sites (warehouses, factories) keep the rules above.
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -54,6 +58,8 @@ namespace FoodFactoryGame.Goods
         public string DestinationSiteId = "";
         // Seconds of driving left; 0 unless driving.
         public long RemainingSeconds;
+        // True while this truck holds the restaurant dock it is loading or unloading at (decision 0034, v16); other trucks wait.
+        public bool Docked;
 
         public string CargoLocationId => Id + ":cargo";
         public bool Driving => State is TruckState.ToPickup or TruckState.ToDropoff;
@@ -371,6 +377,7 @@ namespace FoodFactoryGame.Goods
             truck.State = TruckState.Parked;
             truck.DestinationSiteId = "";
             truck.RemainingSeconds = 0;
+            truck.Docked = false;
         }
 
 
@@ -411,6 +418,7 @@ namespace FoodFactoryGame.Goods
             truck.SiteId = seconds == 0 ? destinationSiteId : truck.SiteId;
             truck.DestinationSiteId = seconds == 0 ? "" : destinationSiteId;
             truck.RemainingSeconds = seconds;
+            truck.Docked = false;
         }
 
         // Runs inside Advance. Trucks act one simulated second at a time in ID order, so two trucks at one dock share it the
@@ -422,6 +430,8 @@ namespace FoodFactoryGame.Goods
             if (_state.Trucks.Count == 0) return;
             var trucks = _state.Trucks.OrderBy(x => x.Id, StringComparer.Ordinal).ToList();
             var waiting = new HashSet<GoodsTruck>();
+            // Nothing in a clock step changes walls or placed pieces, so street reachability is worked out once per step.
+            _usableDocks.Clear();
             var left = seconds;
             while (left > 0)
             {
@@ -439,8 +449,12 @@ namespace FoodFactoryGame.Goods
                         truck.DestinationSiteId = "";
                         truck.State = truck.State == TruckState.ToPickup ? TruckState.Loading : TruckState.Unloading;
                     }
-                    else if (working.Contains(truck) && !(truck.State == TruckState.Loading ? LoadSecond(truck) : UnloadSecond(truck)))
-                        waiting.Add(truck);
+                    else if (working.Contains(truck))
+                    {
+                        // A restaurant dock serves one truck at a time: wait (rechecked every second) while another holds it.
+                        if (!TakeDock(truck, trucks)) continue;
+                        if (!(truck.State == TruckState.Loading ? LoadSecond(truck) : UnloadSecond(truck))) waiting.Add(truck);
+                    }
                 }
                 left -= step;
             }
@@ -500,8 +514,36 @@ namespace FoodFactoryGame.Goods
             return true;
         }
 
-        private GoodsEquipment PlacedDock(string dockId) =>
-            _state.Equipment.FirstOrDefault(x => x.Id == dockId && x.Kind == DockKind && x.State == EquipmentState.Placed);
+        // A placed dock the truck can use: on a restaurant's site it must also be reachable from the street (decision 0034).
+        private GoodsEquipment PlacedDock(string dockId)
+        {
+            var dock = _state.Equipment.FirstOrDefault(x => x.Id == dockId && x.Kind == DockKind && x.State == EquipmentState.Placed);
+            if (dock is null || !RestaurantRules.IsRestaurantSite(_state, dock.SiteId)) return dock;
+            if (!_usableDocks.TryGetValue(dock.Id, out var usable))
+                _usableDocks[dock.Id] = usable = RestaurantRules.Touches(RestaurantRules.Reached(RestaurantRules.Walkable(_state, dock.SiteId),
+                    RestaurantRules.StreetCells(_state.SiteLayouts.FirstOrDefault(x => x.SiteId == dock.SiteId),
+                        _propertyOffers?.Values.FirstOrDefault(x => x.SiteId == dock.SiteId))), dock);
+            return usable ? dock : null;
+        }
+
+        // Street reachability of restaurant docks during one MoveTrucks call.
+        private readonly Dictionary<string, bool> _usableDocks = new(StringComparer.Ordinal);
+
+        // The dock a working truck is at: its route's pickup while loading, its dropoff while unloading.
+        private string WorkingDockId(GoodsTruck truck) => truck.State == TruckState.Loading ? Route(truck).PickupDockId : Route(truck).DropoffDockId;
+
+        // True when the truck may work its dock this second: any dock off a restaurant site, or a restaurant dock it holds or can
+        // take because no other truck holds it.
+        private bool TakeDock(GoodsTruck truck, List<GoodsTruck> trucks)
+        {
+            if (truck.Docked) return true;
+            var dockId = WorkingDockId(truck);
+            var dock = _state.Equipment.FirstOrDefault(x => x.Id == dockId);
+            if (dock is null || !RestaurantRules.IsRestaurantSite(_state, dock.SiteId)) return true;
+            if (trucks.Any(x => x != truck && x.Docked && x.State is TruckState.Loading or TruckState.Unloading && WorkingDockId(x) == dockId)) return false;
+            truck.Docked = true;
+            return true;
+        }
 
         private long FreeUnits(string locationId, GoodsLot lot) => GoodsSlots.FreeUnits(
             _state.Locations.FirstOrDefault(x => x.Id == locationId), _state.Lots, lot.ItemId, lot.Spoiled, MaxStackLocked);
@@ -571,9 +613,17 @@ namespace FoodFactoryGame.Goods
                         : route is not null && route.CompanyId == truck.CompanyId)
                     && (truck.Driving
                         ? siteIds.Contains(truck.DestinationSiteId) && truck.RemainingSeconds >= 1
-                        : string.IsNullOrEmpty(truck.DestinationSiteId) && truck.RemainingSeconds == 0);
+                        : string.IsNullOrEmpty(truck.DestinationSiteId) && truck.RemainingSeconds == 0)
+                    && (!truck.Docked || truck.State is TruckState.Loading or TruckState.Unloading);
                 if (!valid) throw new InvalidOperationException($"Truck {truck.Id} is inconsistent.");
             }
+            // A restaurant dock is held by at most one truck (decision 0034).
+            if (state.Trucks.Where(x => x.Docked).GroupBy(x =>
+                {
+                    var route = RouteOf(state, x);
+                    return x.State == TruckState.Loading ? route?.PickupDockId : route?.DropoffDockId;
+                }).Any(x => x.Count() != 1))
+                throw new InvalidOperationException("Goods snapshot has two trucks holding one dock.");
             // Every vehicle location is one truck's cargo; nothing else stands on the road.
             var cargoIds = new HashSet<string>(state.Trucks.Select(x => x.CargoLocationId));
             if (state.Locations.Any(x => (x.Kind == VehicleLocationKind || x.SiteId == RoadSiteId) && !cargoIds.Contains(x.Id)))

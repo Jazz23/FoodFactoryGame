@@ -405,7 +405,7 @@ namespace FoodFactoryGame.Session.Equipment
             }
             foreach (var location in _site.Locations) text.Append('|').Append(location.Id).Append(location.Capacity);
             // An open table shows its seats and the restaurant's standing, which change with customers.
-            if (_site.Equipment.Any(x => x.Id == interaction.OpenMachineId && x.Kind == GoodsWorld.TableKind))
+            if (_site.Equipment.Any(x => x.Id == interaction.OpenMachineId && GoodsWorld.IsTable(x)))
             {
                 text.Append('|').Append(_site.Customers.Count(x => x.TableId == interaction.OpenMachineId));
                 var diner = _site.Diners.FirstOrDefault();
@@ -472,6 +472,7 @@ namespace FoodFactoryGame.Session.Equipment
             _hovered = null;
             var inventoryId = interaction.InventoryId;
             if (interaction.Screen is InteractionScreen.None or InteractionScreen.Employee or InteractionScreen.PickPosition or InteractionScreen.Logistics
+                    or InteractionScreen.Build
                 || inventoryId == null) return;
             var inventory = Window("hud-inventory", $"Inventory  {Units(site, inventoryId)}");
             inventory.Add(GridView(InventoryGrid));
@@ -505,8 +506,8 @@ namespace FoodFactoryGame.Session.Equipment
         private VisualElement SupplierWindow()
         {
             var window = Window("hud-supplier", "Supplier");
-            // Truck offers are bought on the logistics screen (decision 0023).
-            foreach (var offer in interaction.Session.Offers.Where(x => x != null && x.Truck == null))
+            // Truck offers are bought on the logistics screen (decision 0023); restaurant furnishings in build mode (decision 0034).
+            foreach (var offer in interaction.Session.Offers.Where(x => x != null && x.Truck == null && (x.Equipment == null || string.IsNullOrEmpty(x.Equipment.Category))))
             {
                 var row = new VisualElement { name = $"hud-offer-row-{offer.Id}" };
                 row.style.flexDirection = FlexDirection.Row;
@@ -571,9 +572,9 @@ namespace FoodFactoryGame.Session.Equipment
         private VisualElement MachineWindow(GoodsSnapshot site, GoodsEquipment equipment)
         {
             if (equipment.Kind == GoodsWorld.DockKind) return DockWindow(site, equipment);
-            if (equipment.Kind == GoodsWorld.TableKind) return TableWindow(site, equipment);
+            if (GoodsWorld.IsTable(equipment)) return TableWindow(site, equipment);
             if (!interaction.Session.Recipes.Any(x => x != null && x.StationKind == equipment.Kind)) return StorageMachineWindow(site, equipment);
-            var window = Window("hud-machine", Title(equipment.Kind));
+            var window = Window("hud-machine", MachineName(equipment.Kind));
             window.style.minWidth = 300;
             var body = new VisualElement();
             body.style.flexDirection = FlexDirection.Row;
@@ -610,8 +611,39 @@ namespace FoodFactoryGame.Session.Equipment
             _progressLabel = Caption("", 12, Muted, 6);
             _progressLabel.name = "hud-progress-label";
             window.Add(_progressLabel);
+            if (equipment.Kind == GoodsWorld.CounterKind) window.Add(StaffRow(site, equipment));
             return window;
         }
+
+        // A register (decision 0034) sells only while someone works it: who does, and a button to work it or leave it.
+        private VisualElement StaffRow(GoodsSnapshot site, GoodsEquipment register)
+        {
+            var row = new VisualElement { name = "hud-staff" };
+            row.style.flexDirection = FlexDirection.Row;
+            row.style.alignItems = Align.Center;
+            row.style.marginTop = 6;
+            var me = interaction.LocalPlayerId;
+            var who = string.IsNullOrEmpty(register.StaffId) ? "nobody: customers are not served"
+                : register.StaffId == me ? "you" : site.Employees.FirstOrDefault(x => x.Id == register.StaffId)?.Name ?? "a teammate";
+            var label = Caption($"Staffed by {who}", 12, string.IsNullOrEmpty(register.StaffId) ? Spoiled : Color.white);
+            label.name = "hud-staff-label";
+            label.style.flexGrow = 1;
+            row.Add(label);
+            var mine = register.StaffId == me;
+            var registerId = register.Id;
+            // Not focusable: a focused button would click again on every keyboard Submit (Enter/Space).
+            var button = new Button(() => ClickStaff(registerId, !mine)) { name = "hud-staff-button", text = mine ? "Leave" : "Work this register", focusable = false };
+            row.Add(button);
+            foreach (var employee in site.Employees.Where(x => x.Id != register.StaffId))
+            {
+                var id = employee.Id;
+                row.Add(new Button(() => interaction.Staff(registerId, id)) { name = $"hud-staff-{id}", text = $"Assign {employee.Name}", focusable = false });
+            }
+            return row;
+        }
+
+        // Works the register (or leaves it), like the button. Public so tests drive the same path.
+        public void ClickStaff(string registerId, bool work) => interaction.Staff(registerId, work ? interaction.LocalPlayerId : "");
 
         // A loading dock (decision 0022): trucks load from Outgoing (its input) and unload into Incoming (its output), which
         // only gives. The trucks at this dock are listed under it.
@@ -841,7 +873,7 @@ namespace FoodFactoryGame.Session.Equipment
             var items = new HashSet<string>(menu.SelectMany(x => x.Inputs).Select(x => x.itemId));
             if (!site.Lots.Any(x => x.LocationId == counter.InputLocationId && !x.Spoiled && items.Contains(x.ItemId)))
                 return $"{who}: put edible {food} in the input";
-            var tables = site.Equipment.Where(x => x.Kind == GoodsWorld.TableKind && x.State == EquipmentState.Placed).ToList();
+            var tables = site.Equipment.Where(x => GoodsWorld.IsTable(x) && x.State == EquipmentState.Placed).ToList();
             var freeSeats = tables.Sum(x => x.Seats) - site.Customers.Count(x => tables.Any(y => y.Id == x.TableId));
             if (freeSeats <= 0 && site.Customers.Any(x => x.State == CustomerState.Queued && x.DineIn))
                 return $"{who}: every table seat is taken; place more tables";
@@ -919,6 +951,9 @@ namespace FoodFactoryGame.Session.Equipment
             interaction.Session.EquipmentDefinitions.FirstOrDefault(x => x != null && x.Kind == kind)?.Icon;
 
         // Item and kind IDs are shown directly when no content names them: "dough" -> "Dough".
+        private string MachineName(string kind) =>
+            interaction.Session.EquipmentDefinitions.FirstOrDefault(x => x != null && x.Kind == kind)?.DisplayName ?? Title(kind);
+
         private static string Title(string id) =>
             string.IsNullOrEmpty(id) ? "" : CultureInfo.InvariantCulture.TextInfo.ToTitleCase(id.Replace('-', ' '));
 

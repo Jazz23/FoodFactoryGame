@@ -1,0 +1,20 @@
+﻿{
+  "status": "completed",
+  "duration": 1.79,
+  "summary": {
+    "total": 1,
+    "passed": 0,
+    "failed": 1,
+    "skipped": 0,
+    "inconclusive": 0
+  },
+  "results": [
+    {
+      "FullName": "FoodFactoryGame.Benchmarks.Tests.CustomerRuntimeBenchmarkTests.ThousandCustomersFitAFrameAndCommitUnderTheWarningSignals",
+      "Status": "Failed",
+      "Duration": 1.786165,
+      "Message": "  Expected: <empty>\r\n  But was:  < \"max commit 63.5 ms exceeds the decision 0012 signal (50 ms)\" >\r\n",
+      "StackTrace": "at FoodFactoryGame.Benchmarks.Tests.CustomerRuntimeBenchmarkTests.ThousandCustomersFitAFrameAndCommitUnderTheWarningSignals () [0x00855] in G:\\Unity\\FoodFactoryGame\\Assets\\Tests\\EditMode\\Benchmarks\\CustomerRuntimeBenchmarkTests.cs:195\r\n"
+    }
+  ]
+}

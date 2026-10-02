@@ -488,10 +488,19 @@ namespace FoodFactoryGame.Session.Logistics
                 TruckState.Parked => $"Parked at {here}: no route",
                 TruckState.ToPickup => $"Driving to {there} to load: {PlayerHud.FormatDuration(truck.RemainingSeconds, false)}",
                 TruckState.ToDropoff => $"Driving to {there} with cargo: {PlayerHud.FormatDuration(truck.RemainingSeconds, false)}",
-                TruckState.Loading => $"Loading at {here}" + (Dock(RouteOf(truck)?.PickupDockId)?.State == EquipmentState.Placed ? "" : " (dock not placed)"),
-                TruckState.Unloading => $"Unloading at {here}" + (Dock(RouteOf(truck)?.DropoffDockId)?.State == EquipmentState.Placed ? "" : " (dock not placed)"),
+                TruckState.Loading => $"Loading at {here}" + DockNote(truck, RouteOf(truck)?.PickupDockId),
+                TruckState.Unloading => $"Unloading at {here}" + DockNote(truck, RouteOf(truck)?.DropoffDockId),
                 _ => ""
             };
+        }
+
+        // Why a truck at a dock may be idle: the dock is not placed, or (a restaurant dock, decision 0034) another truck holds it.
+        private string DockNote(GoodsTruck truck, string dockId)
+        {
+            if (Dock(dockId)?.State != EquipmentState.Placed) return " (dock not placed)";
+            var others = Primary?.Trucks.Any(x => x.Id != truck.Id && x.Docked && x.State is TruckState.Loading or TruckState.Unloading
+                && (x.State == TruckState.Loading ? RouteOf(x)?.PickupDockId : RouteOf(x)?.DropoffDockId) == dockId) == true;
+            return !truck.Docked && others ? " (waiting for the dock)" : "";
         }
 
         private string CargoText(GoodsTruck truck)

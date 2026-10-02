@@ -56,7 +56,8 @@ namespace FoodFactoryGame.Goods
                 if (offer is null || string.IsNullOrWhiteSpace(offer.Id) || offer.PriceCents < 1 || OfferExistsLocked(offer.Id)
                     || equipment is null || string.IsNullOrWhiteSpace(equipment.Kind) || equipment.Width < 1 || equipment.Depth < 1
                     || equipment.InputCapacity < 1 || equipment.OutputCapacity < 1
-                    || equipment.Seats < 0 || (equipment.Kind == TableKind) != (equipment.Seats > 0))
+                    || equipment.Seats < 0 || (equipment.Kind == TableKind && equipment.Seats < 1)
+                    || !SiteGrid.IsLayer(equipment.Layer) || equipment.Ambience < 0)
                     throw new ArgumentException("Invalid or duplicate equipment offer.");
                 _equipmentOffers.Add(offer.Id, JsonUtility.FromJson<EquipmentOffer>(JsonUtility.ToJson(offer)));
             }
@@ -137,6 +138,10 @@ namespace FoodFactoryGame.Goods
                     equipment.State = EquipmentState.Held;
                     equipment.HolderId = playerId;
                     equipment.CellX = equipment.CellZ = equipment.Rotation = equipment.Level = 0;
+                    // Recorded so selling it refunds exactly this (decision 0034).
+                    equipment.ChargedCents = machine.PriceCents;
+                    equipment.StaffId = "";
+                    equipment.Layer ??= "";
                     _state.Equipment.Add(equipment);
                     var bought = Record(requestId, playerId, true, "bought", null);
                     bought.EquipmentId = deliveredId;

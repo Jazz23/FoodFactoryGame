@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="1" result="Failed(Child)" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-10-01 20:20:09Z" end-time="2026-10-01 20:20:11Z" duration="2.4263568">
+  <test-suite type="TestSuite" id="1000" name="FoodFactoryGame" fullname="FoodFactoryGame" runstate="Runnable" testcasecount="343" result="Failed" site="Child" start-time="2026-10-01 20:20:09Z" end-time="2026-10-01 20:20:11Z" duration="2.426357" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="EditMode" />
+    </properties>
+    <failure>
+      <message><![CDATA[One or more child tests had errors]]></message>
+    </failure>
+    <test-suite type="Assembly" id="1022" name="FoodFactoryGame.Benchmarks.EditModeTests.dll" fullname="G:/ffb/Library/ScriptAssemblies/FoodFactoryGame.Benchmarks.EditModeTests.dll" runstate="Runnable" testcasecount="9" result="Failed" site="Child" start-time="2026-10-01 20:20:09Z" end-time="2026-10-01 20:20:11Z" duration="2.391781" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="22352" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="EditMode" />
+        <property name="EditorOnly" value="True" />
+      </properties>
+      <failure>
+        <message><![CDATA[One or more child tests had errors]]></message>
+      </failure>
+      <test-suite type="TestSuite" id="1023" name="FoodFactoryGame" fullname="FoodFactoryGame" runstate="Runnable" testcasecount="9" result="Failed" site="Child" start-time="2026-10-01 20:20:09Z" end-time="2026-10-01 20:20:11Z" duration="2.389403" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <failure>
+          <message><![CDATA[One or more child tests had errors]]></message>
+        </failure>
+        <test-suite type="TestSuite" id="1024" name="Benchmarks" fullname="FoodFactoryGame.Benchmarks" runstate="Runnable" testcasecount="9" result="Failed" site="Child" start-time="2026-10-01 20:20:09Z" end-time="2026-10-01 20:20:11Z" duration="2.386916" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <failure>
+            <message><![CDATA[One or more child tests had errors]]></message>
+          </failure>
+          <test-suite type="TestSuite" id="1025" name="Tests" fullname="FoodFactoryGame.Benchmarks.Tests" runstate="Runnable" testcasecount="9" result="Failed" site="Child" start-time="2026-10-01 20:20:09Z" end-time="2026-10-01 20:20:11Z" duration="2.384289" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <failure>
+              <message><![CDATA[One or more child tests had errors]]></message>
+            </failure>
+            <test-suite type="TestFixture" id="1020" name="CustomerRuntimeBenchmarkTests" fullname="FoodFactoryGame.Benchmarks.Tests.CustomerRuntimeBenchmarkTests" classname="FoodFactoryGame.Benchmarks.Tests.CustomerRuntimeBenchmarkTests" runstate="Runnable" testcasecount="1" result="Failed" site="Child" start-time="2026-10-01 20:20:09Z" end-time="2026-10-01 20:20:11Z" duration="2.379697" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+              <properties>
+                <property name="Category" value="Benchmark" />
+              </properties>
+              <failure>
+                <message><![CDATA[One or more child tests had errors]]></message>
+              </failure>
+              <test-case id="1021" name="ThousandCustomersFitAFrameAndCommitUnderTheWarningSignals" fullname="FoodFactoryGame.Benchmarks.Tests.CustomerRuntimeBenchmarkTests.ThousandCustomersFitAFrameAndCommitUnderTheWarningSignals" methodname="ThousandCustomersFitAFrameAndCommitUnderTheWarningSignals" classname="FoodFactoryGame.Benchmarks.Tests.CustomerRuntimeBenchmarkTests" runstate="Runnable" seed="330198615" result="Failed" start-time="2026-10-01 20:20:09Z" end-time="2026-10-01 20:20:11Z" duration="2.358347" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <failure>
+                  <message><![CDATA[  Expected: <empty>
+  But was:  < "max commit 143.6 ms exceeds the decision 0012 signal (50 ms)" >
+]]></message>
+                  <stack-trace><![CDATA[at FoodFactoryGame.Benchmarks.Tests.CustomerRuntimeBenchmarkTests.ThousandCustomersFitAFrameAndCommitUnderTheWarningSignals () [0x00855] in G:\ffb\Assets\Tests\EditMode\Benchmarks\CustomerRuntimeBenchmarkTests.cs:190
+]]></stack-trace>
+                </failure>
+                <output><![CDATA[[Goods] A world commit took 58.9 ms (> 50 ms); see decision 0012.
+[Goods] A world commit took 57.0 ms (> 50 ms); see decision 0012.
+[Benchmark] player transfer: customers=1005 total=68.61ms save=56.97ms wrapper/action=11.64ms save phases copy=0.00 validate=8.68 json=3.82 transaction=39.77 commit+sync=4.71ms
+[Benchmark] player transfer: customers=1005 total=68.61ms save=56.97ms wrapper/action=11.64ms save phases copy=0.00 validate=8.68 json=3.82 transaction=39.77 commit+sync=4.71ms
+[Goods] A world commit took 53.5 ms (> 50 ms); see decision 0012.
+[Benchmark] runtime customers: warmup=420s customers 1005->994 (Eating=287,Queued=224,Travelling=459,Ordering=24) served=1568 walkedOut=274 | tick mean=0.33ms p99=0.83ms max=0.95ms over 300 ticks (step 0.30ms) | commits=30 avg=47.6ms max=143.6ms payload=338KB | cpu="AMD Ryzen 7 5800X 8-Core Processor " unity=6000.5.9f1 editor-mono
+[Benchmark] runtime customers: warmup=420s customers 1005->994 (Eating=287,Queued=224,Travelling=459,Ordering=24) served=1568 walkedOut=274 | tick mean=0.33ms p99=0.83ms max=0.95ms over 300 ticks (step 0.30ms) | commits=30 avg=47.6ms max=143.6ms payload=338KB | cpu="AMD Ryzen 7 5800X 8-Core Processor " unity=6000.5.9f1 editor-mono
+[Benchmark] save phases over 30 tick commits (mean/max ms): copy=0.00/0.00 validate=7.88/13.28 json=3.54/4.31 transaction=26.39/34.23 commit+sync=9.83/102.28
+[Benchmark] save phases over 30 tick commits (mean/max ms): copy=0.00/0.00 validate=7.88/13.28 json=3.54/4.31 transaction=26.39/34.23 commit+sync=9.83/102.28
+<b><color=#2EA3FF>MCP-FOR-UNITY</color></b>: [TestRunnerNoThrottle] Restored Interaction Mode after test run.
+Saving results to: C:/Users/justi/AppData/LocalLow/DefaultCompany/FoodFactoryGame\TestResults.xml
+]]></output>
+              </test-case>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

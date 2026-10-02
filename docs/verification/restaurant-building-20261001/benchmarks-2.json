@@ -1,0 +1,76 @@
+﻿{
+  "status": "completed",
+  "duration": 5.28,
+  "summary": {
+    "total": 9,
+    "passed": 8,
+    "failed": 1,
+    "skipped": 0,
+    "inconclusive": 0
+  },
+  "results": [
+    {
+      "FullName": "FoodFactoryGame.Benchmarks.Tests.CityCustomerBenchmarkTests.AGeneratedCityFitsAFrameAndCommitsUnderTheWarningSignals",
+      "Status": "Passed",
+      "Duration": 1.9307205,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "FoodFactoryGame.Benchmarks.Tests.CityCustomerBenchmarkTests.CrowdViewsForEightConnectionsStayUnderTheirBudget",
+      "Status": "Passed",
+      "Duration": 1.2287725,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "FoodFactoryGame.Benchmarks.Tests.CustomerChoiceBenchmarkTests.AllocationCheck_DetectsAnAllocation",
+      "Status": "Passed",
+      "Duration": 0.0025381,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "FoodFactoryGame.Benchmarks.Tests.CustomerChoiceBenchmarkTests.LunchRush_EveryCustomerDecidesInOneTick",
+      "Status": "Passed",
+      "Duration": 0.015008,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "FoodFactoryGame.Benchmarks.Tests.CustomerChoiceBenchmarkTests.SameSeed_GivesSameOutcome",
+      "Status": "Passed",
+      "Duration": 0.0194392,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "FoodFactoryGame.Benchmarks.Tests.CustomerChoiceBenchmarkTests.TargetPopulation_SteadyTickFitsProvisionalBudget",
+      "Status": "Passed",
+      "Duration": 0.04712,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "FoodFactoryGame.Benchmarks.Tests.CustomerChoiceBenchmarkTests.TenfoldPopulation_ReportsScaling",
+      "Status": "Passed",
+      "Duration": 0.1212721,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "FoodFactoryGame.Benchmarks.Tests.CustomerChoiceBenchmarkTests.WaitSignal_ComparesLiveBestScoreWithPublishedLogit",
+      "Status": "Passed",
+      "Duration": 0.0814012,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "FoodFactoryGame.Benchmarks.Tests.CustomerRuntimeBenchmarkTests.ThousandCustomersFitAFrameAndCommitUnderTheWarningSignals",
+      "Status": "Failed",
+      "Duration": 1.786666,
+      "Message": "  Expected: <empty>\r\n  But was:  < \"max commit 70.4 ms exceeds the decision 0012 signal (50 ms)\" >\r\n",
+      "StackTrace": "at FoodFactoryGame.Benchmarks.Tests.CustomerRuntimeBenchmarkTests.ThousandCustomersFitAFrameAndCommitUnderTheWarningSignals () [0x00855] in G:\\Unity\\FoodFactoryGame\\Assets\\Tests\\EditMode\\Benchmarks\\CustomerRuntimeBenchmarkTests.cs:195\r\n"
+    }
+  ]
+}

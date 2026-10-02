@@ -51,6 +51,9 @@ namespace FoodFactoryGame.Session.Tests
 
             world.RegisterRecipe(SellBread().ToDefinition());
             world.AutomaticJobs = true;
+            // A register sells only while staffed (decision 0034): a test player joins and works it.
+            Assert.That(world.TryGrantDurably("chef", DevWorld.SiteId, WorldPath, DevWorld.InventoryCapacity), Is.True);
+            Assert.That(world.StaffDurably("chef", "staff", counter.Id, "chef", WorldPath).Accepted, Is.True);
             world.Bootstrap(new GoodsLot { Id = "test-bread", ItemId = "bread", OwnerId = DevWorld.SiteId, LocationId = counter.InputLocationId, Quantity = 2, SpoilAfterSeconds = 3600 });
             // The dev district sends a customer every 15 s from a 30 s walk away; ten minutes is ample for one to buy.
             for (var second = 0; second < 600 && world.Snapshot().Companies.Single().Cash == DevWorld.StartingCash; second++)

@@ -22,3 +22,11 @@ MonoBehaviour:
   seats: 4
   visualPrefab: {fileID: 1076854573529140305, guid: 31af91484dc63d949b3a0da881f53618, type: 3}
   icon: {fileID: 21300000, guid: 1aca90c11056f254fbb3a280ddd2ec63, type: 3}
+  layer: 
+  ambience: 0
+  displayName: Table for four
+  category: 
+  mount: 0
+  mountHeight: 1.5
+  hideFromAbove: 0
+  opensScreen: 1

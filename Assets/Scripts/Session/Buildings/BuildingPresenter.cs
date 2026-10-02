@@ -4,6 +4,8 @@
 // Walls and slabs get colliders; the floor tint, lintels, markers and roof do not, so they never catch aim rays. Visuals
 // never own state. The local avatar's cell and height on any drawn site decide "indoors" and its level: the rig switches to the top-down view,
 // and that building's roof and every storey above the avatar's level are hidden (colliders too), for this client only.
+// A restaurant's ground storey (decision 0034) is drawn with the restaurant art kit (RestaurantShellModel) when a style catalog
+// is set, with one invisible collider and NavMesh obstacle per wall cell; a shell is rebuilt whenever its data changes.
 using System.Collections.Generic;
 using System.Linq;
 using FoodFactoryGame.Goods;
@@ -27,6 +29,8 @@ namespace FoodFactoryGame.Session.Buildings
         [SerializeField] private Material roofMaterial;
         [SerializeField] private float doorHeight = 2.2f;
         [SerializeField] private Color elevatorColor = new(0.95f, 0.75f, 0.2f, 1f);
+        // Art-kit models for restaurant walls, doors and windows (decision 0034); boxes are drawn without it.
+        [SerializeField] private RestaurantStyleCatalog restaurantStyles;
 
         private readonly Dictionary<string, Shell> _shells = new();
         private int _shown = -1;
@@ -37,8 +41,9 @@ namespace FoodFactoryGame.Session.Buildings
             public Renderer Roof;
             // Index is the level.
             public List<GameObject> Storeys = new();
-            // What the visual was built from; a shell is rebuilt when its floors or elevator change.
-            public (int Floors, int ElevatorX, int ElevatorZ) Built;
+            // What the visual was built from; a shell is rebuilt when any of its data changes (floors, elevator, or a restaurant
+            // order's walls, doors and windows).
+            public string Built;
             public GoodsBuilding Building;
         }
 
@@ -58,6 +63,10 @@ namespace FoodFactoryGame.Session.Buildings
             _shells.TryGetValue(buildingId, out var shell) && level >= 0 && level < shell.Storeys.Count ? shell.Storeys[level] : null;
 
         public bool RoofVisible(string buildingId) => _shells.TryGetValue(buildingId, out var shell) && shell.Roof.enabled;
+        public RestaurantStyleCatalog RestaurantStyles => restaurantStyles;
+        // Set by build mode (decision 0034) to the site it edits: that site's roofs hide and all its storeys show, so the
+        // interior can be seen from above; null otherwise.
+        public string EditedSiteId { get; set; }
 
         public GoodsBuilding LocalBuilding => LocalBuildingId != null && _shells.TryGetValue(LocalBuildingId, out var shell) ? shell.Building : null;
         public SiteLayout Layout => LocalSite?.Layout;
@@ -103,7 +112,8 @@ namespace FoodFactoryGame.Session.Buildings
             foreach (var (id, shell) in _shells)
             {
                 var local = id == LocalBuildingId;
-                shell.Roof.enabled = !local;
+                var edited = EditedSiteId != null && shell.Building.SiteId == EditedSiteId;
+                shell.Roof.enabled = !local && !edited;
                 for (var level = 0; level < shell.Storeys.Count; level++)
                 {
                     var shown = !local || level <= LocalLevel;
@@ -145,8 +155,7 @@ namespace FoodFactoryGame.Session.Buildings
         {
             var buildings = drawn.Sites.Where(x => x.Layout != null)
                 .SelectMany(site => site.Snapshot.Buildings.Where(x => x.SiteId == site.SiteId).Select(x => (Site: site, Building: x))).ToList();
-            foreach (var id in _shells.Keys.Where(x => buildings.All(y => y.Building.Id != x || y.Building.Floors != _shells[x].Built.Floors
-                         || y.Building.ElevatorX != _shells[x].Built.ElevatorX || y.Building.ElevatorZ != _shells[x].Built.ElevatorZ)).ToList())
+            foreach (var id in _shells.Keys.Where(x => buildings.All(y => y.Building.Id != x || JsonUtility.ToJson(y.Building) != _shells[x].Built)).ToList())
             {
                 Destroy(_shells[id].Root);
                 _shells.Remove(id);
@@ -162,7 +171,8 @@ namespace FoodFactoryGame.Session.Buildings
         {
             var root = new GameObject($"Building {building.Id}");
             root.transform.SetParent(transform, false);
-            var shell = new Shell { Root = root, Built = (building.Floors, building.ElevatorX, building.ElevatorZ) };
+            var shell = new Shell { Root = root, Built = JsonUtility.ToJson(building) };
+            var kit = restaurantStyles != null && building.Kind == GoodsWorld.RestaurantKind;
             var interiorCenter = SiteGridSpace.FootprintCenter(layout, building.CellX + 1, building.CellZ + 1, building.Width - 2, building.Depth - 2);
             var interiorSize = new Vector3((building.Width - 2) * SiteGrid.CellSize, 0f, (building.Depth - 2) * SiteGrid.CellSize);
             for (var level = 0; level < building.Floors; level++)
@@ -170,10 +180,11 @@ namespace FoodFactoryGame.Session.Buildings
                 var storey = new GameObject($"Storey {level}");
                 storey.transform.SetParent(root.transform, false);
                 var baseHeight = Vector3.up * (level * SiteGridSpace.LevelHeight);
-                Walls(layout, building, storey.transform, level);
+                if (kit && level == 0) KitWalls(layout, building, storey.transform);
+                else Walls(layout, building, storey.transform, level);
                 if (level == 0)
                 {
-                    foreach (var door in building.Doors)
+                    foreach (var door in kit ? new List<GridCell>() : building.Doors)
                     {
                         var center = SiteGridSpace.FootprintCenter(layout, door.X, door.Z, 1, 1);
                         Box(storey.transform, $"Lintel {door.X},{door.Z}", wallMaterial, center + Vector3.up * (doorHeight + SiteGridSpace.LevelHeight) * 0.5f,
@@ -205,6 +216,25 @@ namespace FoodFactoryGame.Session.Buildings
             shell.Roof = Box(root.transform, "Roof", roofMaterial, roofCenter + Vector3.up * 0.1f,
                 new Vector3(building.Width * SiteGrid.CellSize, 0.2f, building.Depth * SiteGrid.CellSize), false);
             return shell;
+        }
+
+        // Art-kit visuals plus one invisible box collider (a solid wall for avatars and aim rays) and carving NavMesh obstacle per
+        // wall cell, interior walls and window cells included; doors stay open.
+        private void KitWalls(SiteLayout layout, GoodsBuilding building, Transform parent)
+        {
+            RestaurantShellModel.Build(parent, layout, building, restaurantStyles);
+            var cells = new HashSet<(int X, int Z)>(building.Structures.Where(x => x.Kind == GoodsWorld.PartitionStructure).Select(x => (x.X, x.Z)));
+            for (var x = building.CellX; x < building.CellX + building.Width; x++)
+            for (var z = building.CellZ; z < building.CellZ + building.Depth; z++)
+                if (SiteGrid.OnPerimeter(building, x, z)) cells.Add((x, z));
+            foreach (var (x, z) in cells.Where(c => SiteGrid.IsWall(building, c.X, c.Z)))
+            {
+                var center = SiteGridSpace.FootprintCenter(layout, x, z, 1, 1);
+                var solid = Box(parent, $"Wall {x},{z}", wallMaterial, center + Vector3.up * SiteGridSpace.LevelHeight * 0.5f,
+                    new Vector3(SiteGrid.CellSize, SiteGridSpace.LevelHeight, SiteGrid.CellSize), true);
+                solid.enabled = false;
+                solid.gameObject.AddComponent<NavMeshObstacle>().carving = true;
+            }
         }
 
         // The south and north walls span the full width; the west and east walls fill in between the corners.

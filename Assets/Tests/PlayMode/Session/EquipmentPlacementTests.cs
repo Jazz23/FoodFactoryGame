@@ -338,6 +338,9 @@ namespace FoodFactoryGame.Session.PlayModeTests
             Assert.That(hud.ScreenRoot.Q<Button>("hud-input-slot-0"), Is.Not.Null);
             Assert.That(hud.ScreenRoot.Q<Button>("hud-output-slot-0"), Is.Null, "A counter shows prices, not an output grid.");
             Assert.That(hud.ScreenRoot.Q("hud-sale-prices"), Is.Not.Null);
+            // A register sells only while someone works it (decision 0034): the host works it from the register screen.
+            hud.ClickStaff(DevWorld.CounterId, true);
+            yield return Until(() => _root.ClientSite.Equipment.Single(x => x.Id == DevWorld.CounterId).StaffId == hostId, "the host works the register");
 
             hud.ClickSlot(PlayerHud.InventoryGrid, hud.SlotOf(PlayerHud.InventoryGrid, "bread"));
             hud.ClickSlot(PlayerHud.InputGrid, 0);

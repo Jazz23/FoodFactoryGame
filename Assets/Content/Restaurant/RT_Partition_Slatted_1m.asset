@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9c77d3e4774f0c945971924e55f4e458, type: 3}
+  m_Name: RT_Partition_Slatted_1m
+  m_EditorClassIdentifier: FoodFactoryGame.Session::FoodFactoryGame.Session.Equipment.EquipmentDefinition
+  kind: rt-partition-slatted
+  width: 1
+  depth: 1
+  inputCapacity: 1
+  outputCapacity: 1
+  inputRefrigerated: 0
+  outputRefrigerated: 0
+  seats: 0
+  visualPrefab: {fileID: 1753035853932223593, guid: edf2151ddb30a4c48a61d4fc6beb1f36, type: 3}
+  icon: {fileID: 21300000, guid: cf7a92a91c1663c48899e85206279667, type: 3}
+  layer: 
+  ambience: 2
+  displayName: Slatted screen
+  category: Architecture
+  mount: 0
+  mountHeight: 1.5
+  hideFromAbove: 0
+  opensScreen: 0

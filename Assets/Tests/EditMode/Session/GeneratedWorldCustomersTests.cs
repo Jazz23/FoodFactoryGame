@@ -187,6 +187,11 @@ namespace FoodFactoryGame.Session.Tests
                 Id = "test-bread", ItemId = "bread", OwnerId = state.Sites.Single().Id, LocationId = GeneratedWorld.StartCounterId + ":in",
                 Quantity = 20, SpoilAfterSeconds = 1_000_000
             });
+            // A register sells only while staffed (decision 0034): a test player works the starting counter.
+            var siteId = state.Sites.Single().Id;
+            world.Bootstrap(new GoodsLocation { Id = GoodsWorld.InventoryLocationId("chef"), SiteId = siteId, Kind = "carried", Capacity = 1 });
+            world.Grant("chef", siteId);
+            Assert.That(world.Staff("chef", "staff", GeneratedWorld.StartCounterId, "chef").Accepted, Is.True);
             var cash = state.Companies.Single().Cash;
             var seconds = 0;
             while (world.Snapshot().Companies.Single().Cash == cash && seconds < 6 * 3600)

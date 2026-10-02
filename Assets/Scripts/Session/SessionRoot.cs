@@ -252,6 +252,8 @@ namespace FoodFactoryGame.Session
             // Machine buffer slot counts follow content, so a saved machine created with older counts is brought up to date.
             foreach (var definition in equipmentDefinitions.Where(x => x != null))
                 ServerWorld.ApplyEquipmentCapacitiesDurably(definition.Kind, definition.InputCapacity, definition.OutputCapacity, _options.WorldPath);
+            // Nobody is connected yet, so no player works a register (decision 0034); employees keep theirs.
+            ServerWorld.ReleaseStaffDurably(null, _options.WorldPath);
             // Recipes are content, not saved state, so they are registered on every start, including a recovered save.
             foreach (var recipe in recipes) ServerWorld.RegisterRecipe(recipe.ToDefinition());
             foreach (var offer in offers) offer.RegisterWith(ServerWorld);
@@ -426,6 +428,8 @@ namespace FoodFactoryGame.Session
             TrackPoses();
             _avatars.Remove(connection);
             SavePose(entry.PlayerId);
+            // A player who left no longer works a register (decision 0034).
+            if (ServerBridge != null) ServerBridge.ReleaseStaff(entry.PlayerId);
         }
 
         private void SavePoses()

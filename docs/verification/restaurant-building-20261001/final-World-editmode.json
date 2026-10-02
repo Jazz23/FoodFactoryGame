@@ -1,0 +1,160 @@
+﻿{
+  "status": "completed",
+  "duration": 90.92,
+  "summary": {
+    "total": 21,
+    "passed": 21,
+    "failed": 0,
+    "skipped": 0,
+    "inconclusive": 0
+  },
+  "results": [
+    {
+      "FullName": "FoodFactoryGame.World.Tests.WorldGeneratorTests.AFailedAttemptRetriesWithADerivedSeedAndIsReported",
+      "Status": "Passed",
+      "Duration": 3.0431376,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "FoodFactoryGame.World.Tests.WorldGeneratorTests.AFormatOneLayoutStillReadsAndWritesUnchanged",
+      "Status": "Passed",
+      "Duration": 0.0011999,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "FoodFactoryGame.World.Tests.WorldGeneratorTests.AFormatTwoLayoutHasNoLotsAndRoundTrips",
+      "Status": "Passed",
+      "Duration": 0.9124817,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "FoodFactoryGame.World.Tests.WorldGeneratorTests.DifferentSeedsProduceDifferentLayouts",
+      "Status": "Passed",
+      "Duration": 0.6429624,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "FoodFactoryGame.World.Tests.WorldGeneratorTests.DistrictsArePlacedAsTheDesignSays",
+      "Status": "Passed",
+      "Duration": 11.7167031,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "FoodFactoryGame.World.Tests.WorldGeneratorTests.EveryGeneratedShellsLotIsAValidBuildingSite",
+      "Status": "Passed",
+      "Duration": 0.4057103,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "FoodFactoryGame.World.Tests.WorldGeneratorTests.LandHeightIsTheSameAfterAQuarterTurn",
+      "Status": "Passed",
+      "Duration": 0.2756513,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "FoodFactoryGame.World.Tests.WorldGeneratorTests.LayoutTextRoundTrips",
+      "Status": "Passed",
+      "Duration": 0.7364363,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "FoodFactoryGame.World.Tests.WorldGeneratorTests.SameSeedProducesAnIdenticalLayout",
+      "Status": "Passed",
+      "Duration": 0.7348432,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "FoodFactoryGame.World.Tests.WorldGeneratorTests.SeedTextIsRepeatable",
+      "Status": "Passed",
+      "Duration": 0.0005406,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "FoodFactoryGame.World.Tests.WorldGeneratorTests.StopSignsStopTheMinorRoadOrEveryApproach",
+      "Status": "Passed",
+      "Duration": 0.0013657,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "FoodFactoryGame.World.Tests.WorldGeneratorTests.TheValidatorReportsBrokenLandRiversCrossingsJunctionsAndTrees",
+      "Status": "Passed",
+      "Duration": 4.3769188,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "FoodFactoryGame.World.Tests.WorldGeneratorTests.TheValidatorReportsBrokenLayouts",
+      "Status": "Passed",
+      "Duration": 3.9817376,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "FoodFactoryGame.World.Tests.WorldGeneratorTests.TheValidatorReportsBrokenLots",
+      "Status": "Passed",
+      "Duration": 4.3589141,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "FoodFactoryGame.World.Tests.WorldGeneratorTests.ValidationPassesAcrossManySeeds",
+      "Status": "Passed",
+      "Duration": 50.2641606,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "FoodFactoryGame.World.Tests.WorldGeneratorTests.WorldsHaveLandRiverBridgesCrossingsJunctionsAndTrees",
+      "Status": "Passed",
+      "Duration": 6.0410633,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "FoodFactoryGame.World.Tests.WorldLayoutStoreTests.ADamagedLayoutIsRefusedAndNotRegenerated",
+      "Status": "Passed",
+      "Duration": 0.5419579,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "FoodFactoryGame.World.Tests.WorldLayoutStoreTests.ALayoutIsWrittenOnceAndNeverReplaced",
+      "Status": "Passed",
+      "Duration": 1.0897541,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "FoodFactoryGame.World.Tests.WorldLayoutStoreTests.AnExistingWorldCannotGainALayout",
+      "Status": "Passed",
+      "Duration": 0.5101963,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "FoodFactoryGame.World.Tests.WorldLayoutStoreTests.AnOldSaveLoadsUnchangedWithNoLayout",
+      "Status": "Passed",
+      "Duration": 0.4817839,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "FoodFactoryGame.World.Tests.WorldLayoutStoreTests.AStoredLayoutReloadsExactlyAlongsideTheWorld",
+      "Status": "Passed",
+      "Duration": 0.7774864,
+      "Message": null,
+      "StackTrace": null
+    }
+  ]
+}

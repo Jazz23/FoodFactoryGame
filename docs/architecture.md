@@ -42,7 +42,7 @@ The existing demo prefab catalog remains baseline authoring only.
 
 - `FoodFactoryGame.Goods` holds server-instantiated stable-ID lots and locations, integer quantities, one location per lot, owner/site grants, binary spoilage, elapsed exposure, active reservations, terminal command outcomes, and an integer-second authoritative clock. Ambient time accumulates exposure; refrigerated time does not (confirmed by the owner in [decision 0018](decisions/0018-spoilage-timing-and-refrigeration.md)). Moves retain prior exposure. Equivalent lots merge only when owner, location, item, condition, and exposure/threshold match; reserved lots cannot merge.
 - `Transfer` validates a same-site route, grant, source owner, unreserved quantity or owned reservation, and destination unit capacity before locked mutation. A partial transfer splits with a new ID. Duplicate request IDs replay stored terminal outcomes; another actor cannot replay someone else's outcome. `Cancel` releases an unconsumed reservation; committed transfers are not reversible. No in-flight transport or cross-site route has been implemented.
-- `GoodsSnapshotStore` serializes (schema v4 since conveyor belts, below) world ID, time/revision, lots, locations, grants, reservations, and outcomes with a checksum. An explicit path is required; each commit is one SQLite transaction that keeps the previous committed revision as a fallback (see [SQLite storage](#implemented-sqlite-storage-2026-09-23)). Recovery validates invariants; unknown newer schemas fail. Concurrent saves reject older/conflicting revisions. Every acknowledged mutation has a durable boundary: `TransferDurably`, `ReserveDurably`, `CancelDurably`, and the clock tick `TryAdvanceDurably` commit the snapshot before acknowledging and restore the pre-command state if the commit fails. Terminal outcomes are keyed per actor (player ID + request ID), so one actor cannot claim or poison another actor’s request ID. This is a goods-slice snapshot, **not** the full-world decision-0002 persistence contract; no production snapshot cadence is implemented; the only migrations are the in-memory v1→…→v9 upgrades (v5: company cash; v6: sale jobs; v7: building shells; v8: factory floors; v9: employee records; all below).
+- `GoodsSnapshotStore` serializes (schema v4 since conveyor belts, below) world ID, time/revision, lots, locations, grants, reservations, and outcomes with a checksum. An explicit path is required; each commit is one SQLite transaction that keeps the previous committed revision as a fallback (see [SQLite storage](#implemented-sqlite-storage-2026-09-23)). Recovery validates invariants; unknown newer schemas fail. Concurrent saves reject older/conflicting revisions. Every acknowledged mutation has a durable boundary: `TransferDurably`, `ReserveDurably`, `CancelDurably`, and the clock tick `TryAdvanceDurably` commit the snapshot before acknowledging and restore the pre-command state if the commit fails. Terminal outcomes are keyed per actor (player ID + request ID), so one actor cannot claim or poison another actor’s request ID. This is a goods-slice snapshot, **not** the full-world decision-0002 persistence contract; no production snapshot cadence is implemented; the only migrations are the in-memory v1→…→v16 upgrades (v5: company cash; v6: sale jobs; v7: building shells; v8: factory floors; v9: employee records; v10-v15: lifts, trucks, routes, customers, properties, competitor lots; v16: restaurant building; all below). The current goods snapshot schema is **v16** (restaurant building, 2026-10-01).
 - `GoodsNetworkBridge` is compiled FishNet RPC transport for connection-resolved transfer intent/result and server-validated, revisioned full site baselines. It ticks the same world even with zero subscribers. Its `InitializeServer` requires a pre-existing matching committed save and an authenticated connection-to-player resolver supplied by a session owner. It also exposes reserve/cancel RPCs through the durable paths and rejects requests while clock persistence is failing. An Editor PlayMode listen-server fixture (host + separate loopback-UDP remote client, test-owned bootstrap and connection→player map) has demonstrated an authorized transfer, an unauthorized remote transfer and subscription rejection, a granted site baseline, and unsubscribed site progression persisted to the snapshot. There is still no production session owner or authenticator, player build, client UI, pickup visuals, or multi-process multiplayer evidence. Full baselines (not deltas) are used to avoid a partial replication protocol.
 - EditMode tests with *test-only* restaurant/ingredient/storage/fridge/kitchen capacities and spoilage threshold verify domain and isolated file recovery without any camera or client. The PlayMode fixture above covers the live FishNet path within one Editor process; it does not prove pickup projections, real authentication, or separate-process play. See [verification record](verification/goods-20260922.md).
 
@@ -590,7 +590,7 @@ the goods schema (v15) are unchanged. Evidence: [verification record](verificati
 - Player and employee operational rules should be shared; input and AI choose actions through those rules.
 - Visual objects must not become the sole owners of authoritative simulation state.
 
-These remain accepted contracts; only the bounded goods slice, its station jobs, equipment placement, the working oven, conveyor belts, company cash, the sell counter, supplier purchases, equipment purchases, spoilage timing/refrigeration, building shells, factory floors, conveyor lifts, trucks with loading docks, truck routes and fleet, customers, and the procedural world layout above have a runtime interface. Customer purchases credit cash inside the clock tick; supplier purchases and floor orders are the player payment commands. Trucks move goods between sites only inside the clock tick, through their own cargo locations.
+These remain accepted contracts; only the bounded goods slice, its station jobs, equipment placement, the working oven, conveyor belts, company cash, the sell counter, supplier purchases, equipment purchases, spoilage timing/refrigeration, building shells, factory floors, conveyor lifts, trucks with loading docks, truck routes and fleet, customers, the procedural world layout and restaurant building above have a runtime interface. Customer purchases credit cash inside the clock tick; supplier purchases, floor orders, shell orders, buy-and-place orders and sales are the player payment commands. Trucks move goods between sites only inside the clock tick, through their own cargo locations.
 
 ## Planned / Undecided
 
@@ -604,11 +604,58 @@ These remain accepted contracts; only the bounded goods slice, its station jobs,
 
 ## Standalone restaurant art kit (2026-10-01)
 
-Implemented **art only**: 59 modular restaurant models and 16 shared URP materials in `Assets/Art/Restaurant`, editable
-source in `ArtSource/Restaurant/Restaurant_Kit.blend`. Import and authoring checks live outside the game under `AgentScripts`.
-The kit supplements existing equipment and exterior art; it adds no gameplay components, catalog entries, or scene wiring.
-Restaurant-building behavior from decision 0034 remains planned. Placement conventions and reuse inventory:
-`ArtSource/Restaurant/README.md`; evidence: `docs/verification/restaurant-art-20261001.md`.
+59 modular restaurant models and 16 shared URP materials in `Assets/Art/Restaurant`, editable source in
+`ArtSource/Restaurant/Restaurant_Kit.blend` (import and authoring checks under `AgentScripts`). Placement conventions and reuse
+inventory: `ArtSource/Restaurant/README.md`; evidence: `docs/verification/restaurant-art-20261001.md`. Since restaurant
+building (below) every model is buildable by the player.
+
+## Implemented: restaurant building, slices 1-5 (2026-10-01)
+
+Decisions: [0034](decisions/0034-restaurant-building.md) (owner rules; its PROPOSALS stay undecided) and
+[0035](decisions/0035-restaurant-building-implementation.md) (implementation choices, every PROTOTYPE value, owner questions).
+Goods snapshot schema **v16**. Evidence: [verification record](verification/restaurant-building-20261001.md).
+
+- Shell editing (slice 1, `GoodsWorld.Shell.cs`): `ShellOrder` (resize within the site's grid, interior walls, doors, two-cell
+  windows, removal, perimeter wall finish) planned by the pure `GoodsWorld.PlanShell` that the server command
+  (`OrderShellDurably`, reasons `forbidden`, `no-company`, `not-a-restaurant`, `too-small`, `out-of-bounds`, `unchanged`,
+  `invalid-cell`, `invalid-style`, `no-door`, `blocked`, `insufficient-funds`) and the build-mode preview share. Built pieces are
+  `GoodsBuilding.Structures` records carrying their charge; the net amount is debited or credited in the same mutation as the new
+  building, rejections are unrecorded, an accepted order replays, and company cash plus all recorded charges never changes.
+  `SiteGrid.IsWall` includes interior walls (not those with a door); windows stay walls. Restaurants only; factories unchanged.
+- Furnishing (slices 2-4, `GoodsWorld.Furnishing.cs`): `BuyAndPlaceDurably` (one charge for every piece of an order, all or
+  nothing) and `SellDurably` (exact `ChargedCents` refund; buffered goods and a running job's inputs move to the seller's
+  inventory first, or the sale is refused). Equipment layers (`SiteGrid.FloorLayer`, `WallLayer`, `CeilingLayer`,
+  `TabletopLayer`) overlap only their own kind; the object layer's rules are unchanged. A dining table is any piece with seats
+  (`GoodsWorld.IsTable`).
+- Registers (slice 3): the counter kind is the register (shown "Register"; saves, IDs and recipes unchanged). It sells only while
+  staffed (`StaffDurably`: the player, on that site, or an employee of the site); players' staffing ends on entering another site,
+  disconnecting (`GoodsNetworkBridge.ReleaseStaff`) and at every server start. PROTOTYPE seat rule (`RestaurantRules`): registers
+  and tables count only when a walkable path from the site's edge reaches them. The register screen shows who works it and a
+  Work this register / Leave button (and employee assign buttons).
+- Ambience (slice 4): one score per restaurant (`RestaurantRules.Ambience`, PROTOTYPE cap 100, scale 50) from placed pieces'
+  ambience points, one more term in customer choice (PROTOTYPE weight 0.6). Competitors have none; spend is unchanged.
+- Restaurant docks (slice 5): on a site with a restaurant shell a dock must be reachable from the lot's street edge
+  (`no-street-access` at placement; trucks wait at an unreachable dock) and serves one truck at a time (`GoodsTruck.Docked`).
+  Transfer uses the truck's `LoadUnitsPerSecond`; trip time stays abstract (decision 0032 open). Other sites' docks unchanged.
+  The truck stands at the kerb in front of the lot, level with the dock; the logistics screen says when a truck waits for the dock.
+- Network (`GoodsNetworkBridge`): `RequestShellOrder`, `RequestBuyAndPlace` (JSON payloads), `RequestSell`, `RequestStaff`;
+  results carry `Cents`. Accepted orders rebroadcast full baselines as before.
+- Build mode (slice 2, `Assets/Scripts/Session/Buildings/BuildMode.cs`): Player/Build (B) toggles it as
+  `InteractionScreen.Build`; the camera frames the lot top-down (`OrbitCameraRig.SetBuildView`), the edited site's roofs and
+  ceiling panels hide, a grid covers the lot, and a panel on the right holds tools (sell/remove, resize shell, wall, door, window,
+  wall finish, with style choices) and the catalog by category. The pointer cell shows a ghost and cell tint from the shared rules
+  plus the company's cash, with charge, refund and net or the refusal reason; clicks place single pieces, drags wait for
+  Player/BuildConfirm (Enter) or the Confirm button; Remove (right mouse) sells or removes what is under the pointer.
+- Presentation: `RestaurantStyleCatalog` and `RestaurantShellModel` draw restaurant ground storeys from the art kit (wall graph
+  with 2 m pieces and end posts, doorway bays with frames and leaves, window bays, serving hatch) with one invisible collider and
+  carving obstacle per wall cell; `EquipmentModel` mounts decor (flush floors, wall faces, ceilings, table tops).
+  `SiteStreet.Outward` reads a lot's street from its access cell, so resized shells keep their street.
+- Content (`AgentScripts/BuildRestaurantContent.cs`): 23 kit models as structure styles and 36 as equipment (prefabs, PROTOTYPE
+  definitions and supplier offers, rendered icons in `Assets/Art/Icons/Restaurant`), installed in DevSite and WorldGen.
+
+Not done or open: independent visual review of the captures; a separate-process multiplayer check; `SampleScene` not updated;
+apron spawn uses the bought building's original first door (a resized shell may cover it); no restaurant floors (deferred);
+owner questions in decision 0035.
 
 ## Baseline Test Evolution
 

@@ -40,6 +40,16 @@ namespace FoodFactoryGame.Goods
         // Dining seats (decision 0024): above zero only for a table, copied from content like the capacities. A table's
         // buffers are unused.
         public int Seats;
+        // Decision 0034 (schema v16), copied from content like the capacities: the occupancy layer (SiteGrid.ObjectLayer and the
+        // decor layers) and the ambience points decor adds to its restaurant (0 for anything else).
+        public string Layer = "";
+        public int Ambience;
+        // Whole cents the company paid for this piece; selling it refunds exactly that (0 for pieces that came free or were
+        // bought before v16, when the price was not recorded).
+        public long ChargedCents;
+        // A register (kind counter) is the restaurant's sale point and sells only while staffed (decision 0034): the player or
+        // employee working it, empty when unstaffed. Empty on every other piece.
+        public string StaffId = "";
 
         public string InputLocationId => Id + ":in";
         public string OutputLocationId => Id + ":out";
@@ -80,11 +90,14 @@ namespace FoodFactoryGame.Goods
                 if (copy == null || string.IsNullOrWhiteSpace(copy.Id) || string.IsNullOrWhiteSpace(copy.Kind)
                     || copy.State != EquipmentState.Placed || !string.IsNullOrEmpty(copy.HolderId)
                     || copy.Width < 1 || copy.Depth < 1 || copy.InputCapacity < 1 || copy.OutputCapacity < 1
-                    || copy.Seats < 0 || (copy.Kind == TableKind) != (copy.Seats > 0)
+                    || copy.Seats < 0 || (copy.Kind == TableKind && copy.Seats < 1)
+                    || !SiteGrid.IsLayer(copy.Layer) || copy.Ambience < 0 || copy.ChargedCents < 0 || !string.IsNullOrEmpty(copy.StaffId)
                     || _state.Equipment.Any(x => x.Id == copy.Id) || _state.Stations.Any(x => x.Id == copy.Id)
                     || _state.Locations.Any(x => x.Id == copy.InputLocationId || x.Id == copy.OutputLocationId)
                     || SiteGrid.PlacementProblem(_state, copy, copy.CellX, copy.CellZ, copy.Rotation, copy.Level) != null)
                     throw new ArgumentException("Invalid, duplicate or unplaceable equipment.");
+                copy.Layer ??= "";
+                copy.StaffId = "";
                 _state.Equipment.Add(copy);
                 AddPlacedParts(copy);
                 InvalidateDinersFor(copy);
@@ -146,6 +159,8 @@ namespace FoodFactoryGame.Goods
                 // A customer who has paid is being served at this counter or sits at this table (decision 0024).
                 if (_state.Customers.Any(x => x.CounterId == equipment.Id || x.TableId == equipment.Id))
                     return Record(requestId, playerId, false, "occupied", null);
+                // Tabletop decor stands on this table (decision 0034): take it off first.
+                if (HoldsTabletop(equipment)) return Record(requestId, playerId, false, "blocked", null);
                 var inventory = _state.Locations.FirstOrDefault(x => x.Id == InventoryLocationId(playerId));
                 if (inventory == null || inventory.SiteId != equipment.SiteId)
                     return Record(requestId, playerId, false, "no-inventory", null);
@@ -173,6 +188,7 @@ namespace FoodFactoryGame.Goods
                 _state.Locations.RemoveAll(x => x.Id == equipment.InputLocationId || x.Id == equipment.OutputLocationId);
                 equipment.State = EquipmentState.Held;
                 equipment.HolderId = playerId;
+                equipment.StaffId = "";
                 equipment.CellX = equipment.CellZ = equipment.Rotation = equipment.Level = 0;
                 InvalidateDinersFor(equipment);
                 var result = Record(requestId, playerId, true, "picked-up", null);
@@ -202,7 +218,8 @@ namespace FoodFactoryGame.Goods
                     return Record(requestId, playerId, false, "forbidden", null);
                 if (equipment.State != EquipmentState.Held || equipment.HolderId != playerId)
                     return Record(requestId, playerId, false, "not-held", null);
-                var problem = SiteGrid.PlacementProblem(_state, equipment, cellX, cellZ, rotation, level);
+                var problem = SiteGrid.PlacementProblem(_state, equipment, cellX, cellZ, rotation, level)
+                    ?? DockProblem(_state, equipment, cellX, cellZ, rotation);
                 if (problem != null) return Record(requestId, playerId, false, problem, null);
 
                 equipment.State = EquipmentState.Placed;
@@ -270,6 +287,20 @@ namespace FoodFactoryGame.Goods
             });
         }
 
+        // A staffed register (decision 0034): a placed counter worked by an actor granted its site; an employee must belong to it.
+        private static bool StaffValid(GoodsSnapshot state, GoodsEquipment register) =>
+            register.Kind == CounterKind && register.State == EquipmentState.Placed
+            && state.Grants.Any(x => x.PlayerId == register.StaffId && x.SiteId == register.SiteId)
+            && (!register.StaffId.StartsWith(EmployeePrefix, StringComparison.Ordinal)
+                || state.Employees.Any(x => x.Id == register.StaffId && x.SiteId == register.SiteId));
+
+        // True while tabletop decor stands on this placed table.
+        private bool HoldsTabletop(GoodsEquipment table) =>
+            IsTable(table) && string.IsNullOrEmpty(table.Layer) && _state.Equipment.Any(x => x.State == EquipmentState.Placed
+                && x.SiteId == table.SiteId && x.Layer == SiteGrid.TabletopLayer && SiteGrid.Overlaps(x.CellX, x.CellZ, x.Width, x.Depth,
+                    table.CellX, table.CellZ, SiteGrid.Footprint(table.Width, table.Depth, table.Rotation).Width,
+                    SiteGrid.Footprint(table.Width, table.Depth, table.Rotation).Depth));
+
         private static void ValidateEquipment(GoodsSnapshot state)
         {
             if (state.SiteLayouts.Any(x => x == null || string.IsNullOrWhiteSpace(x.SiteId) || x.Width < 1 || x.Depth < 1)
@@ -277,9 +308,12 @@ namespace FoodFactoryGame.Goods
                 || state.Equipment.Any(x => x == null || string.IsNullOrWhiteSpace(x.Id) || string.IsNullOrWhiteSpace(x.Kind)
                     || !state.SiteLayouts.Any(y => y.SiteId == x.SiteId)
                     || x.Width < 1 || x.Depth < 1 || x.InputCapacity < 1 || x.OutputCapacity < 1
-                    || x.Seats < 0 || (x.Kind == TableKind) != (x.Seats > 0)
+                    || x.Seats < 0 || (x.Kind == TableKind && x.Seats < 1)
+                    || !SiteGrid.IsLayer(x.Layer) || (x.Layer != null && x.Layer != "" && x.Level != 0) || x.Ambience < 0 || x.ChargedCents < 0
+                    || x.StaffId == null || (x.StaffId != "" && !StaffValid(state, x))
                     || (x.State != EquipmentState.Placed && x.State != EquipmentState.Held))
-                || state.Equipment.GroupBy(x => x.Id).Any(x => x.Count() != 1))
+                || state.Equipment.GroupBy(x => x.Id).Any(x => x.Count() != 1)
+                || state.Equipment.Where(x => x.StaffId != "").GroupBy(x => x.StaffId).Any(x => x.Count() != 1))
                 throw new InvalidOperationException("Goods snapshot violates equipment or layout invariants.");
             foreach (var equipment in state.Equipment)
             {

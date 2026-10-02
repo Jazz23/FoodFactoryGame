@@ -70,6 +70,11 @@ namespace FoodFactoryGame.Benchmarks.Tests
                         Id = $"{id}-bread-{counter}", ItemId = "bread", OwnerId = id, LocationId = $"{id}-counter-{counter}:in",
                         Quantity = 200, SpoilAfterSeconds = 100000
                     });
+                    // A register sells only while staffed (decision 0034): one TEST staff member works each one.
+                    var staff = $"staff-{id}-{counter}";
+                    world.Bootstrap(new GoodsLocation { Id = GoodsWorld.InventoryLocationId(staff), SiteId = id, Kind = "carried", Capacity = 1 });
+                    world.Grant(staff, id);
+                    world.Staff(staff, "staff", $"{id}-counter-{counter}", staff);
                 }
                 for (var table = 0; table < 5; table++)
                     world.Bootstrap(new GoodsEquipment

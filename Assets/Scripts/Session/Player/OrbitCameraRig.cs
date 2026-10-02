@@ -7,6 +7,8 @@
 // not orbit it. Each view zooms its own distance in steps, and Yaw follows the blend so movement stays screen-relative.
 // Indoors uses the top-down view (GDD section 3): SetIndoors switches views only when the avatar crosses a building's
 // threshold, so SwitchCamera still overrides the view until the next crossing (decision 0019).
+// Build mode (decision 0034) frames a whole lot: while BuildFocus is set the top-down view looks down on that point from
+// BuildDistance instead of following the avatar, and the previous view returns when it is cleared.
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -48,6 +50,20 @@ namespace FoodFactoryGame.Session.Player
         public bool TopDown { get; private set; }
         // Presentation state owned by the local interaction layer; false while an inventory or machine screen is open.
         public bool OrbitEnabled { get; set; } = true;
+        // Build mode's framing (decision 0034); null while the rig follows the avatar.
+        public Vector3? BuildFocus { get; private set; }
+        public float BuildDistance { get; private set; }
+        private bool _topDownBeforeBuild;
+
+        // Looks straight down on focus from distance metres (null focus returns to the view used before).
+        public void SetBuildView(Vector3? focus, float distance)
+        {
+            if (focus.HasValue && !BuildFocus.HasValue) _topDownBeforeBuild = TopDown;
+            if (!focus.HasValue && BuildFocus.HasValue) SetTopDown(_topDownBeforeBuild || _indoors);
+            BuildFocus = focus;
+            BuildDistance = distance;
+            if (focus.HasValue) SetTopDown(true);
+        }
 
         private float Eased => Mathf.SmoothStep(0f, 1f, _blend);
 
@@ -67,14 +83,17 @@ namespace FoodFactoryGame.Session.Player
             switchViewAction.action.Disable();
         }
 
-        private void OnSwitchView(InputAction.CallbackContext _) => SetTopDown(!TopDown);
+        private void OnSwitchView(InputAction.CallbackContext _)
+        {
+            if (!BuildFocus.HasValue) SetTopDown(!TopDown);
+        }
 
         // Presentation state from the local building presenter: true while the avatar stands inside a building.
         public void SetIndoors(bool indoors)
         {
             if (indoors == _indoors) return;
             _indoors = indoors;
-            SetTopDown(indoors);
+            if (!BuildFocus.HasValue) SetTopDown(indoors);
         }
 
         private void SetTopDown(bool topDown)
@@ -107,7 +126,7 @@ namespace FoodFactoryGame.Session.Player
 
             // The rig ignores the avatar's facing; only position follows the target.
             var eased = Eased;
-            var focus = target.position + Vector3.up * focusHeight;
+            var focus = BuildFocus ?? target.position + Vector3.up * focusHeight;
             var shoulder = focus + Quaternion.Euler(0f, yaw, 0f) * Vector3.right * shoulderOffset;
             transform.SetPositionAndRotation(Vector3.Lerp(shoulder, focus, eased),
                 Quaternion.Slerp(Quaternion.Euler(pitch, yaw, 0f), Quaternion.Euler(90f, _topDownYaw, 0f), eased));
@@ -115,7 +134,8 @@ namespace FoodFactoryGame.Session.Player
             var orbitDistance = pitch < 0f
                 ? Mathf.Min(distance, Mathf.Max(0f, focusHeight - floorClearance) / Mathf.Sin(-pitch * Mathf.Deg2Rad))
                 : distance;
-            cameraTransform.SetLocalPositionAndRotation(new Vector3(0f, 0f, -Mathf.Lerp(orbitDistance, topDownDistance, eased)), Quaternion.identity);
+            var downDistance = BuildFocus.HasValue ? BuildDistance : topDownDistance;
+            cameraTransform.SetLocalPositionAndRotation(new Vector3(0f, 0f, -Mathf.Lerp(orbitDistance, downDistance, eased)), Quaternion.identity);
         }
     }
 }

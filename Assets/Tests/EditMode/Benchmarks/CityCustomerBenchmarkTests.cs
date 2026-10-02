@@ -75,6 +75,10 @@ namespace FoodFactoryGame.Benchmarks.Tests
             {
                 Id = "bread", ItemId = "bread", OwnerId = start.SiteId, LocationId = "counter:in", Quantity = 400, SpoilAfterSeconds = 10_000_000
             });
+            // A register sells only while staffed (decision 0034): a TEST staff member works it.
+            world.Bootstrap(new GoodsLocation { Id = GoodsWorld.InventoryLocationId("staff"), SiteId = start.SiteId, Kind = "carried", Capacity = 1 });
+            world.Grant("staff", start.SiteId);
+            world.Staff("staff", "staff", "counter", "staff");
             foreach (var district in WorldLayoutCustomers.Districts(layout)) world.Bootstrap(district);
             foreach (var competitor in WorldLayoutCustomers.Competitors(layout)) world.Bootstrap(competitor);
             return (world, start.SiteId);

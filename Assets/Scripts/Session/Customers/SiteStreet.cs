@@ -19,6 +19,14 @@ namespace FoodFactoryGame.Session.Customers
         public static Vector2Int? Outward(SiteLayout layout, IEnumerable<GoodsBuilding> buildings)
         {
             if (layout == null) return null;
+            // A generated lot's street is the side its access cell lies past (decision 0028); this holds however the owner has
+            // resized the shell (decision 0034). The shape rule below is for lots the placement does not know.
+            var placement = SitePlacement.Active;
+            var lot = placement?.LotOf(layout.SiteId);
+            var offer = lot == null ? null : placement.OfferOf(lot.Id);
+            if (offer != null)
+                return offer.AccessZ >= offer.LotZ + offer.Depth ? new Vector2Int(0, 1) : offer.AccessZ < offer.LotZ ? new Vector2Int(0, -1)
+                    : offer.AccessX < offer.LotX ? new Vector2Int(-1, 0) : new Vector2Int(1, 0);
             var shell = buildings?.FirstOrDefault(x => x.SiteId == layout.SiteId);
             if (shell == null) return null;
             var spansX = shell.CellX == 0 && shell.Width == layout.Width;

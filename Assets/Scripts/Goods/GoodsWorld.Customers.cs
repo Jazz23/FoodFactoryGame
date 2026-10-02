@@ -105,6 +105,10 @@ namespace FoodFactoryGame.Goods
     {
         public const string CounterKind = "counter";
         public const string TableKind = "table";
+
+        // A dining table is any piece with seats (decision 0034 adds table models of their own kinds); the original kind
+        // "table" always has seats.
+        public static bool IsTable(GoodsEquipment equipment) => equipment != null && equipment.Seats > 0;
         // PROTOTYPE tuning (decision 0024 leaves these open).
         public const int WalkMetresPerSecond = 2;
         public const int PublishIntervalSeconds = 5;
@@ -127,6 +131,8 @@ namespace FoodFactoryGame.Goods
             public int Servers;
             public long ServiceSeconds;
             public int Seats;
+            // Decision 0034: the restaurant's ambience score (RestaurantRules.Ambience); 0 for competitors (PROTOTYPE).
+            public int Ambience;
             public readonly List<GoodsCustomer> Queue = new();
             public readonly Dictionary<string, int> SeatsUsed = new();
             public readonly HashSet<string> BusyCounters = new();
@@ -153,10 +159,9 @@ namespace FoodFactoryGame.Goods
             _customerIndexDirty = true;
         }
 
-        private void InvalidateDinersFor(GoodsEquipment equipment)
-        {
-            if (equipment.Kind == CounterKind || equipment.Kind == TableKind) InvalidateDiners();
-        }
+        // Any placed or removed piece may open or close a path between the street, a register and a table, or change ambience
+        // (decision 0034), so every equipment change rebuilds the catalog.
+        private void InvalidateDinersFor(GoodsEquipment equipment) => InvalidateDiners();
 
         // Server-only map data, like a site's map record.
         public void Bootstrap(GoodsDistrict district)
@@ -286,8 +291,11 @@ namespace FoodFactoryGame.Goods
                     record.Reputation -= Math.Sign(record.Reputation);
         }
 
-        // Every restaurant customers may choose, by ID. A player restaurant is a mapped site with a company, a placed counter and
-        // a menu; its servers are its counters and its seats are those of its placed tables.
+        // Every restaurant customers may choose, by ID. A player restaurant is a mapped site with a company, a menu and a staffed
+        // register (a placed counter, decision 0034) that customers can walk to from the site's edge; its servers are those
+        // registers and its seats are those of the placed tables customers can walk to (PROTOTYPE seat rule of decision 0034:
+        // registers and tables count only when a walkable path from outside reaches them, so the path door to register to seat
+        // exists).
         private List<Diner> Diners()
         {
             if (_cachedDiners is not null)
@@ -300,13 +308,18 @@ namespace FoodFactoryGame.Goods
             foreach (var site in _state.Sites)
             {
                 var placed = _state.Equipment.Where(x => x.SiteId == site.Id && x.State == EquipmentState.Placed).OrderBy(x => x.Id, StringComparer.Ordinal).ToList();
-                var counters = placed.Where(x => x.Kind == CounterKind).ToList();
+                var counters = placed.Where(x => x.Kind == CounterKind && !string.IsNullOrEmpty(x.StaffId)).ToList();
                 if (menu.Count == 0 || counters.Count == 0 || CompanyOfSiteLocked(site.Id) is null) continue;
-                var tables = placed.Where(x => x.Kind == TableKind).ToList();
+                var reached = RestaurantRules.Reached(RestaurantRules.Walkable(_state, site.Id),
+                    RestaurantRules.EdgeCells(_state.SiteLayouts.FirstOrDefault(x => x.SiteId == site.Id)));
+                counters = counters.Where(x => x.Level == 0 && RestaurantRules.Touches(reached, x)).ToList();
+                if (counters.Count == 0) continue;
+                var tables = placed.Where(x => IsTable(x) && x.Level == 0 && RestaurantRules.Touches(reached, x)).ToList();
                 diners.Add(new Diner
                 {
                     Id = site.Id, Player = true, MapX = site.MapX, MapZ = site.MapZ, Menu = menu, Counters = counters, Tables = tables,
-                    Servers = counters.Count, ServiceSeconds = menu[0].DurationSeconds, Seats = tables.Sum(x => x.Seats)
+                    Servers = counters.Count, ServiceSeconds = menu[0].DurationSeconds, Seats = tables.Sum(x => x.Seats),
+                    Ambience = RestaurantRules.Ambience(_state, site.Id)
                 });
             }
             foreach (var competitor in _state.Competitors)
@@ -424,6 +437,7 @@ namespace FoodFactoryGame.Goods
                     - 0.5 * distance / 100.0
                     - 0.5 * (record?.PublishedWaitSeconds ?? 0) / 60.0
                     + (record?.Reputation ?? 0) / (double)ReputationLimit
+                    + RestaurantRules.AmbienceWeight * diner.Ambience / RestaurantRules.AmbienceCap
                     + (customer.DineIn ? (freeSeats > 0 ? 0.5 : -1.0) : 0.0);
                 var weight = Math.Exp(score);
                 options.Add((diner, recipeId, weight));
@@ -601,7 +615,7 @@ namespace FoodFactoryGame.Goods
             var competitors = state.Competitors.ToDictionary(x => x.Id, StringComparer.Ordinal);
             var equipment = state.Equipment.ToDictionary(x => x.Id, StringComparer.Ordinal);
             var seats = new Dictionary<string, int>(StringComparer.Ordinal);
-            foreach (var table in state.Equipment.Where(x => x.Kind == TableKind)) seats.Add(table.Id, table.Seats);
+            foreach (var table in state.Equipment.Where(IsTable)) seats.Add(table.Id, table.Seats);
             foreach (var competitor in state.Competitors) seats.Add(competitor.Id, competitor.Seats);
             var ordering = new Dictionary<string, int>(StringComparer.Ordinal);
             foreach (var customer in state.Customers)
@@ -633,7 +647,7 @@ namespace FoodFactoryGame.Goods
             Dictionary<string, GoodsEquipment> equipment)
         {
             var competitor = competitors.ContainsKey(customer.RestaurantId);
-            bool Placed(string id, string kind) => equipment.TryGetValue(id, out var piece) && piece.Kind == kind
+            bool Placed(string id, string kind) => equipment.TryGetValue(id, out var piece) && (kind == TableKind ? IsTable(piece) : piece.Kind == kind)
                 && piece.SiteId == customer.RestaurantId && piece.State == EquipmentState.Placed;
             var seat = customer.DineIn && (competitor ? customer.TableId == customer.RestaurantId : Placed(customer.TableId, TableKind));
             return customer.State switch

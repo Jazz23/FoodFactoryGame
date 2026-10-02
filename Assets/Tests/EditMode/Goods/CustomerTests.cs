@@ -47,6 +47,8 @@ namespace FoodFactoryGame.Goods.Tests
             });
             world.Bootstrap(new GoodsCompany { Id = "co", Cash = 1000, SiteIds = { "restaurant" } });
             world.Grant("chef", "restaurant");
+            // A register sells only while staffed (decision 0034): the chef works the counter.
+            Assert.That(world.Staff("chef", "staff-counter", "counter-1", "chef").Accepted, Is.True);
             world.RegisterRecipe(SellBread());
             world.AutomaticJobs = true;
             return world;

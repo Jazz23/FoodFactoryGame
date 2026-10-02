@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9c77d3e4774f0c945971924e55f4e458, type: 3}
+  m_Name: RT_Floor_KitchenTile_1m
+  m_EditorClassIdentifier: FoodFactoryGame.Session::FoodFactoryGame.Session.Equipment.EquipmentDefinition
+  kind: rt-floor-kitchen
+  width: 1
+  depth: 1
+  inputCapacity: 1
+  outputCapacity: 1
+  inputRefrigerated: 0
+  outputRefrigerated: 0
+  seats: 0
+  visualPrefab: {fileID: 3079134996332639570, guid: 34e86a298a9d61b4f921dea5cd9a42a8, type: 3}
+  icon: {fileID: 21300000, guid: 00704c5c2f72ec7438bbfebb16ce91f2, type: 3}
+  layer: floor
+  ambience: 1
+  displayName: "Kitchen tile floor (1 m\xB2)"
+  category: Surfaces
+  mount: 1
+  mountHeight: 1.5
+  hideFromAbove: 0
+  opensScreen: 0

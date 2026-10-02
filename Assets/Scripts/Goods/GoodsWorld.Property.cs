@@ -49,6 +49,9 @@ namespace FoodFactoryGame.Goods
         public int BuildingDepth;
         public List<GridCell> Doors = new();
         public int Floors = 1;
+        // The lot's district price multiplier in percent (100 = list price); structure orders on the site are scaled by it
+        // (decision 0034, PROTOTYPE pricing).
+        public int PricePercent = 100;
 
         public bool IsShell => Category == GoodsWorld.RestaurantKind || Category == GoodsWorld.FactoryKind;
     }
@@ -187,7 +190,7 @@ namespace FoodFactoryGame.Goods
             if (string.IsNullOrWhiteSpace(offer.LotId) || string.IsNullOrWhiteSpace(offer.SiteId) || offer.SiteId == RoadSiteId
                 || string.IsNullOrWhiteSpace(offer.BuildingId) || offer.PriceCents < 1 || offer.Width < 1 || offer.Depth < 1 || offer.Doors is null
                 || (!offer.IsShell && offer.Category != FarmCategory && offer.Category != StationCategory)
-                || offer.BuildingX < 0 || offer.BuildingZ < 0 || offer.BuildingWidth < 1 || offer.BuildingDepth < 1
+                || offer.PricePercent < 1 || offer.BuildingX < 0 || offer.BuildingZ < 0 || offer.BuildingWidth < 1 || offer.BuildingDepth < 1
                 || offer.BuildingX + offer.BuildingWidth > offer.Width || offer.BuildingZ + offer.BuildingDepth > offer.Depth)
                 return "invalid-offer";
             if (!offer.IsShell) return null;

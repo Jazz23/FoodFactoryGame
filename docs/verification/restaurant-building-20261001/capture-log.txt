@@ -1,0 +1,27 @@
+room:shell-changed
+room-door:shell-changed
+hatch:shell-changed
+floor:bought
+supplier-rt-table-bistro@2,4:ok
+supplier-rt-chair-spindle@1,4:ok
+supplier-rt-chair-spindle@3,4:ok
+supplier-rt-vase@2,4:ok
+supplier-rt-pendant@2,4:ok
+supplier-rt-table-bistro@2,7:ok
+supplier-rt-chair-spindle@1,7:ok
+supplier-rt-chair-spindle@3,7:ok
+supplier-rt-vase@2,7:ok
+supplier-rt-pendant@2,7:ok
+supplier-rt-table-bistro@5,7:ok
+supplier-rt-chair-spindle@4,7:ok
+supplier-rt-chair-spindle@6,7:ok
+supplier-rt-vase@5,7:ok
+supplier-rt-pendant@5,7:ok
+supplier-rt-plant-floor@1,3:ok
+supplier-rt-plant-floor@1,4:blocked
+supplier-rt-plant-floor@1,5:ok
+supplier-rt-plant-floor@1,6:ok
+supplier-rt-sconce@2,9:ok
+supplier-rt-wall-art@4,9:ok
+supplier-rt-sconce@6,9:ok
+ambience 81

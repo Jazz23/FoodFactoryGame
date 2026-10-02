@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9c77d3e4774f0c945971924e55f4e458, type: 3}
+  m_Name: RT_CoatStand
+  m_EditorClassIdentifier: FoodFactoryGame.Session::FoodFactoryGame.Session.Equipment.EquipmentDefinition
+  kind: rt-coat-stand
+  width: 1
+  depth: 1
+  inputCapacity: 1
+  outputCapacity: 1
+  inputRefrigerated: 0
+  outputRefrigerated: 0
+  seats: 0
+  visualPrefab: {fileID: 3098378710925365554, guid: 661b62f297f233f4587d1ddbd1a96620, type: 3}
+  icon: {fileID: 21300000, guid: 895fc06b1c279eb4694ecc3bc51739bc, type: 3}
+  layer: 
+  ambience: 2
+  displayName: Coat stand
+  category: Decor
+  mount: 0
+  mountHeight: 1.5
+  hideFromAbove: 0
+  opensScreen: 0

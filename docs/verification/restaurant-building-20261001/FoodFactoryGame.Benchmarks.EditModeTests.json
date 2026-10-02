@@ -1,0 +1,76 @@
+﻿{
+  "status": "completed",
+  "duration": 4.06,
+  "summary": {
+    "total": 9,
+    "passed": 7,
+    "failed": 2,
+    "skipped": 0,
+    "inconclusive": 0
+  },
+  "results": [
+    {
+      "FullName": "FoodFactoryGame.Benchmarks.Tests.CityCustomerBenchmarkTests.AGeneratedCityFitsAFrameAndCommitsUnderTheWarningSignals",
+      "Status": "Failed",
+      "Duration": 1.8206028,
+      "Message": "  Expected: <empty>\r\n  But was:  < \"max commit 164.4 ms exceeds the decision 0012 signal (50 ms)\" >\r\n",
+      "StackTrace": "at FoodFactoryGame.Benchmarks.Tests.CityCustomerBenchmarkTests.AGeneratedCityFitsAFrameAndCommitsUnderTheWarningSignals () [0x00842] in G:\\Unity\\FoodFactoryGame\\Assets\\Tests\\EditMode\\Benchmarks\\CityCustomerBenchmarkTests.cs:172\r\n"
+    },
+    {
+      "FullName": "FoodFactoryGame.Benchmarks.Tests.CityCustomerBenchmarkTests.CrowdViewsForEightConnectionsStayUnderTheirBudget",
+      "Status": "Passed",
+      "Duration": 1.1502722,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "FoodFactoryGame.Benchmarks.Tests.CustomerChoiceBenchmarkTests.AllocationCheck_DetectsAnAllocation",
+      "Status": "Passed",
+      "Duration": 0.0119883,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "FoodFactoryGame.Benchmarks.Tests.CustomerChoiceBenchmarkTests.LunchRush_EveryCustomerDecidesInOneTick",
+      "Status": "Passed",
+      "Duration": 0.0112505,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "FoodFactoryGame.Benchmarks.Tests.CustomerChoiceBenchmarkTests.SameSeed_GivesSameOutcome",
+      "Status": "Passed",
+      "Duration": 0.0191427,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "FoodFactoryGame.Benchmarks.Tests.CustomerChoiceBenchmarkTests.TargetPopulation_SteadyTickFitsProvisionalBudget",
+      "Status": "Passed",
+      "Duration": 0.0433637,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "FoodFactoryGame.Benchmarks.Tests.CustomerChoiceBenchmarkTests.TenfoldPopulation_ReportsScaling",
+      "Status": "Passed",
+      "Duration": 0.1253398,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "FoodFactoryGame.Benchmarks.Tests.CustomerChoiceBenchmarkTests.WaitSignal_ComparesLiveBestScoreWithPublishedLogit",
+      "Status": "Passed",
+      "Duration": 0.080908,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "FoodFactoryGame.Benchmarks.Tests.CustomerRuntimeBenchmarkTests.ThousandCustomersFitAFrameAndCommitUnderTheWarningSignals",
+      "Status": "Failed",
+      "Duration": 0.7351185,
+      "Message": "  The synthetic districts must reach the target population (reached 468 after 1800 s).\r\n  Expected: greater than or equal to 1000\r\n  But was:  468\r\n",
+      "StackTrace": "at FoodFactoryGame.Benchmarks.Tests.CustomerRuntimeBenchmarkTests.ThousandCustomersFitAFrameAndCommitUnderTheWarningSignals () [0x00093] in G:\\Unity\\FoodFactoryGame\\Assets\\Tests\\EditMode\\Benchmarks\\CustomerRuntimeBenchmarkTests.cs:116\r\n"
+    }
+  ]
+}

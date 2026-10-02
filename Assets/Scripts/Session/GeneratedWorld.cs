@@ -32,7 +32,7 @@ namespace FoodFactoryGame.Session
         {
             var lot = layout.Lots.FirstOrDefault(x => x.BuildingId == layout.StartRestaurantId)
                 ?? throw new System.ArgumentException("The layout has no lot for its starting restaurant.");
-            return WorldLayoutShells.ToOffer(lot, layout.Buildings.First(x => x.Id == lot.BuildingId));
+            return WorldLayoutShells.PropertyOffers(layout).First(x => x.LotId == lot.Id);
         }
 
         // Returns a world that matches its committed snapshot (GoodsNetworkBridge.InitializeServer requires it), with the

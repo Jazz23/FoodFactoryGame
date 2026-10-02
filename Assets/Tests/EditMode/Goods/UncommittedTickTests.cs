@@ -128,6 +128,9 @@ namespace FoodFactoryGame.Goods.Tests
                 InputCapacity = 5, OutputCapacity = 1
             });
             _world.Bootstrap(new GoodsCompany { Id = "company", Cash = 1000, SiteIds = { "restaurant" } });
+            // A register sells only while staffed (decision 0034): the chef works it.
+            _world.Bootstrap(new GoodsLocation { Id = "carried:chef", SiteId = "restaurant", Kind = "carried", Capacity = 1 });
+            Assert.That(_world.Staff("chef", "staff", "counter", "chef").Accepted, Is.True);
             _world.RegisterRecipe(new RecipeDefinition
             {
                 Id = "sell", StationKind = GoodsWorld.CounterKind, DurationSeconds = 4, Tier = 1, Cuisine = "bakery",

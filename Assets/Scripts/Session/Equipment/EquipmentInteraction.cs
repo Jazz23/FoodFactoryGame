@@ -35,7 +35,9 @@ namespace FoodFactoryGame.Session.Equipment
         // Trucks, routes and the company's remote sites (decision 0022, LogisticsPanel).
         Logistics,
         // A map building's price, owner and Buy button (decision 0028, PropertyPanel).
-        Property
+        Property,
+        // Restaurant build mode (decision 0034, BuildMode): top-down grid, ghosts, prices and orders.
+        Build
     }
 
     // One slot's goods stack (item and spoiled state, up to the item's max stack) in one container, carried on the cursor.
@@ -172,6 +174,8 @@ namespace FoodFactoryGame.Session.Equipment
         // Set by the HUD: the machine or item of the stack under the pointer on an open screen (null when none), so a hotbar
         // key there assigns it to that slot instead of selecting the slot.
         public Func<HotbarEntry> HoveredEntry { get; set; }
+        // Set by build mode: true when Esc was taken to cancel an unconfirmed order instead of closing the screen.
+        public Func<bool> BuildEscape { get; set; }
 
         // The cursor's machine kind, or an unspoiled goods stack carried from the inventory.
         private HotbarEntry CursorEntry => CursorKind != null ? HotbarEntry.Machine(CursorKind)
@@ -289,7 +293,8 @@ namespace FoodFactoryGame.Session.Equipment
                     InteractionScreen.Inventory => "Inventory: click a slot to pick up or put down, shift+click to move a stack across, 1-9 over a stack or dropping it on the hotbar assigns it there, Buy spends company cash at the supplier; E or Esc closes" + suffix,
                     // A sale station (decision 0013) has no results to take: it sells its input for the company.
                     InteractionScreen.Machine when _openMachineSells =>
-                        "Counter: put edible goods in the input; customers queue here and buy them for the company (shift+click moves a stack); E or Esc closes" + suffix,
+                        "Register: put edible goods in the input; customers queue and pay here only while someone works it (Work this register); E or Esc closes" + suffix,
+                    InteractionScreen.Build => "Build mode: pick a tool or item, click to place, drag to draw, Enter or Confirm to order, right click sells or removes; B or Esc leaves" + suffix,
                     InteractionScreen.Machine when _openMachineTable =>
                         "Table: customers who dine in buy only once a seat is free, then sit here to eat; right click picks it up when nobody sits here; E or Esc closes" + suffix,
                     InteractionScreen.Machine when _openMachineDock =>
@@ -303,7 +308,7 @@ namespace FoodFactoryGame.Session.Equipment
                         + (PickText != null ? $" [{PickText}]" : ""),
                     InteractionScreen.Machine => "Machine: put ingredients in the input, take results from the output (shift+click moves a stack); E or Esc closes" + suffix,
                     _ => _released ? "Cursor released: click to resume" + suffix
-                        : ElevatorHint() + HoverHint() + "E: inventory (pick belts or goods to carry them out), L: trucks, 1-9: hotbar, left click: open machine, right click: pick up, R: turn belt, F: take an item off a belt" + suffix
+                        : ElevatorHint() + HoverHint() + "B: build mode, E: inventory (pick belts or goods to carry them out), L: trucks, 1-9: hotbar, left click: open machine, right click: pick up, R: turn belt, F: take an item off a belt" + suffix
                 };
                 return;
             }
@@ -493,6 +498,8 @@ namespace FoodFactoryGame.Session.Equipment
         {
             if (_camera == null || session.ClientSite?.Equipment.Any(x => x.Id == equipmentId && x.State == EquipmentState.Placed) != true)
                 return;
+            var opened = session.ClientSite.Equipment.First(x => x.Id == equipmentId);
+            if (session.EquipmentDefinitions.FirstOrDefault(x => x != null && x.Kind == opened.Kind)?.OpensScreen == false) return;
             Screen = InteractionScreen.Machine;
             OpenMachineId = equipmentId;
             // Decided once per opening rather than every frame: a sale station (decision 0013) gets the counter hint.
@@ -501,7 +508,7 @@ namespace FoodFactoryGame.Session.Equipment
             // A machine with no recipes is storage (the fridge, decision 0018) and gets the storage hint.
             _openMachineStores = !session.Recipes.Any(x => x != null && x.StationKind == kind);
             _openMachineDock = kind == GoodsWorld.DockKind;
-            _openMachineTable = kind == GoodsWorld.TableKind;
+            _openMachineTable = GoodsWorld.IsTable(session.ClientSite.Equipment.First(x => x.Id == equipmentId));
             _awaitingRelease = true;
         }
 
@@ -552,6 +559,27 @@ namespace FoodFactoryGame.Session.Equipment
             LastRejection = null;
             // The subscribed site: the one whose balance and inventory this client shows.
             bridge.RequestPurchase(Track(), _subscription.SiteId, offerId);
+        }
+
+        // Works a register (decision 0034): staffId is this player's ID, an employee's, or empty to leave it unstaffed. The server
+        // checks the register and the staff; nothing changes here until the next baseline.
+        public void Staff(string registerId, string staffId)
+        {
+            var bridge = _subscription?.Bridge;
+            if (bridge == null || string.IsNullOrEmpty(registerId)) return;
+            LastRejection = null;
+            bridge.RequestStaff(Track(), registerId, staffId ?? "");
+        }
+
+        // Opens and closes build mode (decision 0034, BuildMode): a screen of its own, so the world controls here stand aside
+        // while it is open.
+        public bool OpenBuild()
+        {
+            if (Screen != InteractionScreen.None || _camera == null || session.ClientSite == null) return false;
+            ClearCursor();
+            Screen = InteractionScreen.Build;
+            _awaitingRelease = true;
+            return true;
         }
 
         private void OnPlace(InputAction.CallbackContext _)
@@ -637,6 +665,8 @@ namespace FoodFactoryGame.Session.Equipment
         // left) until the next click.
         private void OnCloseScreen(InputAction.CallbackContext _)
         {
+            // Build mode first drops a drawn but unconfirmed order; the next Esc leaves it.
+            if (Screen == InteractionScreen.Build && BuildEscape?.Invoke() == true) return;
             if (Screen == InteractionScreen.PickPosition) CancelPick();
             else if (Screen != InteractionScreen.None) CloseScreen();
             else if (CursorKind != null || CursorGoods != null) ClearCursor();

@@ -15,10 +15,16 @@ namespace FoodFactoryGame.Goods
         public static List<PropertyOffer> PropertyOffers(WorldLayout layout)
         {
             var buildings = layout.Buildings.ToDictionary(x => x.Id, StringComparer.Ordinal);
-            return layout.Lots.Select(x => ToOffer(x, buildings[x.BuildingId])).ToList();
+            var percents = layout.Districts.ToDictionary(x => x.Id, x => x.PricePercent, StringComparer.Ordinal);
+            return layout.Lots.Select(x =>
+            {
+                var building = buildings[x.BuildingId];
+                return ToOffer(x, building, percents.TryGetValue(building.DistrictId ?? "", out var percent) && percent > 0 ? percent : 100);
+            }).ToList();
         }
 
-        public static PropertyOffer ToOffer(WorldLot lot, WorldBuilding building)
+        // pricePercent: the lot's district price multiplier (decision 0034 prices structure with it); 100 without a district.
+        public static PropertyOffer ToOffer(WorldLot lot, WorldBuilding building, int pricePercent = 100)
         {
             if (lot == null || building == null || lot.BuildingId != building.Id || !building.HasLot)
                 throw new ArgumentException("A lot converts only with its own property building.");
@@ -29,7 +35,7 @@ namespace FoodFactoryGame.Goods
                 LotX = lot.X, LotZ = lot.Z, Width = lot.Width, Depth = lot.Depth, AccessX = lot.Access.X, AccessZ = lot.Access.Z,
                 BuildingX = building.X - lot.X, BuildingZ = building.Z - lot.Z, BuildingWidth = building.Width, BuildingDepth = building.Depth,
                 Doors = building.Doors.Select(x => new GridCell { X = x.X - lot.X, Z = x.Z - lot.Z }).ToList(),
-                Floors = building.IsShell ? building.Floors : 1
+                Floors = building.IsShell ? building.Floors : 1, PricePercent = pricePercent
             };
         }
 

@@ -43,6 +43,8 @@ namespace FoodFactoryGame.Goods
                 inventory.SiteId = siteId;
                 foreach (var carriedLot in carried) carriedLot.OwnerId = siteId;
                 foreach (var held in _state.Equipment.Where(x => x.State == EquipmentState.Held && x.HolderId == playerId)) held.SiteId = siteId;
+                // A player who leaves no longer staffs a register on the old site (decision 0034).
+                if (ReleaseStaffLocked(playerId)) InvalidateDiners();
                 return Record(requestId, playerId, true, "entered", null);
             }
         }
