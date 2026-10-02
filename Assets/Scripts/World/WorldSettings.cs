@@ -122,7 +122,7 @@ namespace FoodFactoryGame.World
         public int MaxFarmGap = 20;
         public int FarmIndustrialSideBonusPercent = 30;
 
-        public SizeRange Restaurant = new(9, 16, 8, 14);
+        public SizeRange Restaurant = new(16, 24, 14, 20);
         public SizeRange Factory = new(20, 40, 18, 35);
         public SizeRange House = new(8, 12, 8, 12);
         public SizeRange LargeHouse = new(12, 18, 12, 18);
@@ -136,7 +136,7 @@ namespace FoodFactoryGame.World
         public long FarmCentsPerCell = 1500;
         public long StationCentsPerCell = 12000;
         // Largest footprint the starting restaurant may have.
-        public int StartMaxArea = 160;
+        public int StartMaxArea = 400;
 
         public int MaxAttempts = 8;
 

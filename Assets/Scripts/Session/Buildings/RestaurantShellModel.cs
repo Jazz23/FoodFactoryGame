@@ -4,8 +4,8 @@
 // piece toward each neighbour. A door cell draws a doorway bay with its frame and leaf; two door cells in line make a double
 // door with the 3 m bay. Bays reach half a cell into the neighbouring wall cells, so those leave out their half toward the door.
 // A window draws the 2 m opening bay over its two cells with the glazed unit at sill height (a serving hatch is all bay).
-// Thin kit walls stand on each cell's centreline; grid occupancy stays whole cells (decision 0019). Colliders are added by
-// BuildingPresenter, not here.
+// Thin kit walls stand on each cell's centreline; grid occupancy stays whole cells (decision 0019). Wall colliders are added by
+// BuildingPresenter, not here; each door leaf gets a DoorSwing, which opens it for people nearby and blocks while it is shut.
 using System.Collections.Generic;
 using System.Linq;
 using FoodFactoryGame.Goods;
@@ -95,15 +95,15 @@ namespace FoodFactoryGame.Session.Buildings
                     Place(catalog.DoubleDoorway, parent, center, yaw);
                     Place(catalog.DoubleFrame, parent, center, yaw);
                     var rotation = Quaternion.Euler(0f, yaw, 0f);
-                    Place(leaf, parent, center + rotation * new Vector3(DoubleHinge, 0.005f, 0f), yaw);
-                    Place(leaf, parent, center + rotation * new Vector3(-DoubleHinge, 0.005f, 0f), yaw + 180f);
+                    Swing(Place(leaf, parent, center + rotation * new Vector3(DoubleHinge, 0.005f, 0f), yaw), parent, center);
+                    Swing(Place(leaf, parent, center + rotation * new Vector3(-DoubleHinge, 0.005f, 0f), yaw + 180f), parent, center);
                 }
                 else
                 {
                     var center = Center(layout, cell);
                     Place(catalog.SingleDoorway, parent, center, yaw);
                     Place(catalog.SingleFrame, parent, center, yaw);
-                    Place(leaf, parent, center + Quaternion.Euler(0f, yaw, 0f) * new Vector3(SingleHinge, 0.005f, 0f), yaw);
+                    Swing(Place(leaf, parent, center + Quaternion.Euler(0f, yaw, 0f) * new Vector3(SingleHinge, 0.005f, 0f), yaw), parent, center);
                 }
             }
 
@@ -118,6 +118,12 @@ namespace FoodFactoryGame.Session.Buildings
                 Place(style.bay, parent, center, yaw);
                 if (style.window != null) Place(style.window, parent, center + Vector3.up * SillHeight, yaw);
             }
+        }
+
+        private static void Swing(GameObject leaf, Transform parent, Vector3 doorway)
+        {
+            if (leaf == null) return;
+            leaf.AddComponent<DoorSwing>().Init(parent.TransformPoint(doorway));
         }
 
         private static Vector3 Center(SiteLayout layout, (int X, int Z) cell) => SiteGridSpace.FootprintCenter(layout, cell.X, cell.Z, 1, 1);

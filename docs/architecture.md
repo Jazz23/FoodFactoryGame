@@ -42,7 +42,7 @@ The existing demo prefab catalog remains baseline authoring only.
 
 - `FoodFactoryGame.Goods` holds server-instantiated stable-ID lots and locations, integer quantities, one location per lot, owner/site grants, binary spoilage, elapsed exposure, active reservations, terminal command outcomes, and an integer-second authoritative clock. Ambient time accumulates exposure; refrigerated time does not (confirmed by the owner in [decision 0018](decisions/0018-spoilage-timing-and-refrigeration.md)). Moves retain prior exposure. Equivalent lots merge only when owner, location, item, condition, and exposure/threshold match; reserved lots cannot merge.
 - `Transfer` validates a same-site route, grant, source owner, unreserved quantity or owned reservation, and destination unit capacity before locked mutation. A partial transfer splits with a new ID. Duplicate request IDs replay stored terminal outcomes; another actor cannot replay someone else's outcome. `Cancel` releases an unconsumed reservation; committed transfers are not reversible. No in-flight transport or cross-site route has been implemented.
-- `GoodsSnapshotStore` serializes (schema v4 since conveyor belts, below) world ID, time/revision, lots, locations, grants, reservations, and outcomes with a checksum. An explicit path is required; each commit is one SQLite transaction that keeps the previous committed revision as a fallback (see [SQLite storage](#implemented-sqlite-storage-2026-09-23)). Recovery validates invariants; unknown newer schemas fail. Concurrent saves reject older/conflicting revisions. Every acknowledged mutation has a durable boundary: `TransferDurably`, `ReserveDurably`, `CancelDurably`, and the clock tick `TryAdvanceDurably` commit the snapshot before acknowledging and restore the pre-command state if the commit fails. Terminal outcomes are keyed per actor (player ID + request ID), so one actor cannot claim or poison another actor’s request ID. This is a goods-slice snapshot, **not** the full-world decision-0002 persistence contract; no production snapshot cadence is implemented; the only migrations are the in-memory v1→…→v16 upgrades (v5: company cash; v6: sale jobs; v7: building shells; v8: factory floors; v9: employee records; v10-v15: lifts, trucks, routes, customers, properties, competitor lots; v16: restaurant building; all below). The current goods snapshot schema is **v16** (restaurant building, 2026-10-01).
+- `GoodsSnapshotStore` serializes (schema v4 since conveyor belts, below) world ID, time/revision, lots, locations, grants, reservations, and outcomes with a checksum. An explicit path is required; each commit is one SQLite transaction that keeps the previous committed revision as a fallback (see [SQLite storage](#implemented-sqlite-storage-2026-09-23)). Recovery validates invariants; unknown newer schemas fail. Concurrent saves reject older/conflicting revisions. Every acknowledged mutation has a durable boundary: `TransferDurably`, `ReserveDurably`, `CancelDurably`, and the clock tick `TryAdvanceDurably` commit the snapshot before acknowledging and restore the pre-command state if the commit fails. Terminal outcomes are keyed per actor (player ID + request ID), so one actor cannot claim or poison another actor’s request ID. This is a goods-slice snapshot, **not** the full-world decision-0002 persistence contract; no production snapshot cadence is implemented; the only migrations are the in-memory v1→…→v16 upgrades (v5: company cash; v6: sale jobs; v7: building shells; v8: factory floors; v9: employee records; v10-v15: lifts, trucks, routes, customers, properties, competitor lots; v16: restaurant building; all below). The current goods snapshot schema is **v17** (free restaurant walls, 2026-10-02; v16: restaurant building).
 - `GoodsNetworkBridge` is compiled FishNet RPC transport for connection-resolved transfer intent/result and server-validated, revisioned full site baselines. It ticks the same world even with zero subscribers. Its `InitializeServer` requires a pre-existing matching committed save and an authenticated connection-to-player resolver supplied by a session owner. It also exposes reserve/cancel RPCs through the durable paths and rejects requests while clock persistence is failing. An Editor PlayMode listen-server fixture (host + separate loopback-UDP remote client, test-owned bootstrap and connection→player map) has demonstrated an authorized transfer, an unauthorized remote transfer and subscription rejection, a granted site baseline, and unsubscribed site progression persisted to the snapshot. There is still no production session owner or authenticator, player build, client UI, pickup visuals, or multi-process multiplayer evidence. Full baselines (not deltas) are used to avoid a partial replication protocol.
 - EditMode tests with *test-only* restaurant/ingredient/storage/fridge/kitchen capacities and spoilage threshold verify domain and isolated file recovery without any camera or client. The PlayMode fixture above covers the live FishNet path within one Editor process; it does not prove pickup projections, real authentication, or separate-process play. See [verification record](verification/goods-20260922.md).
 
@@ -379,7 +379,7 @@ filter_type assembly; status JSON in the same folder): `FoodFactoryGame.World.Ed
 being the known nondeterministic `TruckTests.StepSizeDoesNotChangeTheOutcome` (GUID tie-break; it passed in the batch run
 and in 1 of 3 `TruckTests` reruns, `editor-trucks-1..3.json`). Not run: PlayMode and multiplayer suites (no networking changed).
 
-- Generator: `WorldGenerator.Version` = 3, `WorldLayout.CurrentFormat` = 3. Every building that `HasLot` (restaurant and
+- Generator: `WorldGenerator.Version` = 3 (4 since 2026-10-02: larger restaurants, decision 0036), `WorldLayout.CurrentFormat` = 3. Every building that `HasLot` (restaurant and
   factory shells, farms, stations; ownership ForSale, Competitor or Player) gets one `WorldLot { Id = lot-<building>,
   BuildingId, SiteId = site-<building>, X, Z, Width, Depth, Access }` and `WorldBuilding.SiteId` = the lot's site ID; scenery
   gets neither. A lot is the footprint extended forward to its street by `WorldSettings.SetbackFor(category)` (`Setback` 2 m;
@@ -698,6 +698,23 @@ schema **v17**. Evidence: [verification record](verification/trucks-roads-202610
 Not done or open: a separate-process multiplayer check; independent review of the captures; city cars do not turn at
 junctions (each lane's stream ends at its node); traffic-light lamps do not show the simulated phase; no supplier deliveries,
 running costs or refrigerated trucks (see decision 0032 Out of scope).
+
+## Implemented: restaurant building feedback round 1 (2026-10-02)
+
+Decision: [0036](decisions/0036-restaurant-building-feedback.md). Goods snapshot schema **v17**; `WorldGenerator.Version` 4.
+This supersedes the resize and build-mode parts of the section above.
+
+- Free walls: a restaurant's first shell order converts its perimeter to wall records (`GoodsBuilding.FreeWalls`); then outer
+  and inner walls are drawn and removed alike anywhere in the lot, the footprint is the walls' bounding box and the interior is
+  what they enclose (`SiteGrid.IsInterior`, `InteriorCells`). Build mode no longer offers Resize; the planner rejects it on free
+  walls. New reasons `no-walls`, `invalid-order`.
+- Presentation: indoor ceiling outside the top-down view; floor, roof and ceiling over enclosed cells; auto-opening door leaves
+  with a closed-door collider (`DoorSwing`, `DoorOpener`); customer figures route over walkable cells through doors (`SiteWalk`);
+  one-level LOD culling of far visuals (`DistanceCulling`); wall decor faces away from its wall and sinks back onto walls
+  (`EquipmentMount.Backed`).
+- Camera and input: third-person camera collision and ceiling clamp; build-mode pan (Move), zoom (Zoom) and tilt (new
+  Player/CameraTilt, right mouse); Cancel and ClearCursor (X) clear the build selection; right click removes only without a drag.
+- Content: larger generated restaurants; the ceiling panel is withdrawn.
 
 ## Baseline Test Evolution
 

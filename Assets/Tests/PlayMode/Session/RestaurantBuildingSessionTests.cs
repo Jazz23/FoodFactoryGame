@@ -1,5 +1,6 @@
 // Runs restaurant building (decision 0034) in the real WorldGen scene as a host with a loopback-UDP remote teammate, on a new
-// generated world in a unique temporary directory: build-mode orders (resize, interior wall, furnishing, wall decor, a sale)
+// generated world in a unique temporary directory: build-mode orders (removing and redrawing an outer wall, interior wall,
+// furnishing, wall decor, a sale)
 // reach the server and both clients and charge or refund exactly; a teammate's refused order changes nothing; register staffing
 // replicates and ends when the player disconnects; restaurant docks placed in the yard serve one truck at a time and deliver to
 // a teammate's view. An Explicit test renders the build-mode and decorated-restaurant captures for visual acceptance. The
@@ -134,6 +135,10 @@ namespace FoodFactoryGame.Session.PlayModeTests
             return _remoteSite.Latest;
         }
 
+        // Every door of a shell: its perimeter doors, or with free walls (decision 0036) its door records.
+        private static IEnumerable<(int X, int Z)> DoorCells(GoodsBuilding shell) =>
+            shell.Doors.Select(d => (d.X, d.Z)).Concat(shell.Structures.Where(s => s.Kind == GoodsWorld.DoorStructure).Select(s => (s.X, s.Z))).Distinct();
+
         // Interior cells (strictly inside, no wall) whose footprint the build preview accepts for the chosen item.
         private (int X, int Z) FreeInterior(GoodsSnapshot site, int width, int depth, Func<(int X, int Z), bool> extra = null)
         {
@@ -141,7 +146,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
             return Enumerable.Range(0, Start.Width * Start.Depth).Select(i => (X: i % Start.Width, Z: i / Start.Width))
                 .Where(c => SiteGrid.InsideInterior(shell, c.X, c.Z, width, depth) && SiteGrid.CellProblem(site, Start.SiteId, c.X, c.Z, width, depth, null) == null
                     && (extra == null || extra(c)))
-                .OrderByDescending(c => shell.Doors.Min(d => Mathf.Abs(d.X - c.X) + Mathf.Abs(d.Z - c.Z))).First();
+                .OrderByDescending(c => DoorCells(shell).Min(d => Mathf.Abs(d.X - c.X) + Mathf.Abs(d.Z - c.Z))).First();
         }
 
         [UnityTest]
@@ -157,24 +162,29 @@ namespace FoodFactoryGame.Session.PlayModeTests
             var rig = LocalAvatar().CameraRig;
             Assert.That((rig.TopDown, rig.BuildFocus.HasValue), Is.EqualTo((true, true)), "Build mode looks straight down on the lot.");
 
-            // Slice 1: grow the shell one row toward the street (the lot's setback has room there).
-            var street = Start.AccessZ >= Start.LotZ + Start.Depth ? (0, 1) : Start.AccessZ < Start.LotZ ? (0, -1) : Start.AccessX < Start.LotX ? (-1, 0) : (1, 0);
-            var x0 = before.CellX + Math.Min(0, street.Item1);
-            var z0 = before.CellZ + Math.Min(0, street.Item2);
-            var x1 = before.CellX + before.Width - 1 + Math.Max(0, street.Item1);
-            var z1 = before.CellZ + before.Depth - 1 + Math.Max(0, street.Item2);
-            build.SelectTool(BuildTool.Resize);
-            build.Drag((x0, z0), (x1, z1));
-            Assert.That(build.HasPending, Is.True, "A drawn shell waits for Confirm.");
+            // Slice 1 with free walls (decision 0036): a right click takes out an outer wall cell like any other wall (it came with
+            // the building, so it refunds nothing), and the Wall tool draws it back.
+            var outer = Enumerable.Range(before.CellX + 2, before.Width - 4).Select(x => (X: x, Z: before.CellZ + before.Depth - 1))
+                .First(c => SiteGrid.IsWall(before, c.X, c.Z) && SiteGrid.WindowAt(before, c.X, c.Z) == null
+                    && _root.ClientSite.Equipment.All(e => e.Layer != SiteGrid.WallLayer || !SiteGrid.Contains(e, c.X, c.Z, 1, 1)));
+            build.RemoveAt(outer);
+            yield return Until(() => Shell(_root.ClientSite).FreeWalls && !SiteGrid.IsWall(Shell(_root.ClientSite), outer.X, outer.Z), "host sees the opening");
+            Assert.That(build.LastRejection, Is.Null);
+            yield return Until(() => Shell(RemoteLatest()).FreeWalls && !SiteGrid.IsWall(Shell(RemoteLatest()), outer.X, outer.Z), "the teammate sees the opening");
+            Assert.That(SiteGrid.InteriorCells(Shell(_root.ClientSite)), Is.Empty, "An open shell encloses nothing.");
+            build.SelectTool(BuildTool.Wall, "plaster");
+            build.Drag(outer, outer);
+            Assert.That(build.HasPending, Is.True, "A drawn wall waits for Confirm.");
             Assert.That(build.PendingPreview.Problem, Is.Null, build.PendingPreview.Problem);
             var charge = build.PendingPreview.NetCents;
             Assert.That(charge, Is.GreaterThan(0));
             build.Confirm();
-            yield return Until(() => Shell(_root.ClientSite).Width * Shell(_root.ClientSite).Depth > before.Width * before.Depth, "host sees the bigger shell");
+            yield return Until(() => SiteGrid.IsWall(Shell(_root.ClientSite), outer.X, outer.Z), "host sees the outer wall again");
             Assert.That(build.LastRejection, Is.Null);
-            yield return Until(() => Shell(RemoteLatest()).Width == Shell(_root.ClientSite).Width && Shell(RemoteLatest()).Depth == Shell(_root.ClientSite).Depth,
-                "the teammate sees the bigger shell");
-            Assert.That(Shell(RemoteLatest()).Doors.Select(d => (d.X, d.Z)), Is.EqualTo(Shell(_root.ClientSite).Doors.Select(d => (d.X, d.Z))));
+            yield return Until(() => SiteGrid.IsWall(Shell(RemoteLatest()), outer.X, outer.Z), "the teammate sees the outer wall again");
+            Assert.That((Shell(_root.ClientSite).CellX, Shell(_root.ClientSite).CellZ, Shell(_root.ClientSite).Width, Shell(_root.ClientSite).Depth),
+                Is.EqualTo((before.CellX, before.CellZ, before.Width, before.Depth)), "The footprint follows the walls.");
+            Assert.That(SiteGrid.InteriorCells(Shell(_root.ClientSite)).Count(), Is.EqualTo((before.Width - 2) * (before.Depth - 2)), "The room is closed again.");
 
             // An interior wall of two cells, drawn and confirmed.
             var site = _root.ClientSite;
@@ -183,7 +193,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
             build.Drag(wall, (wall.X, wall.Z + 1));
             Assert.That(build.PendingPreview.Problem, Is.Null, build.PendingPreview.Problem);
             build.Confirm();
-            yield return Until(() => Shell(RemoteLatest()).Structures.Count(s => s.Kind == GoodsWorld.PartitionStructure) == 2, "the teammate sees the interior wall");
+            yield return Until(() => Shell(RemoteLatest()).Structures.Count(s => s.Kind == GoodsWorld.PartitionStructure && s.Style == "brick") == 2, "the teammate sees the interior wall");
             var buildings = UnityEngine.Object.FindAnyObjectByType<BuildingPresenter>();
             yield return Until(() => buildings.ShellOf(Shell(_root.ClientSite).Id)?.GetComponentsInChildren<Transform>().Any(t => t.name.StartsWith("RT_Wall_Brick")) == true,
                 "the wall is drawn with the brick kit models");
@@ -279,10 +289,12 @@ namespace FoodFactoryGame.Session.PlayModeTests
             {
                 var template = _root.Offers.Single(x => x.Id == "supplier-dock").Equipment.CreateTemplate();
                 var shell = snapshot.Buildings.Single(x => x.SiteId == lot.SiteId);
-                var cell = Enumerable.Range(0, lot.Width * lot.Depth).Select(i => (X: i % lot.Width, Z: i / lot.Width))
-                    .Where(c => !SiteGrid.Overlaps(c.X, c.Z, 2, 1, shell.CellX - 1, shell.CellZ - 1, shell.Width + 2, shell.Depth + 2))
-                    .First(c => GoodsWorld.FurnishProblem(snapshot, lot.SiteId, template, new[] { new GridPlacement { X = c.X, Z = c.Z } }, 0, lot) == null);
-                bridge.RequestBuyAndPlace(request, new FurnishOrder { SiteId = lot.SiteId, OfferId = "supplier-dock", Placements = { new GridPlacement { X = cell.X, Z = cell.Z } } });
+                // The yard runs along whichever side faces the street, so the dock lies along it (either rotation).
+                var cell = Enumerable.Range(0, lot.Width * lot.Depth * 2).Select(i => (X: i / 2 % lot.Width, Z: i / 2 / lot.Width, Rotation: i % 2))
+                    .Where(c => !SiteGrid.Overlaps(c.X, c.Z, c.Rotation == 0 ? 2 : 1, c.Rotation == 0 ? 1 : 2, shell.CellX - 1, shell.CellZ - 1, shell.Width + 2, shell.Depth + 2))
+                    .First(c => GoodsWorld.FurnishProblem(snapshot, lot.SiteId, template, new[] { new GridPlacement { X = c.X, Z = c.Z, Rotation = c.Rotation } }, 0, lot) == null);
+                bridge.RequestBuyAndPlace(request, new FurnishOrder
+                    { SiteId = lot.SiteId, OfferId = "supplier-dock", Placements = { new GridPlacement { X = cell.X, Z = cell.Z, Rotation = cell.Rotation } } });
                 return $"buy:{_root.Authenticator.LocalPlayerId}:{request}:0";
             }
             var pickup = PlaceDock(Start, _root.ClientSite, "dock-start");
@@ -365,7 +377,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
                     .SelectMany(dx => Enumerable.Range(0, SiteGrid.Footprint(e.Width, e.Depth, e.Rotation).Depth).Select(dz => (e.CellX + dx, e.CellZ + dz)))));
             var free = Enumerable.Range(x0, x1 - x0 + 1).SelectMany(x => Enumerable.Range(z0, z1 - z0 + 1).Select(z => (X: x, Z: z)))
                 .Where(c => !occupied.Contains(c) && !SiteGrid.IsWall(shell, c.X, c.Z) && !(c.X >= x1 - 2 && c.Z <= roomZ + 1)
-                    && !shell.Doors.Any(d => Mathf.Abs(d.X - c.X) + Mathf.Abs(d.Z - c.Z) <= 1)).ToList();
+                    && !DoorCells(shell).Any(d => Mathf.Abs(d.X - c.X) + Mathf.Abs(d.Z - c.Z) <= 1)).ToList();
             var tables = free.Where(c => (c.X - x0) % 3 == 1 && (c.Z - z0) % 3 == 1).Take(3).ToList();
             foreach (var (x, z) in tables)
             {

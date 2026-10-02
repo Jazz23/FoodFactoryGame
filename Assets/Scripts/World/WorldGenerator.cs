@@ -44,7 +44,7 @@ namespace FoodFactoryGame.World
     {
         // 2 (2026-09-28): denser city, land heights, a river with bridges, level crossings, junction controls and trees.
         // 3 (2026-09-29): lots with reserved site IDs (decision 0028); factories and farms stand behind deeper aprons.
-        public const int Version = 3;
+        public const int Version = 4;
 
         // extraRule adds problems of its own (tests use it to force retries); it cannot waive validator problems.
         public static WorldGenerationResult Generate(string requestedSeed, ulong seed, WorldSettings settings = null,

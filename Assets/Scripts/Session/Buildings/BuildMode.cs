@@ -1,12 +1,15 @@
 // Restaurant build mode (decision 0034, slice 2), local player only. Build (B) opens it as a screen of its own: the camera looks
-// straight down on the current site, a grid covers the lot and a panel on the right offers tools (sell or remove, resize the
-// shell, interior walls, doors, windows, wall finish) and a catalog of furnishings by category. The pointer's cell shows a ghost
-// tinted by validity: the same pure rules the server applies (GoodsWorld.PlanShell, FurnishProblem, SiteGrid) plus the company's
-// cash, with the price, refund and net amount, or the reason it would be refused. A click places a single piece, door or window;
-// dragging draws a shell, a line of wall or a filled area of a piece, which waits for Confirm (BuildConfirm, Enter) or Cancel
-// (CloseScreen, Esc). Remove (right mouse) sells the piece under the pointer, or removes the door, window or interior wall
-// there, for its recorded refund. Every order is a request; nothing changes here until the next replicated baseline, and the
-// server's reason is shown when it refuses. Controls come from the Player action map (Input System).
+// down on the current site, a grid covers the lot and a panel on the right offers tools (sell or remove, walls, doors, windows,
+// wall finish) and a catalog of furnishings by category. Walls are free (decision 0036): outer and inner walls are drawn and
+// removed alike, anywhere in the lot. The pointer's cell shows a ghost tinted by validity: the same pure rules the server applies
+// (GoodsWorld.PlanShell, FurnishProblem, SiteGrid) plus the company's cash, with the price, refund and net amount, or the reason it
+// would be refused. A click places a single piece, door or window; dragging draws a line of wall, restyles a line of walls or
+// fills an area with a piece, which waits for Confirm (BuildConfirm, Enter) or Cancel (CloseScreen, Esc). A right click (Remove)
+// without dragging sells the piece under the pointer, or removes the door, window or wall there, for its recorded refund; a right
+// drag tilts the camera instead (OrbitCameraRig), Move pans it and Zoom zooms it. Cancel and ClearCursor (X) clear the selected
+// tool or item. Wall decor turns to face away from its wall and a backed piece (a sink) turns its back to a wall when one is
+// behind either way round. Every order is a request; nothing changes here until the next replicated baseline, and the server's
+// reason is shown when it refuses. Controls come from the Player action map (Input System).
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -21,8 +24,9 @@ namespace FoodFactoryGame.Session.Buildings
 {
     public enum BuildTool
     {
+        // Nothing selected: clicks do nothing; a right click still sells or removes.
+        None,
         Sell,
-        Resize,
         Wall,
         Door,
         Window,
@@ -55,6 +59,8 @@ namespace FoodFactoryGame.Session.Buildings
         private static readonly string[] Sections = { "Restaurant", "Furniture", "Decor", "Lighting", "Surfaces", "Architecture", "Service" };
         private const string EquipmentSection = "Equipment";
         private const int MaxHighlights = 400;
+        // A right press that moves the pointer further than this (pixels) before release tilts the camera instead of removing.
+        private const float ClickSlop = 8f;
 
         [SerializeField] private SessionRoot session;
         [SerializeField] private EquipmentInteraction interaction;
@@ -85,6 +91,7 @@ namespace FoodFactoryGame.Session.Buildings
         private Renderer[] _ghostRenderers = Array.Empty<Renderer>();
         private (int X, int Z)? _dragStart;
         private (int X, int Z)? _hover;
+        private Vector2? _removePress;
         private object _pendingOrder;
         private BuildPreview _pendingPreview;
         private bool _wasActive;
@@ -100,7 +107,7 @@ namespace FoodFactoryGame.Session.Buildings
         private string _shownTools;
 
         public bool Active => interaction != null && interaction.Screen == InteractionScreen.Build;
-        public BuildTool Tool { get; private set; } = BuildTool.Item;
+        public BuildTool Tool { get; private set; } = BuildTool.None;
         public string Style { get; private set; } = "";
         public string OfferId { get; private set; }
         public int Rotation { get; private set; }
@@ -126,6 +133,7 @@ namespace FoodFactoryGame.Session.Buildings
             buildAction.action.Enable();
             confirmAction.action.Enable();
             interaction.BuildEscape = CancelPending;
+            interaction.BuildClear = ClearSelection;
         }
 
         private void OnDisable()
@@ -135,6 +143,7 @@ namespace FoodFactoryGame.Session.Buildings
             buildAction.action.Disable();
             confirmAction.action.Disable();
             if (interaction != null && interaction.BuildEscape == CancelPending) interaction.BuildEscape = null;
+            if (interaction != null && interaction.BuildClear == ClearSelection) interaction.BuildClear = null;
             Subscribe(null);
             ShowWorld(false);
         }
@@ -175,6 +184,16 @@ namespace FoodFactoryGame.Session.Buildings
 
         public void Rotate() => Rotation = (Rotation + 1) % 4;
 
+        // Cancel and ClearCursor (X): drops the drawn order and the chosen tool or item, so the pointer carries nothing.
+        public void ClearSelection()
+        {
+            Tool = BuildTool.None;
+            OfferId = null;
+            Style = "";
+            CancelPending();
+            _shownTools = null;
+        }
+
         private static string DefaultStyle(BuildTool tool) => tool switch
         {
             BuildTool.Wall or BuildTool.Finish => GoodsWorld.WallStyles[0],
@@ -203,11 +222,20 @@ namespace FoodFactoryGame.Session.Buildings
             if (rotateAction.action.WasPressedThisFrame()) Rotate();
             _hover = ForcedHover ?? PointerCell(layout);
             var overPanel = PointerOverPanel();
+            var rig = buildings.LocalAvatar != null ? buildings.LocalAvatar.CameraRig : null;
+            if (rig != null) rig.BuildControls = !overPanel;
+            var pointer = pointAction.action.ReadValue<Vector2>();
             if (!overPanel && ForcedHover == null)
             {
                 if (placeAction.action.WasPressedThisFrame() && _hover.HasValue && interaction.ScreenClicksArmed) PressAt(_hover.Value);
                 if (placeAction.action.WasReleasedThisFrame() && _dragStart.HasValue) ReleaseAt(_hover ?? _dragStart.Value);
-                if (removeAction.action.WasPressedThisFrame() && _hover.HasValue) RemoveAt(_hover.Value);
+                if (removeAction.action.WasPressedThisFrame()) _removePress = pointer;
+            }
+            // Remove acts on release, and only when the press did not drag (a drag tilts the camera).
+            if (removeAction.action.WasReleasedThisFrame())
+            {
+                if (_removePress.HasValue && (pointer - _removePress.Value).magnitude <= ClickSlop && _hover.HasValue && !overPanel) RemoveAt(_hover.Value);
+                _removePress = null;
             }
             Preview = _pendingPreview ?? (_hover.HasValue ? Plan(_dragStart ?? _hover.Value, _hover.Value, out _) : new BuildPreview());
             ShowWorld(true);
@@ -243,8 +271,10 @@ namespace FoodFactoryGame.Session.Buildings
             if (_pendingOrder != null) CancelPending();
             switch (Tool)
             {
-                case BuildTool.Resize:
+                case BuildTool.None:
+                    return;
                 case BuildTool.Wall:
+                case BuildTool.Finish:
                     _dragStart = cell;
                     break;
                 case BuildTool.Item:
@@ -346,6 +376,7 @@ namespace FoodFactoryGame.Session.Buildings
             var site = session.ClientSite;
             var preview = new BuildPreview();
             var restaurant = Restaurant;
+            if (Tool == BuildTool.None) return preview;
             if (Tool == BuildTool.Sell) return RemovalPlan(to, out order);
             if (Tool == BuildTool.Item) return ItemPlan(from, to, out order);
             if (restaurant == null)
@@ -356,23 +387,12 @@ namespace FoodFactoryGame.Session.Buildings
             var shell = new ShellOrder { BuildingId = restaurant.Id, Style = Style };
             switch (Tool)
             {
-                case BuildTool.Resize:
-                    shell.Kind = ShellOrder.Resize;
-                    shell.X = Math.Min(from.X, to.X);
-                    shell.Z = Math.Min(from.Z, to.Z);
-                    shell.Width = Math.Abs(to.X - from.X) + 1;
-                    shell.Depth = Math.Abs(to.Z - from.Z) + 1;
-                    preview.Label = $"Shell {shell.Width} x {shell.Depth}";
-                    break;
                 case BuildTool.Wall:
                 {
                     shell.Kind = ShellOrder.Partition;
-                    var alongX = Math.Abs(to.X - from.X) >= Math.Abs(to.Z - from.Z);
-                    var length = alongX ? Math.Abs(to.X - from.X) : Math.Abs(to.Z - from.Z);
-                    for (var step = 0; step <= length; step++)
-                        shell.Cells.Add(alongX
-                            ? new GridCell { X = from.X + Math.Sign(to.X - from.X) * step, Z = from.Z }
-                            : new GridCell { X = from.X, Z = from.Z + Math.Sign(to.Z - from.Z) * step });
+                    // Cells that already have a wall are skipped, so a line may cross or continue existing walls.
+                    shell.Cells.AddRange(Line(from, to).Where(c => !IsWallCell(restaurant, c.X, c.Z)).Select(c => new GridCell { X = c.X, Z = c.Z }));
+                    if (shell.Cells.Count == 0) shell.Cells.Add(new GridCell { X = to.X, Z = to.Z });
                     preview.Label = $"{shell.Cells.Count} m of {Name(Style)} wall";
                     break;
                 }
@@ -386,14 +406,18 @@ namespace FoodFactoryGame.Session.Buildings
                     shell.Kind = ShellOrder.Window;
                     shell.X = to.X;
                     shell.Z = to.Z;
-                    // On the perimeter the window follows its wall; on an interior wall R picks the direction.
-                    shell.Axis = to.Z == restaurant.CellZ || to.Z == restaurant.CellZ + restaurant.Depth - 1 ? 0
-                        : to.X == restaurant.CellX || to.X == restaurant.CellX + restaurant.Width - 1 ? 1 : Rotation % 2;
+                    // The window follows its wall: along X when the next cell east is a wall, along Z when the next cell north is; R
+                    // picks between them where both are.
+                    var eastWall = IsWallCell(restaurant, to.X + 1, to.Z);
+                    var northWall = IsWallCell(restaurant, to.X, to.Z + 1);
+                    shell.Axis = eastWall && northWall ? Rotation % 2 : eastWall ? 0 : northWall ? 1 : Rotation % 2;
                     preview.Label = $"{Name(Style)} window";
                     break;
                 case BuildTool.Finish:
                     shell.Kind = ShellOrder.WallFinish;
-                    preview.Label = $"{Name(Style)} outer walls";
+                    shell.Cells.AddRange(Line(from, to).Where(c => IsWallCell(restaurant, c.X, c.Z)).Select(c => new GridCell { X = c.X, Z = c.Z }));
+                    if (shell.Cells.Count == 0) shell.Cells.Add(new GridCell { X = to.X, Z = to.Z });
+                    preview.Label = $"{Name(Style)} finish on {shell.Cells.Count} m of wall";
                     break;
             }
             var plan = GoodsWorld.PlanShell(site, shell, PricePercent());
@@ -403,6 +427,52 @@ namespace FoodFactoryGame.Session.Buildings
             preview.Cells.AddRange(StructureCells(shell, plan));
             order = shell;
             return preview;
+        }
+
+        // A straight line of cells from one cell towards another, along whichever axis the second lies further along.
+        private static IEnumerable<(int X, int Z)> Line((int X, int Z) from, (int X, int Z) to)
+        {
+            var alongX = Math.Abs(to.X - from.X) >= Math.Abs(to.Z - from.Z);
+            var length = alongX ? Math.Abs(to.X - from.X) : Math.Abs(to.Z - from.Z);
+            for (var step = 0; step <= length; step++)
+                yield return alongX ? (from.X + Math.Sign(to.X - from.X) * step, from.Z) : (from.X, from.Z + Math.Sign(to.Z - from.Z) * step);
+        }
+
+        // A wall of the restaurant stands on the cell (a door or window included): a wall record, or a rectangular shell's perimeter.
+        private static bool IsWallCell(GoodsBuilding restaurant, int x, int z) => SiteGrid.IsPartition(restaurant, x, z) || SiteGrid.OnPerimeter(restaurant, x, z);
+
+        // The rotation a piece is placed with at a cell: wall decor faces away from its wall (into a room if it can, else to any open
+        // cell), and a backed piece is turned round when that puts more wall behind it. Anything else keeps the chosen rotation.
+        public int FacingRotation(EquipmentDefinition definition, int cellX, int cellZ)
+        {
+            var site = session.ClientSite;
+            var siteId = session.ClientSiteId;
+            if (site == null || definition == null) return Rotation;
+            if (definition.Mount == EquipmentMount.Wall)
+            {
+                var best = Rotation;
+                var bestScore = -1;
+                for (var turn = 0; turn < 4; turn++)
+                {
+                    var rotation = (Rotation + turn) % 4;
+                    var (fx, fz) = SiteGrid.Facing(rotation);
+                    var (x, z) = (cellX + fx, cellZ + fz);
+                    var score = SiteGrid.WallAt(site, siteId, x, z) ? 0
+                        : site.Buildings.Any(b => b.SiteId == siteId && SiteGrid.IsInterior(b, x, z)) ? 2 : 1;
+                    if (score <= bestScore) continue;
+                    best = rotation;
+                    bestScore = score;
+                }
+                return best;
+            }
+            if (definition.Mount != EquipmentMount.Backed) return Rotation;
+            int WallsBehind(int rotation)
+            {
+                var (width, depth) = SiteGrid.Footprint(definition.Width, definition.Depth, rotation);
+                return SiteGrid.BehindCells(cellX, cellZ, width, depth, rotation).Count(c => SiteGrid.WallAt(site, siteId, c.X, c.Z));
+            }
+            var flipped = (Rotation + 2) % 4;
+            return WallsBehind(flipped) > WallsBehind(Rotation) ? flipped : Rotation;
         }
 
         // Cells the shell order touches, for the tint: the new perimeter for a resize, otherwise the named cells.
@@ -419,7 +489,7 @@ namespace FoodFactoryGame.Session.Buildings
                     yield return (order.X, order.Z);
                     yield return order.Axis == 0 ? (order.X + 1, order.Z) : (order.X, order.Z + 1);
                     break;
-                case ShellOrder.WallFinish:
+                case ShellOrder.WallFinish when order.Cells.Count == 0:
                     if (plan.Building == null) yield break;
                     foreach (var cell in Perimeter(plan.Building)) yield return cell;
                     break;
@@ -456,7 +526,9 @@ namespace FoodFactoryGame.Session.Buildings
             for (var z = from.Z; stepZ > 0 ? z <= to.Z : z >= to.Z; z += stepZ)
             {
                 if (furnish.Placements.Count >= GoodsWorld.MaxFurnishPlacements) break;
-                furnish.Placements.Add(new GridPlacement { X = stepX > 0 ? x : x - width + 1, Z = stepZ > 0 ? z : z - depth + 1, Rotation = Rotation });
+                var anchorX = stepX > 0 ? x : x - width + 1;
+                var anchorZ = stepZ > 0 ? z : z - depth + 1;
+                furnish.Placements.Add(new GridPlacement { X = anchorX, Z = anchorZ, Rotation = FacingRotation(offer.Equipment, anchorX, anchorZ) });
             }
             var site = session.ClientSite;
             var problem = GoodsWorld.FurnishProblem(site, session.ClientSiteId, offer.Equipment.CreateTemplate(), furnish.Placements, 0, SiteOffer());
@@ -497,7 +569,7 @@ namespace FoodFactoryGame.Session.Buildings
             }
             var restaurant = Restaurant;
             if (restaurant != null && (SiteGrid.WindowAt(restaurant, cell.X, cell.Z) != null || SiteGrid.IsDoor(restaurant, cell.X, cell.Z)
-                    || SiteGrid.IsPartition(restaurant, cell.X, cell.Z)))
+                    || IsWallCell(restaurant, cell.X, cell.Z)))
             {
                 var shell = new ShellOrder { Kind = ShellOrder.Remove, BuildingId = restaurant.Id, Cells = { new GridCell { X = cell.X, Z = cell.Z } } };
                 var plan = GoodsWorld.PlanShell(site, shell, PricePercent());
@@ -573,10 +645,12 @@ namespace FoodFactoryGame.Session.Buildings
                 ? session.Offers.FirstOrDefault(x => x != null && x.Id == OfferId && x.Equipment != null) : null;
             ShowGhost(offer?.Equipment);
             if (_ghost == null || offer == null) return;
-            var (width, depth) = SiteGrid.Footprint(offer.Equipment.Width, offer.Equipment.Depth, Rotation);
             var anchor = _dragStart ?? _hover.Value;
-            var rotation = SiteGridSpace.Rotation(Rotation);
-            var center = SiteGridSpace.FootprintCenter(layout, anchor.X, anchor.Z, width, depth) + EquipmentModel.MountOffset(offer.Equipment, rotation);
+            var turns = FacingRotation(offer.Equipment, anchor.X, anchor.Z);
+            var (width, depth) = SiteGrid.Footprint(offer.Equipment.Width, offer.Equipment.Depth, turns);
+            var rotation = SiteGridSpace.Rotation(turns);
+            var againstWall = EquipmentModel.BackedAgainstWall(offer.Equipment, session.ClientSite, session.ClientSiteId, anchor.X, anchor.Z, turns);
+            var center = SiteGridSpace.FootprintCenter(layout, anchor.X, anchor.Z, width, depth) + EquipmentModel.MountOffset(offer.Equipment, rotation, againstWall);
             if (offer.Equipment.Mount == EquipmentMount.Tabletop) center += Vector3.up * 0.76f;
             _ghost.transform.SetPositionAndRotation(center, rotation);
             var ghostColor = color;
@@ -718,7 +792,7 @@ namespace FoodFactoryGame.Session.Buildings
             // Not focusable: a focused button would click again on every keyboard Submit (Enter/Space).
             _confirm = new Button(Confirm) { name = "build-confirm", text = "Confirm", focusable = false };
             buttons.Add(_confirm);
-            buttons.Add(new Button(() => CancelPending()) { name = "build-cancel", text = "Cancel", focusable = false });
+            buttons.Add(new Button(ClearSelection) { name = "build-cancel", text = "Cancel", focusable = false });
             buttons.Add(new Button(Toggle) { name = "build-leave", text = "Leave", focusable = false });
             _window.Add(buttons);
             // Rows keep their height in the fixed-height column; only the catalog scrolls.
@@ -764,7 +838,6 @@ namespace FoodFactoryGame.Session.Buildings
                 _tools.Add(button);
             }
             ToolButton(BuildTool.Sell, "Sell / remove");
-            ToolButton(BuildTool.Resize, "Resize shell");
             ToolButton(BuildTool.Wall, "Wall");
             ToolButton(BuildTool.Door, "Door");
             ToolButton(BuildTool.Window, "Window");

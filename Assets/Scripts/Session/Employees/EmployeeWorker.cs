@@ -113,7 +113,13 @@ namespace FoodFactoryGame.Session.Employees
             agent.enabled = false;
         }
 
-        public override void OnStartClient() => ShowBox(_carrying.Value);
+        public override void OnStartClient()
+        {
+            ShowBox(_carrying.Value);
+            // Presentation only: the figure opens restaurant doors and is not drawn far away.
+            if (!TryGetComponent<Buildings.DoorOpener>(out _)) gameObject.AddComponent<Buildings.DoorOpener>();
+            DistanceCulling.Apply(gameObject);
+        }
 
         // Client request: run this program, replacing any running one. Goods in the employee's hands stay there.
         public void RequestRun(string source)

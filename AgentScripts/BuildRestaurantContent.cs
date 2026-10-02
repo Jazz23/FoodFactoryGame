@@ -88,12 +88,11 @@ public static class BuildRestaurantContent
         P("Lighting/RT_Light_CeilingStrip", "rt-ceiling-strip", "Ceiling strip light", "Lighting", 1, 1, 5000, 1, "ceiling", EquipmentMount.Ceiling, light: true, lightHeight: -0.15f),
         P("Lighting/RT_Light_Sconce", "rt-sconce", "Wall sconce", "Lighting", 1, 1, 4500, 2, "wall", EquipmentMount.Wall, 1.9f, light: true, lightHeight: 0.25f),
         P("Lighting/RT_Light_FloorLamp", "rt-floor-lamp", "Floor lamp", "Lighting", 1, 1, 7000, 3, light: true, lightHeight: 1.45f),
-        // Surfaces: floor finishes lie flush under everything else; ceiling panels are hidden when looking down into the room.
+        // Surfaces: floor finishes lie flush under everything else. (The ceiling panel was withdrawn by the owner on 2026-10-02.)
         P("Surfaces/RT_Floor_Checker_1m", "rt-floor-checker", "Checker floor (1 m²)", "Surfaces", 1, 1, 1200, 1, "floor", EquipmentMount.Flush),
         P("Surfaces/RT_Floor_Terracotta_1m", "rt-floor-terracotta", "Terracotta floor (1 m²)", "Surfaces", 1, 1, 1200, 1, "floor", EquipmentMount.Flush),
         P("Surfaces/RT_Floor_OakPlank_1m", "rt-floor-oak", "Oak plank floor (1 m²)", "Surfaces", 1, 1, 1400, 1, "floor", EquipmentMount.Flush),
         P("Surfaces/RT_Floor_KitchenTile_1m", "rt-floor-kitchen", "Kitchen tile floor (1 m²)", "Surfaces", 1, 1, 1000, 1, "floor", EquipmentMount.Flush),
-        P("Surfaces/RT_Ceiling_Panel_1m", "rt-ceiling-panel", "Ceiling panel (1 m²)", "Surfaces", 1, 1, 1000, 1, "ceiling", EquipmentMount.Ceiling, hideFromAbove: true),
         // Architecture pieces that are furnishings, not structure: room dividers and a wall-top cornice.
         P("Architecture/RT_Partition_HalfHeight_2m", "rt-partition-half", "Half-height partition", "Architecture", 2, 1, 9000, 2),
         P("Architecture/RT_Partition_Slatted_1m", "rt-partition-slatted", "Slatted screen", "Architecture", 1, 1, 6000, 2),
@@ -102,7 +101,7 @@ public static class BuildRestaurantContent
         P("Service/RT_StorageShelf_1_2m", "rt-shelf", "Storage shelf", "Service", 2, 1, 10000, 0, storage: 8),
         P("Service/RT_PrepTable_1_5m", "rt-prep-table", "Prep table", "Service", 2, 1, 15000, 0, storage: 4),
         P("Service/RT_Trolley_TwoShelf", "rt-trolley", "Service trolley", "Service", 1, 1, 6000, 0, storage: 2),
-        P("Service/RT_Sink_Single", "rt-sink", "Sink", "Service", 2, 1, 20000, 0)
+        P("Service/RT_Sink_Single", "rt-sink", "Sink", "Service", 2, 1, 20000, 0, mount: EquipmentMount.Backed)
     };
 
     public static string Run()

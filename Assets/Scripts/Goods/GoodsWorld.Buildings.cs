@@ -57,6 +57,10 @@ namespace FoodFactoryGame.Goods
         // Restaurants only (decision 0034, v16): the structure orders built, and the perimeter walls' finish (empty is plaster).
         public List<GoodsStructure> Structures = new();
         public string WallStyle = "";
+        // Restaurants only (decision 0036, v17): every wall is a partition record the owner placed or removes, Doors is empty, the
+        // footprint is the walls' bounding box and the interior is what they enclose. A restaurant gets free walls on its first
+        // shell order (GoodsWorld.ToFreeWalls); until then its perimeter is implied by the footprint.
+        public bool FreeWalls;
 
         public bool HasElevator => Floors > 1;
     }
@@ -164,7 +168,8 @@ namespace FoodFactoryGame.Goods
             var layout = state.SiteLayouts.FirstOrDefault(x => x.SiteId == building.SiteId);
             if (string.IsNullOrWhiteSpace(building.Id) || layout == null || building.Doors == null
                 || (building.Kind != RestaurantKind && building.Kind != FactoryKind)
-                || building.Width < MinimumBuildingSize || building.Depth < MinimumBuildingSize
+                || (!building.FreeWalls && (building.Width < MinimumBuildingSize || building.Depth < MinimumBuildingSize))
+                || (building.FreeWalls && (building.Kind != RestaurantKind || building.Doors.Count > 0 || !FitsWalls(building)))
                 || building.CellX < 0 || building.CellZ < 0
                 || building.CellX + building.Width > layout.Width || building.CellZ + building.Depth > layout.Depth)
                 return "invalid-building";
@@ -194,7 +199,8 @@ namespace FoodFactoryGame.Goods
         }
 
         // Null when the structure records are well formed (decision 0034): only restaurants have any; floor records inside the
-        // footprint, wall records on the perimeter, partitions strictly inside; a door record on a perimeter door or a partition;
+        // footprint, wall records on the perimeter, partitions strictly inside (free walls, decision 0036: partitions anywhere in the
+        // footprint and no floor or wall records); a door record on a perimeter door or a partition;
         // a window on two wall cells of one perimeter side or of partitions, never on a door or another window; known styles.
         private static string StructureProblem(GoodsBuilding building)
         {
@@ -206,9 +212,11 @@ namespace FoodFactoryGame.Goods
                 if (piece == null || piece.ChargedCents < 0 || piece.Style == null) return "invalid-structure";
                 var valid = piece.Kind switch
                 {
-                    FloorStructure => SiteGrid.Overlaps(piece.X, piece.Z, 1, 1, building.CellX, building.CellZ, building.Width, building.Depth),
+                    FloorStructure => !building.FreeWalls
+                        && SiteGrid.Overlaps(piece.X, piece.Z, 1, 1, building.CellX, building.CellZ, building.Width, building.Depth),
                     WallStructure => SiteGrid.OnPerimeter(building, piece.X, piece.Z),
-                    PartitionStructure => SiteGrid.IsInterior(building, piece.X, piece.Z) && WallStyles.Contains(piece.Style),
+                    // Free walls may stand anywhere in the footprint (it is their bounding box); otherwise strictly inside.
+                    PartitionStructure => (building.FreeWalls || SiteGrid.IsInterior(building, piece.X, piece.Z)) && WallStyles.Contains(piece.Style),
                     DoorStructure => DoorStyles.Contains(piece.Style) && (building.Doors.Any(x => x.X == piece.X && x.Z == piece.Z)
                         || SiteGrid.IsPartition(building, piece.X, piece.Z)),
                     WindowStructure => WindowStyles.Contains(piece.Style) && (piece.Axis == 0 || piece.Axis == 1) && WindowFits(building, piece),
@@ -224,6 +232,15 @@ namespace FoodFactoryGame.Goods
                     || building.Structures.Any(x => x.Kind == DoorStructure && SiteGrid.WindowCovers(window, x.X, x.Z)))
                     return "invalid-structure";
             return null;
+        }
+
+        // A free-walled shell's footprint is exactly the bounding box of its walls, and it has at least one wall.
+        private static bool FitsWalls(GoodsBuilding building)
+        {
+            var walls = building.Structures?.Where(x => x != null && x.Kind == PartitionStructure).ToList();
+            if (walls == null || walls.Count == 0) return false;
+            return building.CellX == walls.Min(x => x.X) && building.CellZ == walls.Min(x => x.Z)
+                && building.Width == walls.Max(x => x.X) - building.CellX + 1 && building.Depth == walls.Max(x => x.Z) - building.CellZ + 1;
         }
 
         // Both cells of a window are walls of one perimeter side (non-corner, not doors) or both are interior walls without a door.

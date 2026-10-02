@@ -7,6 +7,8 @@
 // changes nothing. Every new piece records what it was charged (the order fee rides on its first new piece), so a later removal
 // refunds exactly that. An order may not leave a wall over equipment, belts, tables or decor, nor leave decor without the wall or
 // ceiling it needs; selling a piece is its own order. Shell edits apply to restaurants only and are instant once paid.
+// Free walls (decision 0036): every order but a resize first turns a rectangular restaurant into free walls (ToFreeWalls), so
+// the owner then places and removes outer walls exactly like interior ones, anywhere in the lot; the footprint follows the walls.
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -23,6 +25,7 @@ namespace FoodFactoryGame.Goods
         public const string Window = "window";
         public const string Remove = "remove";
         public const string WallFinish = "finish";
+        // Resize applies only to a restaurant without free walls (decision 0036); build mode no longer offers it.
 
         public string Kind;
         public string BuildingId;
@@ -34,7 +37,7 @@ namespace FoodFactoryGame.Goods
         public int Axis;
         // Partition, door, window and wall finish: the style from GoodsWorld's lists.
         public string Style = "";
-        // Partition and remove: the cells.
+        // Partition and remove: the cells. Wall finish: the walls to restyle (none restyles every wall).
         public List<GridCell> Cells = new();
     }
 
@@ -115,11 +118,19 @@ namespace FoodFactoryGame.Goods
                 if (next.Structures.Remove(piece)) plan.Removed.Add(piece);
             }
             var cells = (order.Cells ?? new List<GridCell>()).Where(x => x != null).Select(x => (x.X, x.Z)).ToList();
+            var lot = state.SiteLayouts.FirstOrDefault(x => x.SiteId == current.SiteId);
+            if (order.Kind != ShellOrder.Resize && !next.FreeWalls)
+            {
+                ToFreeWalls(next, plan);
+                // Every check below reads the converted shell.
+                current = JsonUtility.FromJson<GoodsBuilding>(JsonUtility.ToJson(next));
+            }
             switch (order.Kind)
             {
                 case ShellOrder.Resize:
                 {
-                    var layout = state.SiteLayouts.FirstOrDefault(x => x.SiteId == current.SiteId);
+                    if (current.FreeWalls) return Fail("invalid-order");
+                    var layout = lot;
                     if (order.Width < MinimumBuildingSize || order.Depth < MinimumBuildingSize) return Fail("too-small");
                     if (layout == null || order.X < 0 || order.Z < 0 || order.X + order.Width > layout.Width || order.Z + order.Depth > layout.Depth)
                         return Fail("out-of-bounds");
@@ -182,7 +193,8 @@ namespace FoodFactoryGame.Goods
                     if (cells.Count == 0 || cells.Count > MaxShellCells || cells.Distinct().Count() != cells.Count) return Fail("invalid-cell");
                     foreach (var (x, z) in cells)
                     {
-                        if (!SiteGrid.IsInterior(current, x, z) || SiteGrid.IsPartition(current, x, z)) return Fail("invalid-cell");
+                        // Free walls go anywhere in the lot that has no wall yet.
+                        if (lot == null || x < 0 || z < 0 || x >= lot.Width || z >= lot.Depth || SiteGrid.IsPartition(current, x, z)) return Fail("invalid-cell");
                         Add(PartitionStructure, x, z, ShellWallCellCents, order.Style);
                     }
                     break;
@@ -190,7 +202,7 @@ namespace FoodFactoryGame.Goods
                     if (!DoorStyles.Contains(order.Style ?? "")) return Fail("invalid-style");
                     if (SiteGrid.WindowAt(current, order.X, order.Z) != null || SiteGrid.IsDoor(current, order.X, order.Z)) return Fail("invalid-cell");
                     if (SiteGrid.IsDoorCell(current, order.X, order.Z)) next.Doors.Add(new GridCell { X = order.X, Z = order.Z });
-                    else if (!SiteGrid.IsPartition(current, order.X, order.Z)) return Fail("invalid-cell");
+                    else if (!SiteGrid.IsPartition(current, order.X, order.Z) || IsCorner(current, order.X, order.Z)) return Fail("invalid-cell");
                     Add(DoorStructure, order.X, order.Z, ShellDoorCents, order.Style);
                     break;
                 case ShellOrder.Window:
@@ -227,15 +239,32 @@ namespace FoodFactoryGame.Goods
                     }
                     break;
                 case ShellOrder.WallFinish:
+                {
                     if (!WallStyles.Contains(order.Style ?? "")) return Fail("invalid-style");
-                    if ((current.WallStyle == "" ? WallStyles[0] : current.WallStyle) == order.Style) return Fail("unchanged");
-                    // PROTOTYPE: changing the perimeter's finish is free (a cosmetic style of walls already paid for).
-                    next.WallStyle = order.Style;
+                    if (cells.Count > MaxShellCells) return Fail("invalid-cell");
+                    // PROTOTYPE: changing a finish is free (a cosmetic style of walls already paid for). Named cells must be walls.
+                    var walls = cells.Count == 0 ? next.Structures.Where(x => x.Kind == PartitionStructure).ToList()
+                        : cells.Distinct().Select(c => next.Structures.FirstOrDefault(s => s.Kind == PartitionStructure && s.X == c.X && s.Z == c.Z)).ToList();
+                    if (walls.Any(x => x == null)) return Fail("invalid-cell");
+                    if (walls.All(x => x.Style == order.Style) && (cells.Count > 0 || next.WallStyle == order.Style)) return Fail("unchanged");
+                    foreach (var wall in walls) wall.Style = order.Style;
+                    if (cells.Count == 0) next.WallStyle = order.Style;
                     break;
+                }
                 default:
                     return Fail("invalid-order");
             }
-            if (next.Doors.Count == 0) return Fail("no-door");
+            if (next.FreeWalls)
+            {
+                // The footprint follows the walls.
+                var walls = next.Structures.Where(x => x.Kind == PartitionStructure).ToList();
+                if (walls.Count == 0) return Fail("no-walls");
+                next.CellX = walls.Min(x => x.X);
+                next.CellZ = walls.Min(x => x.Z);
+                next.Width = walls.Max(x => x.X) - next.CellX + 1;
+                next.Depth = walls.Max(x => x.Z) - next.CellZ + 1;
+            }
+            if (next.Doors.Count == 0 && !next.Structures.Any(x => x.Kind == DoorStructure)) return Fail("no-door");
             // The fee rides on the first new piece, so removing everything an order built refunds the fee too.
             if (plan.Added.Count > 0) plan.Added[0].ChargedCents = checked(plan.Added[0].ChargedCents + ScaledCents(ShellOrderFeeCents, pricePercent));
             plan.ChargeCents = plan.Added.Sum(x => x.ChargedCents);
@@ -254,6 +283,41 @@ namespace FoodFactoryGame.Goods
                 return Fail("blocked");
             return plan;
         }
+
+        // Turns a rectangular restaurant into free walls (decision 0036): each perimeter cell becomes a wall record in the outer
+        // finish, keeping what a paid perimeter wall cost; each perimeter door becomes a door record on its wall (an unpaid one
+        // records nothing paid). Floor records mean nothing once the footprint follows the walls, so they are refunded by the
+        // order that converts. Windows already stand on those walls.
+        private static void ToFreeWalls(GoodsBuilding building, ShellPlan plan)
+        {
+            var style = string.IsNullOrEmpty(building.WallStyle) ? WallStyles[0] : building.WallStyle;
+            var perimeter = new List<GoodsStructure>();
+            for (var x = building.CellX; x < building.CellX + building.Width; x++)
+            for (var z = building.CellZ; z < building.CellZ + building.Depth; z++)
+            {
+                if (!SiteGrid.OnPerimeter(building, x, z)) continue;
+                var paid = building.Structures.FirstOrDefault(s => s.Kind == WallStructure && s.X == x && s.Z == z);
+                perimeter.Add(new GoodsStructure { Kind = PartitionStructure, X = x, Z = z, Style = style, ChargedCents = paid?.ChargedCents ?? 0 });
+            }
+            foreach (var door in building.Doors)
+                if (!building.Structures.Any(s => s.Kind == DoorStructure && s.X == door.X && s.Z == door.Z))
+                    building.Structures.Add(new GoodsStructure { Kind = DoorStructure, X = door.X, Z = door.Z, Style = DoorStyles[0] });
+            building.Structures.RemoveAll(s => s.Kind == WallStructure);
+            foreach (var floor in building.Structures.Where(s => s.Kind == FloorStructure).ToList())
+            {
+                building.Structures.Remove(floor);
+                plan.Removed.Add(floor);
+            }
+            building.Structures.AddRange(perimeter);
+            building.Doors = new List<GridCell>();
+            building.WallStyle = style;
+            building.FreeWalls = true;
+        }
+
+        // A wall cell joined to walls along both axes (a corner or junction), where a doorway would cut a wall run off.
+        private static bool IsCorner(GoodsBuilding building, int x, int z) =>
+            (SiteGrid.IsPartition(building, x + 1, z) || SiteGrid.IsPartition(building, x - 1, z))
+            && (SiteGrid.IsPartition(building, x, z + 1) || SiteGrid.IsPartition(building, x, z - 1));
 
         // A cell inside a footprint (walls included).
         private static bool Inside(GoodsBuilding building, int x, int z) =>

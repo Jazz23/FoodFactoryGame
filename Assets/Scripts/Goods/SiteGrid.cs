@@ -7,7 +7,12 @@
 // tables, registers, docks and most decor) follows the rules above unchanged; floor finishes and rugs lie under it, wall decor
 // hangs on wall cells, ceiling decor needs a building's interior, and tabletop props stand on a table. Each of those layers
 // overlaps only its own kind, on the ground level.
+// A restaurant with free walls (FreeWalls, decision 0036) has no implied perimeter: every wall is a wall record the owner placed,
+// its footprint is the walls' bounding box, and its interior is what those walls enclose (cells no four-way walk from outside the
+// box reaches without crossing a wall, door or window cell).
+using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 
 namespace FoodFactoryGame.Goods
 {
@@ -110,8 +115,33 @@ namespace FoodFactoryGame.Goods
             return cellX >= piece.CellX && cellZ >= piece.CellZ && cellX + width <= piece.CellX + pieceWidth && cellZ + depth <= piece.CellZ + pieceDepth;
         }
 
+        // The grid direction a piece's front faces: rotation 0 faces +Z, each quarter turn a quarter clockwise seen from above.
+        public static (int X, int Z) Facing(int rotation) => (((rotation % 4) + 4) % 4) switch
+        {
+            0 => (0, 1),
+            1 => (1, 0),
+            2 => (0, -1),
+            _ => (-1, 0)
+        };
+
+        // The cells just behind a footprint (width and depth as placed), opposite the way it faces.
+        public static IEnumerable<(int X, int Z)> BehindCells(int cellX, int cellZ, int width, int depth, int rotation)
+        {
+            var (fx, fz) = Facing(rotation);
+            if (fz != 0)
+                for (var x = cellX; x < cellX + width; x++)
+                    yield return (x, fz > 0 ? cellZ - 1 : cellZ + depth);
+            else
+                for (var z = cellZ; z < cellZ + depth; z++)
+                    yield return (fx > 0 ? cellX - 1 : cellX + width, z);
+        }
+
+        // True when a wall of any of the site's buildings stands on the cell (ground level).
+        public static bool WallAt(GoodsSnapshot state, string siteId, int cellX, int cellZ) =>
+            state.Buildings?.Any(x => x.SiteId == siteId && IsWall(x, cellX, cellZ)) == true;
+
         public static bool OnPerimeter(GoodsBuilding building, int cellX, int cellZ) =>
-            Overlaps(cellX, cellZ, 1, 1, building.CellX, building.CellZ, building.Width, building.Depth)
+            !building.FreeWalls && Overlaps(cellX, cellZ, 1, 1, building.CellX, building.CellZ, building.Width, building.Depth)
             && (cellX == building.CellX || cellX == building.CellX + building.Width - 1
                 || cellZ == building.CellZ || cellZ == building.CellZ + building.Depth - 1);
 
@@ -147,12 +177,87 @@ namespace FoodFactoryGame.Goods
             || (window.Axis == 0 ? window.X + 1 == cellX && window.Z == cellZ : window.X == cellX && window.Z + 1 == cellZ);
 
         // Strictly inside the walls; door cells are not interior.
-        public static bool IsInterior(GoodsBuilding building, int cellX, int cellZ) =>
-            cellX > building.CellX && cellX < building.CellX + building.Width - 1
-            && cellZ > building.CellZ && cellZ < building.CellZ + building.Depth - 1;
+        public static bool IsInterior(GoodsBuilding building, int cellX, int cellZ) => building.FreeWalls
+            ? Enclosed(building).Contains((cellX, cellZ))
+            : cellX > building.CellX && cellX < building.CellX + building.Width - 1
+                && cellZ > building.CellZ && cellZ < building.CellZ + building.Depth - 1;
 
-        public static bool InsideInterior(GoodsBuilding building, int cellX, int cellZ, int width, int depth) =>
-            IsInterior(building, cellX, cellZ) && IsInterior(building, cellX + width - 1, cellZ + depth - 1);
+        public static bool InsideInterior(GoodsBuilding building, int cellX, int cellZ, int width, int depth)
+        {
+            if (!building.FreeWalls) return IsInterior(building, cellX, cellZ) && IsInterior(building, cellX + width - 1, cellZ + depth - 1);
+            for (var x = cellX; x < cellX + width; x++)
+            for (var z = cellZ; z < cellZ + depth; z++)
+                if (!IsInterior(building, x, z)) return false;
+            return true;
+        }
+
+        // Every interior cell of a building (the rectangle inside its perimeter, or what free walls enclose).
+        public static IEnumerable<(int X, int Z)> InteriorCells(GoodsBuilding building)
+        {
+            if (building.FreeWalls) return Enclosed(building);
+            return Enumerable.Range(building.CellX + 1, System.Math.Max(0, building.Width - 2))
+                .SelectMany(x => Enumerable.Range(building.CellZ + 1, System.Math.Max(0, building.Depth - 2)).Select(z => (x, z)));
+        }
+
+        // Free walls' enclosed cells, cached per building object and recomputed when its walls or footprint change.
+        private sealed class Enclosure
+        {
+            public int Key;
+            public HashSet<(int X, int Z)> Cells;
+        }
+
+        private static readonly ConditionalWeakTable<GoodsBuilding, Enclosure> Enclosures = new();
+
+        private static HashSet<(int X, int Z)> Enclosed(GoodsBuilding building)
+        {
+            var key = EnclosureKey(building);
+            lock (Enclosures)
+                if (Enclosures.TryGetValue(building, out var cached) && cached.Key == key) return cached.Cells;
+            var barriers = new HashSet<(int X, int Z)>(building.Structures?.Where(x => x != null && x.Kind == GoodsWorld.PartitionStructure)
+                .Select(x => (x.X, x.Z)) ?? Enumerable.Empty<(int, int)>());
+            // Walk from a ring one cell outside the footprint; whatever stays unreached (and is no wall) is inside.
+            int minX = building.CellX - 1, minZ = building.CellZ - 1, maxX = building.CellX + building.Width, maxZ = building.CellZ + building.Depth;
+            var outside = new HashSet<(int X, int Z)>();
+            var queue = new Queue<(int X, int Z)>();
+            for (var x = minX; x <= maxX; x++)
+            {
+                if (outside.Add((x, minZ))) queue.Enqueue((x, minZ));
+                if (outside.Add((x, maxZ))) queue.Enqueue((x, maxZ));
+            }
+            for (var z = minZ; z <= maxZ; z++)
+            {
+                if (outside.Add((minX, z))) queue.Enqueue((minX, z));
+                if (outside.Add((maxX, z))) queue.Enqueue((maxX, z));
+            }
+            while (queue.Count > 0)
+            {
+                var (x, z) = queue.Dequeue();
+                foreach (var next in new[] { (x + 1, z), (x - 1, z), (x, z + 1), (x, z - 1) })
+                    if (next.Item1 >= minX && next.Item1 <= maxX && next.Item2 >= minZ && next.Item2 <= maxZ && !barriers.Contains(next) && outside.Add(next))
+                        queue.Enqueue(next);
+            }
+            var cells = new HashSet<(int X, int Z)>();
+            for (var x = building.CellX; x < building.CellX + building.Width; x++)
+            for (var z = building.CellZ; z < building.CellZ + building.Depth; z++)
+                if (!outside.Contains((x, z)) && !barriers.Contains((x, z))) cells.Add((x, z));
+            lock (Enclosures)
+            {
+                Enclosures.Remove(building);
+                Enclosures.Add(building, new Enclosure { Key = key, Cells = cells });
+            }
+            return cells;
+        }
+
+        private static int EnclosureKey(GoodsBuilding building)
+        {
+            unchecked
+            {
+                var hash = ((building.CellX * 397 ^ building.CellZ) * 397 ^ building.Width) * 397 ^ building.Depth;
+                foreach (var piece in building.Structures ?? new List<GoodsStructure>())
+                    if (piece != null && piece.Kind == GoodsWorld.PartitionStructure) hash = hash * 31 + (piece.X * 7919 ^ piece.Z);
+                return hash;
+            }
+        }
 
         public static bool IsShaft(GoodsBuilding building, int cellX, int cellZ) =>
             building.HasElevator && building.ElevatorX == cellX && building.ElevatorZ == cellZ;

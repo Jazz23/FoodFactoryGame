@@ -5,7 +5,10 @@
 // never own state. The local avatar's cell and height on any drawn site decide "indoors" and its level: the rig switches to the top-down view,
 // and that building's roof and every storey above the avatar's level are hidden (colliders too), for this client only.
 // A restaurant's ground storey (decision 0034) is drawn with the restaurant art kit (RestaurantShellModel) when a style catalog
-// is set, with one invisible collider and NavMesh obstacle per wall cell; a shell is rebuilt whenever its data changes.
+// is set, with one invisible collider and NavMesh obstacle per wall cell; a shell is rebuilt whenever its data changes. A shell
+// with free walls (decision 0036) gets its floor tint, roof and ceiling over the cells its walls enclose, not its bounding box.
+// Every ground storey has a ceiling under its roof, shown only to a local avatar inside who is not using the top-down view, so
+// the room keeps a ceiling in the third-person view while the top-down view still looks in from above.
 using System.Collections.Generic;
 using System.Linq;
 using FoodFactoryGame.Goods;
@@ -38,7 +41,10 @@ namespace FoodFactoryGame.Session.Buildings
         private sealed class Shell
         {
             public GameObject Root;
-            public Renderer Roof;
+            // One box, or one per row of a free-walled roof.
+            public List<Renderer> Roof = new();
+            // Under the ground storey's top; null for multi-storey shells, whose upper storeys are slabs.
+            public GameObject Ceiling;
             // Index is the level.
             public List<GameObject> Storeys = new();
             // What the visual was built from; a shell is rebuilt when any of its data changes (floors, elevator, or a restaurant
@@ -62,7 +68,10 @@ namespace FoodFactoryGame.Session.Buildings
         public GameObject StoreyOf(string buildingId, int level) =>
             _shells.TryGetValue(buildingId, out var shell) && level >= 0 && level < shell.Storeys.Count ? shell.Storeys[level] : null;
 
-        public bool RoofVisible(string buildingId) => _shells.TryGetValue(buildingId, out var shell) && shell.Roof.enabled;
+        public bool RoofVisible(string buildingId) => _shells.TryGetValue(buildingId, out var shell) && shell.Roof.Any(x => x.enabled);
+        public bool CeilingVisible(string buildingId) => _shells.TryGetValue(buildingId, out var shell) && shell.Ceiling != null && shell.Ceiling.activeSelf;
+        // Height of the ceiling over the local avatar's storey, or null outdoors (the camera rig stays under it).
+        public float? LocalCeiling { get; private set; }
         public RestaurantStyleCatalog RestaurantStyles => restaurantStyles;
         // Set by build mode (decision 0034) to the site it edits: that site's roofs hide and all its storeys show, so the
         // interior can be seen from above; null otherwise.
@@ -109,18 +118,27 @@ namespace FoodFactoryGame.Session.Buildings
                     if (inside != null) break;
                 }
             }
+            var topDown = LocalAvatar != null && LocalAvatar.CameraRig.TopDown;
+            LocalCeiling = null;
             foreach (var (id, shell) in _shells)
             {
                 var local = id == LocalBuildingId;
                 var edited = EditedSiteId != null && shell.Building.SiteId == EditedSiteId;
-                shell.Roof.enabled = !local && !edited;
+                foreach (var roof in shell.Roof) roof.enabled = !local && !edited;
+                if (shell.Ceiling != null)
+                {
+                    var ceiling = local && !edited && !topDown;
+                    if (shell.Ceiling.activeSelf != ceiling) shell.Ceiling.SetActive(ceiling);
+                }
+                if (local && LocalSite?.Layout != null)
+                    LocalCeiling = SiteGridSpace.FloorHeight(LocalSite.Layout, LocalLevel) + SiteGridSpace.LevelHeight;
                 for (var level = 0; level < shell.Storeys.Count; level++)
                 {
                     var shown = !local || level <= LocalLevel;
                     if (shell.Storeys[level].activeSelf != shown) shell.Storeys[level].SetActive(shown);
                 }
             }
-            if (LocalAvatar != null) LocalAvatar.CameraRig.SetIndoors(LocalBuildingId != null);
+            if (LocalAvatar != null) LocalAvatar.CameraRig.SetIndoors(LocalBuildingId != null, LocalCeiling);
             // Other players on a hidden storey are hidden with it.
             var localSite = LocalBuilding == null ? null : drawn.Find(LocalBuilding.SiteId);
             foreach (var avatar in Avatars().Where(x => !x.IsOwner))
@@ -190,8 +208,14 @@ namespace FoodFactoryGame.Session.Buildings
                         Box(storey.transform, $"Lintel {door.X},{door.Z}", wallMaterial, center + Vector3.up * (doorHeight + SiteGridSpace.LevelHeight) * 0.5f,
                             new Vector3(SiteGrid.CellSize, SiteGridSpace.LevelHeight - doorHeight, SiteGrid.CellSize), false);
                     }
-                    var floor = Box(storey.transform, "Floor", floorMaterial, interiorCenter + Vector3.up * 0.005f, interiorSize + Vector3.up * 0.01f, false);
-                    floor.shadowCastingMode = ShadowCastingMode.Off;
+                    if (building.FreeWalls)
+                        foreach (var floor in Cover(layout, storey.transform, "Floor", floorMaterial, SiteGrid.InteriorCells(building), 0.005f, 0.01f))
+                            floor.shadowCastingMode = ShadowCastingMode.Off;
+                    else
+                    {
+                        var floor = Box(storey.transform, "Floor", floorMaterial, interiorCenter + Vector3.up * 0.005f, interiorSize + Vector3.up * 0.01f, false);
+                        floor.shadowCastingMode = ShadowCastingMode.Off;
+                    }
                 }
                 else
                 {
@@ -212,10 +236,64 @@ namespace FoodFactoryGame.Session.Buildings
                 }
                 shell.Storeys.Add(storey);
             }
-            var roofCenter = SiteGridSpace.FootprintCenter(layout, building.CellX, building.CellZ, building.Width, building.Depth, building.Floors);
-            shell.Roof = Box(root.transform, "Roof", roofMaterial, roofCenter + Vector3.up * 0.1f,
-                new Vector3(building.Width * SiteGrid.CellSize, 0.2f, building.Depth * SiteGrid.CellSize), false);
+            if (building.FreeWalls)
+            {
+                // The roof spans the enclosed cells and the walls around them.
+                shell.Roof.AddRange(Cover(layout, root.transform, "Roof", roofMaterial, RoofCells(building), SiteGridSpace.LevelHeight + 0.1f, 0.2f));
+            }
+            else
+            {
+                var roofCenter = SiteGridSpace.FootprintCenter(layout, building.CellX, building.CellZ, building.Width, building.Depth, building.Floors);
+                shell.Roof.Add(Box(root.transform, "Roof", roofMaterial, roofCenter + Vector3.up * 0.1f,
+                    new Vector3(building.Width * SiteGrid.CellSize, 0.2f, building.Depth * SiteGrid.CellSize), false));
+            }
+            if (building.Floors == 1)
+            {
+                // A plaster ceiling just under the top of the walls, over the room and the walls around it (thin kit walls stand on
+                // their cells' centrelines, so the room's edge cells reach past them).
+                shell.Ceiling = new GameObject("Ceiling");
+                shell.Ceiling.transform.SetParent(root.transform, false);
+                var ceilingCells = building.FreeWalls ? RoofCells(building)
+                    : Enumerable.Range(building.CellX, building.Width).SelectMany(x => Enumerable.Range(building.CellZ, building.Depth).Select(z => (X: x, Z: z)));
+                Cover(layout, shell.Ceiling.transform, "Ceiling", wallMaterial, ceilingCells, SiteGridSpace.LevelHeight + 0.023f, 0.05f);
+                shell.Ceiling.SetActive(false);
+            }
+            DistanceCulling.Apply(root, DistanceCulling.Shells);
             return shell;
+        }
+
+        // Cells a free-walled roof covers: the enclosed cells and every wall cell touching one (diagonals too).
+        private static IEnumerable<(int X, int Z)> RoofCells(GoodsBuilding building)
+        {
+            var inside = new HashSet<(int X, int Z)>(SiteGrid.InteriorCells(building));
+            var cells = new HashSet<(int X, int Z)>(inside);
+            foreach (var (x, z) in inside)
+                for (var dx = -1; dx <= 1; dx++)
+                for (var dz = -1; dz <= 1; dz++)
+                    if (SiteGrid.IsPartition(building, x + dx, z + dz)) cells.Add((x + dx, z + dz));
+            return cells;
+        }
+
+        // Flat boxes over a set of cells, one per run of cells along each row (X), top at height + thickness / 2 above the floor.
+        private static List<MeshRenderer> Cover(SiteLayout layout, Transform parent, string name, Material material, IEnumerable<(int X, int Z)> cells,
+            float height, float thickness)
+        {
+            var boxes = new List<MeshRenderer>();
+            foreach (var row in cells.GroupBy(c => c.Z))
+            {
+                var xs = row.Select(c => c.X).OrderBy(x => x).ToList();
+                var start = 0;
+                for (var index = 1; index <= xs.Count; index++)
+                {
+                    if (index < xs.Count && xs[index] == xs[index - 1] + 1) continue;
+                    var width = xs[index - 1] - xs[start] + 1;
+                    var center = SiteGridSpace.FootprintCenter(layout, xs[start], row.Key, width, 1);
+                    boxes.Add(Box(parent, $"{name} {xs[start]},{row.Key}", material, center + Vector3.up * height,
+                        new Vector3(width * SiteGrid.CellSize, thickness, SiteGrid.CellSize), false));
+                    start = index;
+                }
+            }
+            return boxes;
         }
 
         // Art-kit visuals plus one invisible box collider (a solid wall for avatars and aim rays) and carving NavMesh obstacle per

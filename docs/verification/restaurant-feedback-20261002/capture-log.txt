@@ -1,0 +1,18 @@
+lot 16x16, shell (2,0) 14x16, doors (2,7) (2,8), access (237,-310) lot (238,-317)
+rt-wall-clock at (5,0) rotation 0 faces (0,1); front cell interior True; last rejection 
+rt-wall-clock at (6,15) rotation 2 faces (0,-1); front cell interior True; last rejection 
+rt-sink at (8,1) rotation 0 faces (0,1); front cell interior True; last rejection 
+no room behind the shell for the extension
+after ClearSelection: tool None, offer none
+captured 0036-build-tilted.png
+inside: building restaurant-0068, topDown True, ceiling False
+captured 0036-inside-topdown.png
+third person: ceiling True, arm 2.68 of 9, camera height above floor 2.75, camera cell (10,6) interior True
+captured 0036-inside-third-person.png
+2 door leaves; nearest closed: angle 0, blocking True
+avatar 1.2 m away: angle -95, blocking False
+captured 0036-door-open.png
+avatar 4 m away: angle 0, blocking True
+register (8,3) rot 0; service spot (0.50, 0.00, -3.50)
+customer figure samples 0, samples standing on a wall cell 0; customers on site 0
+captured 0036-customers.png

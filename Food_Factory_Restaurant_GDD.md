@@ -211,7 +211,7 @@ Required by the development constraints (`AGENTS.md`), not optional design:
 
 Owner decisions, 2026-10-01 (details: `docs/decisions/0034-restaurant-building.md`):
 
-- **Resizable shell.** The player buys a generated building (section 29.5 is unchanged) and may resize the restaurant's rectangular shell within that purchased lot, and place or remove interior walls, doors, and windows.
+- **Free walls.** The player buys a generated building (section 29.5 is unchanged) and places or removes its outer walls exactly like interior walls, anywhere within that purchased lot, plus doors and windows; the room is what the walls enclose. (Owner, 2026-10-02, replacing "resize the rectangular shell" of 2026-10-01; decision 0036.)
 - **Instant.** Restaurant structural changes take effect as soon as they are paid for (29.2 A for restaurants).
 - **Full refund.** Removing or shrinking structure, and selling equipment, tables, registers, decor, and docks, refunds the amount charged, in full, at any time (29.6 for restaurants). Goods inside a removed piece move to a recorded location; they are never deleted.
 - **Furniture is equipment.** Tables, registers, and decor are purchased equipment that the player places directly, with no contractor.
@@ -531,7 +531,7 @@ support them.
 
 - One farm type, several ingredients, several recipes.
 
-- One restaurant type with editable kitchen/dining layout: resizable shell within the lot, interior walls, doors, windows, tables, registers, decor with an ambience score, and docks.
+- One restaurant type with editable kitchen/dining layout: free outer and interior walls within the lot, doors, windows, tables, registers, decor with an ambience score, and docks.
 
 - Basic food factory processing plus the ability to sell output to
   outside restaurants/distributors.
@@ -784,7 +784,7 @@ Owner direction (2026-09-24): buildings are procedurally generated and some are 
 - B. Rectangular shells - the player sizes a rectangular shell on owned land, then places doors and interior walls freely.
 - C. Freeform walls - the player draws any wall layout on the grid, including non-rectangular buildings.
 
-Owner decision, 2026-10-01: for restaurants, option B (rectangular shells). The player resizes the shell within the lot of a bought generated building, then places interior walls, doors, and windows. This does not add buying empty land (29.5 D stands) and does not select B for factories or other buildings. [SELECTED for restaurants]
+Owner decision, 2026-10-01: for restaurants, option B (rectangular shells). The player resizes the shell within the lot of a bought generated building, then places interior walls, doors, and windows. Revised 2026-10-02: outer walls are placed and removed like interior walls (free shapes within the lot), with no separate resize. This does not add buying empty land (29.5 D stands) and does not select B for factories or other buildings. [SELECTED for restaurants]
 
 Related open detail: walls currently occupy whole cells. Interior walls on cell edges would keep more floor area usable but need a separate occupancy rule (decision 0019).
 

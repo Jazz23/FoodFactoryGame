@@ -257,6 +257,7 @@ namespace FoodFactoryGame.Session.Belts
             }
             if (!root.TryGetComponent<BeltVisual>(out var visual)) visual = root.AddComponent<BeltVisual>();
             visual.Bind(belt.Id);
+            DistanceCulling.Apply(root);
             return root;
         }
 
@@ -348,6 +349,7 @@ namespace FoodFactoryGame.Session.Belts
             instance.transform.SetParent(transform, false);
             var renderer = instance.AddComponent<SpriteRenderer>();
             ConfigureItemSprite(renderer, item?.Icon, itemMaterial, itemSize);
+            DistanceCulling.Apply(instance);
             renderer.color = lot.Spoiled ? new Color(0.6f, 0.75f, 0.35f, 1f) : Color.white;
             return renderer;
         }

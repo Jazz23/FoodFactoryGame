@@ -1,7 +1,9 @@
 // Verifies restaurant shell editing (decision 0034, slice 1): resizing within the site, interior walls, doors, windows, removal
 // and wall finish; that every order charges or refunds exactly once (company cash plus everything recorded as charged never
 // changes), that rejected and failed orders change nothing, that a retried request replays, that walls never cover equipment
-// or decor, and that shells and their charges survive a save, a restart and the v15 upgrade. Isolated saves only.
+// or decor, and that shells and their charges survive a save, a restart and the v15 upgrade. Free walls (decision 0036): any
+// order but a resize turns the perimeter into ordinary walls, which are then removed and drawn anywhere in the lot, the footprint
+// following them and the interior being what they enclose. Isolated saves only.
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -119,25 +121,90 @@ namespace FoodFactoryGame.Goods.Tests
 
             // Windows and the door first, then the walls under them.
             Assert.That(_world.OrderShell("chef", "remove-1", Cells(ShellOrder.Remove, "", (6, 4), (6, 5), (6, 6), (3, 7), (4, 7))).Accepted, Is.True);
-            Assert.That(Shop.Structures.Count(x => x.Kind == GoodsWorld.PartitionStructure), Is.EqualTo(4), "Openings went; the walls stay.");
+            Assert.That(Shop.Structures.Count(x => x.Kind == GoodsWorld.PartitionStructure && x.ChargedCents > 0), Is.EqualTo(4), "Openings went; the walls stay.");
             Assert.That(_world.OrderShell("chef", "remove-2", Cells(ShellOrder.Remove, "", (6, 3), (6, 4), (6, 5), (6, 6))).Accepted, Is.True);
-            Assert.That(Shop.Structures, Is.Empty);
+            Assert.That(Shop.Structures.Where(x => x.ChargedCents > 0), Is.Empty, "Only the building's own walls and door are left, unpaid.");
+            Assert.That(Shop.Structures.Count(x => x.Kind == GoodsWorld.PartitionStructure), Is.EqualTo(24), "The 8x6 perimeter became wall records.");
             Assert.That(Cash, Is.EqualTo(StartCash), "Everything built was refunded in full.");
         }
 
         [Test]
-        public void DoorsAndWindowsMoveWithTheirSideAndLostOnesAreRefunded()
+        public void ADoorMovesWithItsSideOnAResizeOfARectangularShell()
         {
-            Assert.That(_world.OrderShell("chef", "door-2", new ShellOrder { Kind = ShellOrder.Door, BuildingId = "shop", X = 2, Z = 4, Style = "panel" }).Accepted, Is.True);
-            Assert.That(_world.OrderShell("chef", "window", new ShellOrder { Kind = ShellOrder.Window, BuildingId = "shop", X = 6, Z = 2, Axis = 0, Style = "mullioned" }).Accepted,
-                Is.True);
-            // The south side moves down one row and the north side down to row 4, so the paid west door at row 4 becomes a corner.
             Assert.That(_world.OrderShell("chef", "resize", Resize(2, 1, 8, 4)).Accepted, Is.True);
             var shop = Shop;
+            Assert.That(shop.FreeWalls, Is.False);
             Assert.That(shop.Doors.Select(x => (x.X, x.Z)), Is.EqualTo(new[] { (5, 1) }), "The south door moved with its side.");
-            Assert.That(shop.Structures.Single(x => x.Kind == GoodsWorld.WindowStructure).Z, Is.EqualTo(1), "The window moved with the south wall.");
-            Assert.That(shop.Structures.Any(x => x.Kind == GoodsWorld.DoorStructure), Is.False, "The west door fell off the side and was refunded.");
             Assert.That(Ledger, Is.EqualTo(StartCash));
+        }
+
+        [Test]
+        public void AnyOtherOrderTurnsThePerimeterIntoWallsAndResizeNoLongerApplies()
+        {
+            Assert.That(_world.OrderShell("chef", "grow", Resize(2, 2, 10, 6)).Accepted, Is.True);
+            var paid = Shop.Structures.Where(x => x.Kind == GoodsWorld.WallStructure).ToDictionary(x => (x.X, x.Z), x => x.ChargedCents);
+            var floors = Shop.Structures.Where(x => x.Kind == GoodsWorld.FloorStructure).Sum(x => x.ChargedCents);
+            var cash = Cash;
+            var outcome = _world.OrderShell("chef", "window", new ShellOrder { Kind = ShellOrder.Window, BuildingId = "shop", X = 3, Z = 7, Axis = 0, Style = "picture" });
+            Assert.That(outcome.Accepted, Is.True);
+            var shop = Shop;
+            Assert.That((shop.FreeWalls, shop.Doors.Count, shop.CellX, shop.CellZ, shop.Width, shop.Depth), Is.EqualTo((true, 0, 2, 2, 10, 6)));
+            Assert.That(shop.Structures.Count(x => x.Kind == GoodsWorld.PartitionStructure), Is.EqualTo(28), "Every perimeter cell is a wall record.");
+            Assert.That(shop.Structures.Any(x => x.Kind is GoodsWorld.WallStructure or GoodsWorld.FloorStructure), Is.False);
+            Assert.That(shop.Structures.Single(x => x.Kind == GoodsWorld.DoorStructure && x.X == 5 && x.Z == 2).ChargedCents, Is.Zero, "The building's door is unpaid.");
+            foreach (var ((x, z), cents) in paid)
+                Assert.That(shop.Structures.Single(s => s.Kind == GoodsWorld.PartitionStructure && s.X == x && s.Z == z).ChargedCents, Is.EqualTo(cents),
+                    "A paid perimeter wall keeps its price.");
+            Assert.That(Cash, Is.EqualTo(cash - outcome.Cents));
+            Assert.That(outcome.Cents, Is.EqualTo(GoodsWorld.ShellWindowCents + GoodsWorld.ShellOrderFeeCents - floors), "Paid floor cells are refunded once.");
+            Assert.That(SiteGrid.InteriorCells(shop).Count(), Is.EqualTo(8 * 4), "The room is what the walls enclose.");
+            Assert.That(Ledger, Is.EqualTo(StartCash));
+            Assert.That(_world.OrderShell("chef", "regrow", Resize(2, 2, 12, 6)).Reason, Is.EqualTo("invalid-order"));
+        }
+
+        [Test]
+        public void OuterWallsAreDrawnAndRemovedLikeInnerOnesAndTheRoomFollowsThem()
+        {
+            // Three new columns east of the shell (x 10..12), then the old east wall (x 9, rows 3..6) comes down.
+            Assert.That(_world.OrderShell("chef", "south", Cells(ShellOrder.Partition, "brick", (10, 2), (11, 2), (12, 2))).Accepted, Is.True);
+            Assert.That(_world.OrderShell("chef", "east", Cells(ShellOrder.Partition, "brick", (12, 3), (12, 4), (12, 5), (12, 6), (12, 7))).Accepted, Is.True);
+            Assert.That(SiteGrid.IsInterior(Shop, 10, 4), Is.False, "Still open to the north.");
+            Assert.That(_world.OrderShell("chef", "north", Cells(ShellOrder.Partition, "brick", (10, 7), (11, 7))).Accepted, Is.True);
+            Assert.That(SiteGrid.IsInterior(Shop, 10, 4), Is.True, "The new walls close a second room.");
+            var cash = Cash;
+            var down = _world.OrderShell("chef", "open", Cells(ShellOrder.Remove, "", (9, 3), (9, 4), (9, 5), (9, 6)));
+            Assert.That((down.Accepted, down.Cents), Is.EqualTo((true, 0L)), "The building's own walls refund nothing.");
+            Assert.That(Cash, Is.EqualTo(cash));
+            var shop = Shop;
+            Assert.That((shop.CellX, shop.CellZ, shop.Width, shop.Depth), Is.EqualTo((2, 2, 11, 6)), "The footprint follows the walls.");
+            Assert.That(SiteGrid.InteriorCells(shop).Count(), Is.EqualTo(9 * 4), "One room from x 3 to 11.");
+            Assert.That(SiteGrid.IsWall(shop, 9, 4), Is.False);
+            Assert.That(SiteGrid.CellProblem(_world.Snapshot(), "resto", 12, 4, 1, 1, null), Is.EqualTo("blocked"), "A drawn outer wall blocks placement.");
+            Assert.That(Ledger, Is.EqualTo(StartCash));
+
+            // Opening a gap leaves no room; closing it gives the room back.
+            Assert.That(_world.OrderShell("chef", "gap", Cells(ShellOrder.Remove, "", (12, 4))).Accepted, Is.True);
+            Assert.That(SiteGrid.InteriorCells(Shop), Is.Empty);
+            Assert.That(_world.OrderShell("chef", "close", Cells(ShellOrder.Partition, "plaster", (12, 4))).Accepted, Is.True);
+            Assert.That(SiteGrid.InteriorCells(Shop).Count(), Is.EqualTo(9 * 4));
+
+            // Walls stay in the lot, never on a wall, and a door never goes on a corner.
+            Assert.That(_world.OrderShell("chef", "outside", Cells(ShellOrder.Partition, "plaster", (16, 4))).Reason, Is.EqualTo("invalid-cell"));
+            Assert.That(_world.OrderShell("chef", "twice", Cells(ShellOrder.Partition, "plaster", (12, 4))).Reason, Is.EqualTo("invalid-cell"));
+            Assert.That(_world.OrderShell("chef", "corner", new ShellOrder { Kind = ShellOrder.Door, BuildingId = "shop", X = 12, Z = 2, Style = "panel" }).Reason,
+                Is.EqualTo("invalid-cell"));
+            Assert.That(_world.OrderShell("chef", "door", new ShellOrder { Kind = ShellOrder.Door, BuildingId = "shop", X = 12, Z = 5, Style = "glazed" }).Accepted, Is.True);
+
+            // Restyling a line of walls is free.
+            var restyle = _world.OrderShell("chef", "restyle", Cells(ShellOrder.WallFinish, "tile", (12, 3), (12, 4)));
+            Assert.That((restyle.Accepted, restyle.Cents), Is.EqualTo((true, 0L)));
+            Assert.That(Shop.Structures.Where(x => x.Kind == GoodsWorld.PartitionStructure && x.X == 12 && x.Z is 3 or 4).Select(x => x.Style), Is.All.EqualTo("tile"));
+
+            // Free walls survive a save and a restart exactly.
+            GoodsSnapshotStore.Save(_world, PathForSave);
+            var loaded = GoodsSnapshotStore.Load(PathForSave);
+            Assert.That(JsonUtility.ToJson(loaded.Snapshot()), Is.EqualTo(JsonUtility.ToJson(_world.Snapshot())));
+            Assert.That(SiteGrid.InteriorCells(loaded.Snapshot().Buildings.Single(x => x.Id == "shop")).Count(), Is.EqualTo(9 * 4 - 0));
         }
 
         [Test]
@@ -217,7 +284,7 @@ namespace FoodFactoryGame.Goods.Tests
             GoodsSnapshotStore.Save(_world, PathForSave);
             var v15 = SnapshotDatabase.LatestPayload(PathForSave)
                 .Replace($"\"SchemaVersion\":{GoodsSnapshot.CurrentSchema}", "\"SchemaVersion\":15")
-                .Replace(",\"Structures\":[],\"WallStyle\":\"\"", "")
+                .Replace(",\"Structures\":[],\"WallStyle\":\"\",\"FreeWalls\":false", "")
                 .Replace(",\"Layer\":\"\",\"Ambience\":0,\"ChargedCents\":0,\"StaffId\":\"\"", "")
                 .Replace(",\"Docked\":false", "");
             Assert.That(v15, Does.Not.Contain("Structures").And.Not.Contain("StaffId"), "The payload is shaped like a v15 save.");

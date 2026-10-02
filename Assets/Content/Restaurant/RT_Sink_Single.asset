@@ -26,7 +26,7 @@ MonoBehaviour:
   ambience: 0
   displayName: Sink
   category: Service
-  mount: 0
+  mount: 5
   mountHeight: 1.5
   hideFromAbove: 0
   opensScreen: 0

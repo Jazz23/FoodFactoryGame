@@ -17,7 +17,7 @@ namespace FoodFactoryGame.World.Tests
         private const ulong KnownSeed = 20260927;
         // WorldLayoutText.Hash of generator v3's layout for KnownSeed (v1's was c8aed6b7…4269, v2's 6e12b0fd…b598). Changing it
         // requires bumping WorldGenerator.Version.
-        private const string KnownHash = "c8cef1ddd330c5a1a95391844d880f631233a0a0432fec1fd0d70c16eba1db11";
+        private const string KnownHash = "5667d34e01d58a174761126c2cbf03fb51df9329c06bfe7d7f10b36574c747ec";
         private const int SeedCount = 120;
 
         private static WorldLayout Generate(ulong seed) => WorldGenerator.Generate(seed.ToString(), seed).Layout;
@@ -28,7 +28,7 @@ namespace FoodFactoryGame.World.Tests
             var first = WorldLayoutText.Write(Generate(KnownSeed));
             var second = WorldLayoutText.Write(Generate(KnownSeed));
             Assert.That(second, Is.EqualTo(first));
-            Assert.That(first, Does.StartWith("food-factory-world-layout 3\ngenerator 3\n").And.Contains("\nlot lot-"), "the same lots and IDs, in format 3");
+            Assert.That(first, Does.StartWith("food-factory-world-layout 3\ngenerator 4\n").And.Contains("\nlot lot-"), "the same lots and IDs, in format 3");
             TestContext.WriteLine($"seed {KnownSeed}: sha256 {WorldLayoutText.Hash(first)}, {first.Length} chars");
             Assert.That(WorldLayoutText.Hash(first), Is.EqualTo(KnownHash), "Generator output changed: bump WorldGenerator.Version and re-pin.");
         }

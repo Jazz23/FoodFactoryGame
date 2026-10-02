@@ -477,6 +477,9 @@ namespace FoodFactoryGame.Goods
                 state.RoadTrucks ??= new();
                 state.SchemaVersion = 17;
             }
+            // v16 had no free walls (decision 0036); every shell's FreeWalls reads false, so its perimeter stays implied. The version
+            // still changes so an older build refuses a v17 save instead of drawing free walls as a rectangle.
+            if (state != null && state.SchemaVersion == 16) state.SchemaVersion = 17;
             GoodsWorld.Validate(state);
             return state;
         }

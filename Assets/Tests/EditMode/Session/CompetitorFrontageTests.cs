@@ -40,7 +40,8 @@ namespace FoodFactoryGame.Session.Tests
         {
             var buildings = _layout.Buildings.ToDictionary(x => x.Id, StringComparer.Ordinal);
             var lots = _layout.Lots.Where(x => buildings[x.BuildingId].Ownership == Ownership.Competitor).ToList();
-            Assert.That(lots.Count, Is.GreaterThan(250), "A generated city has hundreds of competitors.");
+            // Restaurants grew on 2026-10-02 (owner request), so fewer fit a city.
+            Assert.That(lots.Count, Is.GreaterThan(150), "A generated city has hundreds of competitors.");
             foreach (var lot in lots)
             {
                 var building = buildings[lot.BuildingId];

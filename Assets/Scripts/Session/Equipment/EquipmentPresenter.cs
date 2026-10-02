@@ -2,7 +2,8 @@
 // piece, keyed by equipment ID (unique across sites). Visuals never own state; held equipment has no visual, and a missing
 // baseline clears the scene rather than guessing.
 // A visual shows "running" exactly while the baseline has a running (not blocked) job on its station.
-// Decor (decision 0034) stands where its mount says: on a wall face, under the ceiling or on the table top under it; pieces
+// Decor (decision 0034) stands where its mount says: on a wall face, under the ceiling, on the table top under it or (a sink)
+// back to the wall behind it; pieces
 // marked hide-from-above (ceiling panels) hide their renderers, not their lights, while this client looks down on the room
 // it stands in. Only ground object-layer pieces carve the NavMesh.
 using System.Collections.Generic;
@@ -79,7 +80,8 @@ namespace FoodFactoryGame.Session.Equipment
                 _placed[equipment.Id] = equipment;
                 var rotation = SiteGridSpace.Rotation(equipment.Rotation);
                 var definition = Definition(equipment.Kind);
-                var position = SiteGridSpace.Center(site.Layout, equipment) + (definition == null ? Vector3.zero : EquipmentModel.MountOffset(definition, rotation));
+                var againstWall = EquipmentModel.BackedAgainstWall(definition, site.Snapshot, equipment.SiteId, equipment.CellX, equipment.CellZ, equipment.Rotation);
+                var position = SiteGridSpace.Center(site.Layout, equipment) + (definition == null ? Vector3.zero : EquipmentModel.MountOffset(definition, rotation, againstWall));
                 if (definition != null && definition.Mount == EquipmentMount.Tabletop) position.y = TableTop(site, equipment, position.y);
                 visual.transform.SetPositionAndRotation(position, rotation);
                 visual.SetRunning(site.Snapshot.Jobs.Any(x => x.StationId == equipment.Id && x.State == StationJobState.Running));
@@ -134,6 +136,8 @@ namespace FoodFactoryGame.Session.Equipment
             }
             var visual = root.AddComponent<EquipmentVisual>();
             visual.Bind(equipment.Id, equipment.Kind);
+            // Far away it is not drawn; the machine keeps running on the server.
+            DistanceCulling.Apply(root);
             return visual;
         }
     }

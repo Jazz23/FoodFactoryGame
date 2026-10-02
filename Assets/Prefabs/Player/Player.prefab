@@ -355,6 +355,8 @@ MonoBehaviour:
   lookAction: {fileID: -5630151704836100654, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   zoomAction: {fileID: 500627165542639897, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   switchViewAction: {fileID: 4688106539747999695, guid: 052faaac586de48259a63d0c4782560b, type: 3}
+  moveAction: {fileID: -1680190386980627800, guid: 052faaac586de48259a63d0c4782560b, type: 3}
+  tiltAction: {fileID: 600095576188085588, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   focusHeight: 1
   shoulderOffset: 1
   orbitDegreesPerUnit: 0.2
@@ -369,6 +371,8 @@ MonoBehaviour:
   distance: 9
   topDownDistance: 14
   transitionSeconds: 0.4
+  buildPanSpeed: 12
+  armReturnSeconds: 0.25
 --- !u!1001 &3520566312367721755
 PrefabInstance:
   m_ObjectHideFlags: 0

@@ -2,9 +2,12 @@
 // whatever the asset's pivot. Placed visuals and the placement ghost share this, so the ghost shows exactly where and how
 // the piece will stand. Belt ghosts reuse the ghost conversion on their already tile-centred prefabs. Decor mounts (decision 0034)
 // shift the centred model further: a floor finish sinks flush, a wall piece puts its back on the root's plane facing +Z, and
-// a ceiling piece hangs its top at the root; MountOffset lifts or pushes the root to its wall face or the ceiling.
+// a ceiling piece hangs its top at the root, and a backed piece (a sink) puts its back on the back edge of its footprint;
+// MountOffset lifts or pushes the root to its wall face or the ceiling, and pushes a backed piece standing against a wall
+// back onto that wall's face.
 using System;
 using System.Linq;
+using FoodFactoryGame.Goods;
 using UnityEngine;
 using UnityEngine.Rendering;
 using Object = UnityEngine.Object;
@@ -22,27 +25,38 @@ namespace FoodFactoryGame.Session.Equipment
         {
             var model = Object.Instantiate(definition.VisualPrefab, root, false);
             Center(root, model);
-            Mount(root, model, definition.Mount);
+            Mount(root, model, definition);
             return model;
         }
 
         public static GameObject CreateGhost(EquipmentDefinition definition, Transform parent, Material material)
         {
             var ghost = CreateGhost(definition.VisualPrefab, $"Ghost {definition.Kind}", parent, material, true);
-            if (ghost.transform.childCount > 0) Mount(ghost.transform, ghost.transform.GetChild(0).gameObject, definition.Mount);
+            if (ghost.transform.childCount > 0) Mount(ghost.transform, ghost.transform.GetChild(0).gameObject, definition);
             return ghost;
         }
 
         // Where a mounted piece's root stands relative to its footprint's centre on the floor (tabletop height is the caller's).
-        public static Vector3 MountOffset(EquipmentDefinition definition, Quaternion rotation) => definition.Mount switch
+        // againstWall: a backed piece has walls on every cell behind it (BackedAgainstWall).
+        public static Vector3 MountOffset(EquipmentDefinition definition, Quaternion rotation, bool againstWall = false) => definition.Mount switch
         {
             EquipmentMount.Wall => rotation * Vector3.forward * WallFace + Vector3.up * definition.MountHeight,
             EquipmentMount.Ceiling => Vector3.up * (SiteGridSpace.LevelHeight - 0.005f),
+            EquipmentMount.Backed when againstWall => rotation * Vector3.back * (SiteGrid.CellSize * 0.5f - WallFace),
             _ => Vector3.zero
         };
 
-        private static void Mount(Transform root, GameObject model, EquipmentMount mount)
+        // True when a backed piece at this footprint and rotation has a wall on every cell behind it.
+        public static bool BackedAgainstWall(EquipmentDefinition definition, GoodsSnapshot site, string siteId, int cellX, int cellZ, int rotation)
         {
+            if (definition == null || definition.Mount != EquipmentMount.Backed || site == null) return false;
+            var (width, depth) = SiteGrid.Footprint(definition.Width, definition.Depth, rotation);
+            return SiteGrid.BehindCells(cellX, cellZ, width, depth, rotation).All(c => SiteGrid.WallAt(site, siteId, c.X, c.Z));
+        }
+
+        private static void Mount(Transform root, GameObject model, EquipmentDefinition definition)
+        {
+            var mount = definition.Mount;
             if (mount is EquipmentMount.Floor or EquipmentMount.Tabletop) return;
             var renderers = model.GetComponentsInChildren<Renderer>(true);
             if (renderers.Length == 0) return;
@@ -54,6 +68,7 @@ namespace FoodFactoryGame.Session.Equipment
                 EquipmentMount.Flush => Vector3.down * (Mathf.Abs(size.y) - FlushLift),
                 EquipmentMount.Wall => new Vector3(0f, -Mathf.Abs(size.y) * 0.5f, Mathf.Abs(size.z) * 0.5f),
                 EquipmentMount.Ceiling => Vector3.down * Mathf.Abs(size.y),
+                EquipmentMount.Backed => Vector3.back * Mathf.Max(0f, definition.Depth * SiteGrid.CellSize * 0.5f - Mathf.Abs(size.z) * 0.5f),
                 _ => Vector3.zero
             };
         }

@@ -103,7 +103,11 @@ namespace FoodFactoryGame.Session.PlayModeTests
             Assert.That(walls.Count, Is.EqualTo(2 * building0.Width + 2 * (building0.Depth - 2) - building0.Doors.Count),
                 "Every perimeter cell but the doorway is a solid wall.");
             Assert.That(shell.GetComponentsInChildren<Transform>().Any(x => x.name.StartsWith("RT_Wall_Plaster")), Is.True, "Plaster kit walls are drawn.");
-            Assert.That(shell.GetComponentsInChildren<Collider>().Count(), Is.EqualTo(walls.Count), "Only walls are solid; floor, lintels and roof never catch aim rays.");
+            // Decision 0036: each door leaf is solid while shut, so a closed door bumps; nothing else but walls is.
+            var leaves = shell.GetComponentsInChildren<DoorSwing>();
+            Assert.That(leaves.Length, Is.EqualTo(building0.Doors.Count), "One leaf per door cell (a double door has two).");
+            Assert.That(shell.GetComponentsInChildren<Collider>().Count(x => x.GetComponent<DoorSwing>() == null), Is.EqualTo(walls.Count),
+                "Only walls and door leaves are solid; floor, lintels and roof never catch aim rays.");
             var layout = _root.ClientSite.SiteLayouts.Single();
             var building = _root.ClientSite.Buildings.Single(x => x.Id == DevWorld.RestaurantId);
             var gap = SiteGridSpace.FootprintCenter(layout, DevWorld.RestaurantDoorX, building.CellZ + building.Depth - 1, 2, 1) + Vector3.up;

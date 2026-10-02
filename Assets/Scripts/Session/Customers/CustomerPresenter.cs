@@ -3,11 +3,14 @@
 // 0033): customers at competitors near this client, walking fixed lines in front of the competitor's door (CompetitorFrontage),
 // queueing outside it and hidden while inside. The current site's customers always get figures first; the remaining places go
 // to whichever restaurants are nearest the camera. Figures first appear, and figures that lose their place leave, out of the
-// local camera's view.
+// local camera's view. On a drawn site figures walk the site's open cells (SiteWalk), so they come in through a door, queue back
+// from the register's service spot along the way in, and only fall back to the NavMesh where no cell path exists; a figure on
+// the move opens restaurant doors (DoorOpener), one standing or seated does not.
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using FoodFactoryGame.Goods;
+using FoodFactoryGame.Session.Buildings;
 using FoodFactoryGame.Session.Equipment;
 using UnityEngine;
 using UnityEngine.AI;
@@ -41,6 +44,7 @@ namespace FoodFactoryGame.Session.Customers
         {
             public GameObject Root;
             public Animator Animator;
+            public DoorOpener Opener;
             public Vector3 Target;
             public Vector3[] Corners = Array.Empty<Vector3>();
             public int Corner;
@@ -199,7 +203,7 @@ namespace FoodFactoryGame.Session.Customers
                 var distance = drawnSite.Current ? 0f : Flat(eye, SiteGridSpace.Origin(drawnSite.Layout));
                 foreach (var customer in customers)
                 {
-                    if (!TryTarget(customer, drawnSite.Layout, counters, tables, ranks, out var target)) continue;
+                    if (!TryTarget(customer, drawnSite, counters, tables, ranks, out var target)) continue;
                     result.Add(new Candidate
                     {
                         Id = customer.Id, DistrictId = customer.DistrictId, Appearance = customer.Appearance, Group = drawnSite.Current ? 0 : 1,
@@ -286,7 +290,8 @@ namespace FoodFactoryGame.Session.Customers
             visual.SiteId = candidate.SiteId;
             visual.Frontage = null;
             visual.Free = false;
-            if (moved || (visual.Target - candidate.Target).sqrMagnitude > 0.04f) SetTarget(visual, candidate.Target);
+            if (moved || (visual.Target - candidate.Target).sqrMagnitude > 0.04f)
+                SetTarget(visual, candidate.Target, SiteWalk.For(candidate.Site.Snapshot, candidate.Site.Layout));
         }
 
         private GameObject Spawn(Candidate candidate, Camera camera)
@@ -302,7 +307,8 @@ namespace FoodFactoryGame.Session.Customers
             var animator = root.GetComponentInChildren<Animator>();
             animator.cullingMode = AnimatorCullingMode.CullUpdateTransforms;
             Tint(root, candidate.DistrictId, candidate.Appearance);
-            var visual = new Visual { Root = root, Animator = animator, Target = spawn };
+            DistanceCulling.Apply(root);
+            var visual = new Visual { Root = root, Animator = animator, Target = spawn, Opener = root.AddComponent<DoorOpener>() };
             _visuals.Add(candidate.Id, visual);
             Follow(visual, candidate);
             return root;
@@ -333,7 +339,7 @@ namespace FoodFactoryGame.Session.Customers
                 return;
             }
             var from = visual.SiteId == null ? null : drawn.Find(visual.SiteId);
-            if (from?.Layout != null && TryEdge(from.Layout, from.Snapshot, camera, id, out var exit)) SetTarget(visual, exit);
+            if (from?.Layout != null && TryEdge(from.Layout, from.Snapshot, camera, id, out var exit)) SetTarget(visual, exit, SiteWalk.For(from.Snapshot, from.Layout));
             else visual.LeaveDeadline = Time.time + 1f;
         }
 
@@ -348,10 +354,11 @@ namespace FoodFactoryGame.Session.Customers
             return total;
         }
 
-        private static bool TryTarget(GoodsCustomer customer, SiteLayout layout, List<GoodsEquipment> counters,
+        private static bool TryTarget(GoodsCustomer customer, DrawnSite site, List<GoodsEquipment> counters,
             List<GoodsEquipment> tables, Dictionary<string, int> ranks, out Vector3 target)
         {
             target = default;
+            var layout = site.Layout;
             if (customer.State == CustomerState.Eating)
             {
                 var table = tables.FirstOrDefault(x => x.Id == customer.TableId);
@@ -363,13 +370,12 @@ namespace FoodFactoryGame.Session.Customers
             }
             var counter = counters.FirstOrDefault(x => x.Id == customer.CounterId) ?? counters[0];
             var center = SiteGridSpace.Center(layout, counter);
-            if (customer.State == CustomerState.Ordering)
+            var queueRank = customer.State == CustomerState.Ordering ? -1 : ranks.TryGetValue(customer.Id, out var value) ? value : 0;
+            var spot = SiteWalk.For(site.Snapshot, layout)?.ServiceSpot(counter, queueRank);
+            if (spot.HasValue) target = spot.Value;
+            else if (customer.State == CustomerState.Ordering)
                 target = center + new Vector3(0, 0, -0.9f);
-            else
-            {
-                var rank = ranks.TryGetValue(customer.Id, out var value) ? value : 0;
-                target = center + new Vector3(-0.9f - rank / 10 * 0.8f, 0, 0.9f + rank % 10 * 0.8f);
-            }
+            else target = center + new Vector3(-0.9f - queueRank / 10 * 0.8f, 0, 0.9f + queueRank % 10 * 0.8f);
             return true;
         }
 
@@ -440,19 +446,28 @@ namespace FoodFactoryGame.Session.Customers
             visual.Target = corners[corners.Length - 1];
         }
 
-        private static void SetTarget(Visual visual, Vector3 target)
+        // Over the site's open cells when it has a route, else the NavMesh. A figure never walks a straight line through walls: an
+        // incomplete NavMesh path is walked as far as it goes, then the last short step only.
+        private static void SetTarget(Visual visual, Vector3 target, SiteWalk walk)
         {
             visual.Target = target;
             visual.Corner = 0;
             var from = visual.Root.transform.position;
+            var route = walk?.Route(from, target);
+            if (route != null)
+            {
+                visual.Corners = route;
+                return;
+            }
             if (NavMesh.SamplePosition(from, out var origin, 2f, NavMesh.AllAreas)
                 && NavMesh.SamplePosition(target, out var destination, 2f, NavMesh.AllAreas))
             {
                 var path = new NavMeshPath();
-                if (NavMesh.CalculatePath(origin.position, destination.position, NavMesh.AllAreas, path)
-                    && path.status == NavMeshPathStatus.PathComplete)
+                if (NavMesh.CalculatePath(origin.position, destination.position, NavMesh.AllAreas, path) && path.corners.Length > 0)
                 {
-                    visual.Corners = path.corners;
+                    var end = path.corners[path.corners.Length - 1];
+                    visual.Corners = path.status == NavMeshPathStatus.PathComplete || Flat(end, target) < 1.5f
+                        ? path.corners.Append(target).ToArray() : path.corners;
                     return;
                 }
             }
@@ -476,6 +491,7 @@ namespace FoodFactoryGame.Session.Customers
                 if (direction.sqrMagnitude > 0.001f)
                     transform.rotation = Quaternion.RotateTowards(transform.rotation, Quaternion.LookRotation(direction), 540f * Time.deltaTime);
             }
+            if (visual.Opener != null) visual.Opener.Opens = moving;
             visual.Animator.SetFloat(SpeedParameter, moving ? WalkSpeed : 0f, 0.12f, Time.deltaTime);
             visual.Animator.SetFloat(WalkRateParameter, WalkSpeed / 1.5f);
         }

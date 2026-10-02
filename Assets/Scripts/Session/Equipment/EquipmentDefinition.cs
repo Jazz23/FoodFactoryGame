@@ -2,7 +2,7 @@
 // GoodsEquipment record when the server creates a piece; the record keeps copies, so saved equipment never depends on this
 // asset afterwards. Decision 0034 adds the occupancy layer and ambience points (copied into the record), and presentation-only
 // build-catalog metadata: display name, category, and how the visual is mounted (on the floor, flush in it, on a wall face, under
-// the ceiling or on a table top).
+// the ceiling, on a table top, or backed against a wall).
 using FoodFactoryGame.Goods;
 using UnityEngine;
 
@@ -20,7 +20,10 @@ namespace FoodFactoryGame.Session.Equipment
         // Hung from the ceiling (its pivot at ceiling height).
         Ceiling,
         // Standing on the top of the table under it.
-        Tabletop
+        Tabletop,
+        // Standing on the floor with its back to the wall behind its footprint (a sink); against no wall it stands at the back of
+        // its footprint.
+        Backed
     }
 
     [CreateAssetMenu(menuName = "Food Factory/Equipment Definition")]

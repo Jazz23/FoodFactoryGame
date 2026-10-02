@@ -97,6 +97,7 @@ namespace FoodFactoryGame.Session.Logistics
                     if (truckPrefab == null) continue;
                     visual = Instantiate(truckPrefab, transform);
                     visual.name = $"Truck {truckId}";
+                    DistanceCulling.Apply(visual);
                     _visuals.Add(truckId, visual);
                     visual.transform.SetPositionAndRotation(pose.position, pose.rotation);
                     Paint(visual, truckId);

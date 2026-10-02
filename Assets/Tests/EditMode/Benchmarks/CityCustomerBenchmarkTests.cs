@@ -164,7 +164,8 @@ namespace FoodFactoryGame.Benchmarks.Tests
             TestContext.WriteLine(phasesLine);
             Debug.Log(phasesLine);
 
-            Assert.That(setup.Competitors.Count, Is.GreaterThan(250), "The benchmark runs at a generated city's competitor count.");
+            // Restaurants grew on 2026-10-02 (owner request), so fewer fit a city.
+            Assert.That(setup.Competitors.Count, Is.GreaterThan(150), "The benchmark runs at a generated city's competitor count.");
             Assert.That(end.Customers.Count, Is.GreaterThan(0));
             var missed = new List<string>();
             if (p99 > FrameBudgetMs) missed.Add($"p99 clock tick {p99:F2} ms exceeds one 60 FPS frame ({FrameBudgetMs:F1} ms)");

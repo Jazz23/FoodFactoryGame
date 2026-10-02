@@ -404,6 +404,13 @@ namespace FoodFactoryGame.Session.Equipment
                 foreach (var slot in grid.Value) text.Append('|').Append(slot == null ? "" : $"{slot.Key}:{slot.Count}:{slot.Carried}");
             }
             foreach (var location in _site.Locations) text.Append('|').Append(location.Id).Append(location.Capacity);
+            // An open register shows who works it and who could (decision 0034).
+            var open = _site.Equipment.FirstOrDefault(x => x.Id == interaction.OpenMachineId);
+            if (open?.Kind == GoodsWorld.CounterKind)
+            {
+                text.Append("|staff:").Append(open.StaffId).Append('|').Append(interaction.HasPendingRequests);
+                foreach (var employee in _site.Employees) text.Append('|').Append(employee.Id);
+            }
             // An open table shows its seats and the restaurant's standing, which change with customers.
             if (_site.Equipment.Any(x => x.Id == interaction.OpenMachineId && GoodsWorld.IsTable(x)))
             {
@@ -625,7 +632,9 @@ namespace FoodFactoryGame.Session.Equipment
             var me = interaction.LocalPlayerId;
             var who = string.IsNullOrEmpty(register.StaffId) ? "nobody: customers are not served"
                 : register.StaffId == me ? "you" : site.Employees.FirstOrDefault(x => x.Id == register.StaffId)?.Name ?? "a teammate";
-            var label = Caption($"Staffed by {who}", 12, string.IsNullOrEmpty(register.StaffId) ? Spoiled : Color.white);
+            // While a request is out the row says so, and it is rebuilt when the server's answer arrives (Signature).
+            var label = Caption(interaction.HasPendingRequests ? "Updating..." : $"Staffed by {who}", 12,
+                string.IsNullOrEmpty(register.StaffId) ? Spoiled : Color.white);
             label.name = "hud-staff-label";
             label.style.flexGrow = 1;
             row.Add(label);
@@ -633,6 +642,7 @@ namespace FoodFactoryGame.Session.Equipment
             var registerId = register.Id;
             // Not focusable: a focused button would click again on every keyboard Submit (Enter/Space).
             var button = new Button(() => ClickStaff(registerId, !mine)) { name = "hud-staff-button", text = mine ? "Leave" : "Work this register", focusable = false };
+            button.SetEnabled(!interaction.HasPendingRequests);
             row.Add(button);
             foreach (var employee in site.Employees.Where(x => x.Id != register.StaffId))
             {

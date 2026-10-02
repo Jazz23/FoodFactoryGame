@@ -46,6 +46,8 @@ namespace FoodFactoryGame.Session.Player
         {
             // Remote copies and the server's copies never own a camera, listener, or input.
             cameraRig.gameObject.SetActive(IsOwner);
+            // Every player's figure opens restaurant doors it comes near (presentation only).
+            if (!TryGetComponent<Buildings.DoorOpener>(out _)) gameObject.AddComponent<Buildings.DoorOpener>();
             if (IsOwner)
             {
                 moveAction.action.Enable();
@@ -75,10 +77,12 @@ namespace FoodFactoryGame.Session.Player
                     return;
                 _groundFound = true;
             }
-            var input = Vector2.ClampMagnitude(moveAction.action.ReadValue<Vector2>(), 1f);
+            // In build mode Move pans the camera instead (OrbitCameraRig), so the avatar stands still.
+            var building = cameraRig.BuildFocus.HasValue;
+            var input = building ? Vector2.zero : Vector2.ClampMagnitude(moveAction.action.ReadValue<Vector2>(), 1f);
             var direction = Quaternion.Euler(0f, cameraRig.Yaw, 0f) * new Vector3(input.x, 0f, input.y);
             if (controller.isGrounded)
-                _verticalSpeed = jumpAction.action.WasPressedThisFrame() ? Mathf.Sqrt(-2f * gravity * jumpHeight) : -1f;
+                _verticalSpeed = !building && jumpAction.action.WasPressedThisFrame() ? Mathf.Sqrt(-2f * gravity * jumpHeight) : -1f;
             else
                 _verticalSpeed += gravity * Time.deltaTime;
             var moveSpeed = sprintAction.action.IsPressed() ? sprintSpeed : speed;

@@ -256,6 +256,15 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
+                },
+                {
+                    "name": "CameraTilt",
+                    "type": "Button",
+                    "id": "5d2b7e0c-3f41-4a8e-9b6d-2c7a1e9f4b13",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -1026,6 +1035,17 @@
                     "processors": "",
                     "groups": ";Keyboard&Mouse",
                     "action": "BuildConfirm",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "a8f3c1d2-6e4b-4f7a-8c9d-0b1e2f3a4c5d",
+                    "path": "<Mouse>/rightButton",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Keyboard&Mouse",
+                    "action": "CameraTilt",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

@@ -1,5 +1,5 @@
 // Checks the restaurant building content contract (decision 0034) without entering Play mode: every model of the restaurant
-// art kit is buildable, either as a wall finish, door or window style the build mode orders (the style catalog) or as a piece of
+// art kit but those the owner withdrew is buildable, either as a wall finish, door or window style the build mode orders (the style catalog) or as a piece of
 // equipment with a supplier offer, in both scenes that host sessions; every style the server accepts has its models; decor
 // definitions use known layers and every table supplies seats; and build mode is wired to the Input System's Player actions.
 using System.Collections.Generic;
@@ -20,6 +20,9 @@ namespace FoodFactoryGame.Session.Tests
         private const string ModelRoot = "Assets/Art/Restaurant/Models";
         private const string CatalogPath = "Assets/Content/Restaurant/RestaurantStyles.asset";
         private static readonly string[] Scenes = { "Assets/Scenes/DevSite.unity", "Assets/Scenes/WorldGen.unity" };
+
+        // Kit models the owner took out of the build catalog (the ceiling panel, 2026-10-02).
+        private static readonly string[] Withdrawn = { ModelRoot + "/Surfaces/RT_Ceiling_Panel_1m.fbx" };
 
         private static HashSet<string> KitModels() => new(AssetDatabase.FindAssets("t:Model", new[] { ModelRoot }).Select(AssetDatabase.GUIDToAssetPath));
 
@@ -46,7 +49,8 @@ namespace FoodFactoryGame.Session.Tests
                     Assert.That(buildings.RestaurantStyles, Is.SameAs(catalog), $"{scenePath}: the presenter draws walls, doors and windows from the kit.");
                     var offered = session.Offers.Where(x => x != null && x.Equipment != null).Select(x => x.Equipment).ToList();
                     var equipmentModels = new HashSet<string>(offered.Where(x => session.EquipmentDefinitions.Contains(x)).SelectMany(x => ModelsUsedBy(x.VisualPrefab)));
-                    var missing = models.Where(x => !styleModels.Contains(x) && !equipmentModels.Contains(x)).ToList();
+                    var missing = models.Where(x => !styleModels.Contains(x) && !equipmentModels.Contains(x) && !Withdrawn.Contains(x)).ToList();
+                    Assert.That(Withdrawn.Where(equipmentModels.Contains), Is.Empty, $"{scenePath}: withdrawn kit models on offer.");
                     Assert.That(missing, Is.Empty, $"{scenePath}: kit models nobody can build.");
                     var mode = objects.SelectMany(x => x.GetComponentsInChildren<BuildMode>(true)).Single();
                     using var serialized = new SerializedObject(mode);
