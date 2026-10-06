@@ -1,0 +1,14 @@
+S5 Warning: [Goods] A world commit took 381.3 ms (> 50 ms); see decision 0012.
+S5 Log: [Goods] commits=11 avg=46.2ms max=381.3ms payload=72.0KB
+S6 Log: [Goods] commits=39 avg=22.6ms max=381.3ms payload=89.1KB
+S7 Log: [Goods] commits=45 avg=23.4ms max=381.3ms payload=97.5KB
+S7 Log: [Goods] commits=51 avg=25.2ms max=381.3ms payload=102.9KB
+S7 Log: [Goods] commits=57 avg=24.1ms max=381.3ms payload=110.6KB
+S7 Log: [Goods] commits=63 avg=24.6ms max=381.3ms payload=117.4KB
+S7 Log: [Goods] commits=69 avg=24.9ms max=381.3ms payload=117.4KB
+S7 Log: [Goods] commits=75 avg=25.5ms max=381.3ms payload=115.4KB
+S7 Log: [Goods] commits=81 avg=25.8ms max=381.3ms payload=115.3KB
+S7 Log: [Goods] commits=87 avg=25.2ms max=381.3ms payload=114.1KB
+S7 Log: [Goods] commits=93 avg=24.5ms max=381.3ms payload=114.8KB
+S7 Log: [Goods] commits=99 avg=25.6ms max=381.3ms payload=115.7KB
+S12 Log: [Goods] commits=122 avg=23.9ms max=381.3ms payload=124.5KB

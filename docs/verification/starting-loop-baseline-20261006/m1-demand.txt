@@ -1,0 +1,13 @@
+P0 M1 demand, 2026-10-06 19:52:09Z, Unity 6000.5.9f1; 7200 clock s per seed, advanced in 60 s steps
+
+seed piece-two: 25 districts (1870 customers/h in all), 178 competitors; districts whose range reaches this restaurant 7 (693 customers/h)
+hour | city customers created | chose this restaurant | sales | walk-outs | stock left
+1 | 1837 | 8 | 6 | 0 | 14
+2 | 1837 | 11 | 12 | 0 | 2
+first arrival (chose it) at 240 clock s, first sale at 300 clock s (customers already in the city when stocking are counted only if they choose it afterwards; 60 s sampling)
+
+seed p0-second: 25 districts (1870 customers/h in all), 166 competitors; districts whose range reaches this restaurant 7 (342 customers/h)
+hour | city customers created | chose this restaurant | sales | walk-outs | stock left
+1 | 1816 | 5 | 5 | 0 | 15
+2 | 1813 | 11 | 10 | 0 | 5
+first arrival (chose it) at 480 clock s, first sale at 600 clock s (customers already in the city when stocking are counted only if they choose it afterwards; 60 s sampling)

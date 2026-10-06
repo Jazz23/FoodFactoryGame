@@ -292,3 +292,13 @@ Artifacts are intentionally ignored by Git. Preserve required evidence externall
   customers within seconds, and seated customers are hidden, so seed more than a competitor's servers (and seats) to keep a
   queue. The frame-time comparison and captures are `[Explicit]`: `PresentationCostAndCapturesWithTheCapFull` (about two
   minutes) writes them to `docs/verification/competitor-customers-20260930/`.
+- Starting-loop playthrough (P0, [record](verification/starting-loop-baseline-20261006.md)): create `Temp/starting-loop.flag`
+  (empty), then run `run_tests` `mode: playmode`, `async_tests: true`, `filter_type: testName` with one of
+  `FoodFactoryGame.Session.PlayModeTests.StartingLoopPlaythroughTests.PassRequestsFirstSeed`, `PassRequestsSecondSeed`,
+  `PassInputFirstSeed` or `PassInputSecondSeed` (one per run, 1 matched each, about 13 minutes because S7 watches 10 real
+  minutes). The domain demand measurement is `FoodFactoryGame.Session.Tests.StartingLoopDemandMeasurement` (`mode: editor`, 1
+  matched, seconds). Both write to `docs/verification/starting-loop-baseline-20261006/` and overwrite earlier records there.
+  A playthrough fails when any step does not pass; read its `steps.md`. For harness debugging only, flag lines
+  `watch=<seconds>` shorten S7 and `only=S1,S11,S12` runs just those steps. Delete the flag afterwards. Pass I drives
+  the Player action map with InputTestFixture devices, so it needs no Editor focus. Captures are full-size PNGs (about 17 MB
+  a run); keep only the key ones, scaled to JPEG, as the 2026-10-06 record does.

@@ -1,0 +1,365 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="1" result="Failed(Child)" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-10-06 21:09:24Z" end-time="2026-10-06 21:23:14Z" duration="829.3637479">
+  <test-suite type="TestSuite" id="1091" name="FoodFactoryGame" fullname="FoodFactoryGame" runstate="Runnable" testcasecount="59" result="Failed" site="Child" start-time="2026-10-06 21:09:24Z" end-time="2026-10-06 21:23:14Z" duration="829.363748" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="PlayMode" />
+    </properties>
+    <failure>
+      <message><![CDATA[One or more child tests had errors]]></message>
+    </failure>
+    <test-suite type="Assembly" id="1079" name="FoodFactoryGame.Session.PlayModeTests.dll" fullname="E:/Projects/Unity/FoodFactoryGame/Library/ScriptAssemblies/FoodFactoryGame.Session.PlayModeTests.dll" runstate="Runnable" testcasecount="57" result="Failed" site="Child" start-time="2026-10-06 21:09:24Z" end-time="2026-10-06 21:23:14Z" duration="829.361336" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="9820" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="PlayMode" />
+        <property name="EditorOnly" value="False" />
+      </properties>
+      <failure>
+        <message><![CDATA[One or more child tests had errors]]></message>
+      </failure>
+      <test-suite type="TestSuite" id="1080" name="FoodFactoryGame" fullname="FoodFactoryGame" runstate="Runnable" testcasecount="57" result="Failed" site="Child" start-time="2026-10-06 21:09:24Z" end-time="2026-10-06 21:23:14Z" duration="829.355985" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <failure>
+          <message><![CDATA[One or more child tests had errors]]></message>
+        </failure>
+        <test-suite type="TestSuite" id="1081" name="Session" fullname="FoodFactoryGame.Session" runstate="Runnable" testcasecount="57" result="Failed" site="Child" start-time="2026-10-06 21:09:24Z" end-time="2026-10-06 21:23:14Z" duration="829.353947" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <failure>
+            <message><![CDATA[One or more child tests had errors]]></message>
+          </failure>
+          <test-suite type="TestSuite" id="1082" name="PlayModeTests" fullname="FoodFactoryGame.Session.PlayModeTests" runstate="Runnable" testcasecount="57" result="Failed" site="Child" start-time="2026-10-06 21:09:24Z" end-time="2026-10-06 21:23:14Z" duration="829.351938" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <failure>
+              <message><![CDATA[One or more child tests had errors]]></message>
+            </failure>
+            <test-suite type="TestFixture" id="1061" name="StartingLoopPlaythroughTests" fullname="FoodFactoryGame.Session.PlayModeTests.StartingLoopPlaythroughTests" classname="FoodFactoryGame.Session.PlayModeTests.StartingLoopPlaythroughTests" runstate="Runnable" testcasecount="4" result="Failed" site="Child" start-time="2026-10-06 21:09:24Z" end-time="2026-10-06 21:23:14Z" duration="829.350242" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <failure>
+                <message><![CDATA[One or more child tests had errors]]></message>
+              </failure>
+              <test-case id="1065" name="PassInputSecondSeed" fullname="FoodFactoryGame.Session.PlayModeTests.StartingLoopPlaythroughTests.PassInputSecondSeed" methodname="PassInputSecondSeed" classname="FoodFactoryGame.Session.PlayModeTests.StartingLoopPlaythroughTests" runstate="Runnable" seed="1093423104" result="Failed" start-time="2026-10-06 21:09:24Z" end-time="2026-10-06 21:23:14Z" duration="829.347952" asserts="0">
+                <properties>
+                  <property name="_JOINTYPE" value="UnityCombinatorial" />
+                  <property name="Timeout" value="5400000" />
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <failure>
+                  <message><![CDATA[  Steps not passing (records in E:\Projects\Unity\FoodFactoryGame\docs\verification\starting-loop-baseline-20261006\pass-i-p0-second).
+  Expected: <empty>
+  But was:  < "S12 fail: Truck route >: neither the device press nor a UI pointer event had an effect" >
+]]></message>
+                  <stack-trace><![CDATA[at FoodFactoryGame.Session.PlayModeTests.StartingLoopPlaythroughTests+<Play>d__116.MoveNext () [0x004e9] in E:\Projects\Unity\FoodFactoryGame\Assets\Tests\PlayMode\Session\StartingLoopPlaythroughTests.cs:202
+at UnityEngine.TestTools.TestEnumerator+<Execute>d__7.MoveNext () [0x0003a] in .\Library\PackageCache\com.unity.test-framework@1405238725ab\UnityEngine.TestRunner\NUnitExtensions\Attributes\TestEnumerator.cs:44
+]]></stack-trace>
+                </failure>
+                <output><![CDATA[
+IgnoreFailingMessages:true
+[P0] pass I (simulated input), seed p0-second, save C:\Users\Deven\AppData\Local\Temp\FoodFactoryStartingLoop\25e1e30eb4534b12ac1855be30da4ded, output E:\Projects\Unity\FoodFactoryGame\docs\verification\starting-loop-baseline-20261006\pass-i-p0-second
+[P0] S1 start (input, seed p0-second)
+[World] Generated world from seed 'p0-second' (seed 10596811879078037628, attempt 0, generator v4): 1520 buildings, 573 road segments, 2 rail lines; start restaurant-0049; sha256 6de617f726e992ae6f3fac717e203017cdce2e177be9af859451fdf6d7011db4.
+[Session] Created generated world dev-world: company-1 owns restaurant-0049 (site site-restaurant-0049); 25 districts, 166 competitors.
+[Session] Starting server...
+Local server is starting for Tugboat. Listening on port 63543.
+Local server is started for Tugboat.
+[Session] Hosting
+[Session] Connecting to 127.0.0.1...
+Local client is starting for Tugboat. Server IP is 127.0.0.1, port is 63543.
+Remote connection started for Id 0.
+Local client is started for Tugboat.
+[Session] Joined as player-11aeb8ed040942fb9a6c74a8d97477e5
+[P0] S1: time to playable 2.5 s (Begin to avatar with live controls)
+[P0] S1: seed p0-second; start lot lot-restaurant-0049, site site-restaurant-0049, building restaurant-0049 16x14 at (0,2) in lot 16x16
+[P0] S1: cash $1,000,000.00 (expected $1,000,000.00)
+[P0] S1: start equipment start-counter:counter@(7,5), start-table:table@(13,14)
+[P0] S1: spawn (0.50, -0.04, -7.50) = cell (8,0); inside building: False
+[P0] S1: starter inventory dough x5, belt x50, lift x10
+[P0] S1: doors (8,2) (7,2); street side (0, -1)
+[P0] S1: districts 25, competitors 166
+[P0] S1: capture s1-start.png
+[P0] S1 pass in 2.6 s 
+[P0] S2 start (input, seed p0-second)
+[P0] S2: front door cell (8,2) facing (0.00, 0.00, -1.00)
+[P0] S2: door swing found False, largest angle 0 deg
+[P0] S2: indoors: building restaurant-0049, camera top-down True, pointer locked False, crosshair aims with the free pointer
+[P0] S2: capture s2-indoors.png
+[P0] S2 pass in 2.1 s 
+[P0] S3 start (input, seed p0-second)
+[P0] S3: supplier window offers: supplier-dough-5 5 dough $2.50; supplier-belt-10 10 belt $5.00; supplier-oven 1 oven $150.00; supplier-fridge 1 fridge $80.00; supplier-dock 1 dock $60.00; supplier-table 1 table $40.00; supplier-counter 1 counter $50.00
+[Equipment] Accepted: bought (revision 209).
+[P0] S3: Buy supplier-oven: accepted
+[Equipment] Accepted: bought (revision 211).
+[P0] S3: Buy supplier-dough-5: accepted
+[P0] S3: UI clicks so far: 2 taken from the virtual mouse, 0 needed a UI pointer event, 0 controls not pickable
+[P0] S3: debit $152.50 (expected $152.50)
+[P0] S3: goods land in: dough x10, belt x50, lift x10, machine oven (location carried:player-11aeb8ed040942fb9a6c74a8d97477e5)
+[P0] S3 pass in 0.4 s 
+[P0] S4 start (input, seed p0-second)
+[P0] S4: oven 3x3 interior anchors: ok 106, blocked 14
+[P0] S4: oven ghost at (1,12): visible True, status 'Cursor: oven: left click places, R rotates, X or Esc clears'
+[Equipment] Requesting placement of buy:player-11aeb8ed040942fb9a6c74a8d97477e5:e9febdc6f38e4993b26f51da90b61c53 at (1, 12) level 0 rotation 0.
+[Equipment] Accepted: placed (revision 214).
+[P0] S4: oven placed at (1,12) rotation 0
+[P0] S4: capture s4-oven.png
+[P0] S4 pass in 2.7 s 
+[P0] S5 start (input, seed p0-second)
+[P0] S5: dough held 10; recipe oven-bread: 1 dough -> 1 bread in 10 s
+[Equipment] Requesting transfer of 5 dough from carried:player-11aeb8ed040942fb9a6c74a8d97477e5 to buy:player-11aeb8ed040942fb9a6c74a8d97477e5:e9febdc6f38e4993b26f51da90b61c53:in.
+[Equipment] Requesting transfer of 5 dough from carried:player-11aeb8ed040942fb9a6c74a8d97477e5 to buy:player-11aeb8ed040942fb9a6c74a8d97477e5:e9febdc6f38e4993b26f51da90b61c53:in.
+[Equipment] Accepted: transferred (revision 216).
+[Equipment] Accepted: transferred (revision 217).
+Reduced additional punctual light shadows resolution by 2 to make 6 shadow maps fit in the 2048x2048 shadow atlas. To avoid this, increase shadow atlas size, decrease big shadow resolutions, or reduce the number of shadow maps active in the same frame
+[P0] S5: oven screen progress line 'Making Bread: 0/10 s'
+[P0] S5: dough in the oven 10
+[P0] S5: auto-start after 0.4 s
+[P0] S5: first bread after 9.3 s
+[Goods] A world commit took 381.3 ms (> 50 ms); see decision 0012.
+[Goods] commits=11 avg=46.2ms max=381.3ms payload=72.0KB
+[P0] S5: oven output 10 bread after 99.3 s; dough left in input 0; blocked False
+[P0] S5: spoil timers: 1 bread 3510 s left of 3600, 1 bread 3520 s left of 3600, 1 bread 3530 s left of 3600, 1 bread 3540 s left of 3600, 1 bread 3550 s left of 3600, 1 bread 3560 s left of 3600, 1 bread 3570 s left of 3600, 1 bread 3580 s left of 3600, 1 bread 3590 s left of 3600, 1 bread 3600 s left of 3600
+[P0] S5: spoil timers shown on the oven screen: 58m
+[Equipment] Requesting transfer of 1 bread from buy:player-11aeb8ed040942fb9a6c74a8d97477e5:e9febdc6f38e4993b26f51da90b61c53:out to carried:player-11aeb8ed040942fb9a6c74a8d97477e5.
+[Equipment] Requesting transfer of 1 bread from buy:player-11aeb8ed040942fb9a6c74a8d97477e5:e9febdc6f38e4993b26f51da90b61c53:out to carried:player-11aeb8ed040942fb9a6c74a8d97477e5.
+[Equipment] Requesting transfer of 1 bread from buy:player-11aeb8ed040942fb9a6c74a8d97477e5:e9febdc6f38e4993b26f51da90b61c53:out to carried:player-11aeb8ed040942fb9a6c74a8d97477e5.
+[Equipment] Requesting transfer of 1 bread from buy:player-11aeb8ed040942fb9a6c74a8d97477e5:e9febdc6f38e4993b26f51da90b61c53:out to carried:player-11aeb8ed040942fb9a6c74a8d97477e5.
+[Equipment] Requesting transfer of 1 bread from buy:player-11aeb8ed040942fb9a6c74a8d97477e5:e9febdc6f38e4993b26f51da90b61c53:out to carried:player-11aeb8ed040942fb9a6c74a8d97477e5.
+[Equipment] Requesting transfer of 1 bread from buy:player-11aeb8ed040942fb9a6c74a8d97477e5:e9febdc6f38e4993b26f51da90b61c53:out to carried:player-11aeb8ed040942fb9a6c74a8d97477e5.
+[Equipment] Requesting transfer of 1 bread from buy:player-11aeb8ed040942fb9a6c74a8d97477e5:e9febdc6f38e4993b26f51da90b61c53:out to carried:player-11aeb8ed040942fb9a6c74a8d97477e5.
+[Equipment] Requesting transfer of 1 bread from buy:player-11aeb8ed040942fb9a6c74a8d97477e5:e9febdc6f38e4993b26f51da90b61c53:out to carried:player-11aeb8ed040942fb9a6c74a8d97477e5.
+[Equipment] Requesting transfer of 1 bread from buy:player-11aeb8ed040942fb9a6c74a8d97477e5:e9febdc6f38e4993b26f51da90b61c53:out to carried:player-11aeb8ed040942fb9a6c74a8d97477e5.
+[Equipment] Requesting transfer of 1 bread from buy:player-11aeb8ed040942fb9a6c74a8d97477e5:e9febdc6f38e4993b26f51da90b61c53:out to carried:player-11aeb8ed040942fb9a6c74a8d97477e5.
+[Equipment] Accepted: transferred (revision 318).
+[Equipment] Accepted: transferred (revision 319).
+[Equipment] Accepted: transferred (revision 320).
+[Equipment] Accepted: transferred (revision 321).
+[Equipment] Accepted: transferred (revision 322).
+[Equipment] Accepted: transferred (revision 323).
+[Equipment] Accepted: transferred (revision 324).
+[Equipment] Accepted: transferred (revision 325).
+[Equipment] Accepted: transferred (revision 326).
+[Equipment] Accepted: transferred (revision 327).
+[P0] S5: held after baking: belt x50, lift x10, bread x10
+[P0] S5 pass in 100.3 s 
+[P0] S6 start (input, seed p0-second)
+[Equipment] Requesting transfer of 1 bread from carried:player-11aeb8ed040942fb9a6c74a8d97477e5 to start-counter:in.
+[Equipment] Requesting transfer of 1 bread from carried:player-11aeb8ed040942fb9a6c74a8d97477e5 to start-counter:in.
+[Equipment] Requesting transfer of 1 bread from carried:player-11aeb8ed040942fb9a6c74a8d97477e5 to start-counter:in.
+[Equipment] Requesting transfer of 1 bread from carried:player-11aeb8ed040942fb9a6c74a8d97477e5 to start-counter:in.
+[Equipment] Requesting transfer of 1 bread from carried:player-11aeb8ed040942fb9a6c74a8d97477e5 to start-counter:in.
+[Equipment] Requesting transfer of 1 bread from carried:player-11aeb8ed040942fb9a6c74a8d97477e5 to start-counter:in.
+[Equipment] Requesting transfer of 1 bread from carried:player-11aeb8ed040942fb9a6c74a8d97477e5 to start-counter:in.
+[Equipment] Requesting transfer of 1 bread from carried:player-11aeb8ed040942fb9a6c74a8d97477e5 to start-counter:in.
+[Equipment] Requesting transfer of 1 bread from carried:player-11aeb8ed040942fb9a6c74a8d97477e5 to start-counter:in.
+[Equipment] Requesting transfer of 1 bread from carried:player-11aeb8ed040942fb9a6c74a8d97477e5 to start-counter:in.
+[Equipment] Accepted: transferred (revision 330).
+[Equipment] Accepted: transferred (revision 331).
+[Equipment] Accepted: transferred (revision 332).
+[Equipment] Accepted: transferred (revision 333).
+[Equipment] Accepted: transferred (revision 334).
+[Equipment] Accepted: transferred (revision 335).
+[Equipment] Accepted: transferred (revision 336).
+[Equipment] Accepted: transferred (revision 337).
+[Equipment] Accepted: transferred (revision 338).
+[Equipment] Accepted: transferred (revision 339).
+[P0] S6: staff button reads 'Work this register'
+[Equipment] Accepted: staffed (revision 340).
+[P0] S6: register stocked with 10 bread, staffed by the host
+[P0] S6: capture s6-register.png
+[Goods] commits=39 avg=22.6ms max=381.3ms payload=89.1KB
+[P0] S6: after walking out of the door and using the oven, register staff = 'player-11aeb8ed040942fb9a6c74a8d97477e5'
+[P0] S6 pass in 14.9 s 
+[P0] S7 start (input, seed p0-second)
+[Goods] commits=45 avg=23.4ms max=381.3ms payload=97.5KB
+[Goods] commits=51 avg=25.2ms max=381.3ms payload=102.9KB
+[Goods] commits=57 avg=24.1ms max=381.3ms payload=110.6KB
+[Goods] commits=63 avg=24.6ms max=381.3ms payload=117.4KB
+[Goods] commits=69 avg=24.9ms max=381.3ms payload=117.4KB
+[Goods] commits=75 avg=25.5ms max=381.3ms payload=115.4KB
+[P0] S7: capture s7-customers-inside.png
+[P0] S7: capture s7-overview.png (overview)
+[Goods] commits=81 avg=25.8ms max=381.3ms payload=115.3KB
+[Goods] commits=87 avg=25.2ms max=381.3ms payload=114.1KB
+[Goods] commits=93 avg=24.5ms max=381.3ms payload=114.8KB
+[Goods] commits=99 avg=25.6ms max=381.3ms payload=115.7KB
+[P0] S7: watched 600 real s = 600 clock s
+[P0] S7: first arrival 315 s, first sale 395 s, first seated diner 399 s (real s after staffing)
+[P0] S7: customers that chose this restaurant 1, sales 1, walk-outs 0
+[P0] S7: cash delta $2.50; sales x $2.50 = $2.50
+[P0] S7: S7 frame time over 300 frames: mean 6.8 ms, p95 8.3 ms, max 27.0 ms (Editor)
+[P0] S7 pass in 600.0 s 
+[P0] S8 start (input, seed p0-second)
+[P0] S8: figures drawn 5 (all restaurants), of customers who chose this restaurant 1 (of 1 such customers); entered the shell 1 (by a door 1); stood at the counter's ordering cells 1; hidden on arrival (seated) 0; with samples in a wall cell 0
+[P0] S8 pass in 0.0 s 
+[P0] S9 start (input, seed p0-second)
+[Equipment] Requesting transfer of 1 bread from start-counter:in to carried:player-11aeb8ed040942fb9a6c74a8d97477e5.
+[Equipment] Requesting transfer of 1 bread from start-counter:in to carried:player-11aeb8ed040942fb9a6c74a8d97477e5.
+[Equipment] Requesting transfer of 1 bread from start-counter:in to carried:player-11aeb8ed040942fb9a6c74a8d97477e5.
+[Equipment] Requesting transfer of 1 bread from start-counter:in to carried:player-11aeb8ed040942fb9a6c74a8d97477e5.
+[Equipment] Requesting transfer of 1 bread from start-counter:in to carried:player-11aeb8ed040942fb9a6c74a8d97477e5.
+[Equipment] Requesting transfer of 1 bread from start-counter:in to carried:player-11aeb8ed040942fb9a6c74a8d97477e5.
+[Equipment] Requesting transfer of 1 bread from start-counter:in to carried:player-11aeb8ed040942fb9a6c74a8d97477e5.
+[Equipment] Requesting transfer of 1 bread from start-counter:in to carried:player-11aeb8ed040942fb9a6c74a8d97477e5.
+[Equipment] Requesting transfer of 1 bread from start-counter:in to carried:player-11aeb8ed040942fb9a6c74a8d97477e5.
+[Equipment] Accepted: transferred (revision 956).
+[Equipment] Accepted: transferred (revision 957).
+[Equipment] Accepted: transferred (revision 958).
+[Equipment] Accepted: transferred (revision 959).
+[Equipment] Accepted: transferred (revision 960).
+[Equipment] Accepted: transferred (revision 961).
+[Equipment] Accepted: transferred (revision 962).
+[Equipment] Accepted: transferred (revision 963).
+[Equipment] Accepted: transferred (revision 964).
+[P0] S9: register screen (empty, staffed): 'No customers waiting; keep Bread in the input' / 'Staffed by you'; status line 'Register: put edible goods in the input; customers queue and pay here only while someone works it (Work this register); E or Esc closes'
+[P0] S9: capture s9-empty-staffed.png
+[P0] S9: staff button reads 'Leave'
+[Equipment] Accepted: unstaffed (revision 966).
+[P0] S9: register screen (empty, unstaffed): 'No customers waiting; keep Bread in the input' / 'Staffed by nobody: customers are not served'; status line 'Register: put edible goods in the input; customers queue and pay here only while someone works it (Work this register); E or Esc closes'
+[P0] S9: capture s9-empty-unstaffed.png
+[P0] S9: world HUD line with no screen open: 'B: build mode, E: inventory (pick belts or goods to carry them out), L: trucks, 1-9: hotbar, left click: open machine, right click: pick up, R: turn belt, F: take an item off a belt'
+[P0] S9 pass in 3.1 s 
+[P0] S10 start (input, seed p0-second)
+[P0] S10: chosen cells: bistro table (14,13), wall art (1,15), interior wall (13,12)-(13,13), door in it at (13,12)
+[P0] S10: bistro table preview at (14,13): 1 x Bistro table (2 seats): charge $60.00, refund $0.00
+[Build] Requesting 1 x supplier-rt-table-bistro (6000 cents).
+[Build] Accepted: 1 x Bistro table (2 seats) bought (6000 cents, revision 970).
+[P0] S10: bistro table: accepted; cash now $999,790.00
+[P0] S10: wall art preview at (1,15): 1 x Abstract wall art: charge $70.00, refund $0.00
+[Build] Requesting 1 x supplier-rt-wall-art (7000 cents).
+[Build] Accepted: 1 x Abstract wall art bought (7000 cents, revision 973).
+[P0] S10: wall art: accepted; cash now $999,720.00
+[P0] S10: ambience with the art 11
+[P0] S10: interior wall drawn: pending True, 2 m of Plaster wall charge $96.00 
+[Build] Requesting partition on restaurant-0049 (9600 cents).
+[Build] Accepted: 2 m of Plaster wall shell-changed (9600 cents, revision 975).
+[P0] S10: interior wall: accepted; cash now $999,624.00
+[P0] S10: door in the interior wall preview at (13,12): Panel door door: charge $150.00, refund $0.00
+[Build] Requesting door on restaurant-0049 (15000 cents).
+[Build] Accepted: Panel door door shell-changed (15000 cents, revision 978).
+[P0] S10: door in the interior wall: accepted; cash now $999,474.00
+[P0] S10: sell the wall art preview at (1,15): Sell Abstract wall art: charge $0.00, refund $70.00
+[Build] Requesting the sale of buy:player-11aeb8ed040942fb9a6c74a8d97477e5:b96463526e67442090145af78fc96449:0.
+[Build] Accepted: Sell Abstract wall art sold (-7000 cents, revision 980).
+[P0] S10: sell the wall art: accepted; cash now $999,544.00
+[P0] S10: cash $999,850.00 -> $999,544.00; ambience 0 -> 4 (wall art sold back at the end)
+[P0] S10: build outcomes: bought $60.00; bought $70.00; shell-changed $96.00; shell-changed $150.00; sold -$70.00
+[P0] S10: seat reachability: start-table (table, 4 seats) reached from the street: True
+[P0] S10: seat reachability: buy:player-11aeb8ed040942fb9a6c74a8d97477e5:45c548d3ab41437aa905cd311676af40:0 (rt-table-bistro, 2 seats) reached from the street: True
+[P0] S10: register reached from the street: True
+[P0] S10: capture s10-build.png (overview)
+[P0] S10 pass in 3.1 s 
+[P0] S11 start (input, seed p0-second)
+[P0] S11: dock 2x1 on lot-restaurant-0049 outside the shell: ok 46, out-of-bounds 2
+[P0] S11: supplier-dock preview at (0,0): 1 x dock: charge $60.00, refund $0.00
+[Build] Requesting 1 x supplier-dock (6000 cents).
+[Build] Accepted: 1 x dock bought (6000 cents, revision 984).
+[P0] S11: supplier-dock: accepted; cash now $999,484.00
+[P0] S11: dock buy:player-11aeb8ed040942fb9a6c74a8d97477e5:5778fcc0c9614d15ac93902dbb6e7d5e:0 at (0,0) rotation 0; street reach True; charged $60.00
+[P0] S11: capture s11-dock.png (overview)
+[P0] S11 pass in 1.8 s 
+[P0] S12 start (input, seed p0-second)
+[P0] S12: nearest restaurant for sale lot-restaurant-0063 (restaurant-0063), $100,800.00, 102 m from the start site
+[P0] S12: diner marker 95 m from the avatar on the apron (reach 60 m)
+[P0] S12: street walk: 5 waypoints, 100 m
+[P0] S12: buy panel: 'For sale', price shown 'Price: $100,800.00  (lot 16 x 16 m)'
+[Property] Requesting lot-restaurant-0063 for $100,800.00.
+[Property] Accepted: property-bought (revision 1011).
+[World] restaurant-0063 awning re-tinted: owned by this company.
+[Session] Receiving site site-restaurant-0063 for remote management.
+[P0] S12: bought for $100,800.00
+[P0] S12: carrying belt x50, bread x1, bread x1, bread x1, bread x1, bread x1, bread x1, bread x1, bread x1, bread x1, lift x10
+[P0] S12: street walk: 5 waypoints, 100 m
+[Goods] commits=122 avg=23.9ms max=381.3ms payload=124.5KB
+[Session] Current site is now site-restaurant-0063.
+[P0] S12: entered site-restaurant-0063 after 36 s; rejection none
+[P0] S12: dock 2x1 on lot-restaurant-0063 outside the shell: ok 46, out-of-bounds 18
+[P0] S12: supplier-dock preview at (14,0): 1 x dock: charge $60.00, refund $0.00
+[Build] Requesting 1 x supplier-dock (6000 cents).
+[Build] Accepted: 1 x dock bought (6000 cents, revision 1051).
+[P0] S12: supplier-dock: accepted; cash now $898,624.00
+[Equipment] Accepted: bought (revision 1053).
+[P0] S12: Buy supplier-counter: accepted
+[P0] S12: UI clicks so far: 21 taken from the virtual mouse, 0 needed a UI pointer event, 0 controls not pickable
+[P0] S12: counter ghost at (1,14): visible True, status 'Cursor: counter: left click places, R rotates, X or Esc clears'
+[Equipment] Requesting placement of buy:player-11aeb8ed040942fb9a6c74a8d97477e5:08950d1d926e42838cea086094f9d6cb at (1, 14) level 0 rotation 0.
+[Equipment] Accepted: placed (revision 1057).
+[P0] S12: staff button reads 'Work this register'
+[Equipment] Accepted: staffed (revision 1058).
+[P0] S12: second register buy:player-11aeb8ed040942fb9a6c74a8d97477e5:08950d1d926e42838cea086094f9d6cb staffed by 'player-11aeb8ed040942fb9a6c74a8d97477e5', stocked 0
+[P0] S12: capture s12-diner.png (overview)
+[P0] S12: street walk: 5 waypoints, 100 m
+[Session] Current site is now site-restaurant-0049.
+[P0] S12: back home after 25 s; register at the second site staffed by '' after leaving
+[Equipment] Accepted: bought (revision 1087).
+[P0] S12: Buy supplier-dough-5: accepted
+[P0] S12: UI clicks so far: 23 taken from the virtual mouse, 0 needed a UI pointer event, 0 controls not pickable
+[Equipment] Requesting transfer of 5 dough from carried:player-11aeb8ed040942fb9a6c74a8d97477e5 to buy:player-11aeb8ed040942fb9a6c74a8d97477e5:5778fcc0c9614d15ac93902dbb6e7d5e:0:in.
+[Equipment] Accepted: transferred (revision 1091).
+[P0] S12: dock screen says 'No truck serves this dock; press L to set up a route.'
+[P0] S12: 5 dough on the start dock's outgoing
+[P0] S12: UI FINDING: Truck route >: no point of it takes a pointer pick (centre over 'logistics-trucks' (x:604.90, y:197.88, width:330.12, height:250.78)); bounds (x:910.53, y:313.47, width:34.29, height:37.22), panel (x:0.00, y:0.00, width:1440.00, height:702.37) (screen 1470x717); ancestors '' (x:910.53, y:313.47, width:34.29, height:37.22) < 'logistics-route-buy:player-11aeb8ed040942fb9a6c74a8d97477e5:77bbc5b54ec44381a610233cf428315e' (x:612.73, y:311.51, width:314.45, height:41.14) < 'logistics-truck-buy:player-11aeb8ed040942fb9a6c74a8d97477e5:77bbc5b54ec44381a610233cf428315e' (x:604.90, y:229.22, width:330.12, height:174.37) < 'logistics-trucks' (x:604.90, y:197.88, width:330.12, height:250.78); PickAll at the centre: VisualElement'logistics-trucks', VisualElement'', VisualElement'logistics'; at its parent's centre: VisualElement'logistics-trucks', VisualElement'', VisualElement'logistics'
+[P0] S12: capture failed-s12.png
+[P0] S12 fail in 90.3 s Truck route >: neither the device press nor a UI pointer event had an effect
+[P0] S13 start (input, seed p0-second)
+[Equipment] Requesting transfer of 1 bread from carried:player-11aeb8ed040942fb9a6c74a8d97477e5 to start-counter:in.
+[Equipment] Requesting transfer of 1 bread from carried:player-11aeb8ed040942fb9a6c74a8d97477e5 to start-counter:in.
+[Equipment] Requesting transfer of 1 bread from carried:player-11aeb8ed040942fb9a6c74a8d97477e5 to start-counter:in.
+[Equipment] Requesting transfer of 1 bread from carried:player-11aeb8ed040942fb9a6c74a8d97477e5 to start-counter:in.
+[Equipment] Requesting transfer of 1 bread from carried:player-11aeb8ed040942fb9a6c74a8d97477e5 to start-counter:in.
+[Equipment] Requesting transfer of 1 bread from carried:player-11aeb8ed040942fb9a6c74a8d97477e5 to start-counter:in.
+[Equipment] Requesting transfer of 1 bread from carried:player-11aeb8ed040942fb9a6c74a8d97477e5 to start-counter:in.
+[Equipment] Requesting transfer of 1 bread from carried:player-11aeb8ed040942fb9a6c74a8d97477e5 to start-counter:in.
+[Equipment] Requesting transfer of 1 bread from carried:player-11aeb8ed040942fb9a6c74a8d97477e5 to start-counter:in.
+[Equipment] Accepted: transferred (revision 1099).
+[Equipment] Accepted: transferred (revision 1100).
+[Equipment] Accepted: transferred (revision 1101).
+[Equipment] Accepted: transferred (revision 1102).
+[Equipment] Accepted: transferred (revision 1103).
+[Equipment] Accepted: transferred (revision 1104).
+[Equipment] Accepted: transferred (revision 1105).
+[Equipment] Accepted: transferred (revision 1106).
+[Equipment] Accepted: transferred (revision 1107).
+[P0] S13: staff button reads 'Work this register'
+[Equipment] Accepted: staffed (revision 1109).
+[P0] S13: before restart: revision 1111, clock 826, register bread 9, staff 'player-11aeb8ed040942fb9a6c74a8d97477e5', customers here 0 (queued 0), truck none
+[P0] S13: no customer was queued at the restart (none could be forced without test-only seeding)
+[P0] S13: committed revision 1109 (live 1111); clock lag 2 s
+Local client is stopping for Tugboat.
+Local server is stopping for Tugboat.
+Local server is stopped for Tugboat.
+Local client is stopped for Tugboat.
+[Session] Disconnected
+[Session] Starting server...
+Local server is starting for Tugboat. Listening on port 63543.
+Local server is started for Tugboat.
+[Session] Hosting
+[Session] Connecting to 127.0.0.1...
+Local client is starting for Tugboat. Server IP is 127.0.0.1, port is 63543.
+Remote connection started for Id 0.
+Local client is started for Tugboat.
+[Session] Joined as player-11aeb8ed040942fb9a6c74a8d97477e5
+[Session] Receiving site site-restaurant-0063 for remote management.
+[World] restaurant-0063 awning re-tinted: owned by this company.
+[P0] S13: time to playable 1.8 s (Begin to avatar with live controls)
+[P0] S13: after restart: revision 1113, clock 827, client site site-restaurant-0049
+[P0] S13: units committed belt:50 bread:9 dough:5 lift:10 | after belt:50 bread:9 dough:5 lift:10
+[P0] S13: cash committed $898,321.50 | after $898,321.50
+[P0] S13: equipment committed 7 | after 7; trucks 1 | 1; customers 122 | 122
+[P0] S13: register staff after restart '' (0035: cleared)
+[P0] S13: resumed vs live at shutdown: same; vs last commit: same (customers may have bought in between)
+[P0] S13 pass in 7.2 s 
+Local client is stopping for Tugboat.
+Local server is stopping for Tugboat.
+Local server is stopped for Tugboat.
+Local client is stopped for Tugboat.
+[Session] Disconnected
+<b><color=#2EA3FF>MCP-FOR-UNITY</color></b>: [TestRunnerNoThrottle] Restored Interaction Mode after test run.
+Saving results to: C:/Users/Deven/AppData/LocalLow/DefaultCompany/FoodFactoryGame\TestResults.xml
+]]></output>
+              </test-case>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>
