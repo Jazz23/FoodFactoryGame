@@ -216,7 +216,8 @@ Owner decisions, 2026-10-01 (details: `docs/decisions/0034-restaurant-building.m
 - **Full refund.** Removing or shrinking structure, and selling equipment, tables, registers, decor, and docks, refunds the amount charged, in full, at any time (29.6 for restaurants). Goods inside a removed piece move to a recorded location; they are never deleted.
 - **Furniture is equipment.** Tables, registers, and decor are purchased equipment that the player places directly, with no contractor.
 - **Decor.** Floor and wall finishes, props, and lighting are cosmetic and add to one ambience score per restaurant (section 7). Decor has no upkeep.
-- **Docks.** A restaurant may have any number of docks, anywhere in its lot (inside or outside the shell) as long as the dock can be reached from the street (section 9).
+- **Back door.** Every generated restaurant comes with a back door on a wall away from the street. The player may move or remove it with free walls like any door, as long as the restaurant keeps at least one back door. Back doors are for staff and goods only: customers always enter and leave by a customer (front) door; players and employees may use either. (Owner, 2026-10-06; plan: `docs/starting-loop-plan.md`.)
+- **Docks.** A restaurant may have any number of docks. Each dock stands outside the shell, next to a back door, and must be reachable from the street (section 9). The generated building comes with one dock placed there; more back doors allow more docks. (Owner, 2026-10-06, replacing "anywhere in its lot (inside or outside the shell)" of 2026-10-01.)
 - **Floors.** Extra floors for restaurants are deferred, not forbidden (29.8).
 
 Proposal - what counts as construction (not yet approved):
@@ -332,7 +333,7 @@ seating if applicable, pay, and leave.
 Owner decisions, 2026-10-01; numbers and formulas are PROTOTYPE and open (`docs/decisions/0034-restaurant-building.md`):
 
 - A register is the sale point. A customer pays at a register staffed by an employee or the player. A restaurant without a staffed register makes no sales.
-- A table supplies seats. A seat counts as free for customer choice only if a customer can walk from the door to a register and to that seat.
+- A table supplies seats. A seat counts as free for customer choice only if a customer can walk from a customer door to a register and to that seat. Back doors do not count (section 5, owner 2026-10-06).
 - Each restaurant has one ambience score, summed from its placed decor. Ambience is one more input to customer choice and spend, alongside cuisine fit, price, reputation, and waiting time.
 - Decor takes floor space, so ambience trades against seats and kitchen area (section 5).
 
@@ -362,7 +363,7 @@ Owner decisions, 2026-10-01; numbers and formulas are PROTOTYPE and open (`docs/
 
 - Affected by road distance and congestion.
 
-- A restaurant may place any number of docks, each serving one truck at a time. A dock may stand anywhere in the restaurant's lot, inside or outside the shell, if it is reachable from the street.
+- A restaurant may place any number of docks, each serving one truck at a time. Each dock stands outside the shell next to a back door and must be reachable from the street (section 5, owner 2026-10-06).
 
 - Loading is automatic: the truck arrives from the street and goods move between truck and dock at a limited rate. There is no loading animation, and the player makes no loading decisions beyond where the dock stands and which route it serves. Goods are real inventory throughout.
 
@@ -531,7 +532,7 @@ support them.
 
 - One farm type, several ingredients, several recipes.
 
-- One restaurant type with editable kitchen/dining layout: free outer and interior walls within the lot, doors, windows, tables, registers, decor with an ambience score, and docks.
+- One restaurant type with editable kitchen/dining layout: free outer and interior walls within the lot, doors, a back door, windows, tables, registers, decor with an ambience score, and docks beside the back door.
 
 - Basic food factory processing plus the ability to sell output to
   outside restaurants/distributors.
