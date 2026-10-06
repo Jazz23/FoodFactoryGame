@@ -208,7 +208,10 @@ namespace FoodFactoryGame.Session.Buildings
                         Box(storey.transform, $"Lintel {door.X},{door.Z}", wallMaterial, center + Vector3.up * (doorHeight + SiteGridSpace.LevelHeight) * 0.5f,
                             new Vector3(SiteGrid.CellSize, SiteGridSpace.LevelHeight - doorHeight, SiteGrid.CellSize), false);
                     }
-                    if (building.FreeWalls)
+                    if (kit)
+                        foreach (var floor in KitFloor(layout, building, storey.transform))
+                            floor.shadowCastingMode = ShadowCastingMode.Off;
+                    else if (building.FreeWalls)
                         foreach (var floor in Cover(layout, storey.transform, "Floor", floorMaterial, SiteGrid.InteriorCells(building), 0.005f, 0.01f))
                             floor.shadowCastingMode = ShadowCastingMode.Off;
                     else
@@ -272,6 +275,27 @@ namespace FoodFactoryGame.Session.Buildings
                 for (var dz = -1; dz <= 1; dz++)
                     if (SiteGrid.IsPartition(building, x + dx, z + dz)) cells.Add((x + dx, z + dz));
             return cells;
+        }
+
+        // Thin kit walls stand on their cells' centrelines, so the floor tint covers the enclosed cells and reaches half a cell
+        // into each wall cell beside them; edge cells get one extended box each so inner corners are filled too.
+        private List<MeshRenderer> KitFloor(SiteLayout layout, GoodsBuilding building, Transform parent)
+        {
+            var inside = new HashSet<(int X, int Z)>(SiteGrid.InteriorCells(building));
+            var boxes = Cover(layout, parent, "Floor", floorMaterial, inside, 0.005f, 0.01f);
+            var half = SiteGrid.CellSize * 0.5f;
+            foreach (var (x, z) in inside)
+            {
+                var west = inside.Contains((x - 1, z)) ? 0f : half;
+                var east = inside.Contains((x + 1, z)) ? 0f : half;
+                var south = inside.Contains((x, z - 1)) ? 0f : half;
+                var north = inside.Contains((x, z + 1)) ? 0f : half;
+                if (west + east + south + north == 0f) continue;
+                var center = SiteGridSpace.FootprintCenter(layout, x, z, 1, 1) + new Vector3((east - west) * 0.5f, 0.005f, (north - south) * 0.5f);
+                boxes.Add(Box(parent, $"Floor Edge {x},{z}", floorMaterial, center,
+                    new Vector3(SiteGrid.CellSize + west + east, 0.01f, SiteGrid.CellSize + south + north), false));
+            }
+            return boxes;
         }
 
         // Flat boxes over a set of cells, one per run of cells along each row (X), top at height + thickness / 2 above the floor.
