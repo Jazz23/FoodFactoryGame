@@ -112,7 +112,9 @@ namespace FoodFactoryGame.Session.PlayModeTests
             var building = _root.ClientSite.Buildings.Single(x => x.Id == DevWorld.RestaurantId);
             var gap = SiteGridSpace.FootprintCenter(layout, DevWorld.RestaurantDoorX, building.CellZ + building.Depth - 1, 2, 1) + Vector3.up;
             Assert.That(walls.Any(x => x.bounds.Contains(gap)), Is.False, "The doorway is open.");
-            Assert.That(walls.Any(x => x.bounds.Contains(SiteGridSpace.FootprintCenter(layout, building.CellX, 4, 1, 1) + Vector3.up)), Is.True, "The west wall is solid.");
+            Assert.That(walls.Any(x => x.bounds.Contains(SiteGridSpace.FootprintCenter(layout, building.CellX, 6, 1, 1) + Vector3.up)), Is.True, "The west wall is solid.");
+            Assert.That(walls.Any(x => x.bounds.Contains(SiteGridSpace.FootprintCenter(layout, building.CellX, DevWorld.RestaurantBackDoorZ, 1, 1) + Vector3.up)), Is.False,
+                "The back door in it (decision 0037) is an opening.");
 
             yield return Until(() => (_avatar = UnityEngine.Object.FindObjectsByType<PlayerAvatar>(FindObjectsSortMode.None).FirstOrDefault(x => x.IsOwner)) != null, "owned avatar");
             var rig = _avatar.CameraRig;

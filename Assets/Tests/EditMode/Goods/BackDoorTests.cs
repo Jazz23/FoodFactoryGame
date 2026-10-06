@@ -144,6 +144,11 @@ namespace FoodFactoryGame.Goods.Tests
             Assert.That(Furnish("dock", "dock", 10, 5).Accepted, Is.True);
             Assert.That(Shell("remove-a", ShellOrder.Remove, 0, 0, (9, 4)).Reason, Is.EqualTo("no-back-door"), "The only back door, with a dock beside it.");
             Assert.That(Shell("wall-step", ShellOrder.Partition, 0, 0, (10, 4)).Reason, Is.EqualTo("dock-attached"), "Its doorstep stays open.");
+            // Taking another outer wall out (the shell is open, with no interior) and drawing it back leaves the back door's doorstep.
+            Assert.That(Shell("open", ShellOrder.Remove, 0, 0, (5, 7)).Accepted, Is.True);
+            Assert.That(SiteGrid.InteriorCells(Shop), Is.Empty);
+            Assert.That(SiteGrid.Doorstep(Shop, 9, 4), Is.EqualTo(((int, int)?)(10, 4)));
+            Assert.That(Shell("close", ShellOrder.Partition, 0, 0, (5, 7)).Accepted, Is.True);
             Assert.That(Shell("back-b", ShellOrder.BackDoor, 2, 5).Accepted, Is.True);
             Assert.That(Shell("remove-a-again", ShellOrder.Remove, 0, 0, (9, 4)).Reason, Is.EqualTo("dock-attached"), "The dock stands beside A, not B.");
             Assert.That(Shell("remove-b", ShellOrder.Remove, 0, 0, (2, 5)).Accepted, Is.True, "Nothing needs B.");

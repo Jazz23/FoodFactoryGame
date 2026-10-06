@@ -172,7 +172,9 @@ namespace FoodFactoryGame.Session.PlayModeTests
         {
             _devices = devices;
             _seed = seed;
-            _output = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "docs", "verification", RunFolder, $"pass-{(devices ? "i" : "r")}-{seed}"));
+            // A flag file line "folder=<name>" writes the records to docs/verification/<name>/ instead (later evidence runs).
+            var folder = File.ReadAllLines(Flag).FirstOrDefault(x => x.StartsWith("folder=", StringComparison.Ordinal))?.Substring(7) ?? RunFolder;
+            _output = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "docs", "verification", folder, $"pass-{(devices ? "i" : "r")}-{seed}"));
             Directory.CreateDirectory(_output);
             _root.Configure(new SessionOptions
             {

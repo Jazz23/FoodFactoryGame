@@ -379,7 +379,8 @@ filter_type assembly; status JSON in the same folder): `FoodFactoryGame.World.Ed
 being the known nondeterministic `TruckTests.StepSizeDoesNotChangeTheOutcome` (GUID tie-break; it passed in the batch run
 and in 1 of 3 `TruckTests` reruns, `editor-trucks-1..3.json`). Not run: PlayMode and multiplayer suites (no networking changed).
 
-- Generator: `WorldGenerator.Version` = 3 (4 since 2026-10-02: larger restaurants, decision 0036), `WorldLayout.CurrentFormat` = 3. Every building that `HasLot` (restaurant and
+- Generator: `WorldGenerator.Version` = 3 (4 since 2026-10-02: larger restaurants, decision 0036; 5 since 2026-10-06: service yards,
+  decision 0037), `WorldLayout.CurrentFormat` = 3 (4 since decision 0037). Every building that `HasLot` (restaurant and
   factory shells, farms, stations; ownership ForSale, Competitor or Player) gets one `WorldLot { Id = lot-<building>,
   BuildingId, SiteId = site-<building>, X, Z, Width, Depth, Access }` and `WorldBuilding.SiteId` = the lot's site ID; scenery
   gets neither. A lot is the footprint extended forward to its street by `WorldSettings.SetbackFor(category)` (`Setback` 2 m;
@@ -715,6 +716,24 @@ This supersedes the resize and build-mode parts of the section above.
 - Camera and input: third-person camera collision and ceiling clamp; build-mode pan (Move), zoom (Zoom) and tilt (new
   Player/CameraTilt, right mouse); Cancel and ClearCursor (X) clear the build selection; right click removes only without a drag.
 - Content: larger generated restaurants; the ceiling panel is withdrawn.
+
+## Implemented: back doors and the dock rule (2026-10-06)
+
+Decision: [0037](decisions/0037-back-doors-and-the-dock-rule.md) (piece P1 of [the starting-loop plan](starting-loop-plan.md)).
+Goods snapshot schema **v18**; `WorldGenerator.Version` 5; layout format 4. Verification:
+[record](verification/back-door-20261006.md). Supersedes the restaurant dock rule of 0034/0035.
+
+- Implemented: door records carry a role (`GoodsStructure.Role`, back door = `service`); `ShellOrder.BackDoor`; the
+  `no-back-door` and `dock-attached` guards; restaurant docks must touch an open back-door doorstep (`not-beside-back-door`)
+  and reach the street; other object-layer pieces keep doorsteps clear (`doorstep`); customers treat back doors as walls and come
+  only from the street edge (`RestaurantRules.Walkable(customers: true)`, `StreetCells`).
+- Implemented: every generated restaurant lot has a service yard with a back door and a starter dock; new worlds get
+  `start-dock`, bought restaurants `dock:<site>` (free); the dev restaurant has a back door at (9, 4).
+- Implemented (presentation): build-mode Back door tool, dock-screen mark for docks placed before the rule, restaurant rules in
+  the placement ghost, customer figures never open or route through back doors.
+- Keep and mark: docks placed before v18 keep serving trucks where they stand; older worlds have no yard and no back door until
+  the owner draws one.
+- Not done: the "staff" sign art; independent visual review. Undecided: the owner questions in decision 0037.
 
 ## Baseline Test Evolution
 
