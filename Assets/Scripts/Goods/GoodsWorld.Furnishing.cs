@@ -33,9 +33,10 @@ namespace FoodFactoryGame.Goods
         // Pieces one buy-and-place order may place (a floor finish dragged over a room); bounds the work of one request.
         public const int MaxFurnishPlacements = 200;
 
-        // The dock street rule with the site's listed lot (decision 0034).
-        private string DockProblem(GoodsSnapshot state, GoodsEquipment piece, int cellX, int cellZ, int rotation) =>
-            RestaurantRules.DockProblem(state, piece, cellX, cellZ, rotation, _propertyOffers?.Values.FirstOrDefault(x => x.SiteId == piece.SiteId));
+        // The restaurant placement rules (the dock street rule of decision 0034, the back-door rules of 0037) with the site's listed
+        // lot.
+        private string RestaurantProblem(GoodsSnapshot state, GoodsEquipment piece, int cellX, int cellZ, int rotation) =>
+            RestaurantRules.PlacementProblem(state, piece, cellX, cellZ, rotation, _propertyOffers?.Values.FirstOrDefault(x => x.SiteId == piece.SiteId));
 
         // The listed lot of a site, for client previews of the dock rule; null for sites without one.
         public PropertyOffer OfferOfSite(string siteId)
@@ -69,7 +70,7 @@ namespace FoodFactoryGame.Goods
                 piece.Rotation = placement.Rotation;
                 piece.Level = level;
                 var problem = SiteGrid.PlacementProblem(probe, piece, placement.X, placement.Z, placement.Rotation, level)
-                    ?? RestaurantRules.DockProblem(probe, piece, placement.X, placement.Z, placement.Rotation, offer);
+                    ?? RestaurantRules.PlacementProblem(probe, piece, placement.X, placement.Z, placement.Rotation, offer);
                 if (problem != null) return problem;
                 probe.Equipment.Add(piece);
             }

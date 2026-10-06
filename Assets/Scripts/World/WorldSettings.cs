@@ -123,6 +123,9 @@ namespace FoodFactoryGame.World
         public int FarmIndustrialSideBonusPercent = 30;
 
         public SizeRange Restaurant = new(16, 24, 14, 20);
+        // PROTOTYPE (generator v5, owner decision 1 of 2026-10-06's plan): cells of service yard beside every restaurant, between
+        // its back door and the next lot, from the street to the rear.
+        public int ServiceYardWidth = 4;
         public SizeRange Factory = new(20, 40, 18, 35);
         public SizeRange House = new(8, 12, 8, 12);
         public SizeRange LargeHouse = new(12, 18, 12, 18);

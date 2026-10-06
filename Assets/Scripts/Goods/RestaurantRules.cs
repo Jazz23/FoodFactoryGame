@@ -1,7 +1,8 @@
 // Pure restaurant rules of decision 0034, shared by the server simulation and the client's build-mode preview.
 // Walking: a site's ground cells are walkable unless a wall (perimeter, interior wall or window) or a placed object-layer piece
 // covers them; decor on the floor, walls, ceiling or tables never blocks. A piece is reached when a walkable cell beside its
-// footprint can be walked to from a source. Customers come from any edge of the site; trucks stop on the street edge of a lot.
+// footprint can be walked to from a source. Customers come from the street edge of a lot (any edge of a dev site) and never pass
+// a back door (decision 0037); trucks stop on the street edge. A restaurant dock stands beside a back door's doorstep.
 // Ambience: one score per restaurant from its placed pieces' ambience points, with diminishing returns and a cap.
 using System;
 using System.Collections.Generic;
@@ -18,8 +19,8 @@ namespace FoodFactoryGame.Goods
         public const double AmbienceWeight = 0.6;
 
         // Walkable ground cells of a site, indexed [x, z]; null without a layout. block marks one more footprint as taken (a
-        // piece about to be placed).
-        public static bool[,] Walkable(GoodsSnapshot state, string siteId, (int X, int Z, int Width, int Depth)? block = null)
+        // piece about to be placed). For customers (decision 0037) back doors are walls too.
+        public static bool[,] Walkable(GoodsSnapshot state, string siteId, (int X, int Z, int Width, int Depth)? block = null, bool customers = false)
         {
             var layout = state.SiteLayouts?.FirstOrDefault(x => x.SiteId == siteId);
             if (layout == null) return null;
@@ -28,6 +29,9 @@ namespace FoodFactoryGame.Goods
             for (var x = 0; x < layout.Width; x++)
             for (var z = 0; z < layout.Depth; z++)
                 open[x, z] = !buildings.Any(b => SiteGrid.IsWall(b, x, z));
+            if (customers)
+                foreach (var (x, z) in buildings.SelectMany(SiteGrid.ServiceDoors))
+                    if (x >= 0 && z >= 0 && x < layout.Width && z < layout.Depth) open[x, z] = false;
             void Close(int cellX, int cellZ, int width, int depth)
             {
                 for (var x = Math.Max(0, cellX); x < Math.Min(layout.Width, cellX + width); x++)
@@ -110,16 +114,82 @@ namespace FoodFactoryGame.Goods
         public static bool IsRestaurantSite(GoodsSnapshot state, string siteId) =>
             state.Buildings?.Any(x => x.SiteId == siteId && x.Kind == GoodsWorld.RestaurantKind) == true;
 
-        // Null unless a dock on a restaurant site would stand where no walkable path reaches it from the lot's street edge
-        // ("no-street-access"). Any other piece, and docks elsewhere (factories, warehouses), are unaffected.
+        // Restaurant placement rules on top of SiteGrid's (decisions 0034, 0037): an object-layer piece may not cover a back door's
+        // doorstep ("doorstep"), and a dock must touch one and be reachable from the street (DockProblem).
+        public static string PlacementProblem(GoodsSnapshot state, GoodsEquipment piece, int cellX, int cellZ, int rotation, PropertyOffer offer) =>
+            DoorstepProblem(state, piece, cellX, cellZ, rotation) ?? DockProblem(state, piece, cellX, cellZ, rotation, offer);
+
+        // Null unless an object-layer piece other than a dock would cover the doorstep of a back door on its site ("doorstep"): the
+        // doorstep stays clear so goods can come in. Docks have their own rule; decor layers never block.
+        public static string DoorstepProblem(GoodsSnapshot state, GoodsEquipment piece, int cellX, int cellZ, int rotation)
+        {
+            if (piece.Kind == GoodsWorld.DockKind || !string.IsNullOrEmpty(piece.Layer) || !IsRestaurantSite(state, piece.SiteId)) return null;
+            var (width, depth) = SiteGrid.Footprint(piece.Width, piece.Depth, rotation);
+            return Doorsteps(state, piece.SiteId).Any(c => SiteGrid.Overlaps(c.X, c.Z, 1, 1, cellX, cellZ, width, depth)) ? "doorstep" : null;
+        }
+
+        // Null unless a dock on a restaurant site would stand where it does not touch a back door's doorstep
+        // ("not-beside-back-door", decision 0037: wholly outside every interior, edge to edge with an open doorstep it leaves
+        // clear), or where no walkable path reaches it from the lot's street edge ("no-street-access"). Any other piece, and docks
+        // elsewhere (factories, warehouses), are unaffected. Docks placed before decision 0037 keep working where they stand.
         public static string DockProblem(GoodsSnapshot state, GoodsEquipment dock, int cellX, int cellZ, int rotation, PropertyOffer offer)
         {
             if (dock.Kind != GoodsWorld.DockKind || !IsRestaurantSite(state, dock.SiteId)) return null;
             var (width, depth) = SiteGrid.Footprint(dock.Width, dock.Depth, rotation);
+            var layout = state.SiteLayouts.FirstOrDefault(x => x.SiteId == dock.SiteId);
+            if (!state.Buildings.Where(x => x.SiteId == dock.SiteId && x.Kind == GoodsWorld.RestaurantKind)
+                    .Any(b => BesideBackDoor(state, b, layout, cellX, cellZ, width, depth)))
+                return "not-beside-back-door";
             var walkable = Walkable(state, dock.SiteId, (cellX, cellZ, width, depth));
-            var reached = Reached(walkable, StreetCells(state.SiteLayouts.FirstOrDefault(x => x.SiteId == dock.SiteId), offer));
+            var reached = Reached(walkable, StreetCells(layout, offer));
             return Touches(reached, cellX, cellZ, width, depth) ? null : "no-street-access";
         }
+
+        // True when a footprint lies wholly outside the building's interior and touches, edge to edge without covering it, the
+        // doorstep of one of its back doors that is open ground on the site.
+        public static bool BesideBackDoor(GoodsSnapshot state, GoodsBuilding building, SiteLayout layout, int cellX, int cellZ, int width, int depth)
+        {
+            if (layout == null) return false;
+            for (var x = cellX; x < cellX + width; x++)
+            for (var z = cellZ; z < cellZ + depth; z++)
+                if (SiteGrid.IsInterior(building, x, z)) return false;
+            foreach (var door in SiteGrid.ServiceDoors(building))
+            {
+                if (SiteGrid.Doorstep(building, door.X, door.Z) is not { } step || !Open(state, building, layout, step.X, step.Z)) continue;
+                if (SiteGrid.Overlaps(step.X, step.Z, 1, 1, cellX, cellZ, width, depth)) continue;
+                var alongX = step.X >= cellX && step.X < cellX + width;
+                var alongZ = step.Z >= cellZ && step.Z < cellZ + depth;
+                if ((alongX && (step.Z == cellZ - 1 || step.Z == cellZ + depth)) || (alongZ && (step.X == cellX - 1 || step.X == cellX + width))) return true;
+            }
+            return false;
+        }
+
+        public static bool BesideBackDoor(GoodsSnapshot state, GoodsBuilding building, GoodsEquipment dock)
+        {
+            var (width, depth) = SiteGrid.Footprint(dock.Width, dock.Depth, dock.Rotation);
+            return BesideBackDoor(state, building, state.SiteLayouts.FirstOrDefault(x => x.SiteId == dock.SiteId), dock.CellX, dock.CellZ, width, depth);
+        }
+
+        // A placed restaurant dock that touches a back door's doorstep (decision 0037); docks placed before the rule may not.
+        public static bool BesideBackDoor(GoodsSnapshot state, GoodsEquipment dock) =>
+            state.Buildings.Any(b => b.SiteId == dock.SiteId && b.Kind == GoodsWorld.RestaurantKind && BesideBackDoor(state, b, dock));
+
+        // The doorsteps of a site's back doors that lie on the site grid.
+        public static List<(int X, int Z)> Doorsteps(GoodsSnapshot state, string siteId)
+        {
+            var layout = state.SiteLayouts?.FirstOrDefault(x => x.SiteId == siteId);
+            var steps = new List<(int X, int Z)>();
+            if (layout == null) return steps;
+            foreach (var building in state.Buildings.Where(x => x.SiteId == siteId))
+                foreach (var door in SiteGrid.ServiceDoors(building))
+                    if (SiteGrid.Doorstep(building, door.X, door.Z) is { } step && step.X >= 0 && step.Z >= 0 && step.X < layout.Width && step.Z < layout.Depth)
+                        steps.Add(step);
+            return steps;
+        }
+
+        // A doorstep is open ground when it lies on the grid and no wall of any of the site's buildings stands there.
+        private static bool Open(GoodsSnapshot state, GoodsBuilding building, SiteLayout layout, int x, int z) =>
+            x >= 0 && z >= 0 && x < layout.Width && z < layout.Depth && !SiteGrid.WallAt(state, building.SiteId, x, z);
 
         // True when a walkable path reaches a placed dock from its lot's street edge (any site; restaurants require it).
         public static bool ReachesStreet(GoodsSnapshot state, GoodsEquipment dock, PropertyOffer offer) =>

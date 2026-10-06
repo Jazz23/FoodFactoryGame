@@ -1,6 +1,6 @@
 // Runs the real WorldGen scene (decision 0028, piece 2) as a host, with a loopback-UDP remote client where needed, on a new
 // generated world in a unique temporary directory: the player starts on the starting restaurant's own site, the map's starting
-// lot lines up with the site grid, a dock (small enough for a restaurant's 2 m apron) places there, a purchase through the
+// lot lines up with the site grid, a dock places there beside the back door (decision 0037), a purchase through the
 // buy panel reaches both clients, and a whole sale in the pre-equipped starting restaurant (decision 0030) reaches both.
 // The application's saves are never opened.
 using System;
@@ -121,8 +121,9 @@ namespace FoodFactoryGame.Session.PlayModeTests
             Assert.That(site.Companies.Single().Cash, Is.EqualTo(GeneratedWorld.StartingCash));
             Assert.That(site.Properties.Single().LotId, Is.EqualTo(Start.LotId));
             Assert.That(site.Locations.Single(x => x.Id == GoodsWorld.InventoryLocationId(_root.Authenticator.LocalPlayerId)).SiteId, Is.EqualTo(Start.SiteId));
-            Assert.That(site.Equipment.Select(x => x.Id), Is.EquivalentTo(new[] { GeneratedWorld.StartCounterId, GeneratedWorld.StartTableId }),
-                "Pre-equipped with a counter and a table (decision 0030).");
+            Assert.That(site.Equipment.Select(x => x.Id), Is.EquivalentTo(new[] { GeneratedWorld.StartCounterId, GeneratedWorld.StartTableId, GeneratedWorld.StartDockId }),
+                "Pre-equipped with a counter and a table (decision 0030) and the dock beside the back door (decision 0037).");
+            Assert.That(RestaurantRules.BesideBackDoor(site, site.Equipment.Single(x => x.Id == GeneratedWorld.StartDockId)), Is.True);
             Assert.That(site.Belts.Count + site.Employees.Count, Is.Zero, "No dev seed.");
             Assert.That((GameObject.Find("Navigation"), GameObject.Find("Landmark 1")), Is.EqualTo(((GameObject)null, (GameObject)null)),
                 "The dev site's ground and NavMesh are hidden in a generated world.");
@@ -177,9 +178,11 @@ namespace FoodFactoryGame.Session.PlayModeTests
             var site = _root.ClientSite;
             var dock = site.Equipment.Single(x => x.HolderId == me);
             var (width, depth) = SiteGrid.Footprint(dock.Width, dock.Depth, 0);
+            // Beside the back door's doorstep (decision 0037), as the server requires.
             var anchor = Enumerable.Range(0, Start.Width * Start.Depth).Select(i => (X: i % Start.Width, Z: i / Start.Width))
                 .First(c => !SiteGrid.Overlaps(c.X, c.Z, width, depth, Start.BuildingX, Start.BuildingZ, Start.BuildingWidth, Start.BuildingDepth)
-                            && SiteGrid.PlacementProblem(site, dock, c.X, c.Z, 0, 0) == null);
+                            && SiteGrid.PlacementProblem(site, dock, c.X, c.Z, 0, 0) == null
+                            && RestaurantRules.PlacementProblem(site, dock, c.X, c.Z, 0, Start) == null);
             bridge.RequestPlace("place-dock", dock.Id, anchor.X, anchor.Z, 0);
             yield return Until(() => results.ContainsKey("place-dock"), "placement reply");
             Assert.That(results["place-dock"].Accepted, Is.True, results["place-dock"].Reason);

@@ -317,7 +317,10 @@ namespace FoodFactoryGame.Session.Equipment
             var (width, depth) = SiteGrid.Footprint(_held.Width, _held.Depth, _rotation);
             _target = SiteGridSpace.AnchorAt(layout, point, width, depth);
             _targetLevel = Level;
-            var problem = SiteGrid.PlacementProblem(site, _held, _target.X, _target.Z, _rotation, _targetLevel);
+            // The restaurant rules too (decision 0037: a dock beside a back door, doorsteps kept clear), as the server checks them.
+            var lot = SitePlacement.Active?.LotOf(_held.SiteId);
+            var problem = SiteGrid.PlacementProblem(site, _held, _target.X, _target.Z, _rotation, _targetLevel)
+                ?? (_targetLevel == 0 ? RestaurantRules.PlacementProblem(site, _held, _target.X, _target.Z, _rotation, lot == null ? null : SitePlacement.Active.OfferOf(lot.Id)) : null);
             var center = SiteGridSpace.FootprintCenter(layout, _target.X, _target.Z, width, depth, _targetLevel);
             var color = problem == null ? validColor : invalidColor;
             ghost.gameObject.SetActive(true);

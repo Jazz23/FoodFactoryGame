@@ -480,6 +480,14 @@ namespace FoodFactoryGame.Goods
             // v16 had no free walls (decision 0036); every shell's FreeWalls reads false, so its perimeter stays implied. The version
             // still changes so an older build refuses a v17 save instead of drawing free walls as a rectangle.
             if (state != null && state.SchemaVersion == 16) state.SchemaVersion = 17;
+            // v17 had no back doors (decision 0037): every door record reads as a customer door and nothing moves. Docks placed
+            // before keep working where they stand; only new placements follow the back-door rule.
+            if (state != null && state.SchemaVersion == 17)
+            {
+                foreach (var piece in (state.Buildings ?? new()).Where(x => x != null).SelectMany(x => x.Structures ?? new()))
+                    if (piece != null) piece.Role ??= "";
+                state.SchemaVersion = 18;
+            }
             GoodsWorld.Validate(state);
             return state;
         }

@@ -1,6 +1,6 @@
 // Restaurant build mode (decision 0034, slice 2), local player only. Build (B) opens it as a screen of its own: the camera looks
-// down on the current site, a grid covers the lot and a panel on the right offers tools (sell or remove, walls, doors, windows,
-// wall finish) and a catalog of furnishings by category. Walls are free (decision 0036): outer and inner walls are drawn and
+// down on the current site, a grid covers the lot and a panel on the right offers tools (sell or remove, walls, doors, back doors
+// (decision 0037), windows, wall finish) and a catalog of furnishings by category. Walls are free (decision 0036): outer and inner walls are drawn and
 // removed alike, anywhere in the lot. The pointer's cell shows a ghost tinted by validity: the same pure rules the server applies
 // (GoodsWorld.PlanShell, FurnishProblem, SiteGrid) plus the company's cash, with the price, refund and net amount, or the reason it
 // would be refused. A click places a single piece, door or window; dragging draws a line of wall, restyles a line of walls or
@@ -29,6 +29,8 @@ namespace FoodFactoryGame.Session.Buildings
         Sell,
         Wall,
         Door,
+        // A back door (decision 0037): a door on an outer wall for staff and goods only.
+        BackDoor,
         Window,
         Finish,
         Item
@@ -198,6 +200,7 @@ namespace FoodFactoryGame.Session.Buildings
         {
             BuildTool.Wall or BuildTool.Finish => GoodsWorld.WallStyles[0],
             BuildTool.Door => GoodsWorld.DoorStyles[0],
+            BuildTool.BackDoor => GoodsWorld.BackDoorStyle,
             BuildTool.Window => GoodsWorld.WindowStyles[0],
             _ => ""
         };
@@ -397,10 +400,11 @@ namespace FoodFactoryGame.Session.Buildings
                     break;
                 }
                 case BuildTool.Door:
-                    shell.Kind = ShellOrder.Door;
+                case BuildTool.BackDoor:
+                    shell.Kind = Tool == BuildTool.BackDoor ? ShellOrder.BackDoor : ShellOrder.Door;
                     shell.X = to.X;
                     shell.Z = to.Z;
-                    preview.Label = $"{Name(Style)} door";
+                    preview.Label = Tool == BuildTool.BackDoor ? $"{Name(Style)} back door" : $"{Name(Style)} door";
                     break;
                 case BuildTool.Window:
                     shell.Kind = ShellOrder.Window;
@@ -840,13 +844,14 @@ namespace FoodFactoryGame.Session.Buildings
             ToolButton(BuildTool.Sell, "Sell / remove");
             ToolButton(BuildTool.Wall, "Wall");
             ToolButton(BuildTool.Door, "Door");
+            ToolButton(BuildTool.BackDoor, "Back door");
             ToolButton(BuildTool.Window, "Window");
             ToolButton(BuildTool.Finish, "Wall finish");
             _styles.Clear();
             var styles = Tool switch
             {
                 BuildTool.Wall or BuildTool.Finish => GoodsWorld.WallStyles,
-                BuildTool.Door => GoodsWorld.DoorStyles,
+                BuildTool.Door or BuildTool.BackDoor => GoodsWorld.DoorStyles,
                 BuildTool.Window => GoodsWorld.WindowStyles,
                 _ => Array.Empty<string>()
             };

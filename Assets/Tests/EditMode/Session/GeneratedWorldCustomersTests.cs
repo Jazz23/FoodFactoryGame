@@ -208,6 +208,34 @@ namespace FoodFactoryGame.Session.Tests
             Assert.DoesNotThrow(() => GoodsWorld.Validate(after));
         }
 
+        // Decision 0037 (generator v5): a new world's starting restaurant has its back door in the shell and the dock beside it, both
+        // where the layout put them; the dock can take a truck from the street; customers still reach the counter by the front
+        // door; reloading adds nothing.
+        [Test]
+        public void ANewWorldStartsWithItsBackDoorAndTheDockBesideIt()
+        {
+            var stored = Layout();
+            var start = GeneratedWorld.StartOffer(stored.Layout);
+            Assert.That((start.BackDoors.Count, start.HasDock), Is.EqualTo((1, true)), "A format 4 starting lot lists its back door and dock.");
+            var dockDefinition = AssetDatabase.LoadAssetAtPath<EquipmentDefinition>("Assets/Content/Equipment/Dock.asset");
+            var world = GeneratedWorld.LoadOrCreate(WorldPath, stored, SessionTestFiles.ContentItems(), Counter(), Table(), dockDefinition);
+            var state = world.Snapshot();
+            var shell = state.Buildings.Single();
+            Assert.That(SiteGrid.ServiceDoors(shell), Is.EqualTo(new[] { (start.BackDoors[0].X, start.BackDoors[0].Z) }));
+            var dock = state.Equipment.Single(x => x.Id == GeneratedWorld.StartDockId);
+            Assert.That((dock.Kind, dock.State, dock.CellX, dock.CellZ, dock.Rotation, dock.ChargedCents),
+                Is.EqualTo((GoodsWorld.DockKind, EquipmentState.Placed, start.DockX, start.DockZ, start.DockRotation, 0L)));
+            Assert.That(RestaurantRules.BesideBackDoor(state, dock), Is.True);
+            Assert.That(RestaurantRules.ReachesStreet(state, dock, start), Is.True, "Trucks reach it along the yard.");
+            var counter = state.Equipment.Single(x => x.Id == GeneratedWorld.StartCounterId);
+            var customers = RestaurantRules.Reached(RestaurantRules.Walkable(state, start.SiteId, customers: true),
+                RestaurantRules.StreetCells(state.SiteLayouts.Single(), start));
+            Assert.That(RestaurantRules.Touches(customers, counter), Is.True, "Customers reach the counter by the front door.");
+            Assert.That(JsonUtility.ToJson(GeneratedWorld.LoadOrCreate(WorldPath, Layout(), SessionTestFiles.ContentItems(), Counter(), Table(), dockDefinition).Snapshot()),
+                Is.EqualTo(JsonUtility.ToJson(state)), "Reloading adds nothing.");
+            TestContext.WriteLine($"generator v{stored.Layout.GeneratorVersion}: {state.Competitors.Count} competitors, {stored.Layout.Buildings.Count(x => x.ServiceYard != null)} restaurants with a service yard");
+        }
+
         private static bool OvenFits(GoodsSnapshot state, GoodsBuilding shell)
         {
             var oven = Oven();

@@ -1,8 +1,9 @@
 // Verifies restaurant furnishing (decision 0034, slices 3-5): buy-and-place orders charge once for all pieces or change nothing;
 // selling refunds exactly what was charged and moves a piece's goods to the seller's inventory first; decor layers (floor, wall,
 // ceiling, tabletop) overlap only their own kind; a register sells only while staffed and reachable, and only reachable tables
-// give seats; ambience is one capped score per restaurant that customers weigh; restaurant docks need a path from the street
-// and serve one truck at a time while other sites' docks keep their old rules. Isolated saves only.
+// give seats; ambience is one capped score per restaurant that customers weigh; a restaurant dock (beside a back door, decision
+// 0037, whose rules BackDoorTests cover) serves one truck at a time while other sites' docks keep their old rules. Isolated saves
+// only.
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -245,17 +246,12 @@ namespace FoodFactoryGame.Goods.Tests
         }
 
         [Test]
-        public void RestaurantDocksNeedAStreetPathAndServeOneTruckAtATime()
+        public void RestaurantDocksServeOneTruckAtATime()
         {
-            // The dock inside the shell with the only door bricked up: no path from the street.
-            Assert.That(Furnish("dock-in", "dock", (4, 5, 0)).Accepted, Is.True);
-            Assert.That(_world.OrderShell("chef", "door-2", new ShellOrder { Kind = ShellOrder.Door, BuildingId = "shop", X = 9, Z = 4, Style = "panel" }).Accepted, Is.True);
-            Assert.That(_world.OrderShell("chef", "close", new ShellOrder { Kind = ShellOrder.Remove, BuildingId = "shop", Cells = { new GridCell { X = 9, Z = 4 } } }).Accepted,
+            // A back door on the east wall (doorstep (10, 4)) and a dock beside it (decision 0037; the rule itself is BackDoorTests').
+            Assert.That(_world.OrderShell("chef", "back", new ShellOrder { Kind = ShellOrder.BackDoor, BuildingId = "shop", X = 9, Z = 4, Style = "kitchen" }).Accepted,
                 Is.True);
-            var walled = new ShellOrder { Kind = ShellOrder.Partition, BuildingId = "shop", Style = "plaster", Cells = { new GridCell { X = 5, Z = 3 } } };
-            Assert.That(_world.OrderShell("chef", "wall", walled).Accepted, Is.True, "Seals the doorway's inward cell.");
-            Assert.That(Furnish("dock-sealed", "dock", (6, 4, 0)).Reason, Is.EqualTo("no-street-access"));
-            Assert.That(Furnish("dock-yard", "dock", (12, 9, 0), (12, 0, 0)).Accepted, Is.True, "Anywhere in the lot outside the shell.");
+            Assert.That(Furnish("dock-yard", "dock", (10, 5, 0)).Accepted, Is.True, "Beside the back door, reachable from the street.");
 
             // Two trucks on one route to the yard dock: one unloads, the other waits its turn.
             var world = _world;

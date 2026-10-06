@@ -10,7 +10,8 @@
 // The site company's cash is shown top right, read from the latest baseline. Edible goods slots show the ambient time left
 // before their first lot spoils, frozen (blue) while refrigerated because refrigeration pauses spoilage (decision 0018), and
 // the hover line gives the full time; a machine with no recipes (the fridge) opens as plain storage, and a loading dock as its
-// outgoing and incoming grids (decision 0022). Inside a factory the inventory screen also offers its next floor (decision 0020).
+// outgoing and incoming grids (decision 0022), marked when a restaurant dock is not beside a back door (decision 0037). Inside a
+// factory the inventory screen also offers its next floor (decision 0020).
 // Presentation only: slot positions are this client's arrangement of the replicated stacks, never saved or sent, and
 // progress is interpolated for at most one clock step past the latest baseline.
 using System;
@@ -685,6 +686,13 @@ namespace FoodFactoryGame.Session.Equipment
                 var warning = Caption("Warning: no clear path from the street to this dock. Trucks still use it.", 12, new Color(1f, 0.75f, 0.3f), 6);
                 warning.name = "hud-dock-street-warning";
                 window.Add(warning);
+            }
+            // A restaurant dock placed before back doors (decision 0037) keeps working where it stands; it is only marked.
+            if (RestaurantRules.IsRestaurantSite(site, equipment.SiteId) && !RestaurantRules.BesideBackDoor(site, equipment))
+            {
+                var mark = Caption("Not beside a back door. Trucks still use it; new docks go beside a back door.", 12, new Color(1f, 0.75f, 0.3f), 6);
+                mark.name = "hud-dock-back-door-mark";
+                window.Add(mark);
             }
             return window;
         }

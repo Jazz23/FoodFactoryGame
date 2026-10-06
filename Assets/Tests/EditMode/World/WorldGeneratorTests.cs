@@ -15,9 +15,9 @@ namespace FoodFactoryGame.World.Tests
     public sealed class WorldGeneratorTests
     {
         private const ulong KnownSeed = 20260927;
-        // WorldLayoutText.Hash of generator v3's layout for KnownSeed (v1's was c8aed6b7…4269, v2's 6e12b0fd…b598). Changing it
-        // requires bumping WorldGenerator.Version.
-        private const string KnownHash = "5667d34e01d58a174761126c2cbf03fb51df9329c06bfe7d7f10b36574c747ec";
+        // WorldLayoutText.Hash of generator v5's layout for KnownSeed (v1's was c8aed6b7…4269, v2's 6e12b0fd…b598, the pin before v5
+        // 5667d34e…47ec). Changing it requires bumping WorldGenerator.Version.
+        private const string KnownHash = "d0a58a011d03fa053ddb5e3df9726dd67115863b6289e56dbdd8bd2f82768d7f";
         private const int SeedCount = 120;
 
         private static WorldLayout Generate(ulong seed) => WorldGenerator.Generate(seed.ToString(), seed).Layout;
@@ -28,7 +28,8 @@ namespace FoodFactoryGame.World.Tests
             var first = WorldLayoutText.Write(Generate(KnownSeed));
             var second = WorldLayoutText.Write(Generate(KnownSeed));
             Assert.That(second, Is.EqualTo(first));
-            Assert.That(first, Does.StartWith("food-factory-world-layout 3\ngenerator 4\n").And.Contains("\nlot lot-"), "the same lots and IDs, in format 3");
+            Assert.That(first, Does.StartWith("food-factory-world-layout 4\ngenerator 5\n").And.Contains("\nlot lot-").And.Contains("\nservice restaurant-"),
+                "the same lots, service yards and IDs, in format 4");
             TestContext.WriteLine($"seed {KnownSeed}: sha256 {WorldLayoutText.Hash(first)}, {first.Length} chars");
             Assert.That(WorldLayoutText.Hash(first), Is.EqualTo(KnownHash), "Generator output changed: bump WorldGenerator.Version and re-pin.");
         }
@@ -47,7 +48,10 @@ namespace FoodFactoryGame.World.Tests
             var read = WorldLayoutText.Read(text);
             Assert.That(WorldLayoutText.Write(read), Is.EqualTo(text));
             Assert.That(read.RequestedSeed, Is.EqualTo("Sunny Valley"));
-            Assert.That(read.FormatVersion, Is.EqualTo(3));
+            Assert.That(read.FormatVersion, Is.EqualTo(4));
+            Assert.That(read.Buildings.Where(x => x.ServiceYard != null).Select(x => (x.Id, x.ServiceYard.X, x.ServiceYard.Z, x.ServiceYard.Width, x.ServiceYard.Depth, x.BackDoor.X, x.BackDoor.Z, x.ServiceDock.X, x.ServiceDock.Z, x.ServiceDock.Width, x.ServiceDock.Depth)),
+                Is.EqualTo(layout.Buildings.Where(x => x.ServiceYard != null).Select(x => (x.Id, x.ServiceYard.X, x.ServiceYard.Z, x.ServiceYard.Width, x.ServiceYard.Depth, x.BackDoor.X, x.BackDoor.Z, x.ServiceDock.X, x.ServiceDock.Z, x.ServiceDock.Width, x.ServiceDock.Depth))).And.Not.Empty,
+                "service yards round-trip");
             Assert.That(read.Lots.Select(x => (x.Id, x.BuildingId, x.SiteId, x.X, x.Z, x.Width, x.Depth, x.Access.X, x.Access.Z)),
                 Is.EqualTo(layout.Lots.Select(x => (x.Id, x.BuildingId, x.SiteId, x.X, x.Z, x.Width, x.Depth, x.Access.X, x.Access.Z))).And.Not.Empty);
             Assert.That(WorldLayoutValidator.Validate(read), Is.Empty);
@@ -72,7 +76,8 @@ namespace FoodFactoryGame.World.Tests
             TestContext.WriteLine($"{SeedCount} seeds valid; {retried} needed a retry; buildings min {buildings.Min()} max {buildings.Max()}");
         }
 
-        // Exactly one lot per property and none for scenery; the lot is the footprint extended forward by the category's setback,
+        // Exactly one lot per property and none for scenery; the lot is the footprint extended forward by the category's setback
+        // (with a restaurant's service yard beside it, generator v5),
         // its IDs are the building's reserved ones, and its access cell lies just past its street edge (validity is Validate's).
         private static void AssertOneLotPerProperty(WorldLayout layout, string context)
         {
@@ -88,7 +93,7 @@ namespace FoodFactoryGame.World.Tests
                 Assert.That(lots.TryGetValue(building.Id, out var found) ? found.Count : 0, Is.EqualTo(1), $"{context}: {building.Id}");
                 var lot = found[0];
                 Assert.That((lot.Id, lot.SiteId, building.SiteId), Is.EqualTo(("lot-" + building.Id, "site-" + building.Id, "site-" + building.Id)), context);
-                var rect = WorldGeometry.LotRect(building.Footprint, building.Facing, settings.SetbackFor(building.Category));
+                var rect = WorldGeometry.LotRect(building, settings.SetbackFor(building.Category));
                 Assert.That((lot.X, lot.Z, lot.Width, lot.Depth), Is.EqualTo((rect.X, rect.Z, rect.Width, rect.Depth)), $"{context}: {building.Id}");
                 var access = WorldGeometry.AccessCell(rect, building.Facing, building.Doors[0]);
                 Assert.That((lot.Access.X, lot.Access.Z), Is.EqualTo((access.X, access.Z)), $"{context}: {building.Id}");
@@ -286,6 +291,42 @@ namespace FoodFactoryGame.World.Tests
             {
                 Id = "lot-house", BuildingId = x.Buildings.First(b => !b.HasLot).Id, SiteId = "site-house", Width = 1, Depth = 1, Access = new WorldCell(0, 0)
             })), Has.Some.Contains("not the lot of a property"));
+        }
+
+        // Decision 0037 (generator v5): every restaurant property has its service yard, a back door opening into it and a starter
+        // dock touching that doorstep; the validator catches each piece out of place.
+        [Test]
+        public void TheValidatorReportsBrokenServiceYards()
+        {
+            List<string> ProblemsAfter(Action<WorldBuilding, WorldLayout> damage)
+            {
+                var layout = Generate(3);
+                damage(layout.Buildings.First(x => x.Category == BuildingCategory.Restaurant && x.HasLot), layout);
+                return WorldLayoutValidator.Validate(layout);
+            }
+            Assert.That(ProblemsAfter((b, _) => { }), Is.Empty);
+            Assert.That(ProblemsAfter((b, _) => b.ServiceYard = null), Has.Some.Contains("restaurant without a service yard"));
+            Assert.That(ProblemsAfter((b, _) => b.BackDoor = b.Doors[0]), Has.Some.Contains("back door is not a free non-corner wall cell"));
+            Assert.That(ProblemsAfter((b, _) => b.BackDoor = new WorldCell(b.X, b.Z)), Has.Some.Contains("back door is not a free non-corner wall cell"));
+            // The back door moved onto the opposite side wall: its doorstep is outside the yard.
+            Assert.That(ProblemsAfter((b, _) =>
+            {
+                var doorstep = WorldGeometry.Doorstep(b.Footprint, b.BackDoor);
+                var flip = b.Facing is Facing.North or Facing.South
+                    ? new WorldCell(b.BackDoor.X == b.X ? b.X + b.Width - 1 : b.X, b.BackDoor.Z)
+                    : new WorldCell(b.BackDoor.X, b.BackDoor.Z == b.Z ? b.Z + b.Depth - 1 : b.Z);
+                Assert.That(doorstep, Is.Not.Null);
+                b.BackDoor = flip;
+            }), Has.Some.Contains("back door does not open into the service yard"));
+            Assert.That(ProblemsAfter((b, _) => b.ServiceDock = new WorldRect(b.ServiceDock.X, b.ServiceDock.Z, 2, 2)), Has.Some.Contains("not a 2 x 1 piece"));
+            // The dock slid along the yard, away from the doorstep.
+            Assert.That(ProblemsAfter((b, _) =>
+            {
+                var (dx, dz) = WorldGeometry.Step(b.Facing);
+                b.ServiceDock = new WorldRect(b.ServiceDock.X + 3 * dx, b.ServiceDock.Z + 3 * dz, b.ServiceDock.Width, b.ServiceDock.Depth);
+            }), Has.Some.Contains("does not touch the back door's doorstep"));
+            Assert.That(ProblemsAfter((b, layout) => layout.Buildings.First(x => !x.HasLot).ServiceYard = b.ServiceYard),
+                Has.Some.Contains("only a format 4 restaurant property has a service yard"));
         }
 
         // Stored format 2 worlds (generator v2) have no lots: they still read, write back byte-for-byte and validate, and list

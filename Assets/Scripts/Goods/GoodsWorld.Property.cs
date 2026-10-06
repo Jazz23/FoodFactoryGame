@@ -4,7 +4,8 @@
 // the buyer and every teammate (players granted any of the company's sites; not employees) the new site; a rejected or failed
 // purchase leaves no site, property or debit behind. Sites and properties are never removed. Ownership is public: every site
 // view carries all properties, so any client can colour the map by owner. The site grid covers exactly the lot; a restaurant or factory shell becomes the site's GoodsBuilding
-// (decision 0019) and the rest of the lot is ordinary outdoor cells.
+// (decision 0019) and the rest of the lot is ordinary outdoor cells. A generated restaurant's back door comes with its shell, and
+// on purchase the dock that comes with it is placed beside that door (decision 0037).
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -48,6 +49,14 @@ namespace FoodFactoryGame.Goods
         public int BuildingWidth;
         public int BuildingDepth;
         public List<GridCell> Doors = new();
+        // A generated restaurant's back doors (layout format 4, decision 0037), in site cells; they are also in Doors' perimeter,
+        // never among Doors. Empty for older layouts and other buildings.
+        public List<GridCell> BackDoors = new();
+        // The starter dock that comes with a generated restaurant, in site cells (rotation 0 lies along X); HasDock false otherwise.
+        public bool HasDock;
+        public int DockX;
+        public int DockZ;
+        public int DockRotation;
         public int Floors = 1;
         // The lot's district price multiplier in percent (100 = list price); structure orders on the site are scaled by it
         // (decision 0034, PROTOTYPE pricing).
@@ -113,6 +122,7 @@ namespace FoodFactoryGame.Goods
                 TryDebit(company, offer.PriceCents);
                 var teammates = Teammates(company);
                 CreateProperty(offer, company);
+                PlaceStarterDock(offer);
                 Grant(playerId, offer.SiteId);
                 foreach (var teammate in teammates) Grant(teammate, offer.SiteId);
                 return Record(requestId, playerId, true, "property-bought", null);
@@ -160,12 +170,44 @@ namespace FoodFactoryGame.Goods
         public static string ViewSiteId(GoodsSnapshot view) =>
             view?.SiteLayouts?.FirstOrDefault()?.SiteId ?? view?.Locations?.FirstOrDefault()?.SiteId;
 
+        // A back door is a perimeter opening with a door record in the service role (decision 0037); it came with the building, so it
+        // records nothing paid. The kitchen leaf is its look.
         internal static GoodsBuilding BuildingOf(PropertyOffer offer) => new()
         {
             Id = offer.BuildingId, SiteId = offer.SiteId, Kind = offer.Category, CellX = offer.BuildingX, CellZ = offer.BuildingZ,
             Width = offer.BuildingWidth, Depth = offer.BuildingDepth, Floors = offer.Floors,
-            Doors = offer.Doors.Select(x => new GridCell { X = x.X, Z = x.Z }).ToList()
+            Doors = offer.Doors.Concat(offer.BackDoors ?? new List<GridCell>()).Select(x => new GridCell { X = x.X, Z = x.Z }).ToList(),
+            Structures = (offer.BackDoors ?? new List<GridCell>())
+                .Select(x => new GoodsStructure { Kind = DoorStructure, X = x.X, Z = x.Z, Style = BackDoorStyle, Role = ServiceDoorRole }).ToList()
         };
+
+        public const string BackDoorStyle = "kitchen";
+
+        // The dock that came with a bought restaurant (decision 0037), from the supplier's dock content, placed free of charge (it
+        // came with the building, so selling it refunds nothing). Call only under _gate, after CreateProperty. Nothing is placed
+        // when no dock content is registered or something already stands there.
+        private void PlaceStarterDock(PropertyOffer offer)
+        {
+            var template = _equipmentOffers.Values.Select(x => x.Equipment).FirstOrDefault(x => x != null && x.Kind == DockKind);
+            if (!offer.HasDock || template == null) return;
+            var dock = JsonUtility.FromJson<GoodsEquipment>(JsonUtility.ToJson(template));
+            dock.Id = StarterDockId(offer.SiteId);
+            dock.SiteId = offer.SiteId;
+            dock.State = EquipmentState.Placed;
+            dock.HolderId = "";
+            dock.CellX = offer.DockX;
+            dock.CellZ = offer.DockZ;
+            dock.Rotation = offer.DockRotation;
+            dock.Level = 0;
+            dock.ChargedCents = 0;
+            dock.StaffId = "";
+            dock.Layer ??= "";
+            if (_state.Equipment.Any(x => x.Id == dock.Id) || SiteGrid.PlacementProblem(_state, dock, dock.CellX, dock.CellZ, dock.Rotation) != null) return;
+            _state.Equipment.Add(dock);
+            AddPlacedParts(dock);
+        }
+
+        public static string StarterDockId(string siteId) => "dock:" + siteId;
 
         // Call only under _gate, after every check. The site's map position is the lot's access point.
         private void CreateProperty(PropertyOffer offer, string companyId)
@@ -192,6 +234,11 @@ namespace FoodFactoryGame.Goods
                 || (!offer.IsShell && offer.Category != FarmCategory && offer.Category != StationCategory)
                 || offer.PricePercent < 1 || offer.BuildingX < 0 || offer.BuildingZ < 0 || offer.BuildingWidth < 1 || offer.BuildingDepth < 1
                 || offer.BuildingX + offer.BuildingWidth > offer.Width || offer.BuildingZ + offer.BuildingDepth > offer.Depth)
+                return "invalid-offer";
+            if (offer.BackDoors is null || (offer.BackDoors.Count > 0 && offer.Category != RestaurantKind)
+                || offer.BackDoors.Any(x => x is null || offer.Doors.Any(d => d.X == x.X && d.Z == x.Z))
+                || (offer.HasDock && (offer.Category != RestaurantKind || offer.DockRotation < 0 || offer.DockRotation > 3 || offer.DockX < 0 || offer.DockZ < 0
+                    || offer.DockX + (offer.DockRotation % 2 == 0 ? 2 : 1) > offer.Width || offer.DockZ + (offer.DockRotation % 2 == 0 ? 1 : 2) > offer.Depth)))
                 return "invalid-offer";
             if (!offer.IsShell) return null;
             var probe = new GoodsSnapshot { WorldId = "offer" };

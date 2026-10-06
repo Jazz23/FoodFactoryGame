@@ -21,15 +21,18 @@ namespace FoodFactoryGame.Session.Buildings
         private float _angle;
         private float _target;
         private BoxCollider _box;
+        private bool _serviceOnly;
 
         public float Angle => _angle;
         public bool Blocking => _box != null && _box.enabled;
         public Vector3 Doorway => _doorway;
 
-        // doorway: the centre of the opening (scene space). The leaf's current local rotation is its closed pose.
-        public void Init(Vector3 doorway)
+        // doorway: the centre of the opening (scene space). The leaf's current local rotation is its closed pose. A back door
+        // (serviceOnly, decision 0037) never opens for a customer.
+        public void Init(Vector3 doorway, bool serviceOnly = false)
         {
             _doorway = doorway;
+            _serviceOnly = serviceOnly;
             _closed = transform.localRotation;
             var renderers = GetComponentsInChildren<Renderer>();
             if (renderers.Length == 0) return;
@@ -49,7 +52,7 @@ namespace FoodFactoryGame.Session.Buildings
 
         private void Update()
         {
-            var opener = DoorOpener.Nearest(_doorway, Reach);
+            var opener = DoorOpener.Nearest(_doorway, Reach, !_serviceOnly);
             if (opener == null) _target = 0f;
             else if (Mathf.Approximately(_target, 0f)) _target = AwayFrom(opener.transform.position) * OpenDegrees;
             _angle = Mathf.MoveTowards(_angle, _target, DegreesPerSecond * Time.deltaTime);

@@ -57,7 +57,8 @@ namespace FoodFactoryGame.Session.Tests
             var shell = state.Buildings.Single(x => x.Id == DevWorld.RestaurantId);
             Assert.That((shell.Kind, shell.Floors, shell.CellX, shell.CellZ, shell.Width, shell.Depth),
                 Is.EqualTo((GoodsWorld.RestaurantKind, 1, DevWorld.RestaurantCellX, DevWorld.RestaurantCellZ, DevWorld.RestaurantWidth, DevWorld.RestaurantDepth)));
-            Assert.That(shell.Doors.Select(x => (x.X, x.Z)), Is.EqualTo(new[] { (DevWorld.RestaurantDoorX, 8), (DevWorld.RestaurantDoorX + 1, 8) }));
+            Assert.That(shell.Doors.Select(x => (x.X, x.Z)), Is.EqualTo(new[] { (DevWorld.RestaurantDoorX, 8), (DevWorld.RestaurantDoorX + 1, 8), (DevWorld.RestaurantCellX, DevWorld.RestaurantBackDoorZ) }));
+            Assert.That(SiteGrid.ServiceDoors(shell), Is.EqualTo(new[] { (DevWorld.RestaurantCellX, DevWorld.RestaurantBackDoorZ) }), "Its back door (decision 0037) on the west wall.");
             var factory = state.Buildings.Single(x => x.Id == DevWorld.FactoryId);
             Assert.That((factory.Kind, factory.Floors, factory.CellX, factory.CellZ, factory.Width, factory.Depth),
                 Is.EqualTo((GoodsWorld.FactoryKind, 1, DevWorld.FactoryCellX, DevWorld.FactoryCellZ, DevWorld.FactoryWidth, DevWorld.FactoryDepth)));
@@ -101,7 +102,7 @@ namespace FoodFactoryGame.Session.Tests
         {
             SaveWithoutBuilding(new GoodsEquipment
             {
-                Id = "old-fridge", Kind = "fridge", SiteId = DevWorld.SiteId, CellX = DevWorld.RestaurantCellX, CellZ = 4,
+                Id = "old-fridge", Kind = "fridge", SiteId = DevWorld.SiteId, CellX = DevWorld.RestaurantCellX, CellZ = 3,
                 Width = 1, Depth = 1, InputCapacity = 1, OutputCapacity = 1
             });
             LogAssert.Expect(LogType.Warning, new Regex("dev restaurant's walls"));

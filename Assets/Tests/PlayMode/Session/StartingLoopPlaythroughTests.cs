@@ -362,8 +362,8 @@ namespace FoodFactoryGame.Session.PlayModeTests
             Expect(company.Cash == GeneratedWorld.StartingCash, "starting cash differs");
             var equipment = site.Equipment.Where(x => x.SiteId == Start.SiteId).Select(x => $"{x.Id}:{x.Kind}@({x.CellX},{x.CellZ})").ToList();
             Note("start equipment " + string.Join(", ", equipment));
-            Expect(site.Equipment.Select(x => x.Id).OrderBy(x => x).SequenceEqual(new[] { GeneratedWorld.StartCounterId, GeneratedWorld.StartTableId }.OrderBy(x => x)),
-                "start equipment is not exactly start-counter and start-table");
+            Expect(site.Equipment.Select(x => x.Id).OrderBy(x => x).SequenceEqual(new[] { GeneratedWorld.StartCounterId, GeneratedWorld.StartTableId, GeneratedWorld.StartDockId }.OrderBy(x => x)),
+                "start equipment is not exactly start-counter, start-table and start-dock");
             var avatar = LocalAvatar().transform.position;
             var cell = SiteGridSpace.AnchorAt(LayoutOf(Start.SiteId), avatar, 1, 1);
             Note($"spawn {avatar} = cell ({cell.X},{cell.Z}); inside building: {SiteGrid.Overlaps(cell.X, cell.Z, 1, 1, Start.BuildingX, Start.BuildingZ, Start.BuildingWidth, Start.BuildingDepth)}");

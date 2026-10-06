@@ -4,7 +4,8 @@
 // A rectangle's X/Z is its minimum cell and Width/Depth count cells along X/Z. Roads and rails are centrelines with a width.
 // Format 2 adds the land surface (WorldTerrain), rivers with bridges, level crossings, junction controls, building elevations
 // and trees; a format 1 layout (generator v1) reads as flat land with none of them. Format 3 adds lots and reserved site IDs
-// (decision 0028); format 1 and 2 layouts have no lots, so nothing in them can be bought.
+// (decision 0028); format 1 and 2 layouts have no lots, so nothing in them can be bought. Format 4 adds each restaurant's service
+// yard, back door and starter dock (generator v5); older layouts have none.
 using System.Collections.Generic;
 
 namespace FoodFactoryGame.World
@@ -219,6 +220,12 @@ namespace FoodFactoryGame.World
         public string SiteId = "";
         // Ground-floor level in centimetres: the land height at the entrance (0 in format 1).
         public int ElevationCm;
+        // Restaurants only, format 4 (generator v5, owner decisions of 2026-10-06): the service yard beside the shell, from the
+        // lot's street edge to the building's rear, the back door on the yard-side wall (a perimeter cell, never a corner), and
+        // the starter dock (a 2 x 1 rectangle) in the yard touching the back door's doorstep. Null in older formats.
+        public WorldRect ServiceYard;
+        public WorldCell BackDoor;
+        public WorldRect ServiceDock;
 
         public bool IsShell => Category == BuildingCategory.Restaurant || Category == BuildingCategory.Factory;
         public bool IsPurchasable => Ownership == Ownership.ForSale || Ownership == Ownership.Competitor;
@@ -253,7 +260,7 @@ namespace FoodFactoryGame.World
     public sealed class WorldLayout
     {
         // Format of WorldLayoutText; the generator version is separate (a new generator may keep the format).
-        public const int CurrentFormat = 3;
+        public const int CurrentFormat = 4;
 
         public int FormatVersion = CurrentFormat;
         public int GeneratorVersion;

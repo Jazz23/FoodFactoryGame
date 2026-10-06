@@ -9,7 +9,8 @@
 // river) -> road graph -> rail lines -> land heights -> junction controls -> bridges -> level crossings -> stations at level
 // crossings -> buildings along every block edge, doors facing the street, on land flat enough -> farms along rural spurs ->
 // trees -> IDs -> starting restaurant -> turn -> lots. Every purchasable building is placed together with its lot (its
-// footprint plus the setback to its street, deeper for factories and farms), and nothing else may stand on a lot.
+// footprint plus the setback to its street, deeper for factories and farms, plus a restaurant's service yard beside it), and
+// nothing else may stand on a lot.
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -44,7 +45,10 @@ namespace FoodFactoryGame.World
     {
         // 2 (2026-09-28): denser city, land heights, a river with bridges, level crossings, junction controls and trees.
         // 3 (2026-09-29): lots with reserved site IDs (decision 0028); factories and farms stand behind deeper aprons.
-        public const int Version = 4;
+        // 4 (2026-10-02): larger restaurants (decision 0036).
+        // 5 (2026-10-06): every restaurant lot has a service yard beside the shell with a back door and a starter dock (layout
+        // format 4, decision 0037).
+        public const int Version = 5;
 
         // extraRule adds problems of its own (tests use it to force retries); it cannot waive validator problems.
         public static WorldGenerationResult Generate(string requestedSeed, ulong seed, WorldSettings settings = null,
@@ -718,20 +722,25 @@ namespace FoodFactoryGame.World
                         cursor += 3;
                         continue;
                     }
-                    var along = Math.Min(rng.Range(size.MinAlong, size.MaxAlong), to - cursor);
+                    // A restaurant's lot also holds its service yard beside the shell (generator v5).
+                    var yard = category == BuildingCategory.Restaurant ? _s.ServiceYardWidth : 0;
+                    var along = Math.Min(rng.Range(size.MinAlong, size.MaxAlong), to - cursor - yard);
                     if (along < size.MinAlong) break;
                     var deep = rng.Range(size.MinDeep, deepMax);
+                    var yardLow = yard > 0 && rng.Chance(50);
+                    var start = cursor + (yardLow ? yard : 0);
                     var line = facing is Facing.North or Facing.East ? edge - back : edge + back;
                     var rect = facing switch
                     {
-                        Facing.North => new WorldRect(cursor, line - deep, along, deep),
-                        Facing.South => new WorldRect(cursor, line, along, deep),
-                        Facing.East => new WorldRect(line - deep, cursor, deep, along),
-                        _ => new WorldRect(line, cursor, deep, along)
+                        Facing.North => new WorldRect(start, line - deep, along, deep),
+                        Facing.South => new WorldRect(start, line, along, deep),
+                        Facing.East => new WorldRect(line - deep, start, deep, along),
+                        _ => new WorldRect(line, start, deep, along)
                     };
                     var building = Lot(rng, category, kind, rect, facing);
+                    if (yard > 0) WorldGeometry.AddServiceYard(building, yardLow, yard, _s.SetbackFor(category));
                     // Property is checked with its whole lot, scenery with its footprint.
-                    var box = WorldGeometry.Of(building.HasLot ? LotRect(rect, facing, category) : rect);
+                    var box = WorldGeometry.Of(building.HasLot ? LotRect(building) : rect);
                     if (_placed.Any(Grow(box, 2 * profile.MinGap)))
                     {
                         cursor += 2;
@@ -743,7 +752,7 @@ namespace FoodFactoryGame.World
                         building.ElevationCm = level.Value;
                         Add(building);
                     }
-                    cursor += along + rng.Range(profile.MinGap, profile.MaxGap);
+                    cursor += along + yard + rng.Range(profile.MinGap, profile.MaxGap);
                 }
             }
 
@@ -856,11 +865,14 @@ namespace FoodFactoryGame.World
             private WorldRect LotRect(WorldRect footprint, Facing facing, BuildingCategory category) =>
                 WorldGeometry.LotRect(footprint, facing, _s.SetbackFor(category));
 
+            // A property's whole lot, its service yard included.
+            private WorldRect LotRect(WorldBuilding building) => WorldGeometry.LotRect(building, _s.SetbackFor(building.Category));
+
             private void Add(WorldBuilding building)
             {
                 _layout.Buildings.Add(building);
                 // A property's whole lot is taken, so no building or tree stands on its apron.
-                var box = WorldGeometry.Of(building.HasLot ? LotRect(building.Footprint, building.Facing, building.Category) : building.Footprint);
+                var box = WorldGeometry.Of(building.HasLot ? LotRect(building) : building.Footprint);
                 _placed.Add(box, 0);
                 if (building.Category == BuildingCategory.Station) _reserved.Add(box, -1);
                 // The way in: no street tree in front of a door.
@@ -1017,7 +1029,7 @@ namespace FoodFactoryGame.World
             {
                 foreach (var building in _layout.Buildings.Where(x => x.HasLot))
                 {
-                    var rect = LotRect(building.Footprint, building.Facing, building.Category);
+                    var rect = LotRect(building);
                     building.SiteId = WorldLot.SiteIdFor(building.Id);
                     _layout.Lots.Add(new WorldLot
                     {
@@ -1064,6 +1076,9 @@ namespace FoodFactoryGame.World
                     building.Depth = rect.Depth;
                     building.Facing = WorldGeometry.TurnFacing(building.Facing);
                     building.Doors = building.Doors.Select(WorldGeometry.TurnCell).ToList();
+                    if (building.ServiceYard != null) building.ServiceYard = WorldGeometry.TurnRect(building.ServiceYard);
+                    if (building.BackDoor != null) building.BackDoor = WorldGeometry.TurnCell(building.BackDoor);
+                    if (building.ServiceDock != null) building.ServiceDock = WorldGeometry.TurnRect(building.ServiceDock);
                 }
                 _layout.Terrain = _layout.Terrain.Turned();
                 foreach (var river in _layout.Rivers) river.Points = river.Points.Select(TurnedPoint).ToList();

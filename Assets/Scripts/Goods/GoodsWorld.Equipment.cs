@@ -219,7 +219,7 @@ namespace FoodFactoryGame.Goods
                 if (equipment.State != EquipmentState.Held || equipment.HolderId != playerId)
                     return Record(requestId, playerId, false, "not-held", null);
                 var problem = SiteGrid.PlacementProblem(_state, equipment, cellX, cellZ, rotation, level)
-                    ?? DockProblem(_state, equipment, cellX, cellZ, rotation);
+                    ?? RestaurantProblem(_state, equipment, cellX, cellZ, rotation);
                 if (problem != null) return Record(requestId, playerId, false, problem, null);
 
                 equipment.State = EquipmentState.Placed;

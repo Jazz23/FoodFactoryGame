@@ -310,8 +310,10 @@ namespace FoodFactoryGame.Goods
                 var placed = _state.Equipment.Where(x => x.SiteId == site.Id && x.State == EquipmentState.Placed).OrderBy(x => x.Id, StringComparer.Ordinal).ToList();
                 var counters = placed.Where(x => x.Kind == CounterKind && !string.IsNullOrEmpty(x.StaffId)).ToList();
                 if (menu.Count == 0 || counters.Count == 0 || CompanyOfSiteLocked(site.Id) is null) continue;
-                var reached = RestaurantRules.Reached(RestaurantRules.Walkable(_state, site.Id),
-                    RestaurantRules.EdgeCells(_state.SiteLayouts.FirstOrDefault(x => x.SiteId == site.Id)));
+                // Customers walk in from the lot's street edge (every edge of a dev site) and never through a back door (decision 0037).
+                var reached = RestaurantRules.Reached(RestaurantRules.Walkable(_state, site.Id, customers: true),
+                    RestaurantRules.StreetCells(_state.SiteLayouts.FirstOrDefault(x => x.SiteId == site.Id),
+                        _propertyOffers?.Values.FirstOrDefault(x => x.SiteId == site.Id)));
                 counters = counters.Where(x => x.Level == 0 && RestaurantRules.Touches(reached, x)).ToList();
                 if (counters.Count == 0) continue;
                 var tables = placed.Where(x => IsTable(x) && x.Level == 0 && RestaurantRules.Touches(reached, x)).ToList();

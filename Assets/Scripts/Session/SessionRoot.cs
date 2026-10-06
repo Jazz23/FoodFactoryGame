@@ -241,7 +241,8 @@ namespace FoodFactoryGame.Session
             ServerWorld = GeneratedWorld.Supports(ServerLayout)
                 ? GeneratedWorld.LoadOrCreate(_options.WorldPath, ServerLayout, items,
                     equipmentDefinitions.FirstOrDefault(x => x != null && x.Kind == DevWorld.CounterKind),
-                    equipmentDefinitions.FirstOrDefault(x => x != null && x.Kind == DevWorld.TableKind))
+                    equipmentDefinitions.FirstOrDefault(x => x != null && x.Kind == DevWorld.TableKind),
+                    equipmentDefinitions.FirstOrDefault(x => x != null && x.Kind == GoodsWorld.DockKind))
                 : null;
             StartOffer = ServerWorld != null ? GeneratedWorld.StartOffer(ServerLayout.Layout) : null;
             ServerWorld ??= DevWorld.LoadOrCreate(_options.WorldPath, equipmentDefinitions.FirstOrDefault(x => x != null && x.Kind == "oven"), items,

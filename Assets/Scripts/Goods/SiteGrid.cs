@@ -162,6 +162,30 @@ namespace FoodFactoryGame.Goods
             (OnPerimeter(building, cellX, cellZ) && building.Doors.Any(x => x.X == cellX && x.Z == cellZ))
             || (IsPartition(building, cellX, cellZ) && HasStructure(building, GoodsWorld.DoorStructure, cellX, cellZ));
 
+        // A back door (decision 0037): a door whose record has the service role. Customers treat it as a wall.
+        public static bool IsServiceDoor(GoodsBuilding building, int cellX, int cellZ) =>
+            IsDoor(building, cellX, cellZ) && building.Structures?.Any(x => x != null && x.Kind == GoodsWorld.DoorStructure && x.X == cellX && x.Z == cellZ
+                && x.Role == GoodsWorld.ServiceDoorRole) == true;
+
+        // Every back door of a building.
+        public static IEnumerable<(int X, int Z)> ServiceDoors(GoodsBuilding building) =>
+            (building.Structures ?? new List<GoodsStructure>()).Where(x => x != null && x.Kind == GoodsWorld.DoorStructure && x.Role == GoodsWorld.ServiceDoorRole
+                && IsDoor(building, x.X, x.Z)).Select(x => (x.X, x.Z));
+
+        // The doorstep of a door on an outer wall: the one neighbour that is neither wall line nor interior (null for a door between
+        // two rooms, or a cell that opens nowhere). Footprint perimeter cells and free walls count as wall line, door cells included.
+        public static (int X, int Z)? Doorstep(GoodsBuilding building, int cellX, int cellZ)
+        {
+            (int X, int Z)? found = null;
+            foreach (var (x, z) in new[] { (cellX + 1, cellZ), (cellX - 1, cellZ), (cellX, cellZ + 1), (cellX, cellZ - 1) })
+            {
+                if (OnPerimeter(building, x, z) || IsPartition(building, x, z) || IsInterior(building, x, z)) continue;
+                if (found != null) return null;
+                found = (x, z);
+            }
+            return found;
+        }
+
         public static bool IsPartition(GoodsBuilding building, int cellX, int cellZ) =>
             HasStructure(building, GoodsWorld.PartitionStructure, cellX, cellZ);
 

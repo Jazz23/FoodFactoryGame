@@ -5,7 +5,7 @@
 // first added floor, runs through all of them and never holds equipment or belts. Floors are never removed.
 // A restaurant's owner may reshape its shell (decision 0034, GoodsWorld.Shell.cs): every piece of structure an order built is a
 // GoodsStructure carrying the cents it was charged, so removing it refunds exactly that; structure that came with the bought
-// building has no record and refunds nothing.
+// building has no record and refunds nothing. A door record may make its door a back door (decision 0037), which customers never use.
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -34,6 +34,9 @@ namespace FoodFactoryGame.Goods
         public string Style = "";
         // Whole cents charged when it was built, including any order fee assigned to it; refunded in full when it goes.
         public long ChargedCents;
+        // Doors only (decision 0037, schema v18): GoodsWorld.ServiceDoorRole for a back door (staff and goods only), empty for a
+        // customer door. A perimeter door without a record is a customer door.
+        public string Role = "";
     }
 
     [Serializable] public sealed class GoodsBuilding
@@ -78,6 +81,9 @@ namespace FoodFactoryGame.Goods
     {
         public const string RestaurantKind = "restaurant";
         public const string FactoryKind = "factory";
+        // A door's role (decision 0037): customers enter and leave only by customer doors (empty role); players and employees use
+        // either.
+        public const string ServiceDoorRole = "service";
         // Smallest shell with an interior: one cell inside a ring of walls.
         public const int MinimumBuildingSize = 3;
 
@@ -209,7 +215,10 @@ namespace FoodFactoryGame.Goods
             if (building.Kind != RestaurantKind || (building.WallStyle != "" && !WallStyles.Contains(building.WallStyle))) return "invalid-structure";
             foreach (var piece in building.Structures)
             {
-                if (piece == null || piece.ChargedCents < 0 || piece.Style == null) return "invalid-structure";
+                if (piece == null || piece.ChargedCents < 0 || piece.Style == null || piece.Role == null) return "invalid-structure";
+                // A back door is a door on an outer wall: it has a doorstep outside (decision 0037).
+                if (piece.Role != "" && (piece.Role != ServiceDoorRole || piece.Kind != DoorStructure || SiteGrid.Doorstep(building, piece.X, piece.Z) == null))
+                    return "invalid-structure";
                 var valid = piece.Kind switch
                 {
                     FloorStructure => !building.FreeWalls
