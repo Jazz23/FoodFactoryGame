@@ -147,14 +147,19 @@ namespace FoodFactoryGame.Goods
             return Commit(playerId, requestId, savePath, () => StartJob(playerId, requestId, stationId, recipeId));
         }
 
+        private List<(GoodsLot Lot, int Take)> InputPlan(GoodsStation station, RecipeDefinition recipe) => InputPlan(_state, station, recipe);
+
         // Most-exposed edible lots are consumed first; lot ID breaks ties so the choice is deterministic. Null if any input is short.
-        private List<(GoodsLot Lot, int Take)> InputPlan(GoodsStation station, RecipeDefinition recipe)
+        // Pure, so a client asks the same question of its baseline (decision 0038 readout); a view carries no reservations, so there
+        // every unit counts as available.
+        public static List<(GoodsLot Lot, int Take)> InputPlan(GoodsSnapshot state, GoodsStation station, RecipeDefinition recipe)
         {
+            int Available(GoodsLot lot) => lot.Quantity - state.Reservations.Where(x => x.Active && x.LotId == lot.Id).Sum(x => x.Quantity);
             var plan = new List<(GoodsLot Lot, int Take)>();
             foreach (var input in recipe.Inputs)
             {
                 var needed = input.Quantity;
-                var candidates = _state.Lots
+                var candidates = state.Lots
                     .Where(x => x.LocationId == station.InputLocationId && x.ItemId == input.ItemId
                         && x.OwnerId == station.SiteId && !x.Spoiled && Available(x) > 0)
                     .OrderByDescending(x => x.ExposureSeconds).ThenBy(x => x.Id, StringComparer.Ordinal);
@@ -225,7 +230,8 @@ namespace FoodFactoryGame.Goods
         {
             var company = _state.Companies.First(x => x.SiteIds.Contains(station.SiteId));
             if (company.Cash > long.MaxValue - job.SaleCents) return false;
-            TryCredit(company.Id, job.SaleCents);
+            TryCredit(company.Id, job.SaleCents, new CashNote(LedgerSale, station.SiteId, equipmentId: station.Id, offerId: job.RecipeId,
+                clockSeconds: Math.Min(_state.ClockSeconds, job.StartedAtSeconds + job.DurationSeconds)));
             _state.Jobs.Remove(job);
             return true;
         }

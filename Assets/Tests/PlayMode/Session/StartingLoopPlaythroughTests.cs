@@ -63,6 +63,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
         private string _output;
         private string _seed;
         private bool _devices;
+        private float _clockRate = 1f;
         private SessionRoot _root;
         private WorldLayoutPresenter _map;
         private StepRecord _current;
@@ -108,6 +109,18 @@ namespace FoodFactoryGame.Session.PlayModeTests
             public readonly Dictionary<string, string> LotItems = new();
         }
 
+        // Harness debugging only: a flag file line "clock=<rate>" runs the server clock that many times faster
+        // (GoodsNetworkBridge.ClockRate), so bakes, sales and trucks take less real time and S7 watches the same clock time in
+        // fewer real seconds. Recorded runs use 1; the record states any other rate.
+        private static float ClockRateFlag
+        {
+            get
+            {
+                var line = File.Exists(Flag) ? File.ReadAllLines(Flag).FirstOrDefault(x => x.StartsWith("clock=", StringComparison.Ordinal)) : null;
+                return line != null && float.TryParse(line.Substring(6), NumberStyles.Float, CultureInfo.InvariantCulture, out var rate) && rate > 0f ? rate : 1f;
+            }
+        }
+
         private static string Flag => Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Temp", "starting-loop.flag"));
 
         [UnitySetUp]
@@ -151,6 +164,8 @@ namespace FoodFactoryGame.Session.PlayModeTests
                     Application.logMessageReceivedThreaded -= OnLog;
                     LogAssert.ignoreFailingMessages = _ignoredFailingMessages;
                     _inputFixture.TearDown();
+                    _unfocused?.Dispose();
+                    _unfocused = null;
                 }
                 _setUp = false;
             }
@@ -172,6 +187,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
         {
             _devices = devices;
             _seed = seed;
+            _clockRate = ClockRateFlag;
             // A flag file line "folder=<name>" writes the records to docs/verification/<name>/ instead (later evidence runs).
             var folder = File.ReadAllLines(Flag).FirstOrDefault(x => x.StartsWith("folder=", StringComparison.Ordinal))?.Substring(7) ?? RunFolder;
             _output = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "docs", "verification", folder, $"pass-{(devices ? "i" : "r")}-{seed}"));
@@ -249,6 +265,8 @@ namespace FoodFactoryGame.Session.PlayModeTests
                     stack.Pop();
                     continue;
                 }
+                // Every frame, so a restarted server (S13) gets the rate back.
+                if (_clockRate != 1f && _root != null && Bridge != null && Bridge.IsServerStarted) Bridge.ClockRate = _clockRate;
                 if (yielded is IEnumerator nested)
                 {
                     stack.Push(nested);
@@ -593,7 +611,8 @@ namespace FoodFactoryGame.Session.PlayModeTests
             var frames = new List<float>();
             var presenter = UnityEngine.Object.FindAnyObjectByType<CustomerPresenter>();
             var nextSample = 0f;
-            while (Time.realtimeSinceStartup - began < SalesWatchSeconds)
+            var watch = SalesWatchSeconds / _clockRate;
+            while (Time.realtimeSinceStartup - began < watch)
             {
                 var now = Time.realtimeSinceStartup - began;
                 if (frames.Count < 300) frames.Add(Time.unscaledDeltaTime);
@@ -623,7 +642,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
             var end = Server;
             var sales = Served(end, site) - served0;
             var cash = end.Companies.Single().Cash - cash0;
-            Note($"watched {SalesWatchSeconds:F0} real s = {end.ClockSeconds - clockBegan} clock s");
+            Note($"watched {watch:F0} real s = {end.ClockSeconds - clockBegan} clock s (clock x{_clockRate:0.##})");
             Note($"first arrival {Show(firstArrival)}, first sale {Show(firstSale)}, first seated diner {Show(firstSeat)} (real s after staffing)");
             Note($"customers that chose this restaurant {arrivals.Count}, sales {sales}, walk-outs {WalkedOut(end, site) - walked0}");
             Note($"cash delta {Cash(cash)}; sales x {Cash(Sale.SaleCents)} = {Cash(sales * Sale.SaleCents)}");
@@ -634,7 +653,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
                 yield return Capture("s7-no-customer-inside");
                 yield return CaptureOverview("s7-overview", Start.SiteId);
             }
-            Expect(sales > 0, "no sale in 10 real minutes");
+            Expect(sales > 0, $"no sale in {watch:F0} real s");
         }
 
         private static string Show(float? seconds) => seconds.HasValue ? $"{seconds.Value:F0} s" : "never";
@@ -1136,6 +1155,9 @@ namespace FoodFactoryGame.Session.PlayModeTests
                 var ledger = now.Cash + now.Charged - prev.Cash - prev.Charged;
                 if (ledger != revenue - spend)
                     problems.Add($"cash+charges moved {Cash(ledger)}, explained {Cash(revenue - spend)} (sales {sales}, packs {packs}, other spend)");
+                // The cash ledger (decision 0038): opening + carried + kept entries == cash, for every company.
+                foreach (var company in state.Companies.Where(x => !GoodsWorld.LedgerBalances(state, x)))
+                    problems.Add($"ledger of {company.Id} does not balance its cash");
                 // Bakes: dough becomes bread one for one per the oven recipe.
                 var input0 = Bake.Inputs[0];
                 var residual = now.Units.Keys.Union(prev.Units.Keys).Union(expected.Keys)
@@ -1233,6 +1255,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
             text.AppendLine($"# P0 {(_devices ? "Pass I (simulated input)" : "Pass R (requests)")}, seed `{_seed}`");
             text.AppendLine();
             text.AppendLine($"Run {DateTime.UtcNow:u}; isolated save `{_directory}`; Unity {Application.unityVersion}; screen {Screen.width}x{Screen.height}.");
+            if (_clockRate != 1f) text.AppendLine($"**Debug run: server clock x{_clockRate:0.##} (flag `clock=`); not an acceptance run.**");
             text.AppendLine();
             text.AppendLine("| Step | Action | Result | Seconds | Notes |");
             text.AppendLine("|---|---|---|---|---|");

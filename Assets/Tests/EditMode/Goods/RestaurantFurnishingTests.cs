@@ -89,6 +89,9 @@ namespace FoodFactoryGame.Goods.Tests
             Assert.That((bought.Accepted, bought.Cents, bought.EquipmentId), Is.EqualTo((true, 12000L, Placed("tables"))));
             Assert.That(_world.Snapshot().Equipment.Where(x => x.Kind == GoodsWorld.TableKind).Select(x => x.ChargedCents), Is.All.EqualTo(4000));
             Assert.That(Cash, Is.EqualTo(StartCash - 12000));
+            var entry = _world.Snapshot().Ledger.Last();
+            Assert.That((entry.Kind, entry.Cents, entry.RequestId, entry.EquipmentId, entry.OfferId),
+                Is.EqualTo((GoodsWorld.LedgerFurnish, -12000L, "tables", Placed("tables"), "table")), "One ledger entry for the order (decision 0038).");
 
             var before = JsonUtility.ToJson(_world.Snapshot());
             Assert.That(Furnish("overlap", "table", (4, 4, 0), (4, 4, 0)).Reason, Is.EqualTo("blocked"), "Pieces of one order see each other.");
@@ -133,6 +136,9 @@ namespace FoodFactoryGame.Goods.Tests
             Assert.That(state.Lots.Single(x => x.Id == "bread").LocationId, Is.EqualTo("carried:chef"), "The goods keep their ID and move to the seller.");
             Assert.That(state.Locations.Any(x => x.Id.StartsWith(register, StringComparison.Ordinal)), Is.False);
             Assert.That(Cash, Is.EqualTo(StartCash), "A full refund.");
+            var refund = state.Ledger.Last();
+            Assert.That((refund.Kind, refund.Cents, refund.RequestId, refund.EquipmentId), Is.EqualTo((GoodsWorld.LedgerSellBack, 5000L, "sell", register)),
+                "The refund's ledger entry (decision 0038).");
 
             // Goods that do not fit block the sale.
             Assert.That(Furnish("register-2", "register", (4, 4, 0)).Accepted, Is.True);

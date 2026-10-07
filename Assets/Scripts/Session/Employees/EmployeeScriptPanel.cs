@@ -98,10 +98,6 @@ namespace FoodFactoryGame.Session.Employees
             var root = document.rootVisualElement;
             root.Clear();
             _window = new VisualElement { name = "employee-script" };
-            _window.style.position = Position.Absolute;
-            _window.style.left = new Length(50, LengthUnit.Percent);
-            _window.style.top = new Length(50, LengthUnit.Percent);
-            _window.style.translate = new Translate(new Length(-50, LengthUnit.Percent), new Length(-50, LengthUnit.Percent));
             _window.style.width = 640;
             _window.style.backgroundColor = Backdrop;
             _window.style.paddingLeft = _window.style.paddingRight = 12;
@@ -178,7 +174,7 @@ namespace FoodFactoryGame.Session.Employees
             reference.style.whiteSpace = WhiteSpace.Normal;
             _window.Add(reference);
 
-            root.Add(_window);
+            root.Add(CentredWindow.Overlay("employee-script-overlay", _window));
             _window.style.display = DisplayStyle.None;
             ShowAssistant(false);
         }

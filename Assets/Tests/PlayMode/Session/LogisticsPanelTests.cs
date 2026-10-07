@@ -15,6 +15,7 @@ using FoodFactoryGame.Session.Logistics;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.LowLevel;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using UnityEngine.UIElements;
@@ -157,6 +158,114 @@ namespace FoodFactoryGame.Session.PlayModeTests
             interaction.OpenMachine(DevWorld.DockId);
             yield return Until(() => hud.ScreenRoot.Q<Label>("hud-dock-trucks") != null, "dock screen");
             Assert.That(hud.ScreenRoot.Q<Label>("hud-dock-trucks").text, Is.EqualTo("Truck 1: delivers here"));
+        }
+
+        // P0-01: after the window grows (a bought truck, a new route), a truck card's route arrows and Assign take pointer picks
+        // where they are drawn and stay inside the card, also when the window is squeezed narrow; the virtual mouse then picks a
+        // route and assigns it.
+        [UnityTest]
+        public IEnumerator TruckCardControlsTakeThePointerAfterTheWindowGrows()
+        {
+            var panel = UnityEngine.Object.FindAnyObjectByType<LogisticsPanel>();
+            var interaction = UnityEngine.Object.FindAnyObjectByType<EquipmentInteraction>();
+            var mouse = InputSystem.AddDevice<Mouse>();
+            Assert.That(_root.Begin(SessionMode.Host), Is.True);
+            yield return Until(() => _root.ClientSite != null && _root.ClientSubscription.Bridge != null, "host dev-site baseline");
+            yield return Until(() =>
+            {
+                if (interaction.Screen == InteractionScreen.None) interaction.ToggleLogistics();
+                return interaction.Screen == InteractionScreen.Logistics;
+            }, "logistics screen open");
+            yield return null;
+            panel.BuyTruck(_root.Offers.Single(x => x != null && x.Truck != null).Id);
+            yield return Until(() => !panel.HasPendingRequests && _root.ClientSite.Trucks.Count == 2, "truck bought");
+            var truckId = _root.ClientSite.Trucks.Single(x => x.Id != DevWorld.TruckId).Id;
+            panel.CycleDraft(LogisticsPanel.NewRouteKey, LogisticsPanel.PickupField, 1);
+            panel.CycleDraft(LogisticsPanel.NewRouteKey, LogisticsPanel.DropoffField, 1);
+            panel.CycleDraft(LogisticsPanel.NewRouteKey, LogisticsPanel.DropoffField, 1);
+            panel.CreateRoute();
+            yield return Until(() => !panel.HasPendingRequests && _root.ClientSite.Routes.Count == 2, "route created");
+            var routeId = _root.ClientSite.Routes.Single(x => x.Id != DevWorld.RouteId).Id;
+            yield return Until(() => panel.Window.Q($"logistics-route-{routeId}") != null, "route card");
+            for (var frame = 0; frame < 3; frame++) yield return null;
+
+            VisualElement Card() => panel.Window.Q($"logistics-truck-{truckId}");
+            Button[] Controls() => Card().Query<Button>().ToList().ToArray();
+            void AssertReachable(string when)
+            {
+                var card = Card();
+                Assert.That(Controls().Length, Is.EqualTo(3), "<, > and Assign.");
+                foreach (var button in Controls())
+                {
+                    var bounds = button.worldBound;
+                    var picked = card.panel.Pick(bounds.center);
+                    Assert.That(picked == button || button.Contains(picked), Is.True,
+                        $"{when}: '{button.text}' at {bounds} picks '{picked?.name}' {picked?.worldBound}");
+                    Assert.That(bounds.xMin >= card.worldBound.xMin - 0.5f && bounds.xMax <= card.worldBound.xMax + 0.5f, Is.True,
+                        $"{when}: '{button.text}' {bounds} outside its card {card.worldBound}");
+                }
+            }
+            AssertReachable("full width");
+
+            // A narrow screen: the overlay that centres the window is narrowed, so the window and its columns shrink.
+            var overlay = panel.Window.parent;
+            overlay.style.right = StyleKeyword.Auto;
+            overlay.style.width = 820;
+            for (var frame = 0; frame < 3; frame++) yield return null;
+            Assert.That(panel.Window.worldBound.width, Is.LessThanOrEqualTo(820.5f), "The window stays on the narrow screen.");
+            AssertReachable("narrow");
+            overlay.style.width = StyleKeyword.Null;
+            overlay.style.right = 0;
+            for (var frame = 0; frame < 3; frame++) yield return null;
+
+            IEnumerator MouseClick(Button button)
+            {
+                var origin = RuntimePanelUtils.ScreenToPanel(button.panel, Vector2.zero);
+                var unit = RuntimePanelUtils.ScreenToPanel(button.panel, Vector2.one) - origin;
+                var centre = button.worldBound.center;
+                var screen = new Vector2((centre.x - origin.x) / unit.x, UnityEngine.Screen.height - (centre.y - origin.y) / unit.y);
+                InputSystem.QueueStateEvent(mouse, new MouseState { position = screen });
+                for (var frame = 0; frame < 2; frame++) yield return null;
+                InputSystem.QueueStateEvent(mouse, new MouseState { position = screen }.WithButton(UnityEngine.InputSystem.LowLevel.MouseButton.Left));
+                for (var frame = 0; frame < 3; frame++) yield return null;
+                InputSystem.QueueStateEvent(mouse, new MouseState { position = screen });
+                for (var frame = 0; frame < 3; frame++) yield return null;
+            }
+
+            // The virtual mouse must reach the panel whether or not the Editor has focus.
+            var unfocused = new UnfocusedUiInput();
+            try
+            {
+                // Options: Parked, then the routes by ID; > reaches the new one.
+                var presses = 1 + _root.ClientSite.Routes.Select(x => x.Id).OrderBy(x => x, StringComparer.Ordinal).ToList().IndexOf(routeId);
+                var value = panel.Window.Q<Label>($"logistics-route-value-{truckId}");
+                for (var press = 0; press < presses; press++)
+                {
+                    var before = value.text;
+                    var target = Controls()[1];
+                    var seen = new System.Collections.Generic.List<string>();
+                    target.RegisterCallback<PointerDownEvent>(e => seen.Add("down " + e.position), TrickleDown.TrickleDown);
+                    target.RegisterCallback<PointerMoveEvent>(e => seen.Add("move " + e.position), TrickleDown.TrickleDown);
+                    panel.Window.RegisterCallback<PointerDownEvent>(e => seen.Add("window down " + e.position + " target " + (e.target as VisualElement)?.name), TrickleDown.TrickleDown);
+                    yield return MouseClick(target);
+                    value = panel.Window.Q<Label>($"logistics-route-value-{truckId}");
+                    Assert.That(value.text, Is.Not.EqualTo(before), $"> press {press + 1} changed the route choice. DIAG focused={Application.isFocused} current={Mouse.current == mouse} pos={mouse.position.ReadValue()} target={target.worldBound} screen={UnityEngine.Screen.width}x{UnityEngine.Screen.height} bg={InputSystem.settings.backgroundBehavior} editor={InputSystem.settings.editorInputBehaviorInPlayMode} events=[{string.Join("; ", seen)}]");
+                }
+                AssertReachable("after choosing");
+                var assign = panel.Window.Q<Button>($"logistics-assign-{truckId}");
+                Assert.That((assign.text, assign.enabledSelf), Is.EqualTo(("Assign", true)));
+                yield return MouseClick(assign);
+                yield return Until(() => !panel.HasPendingRequests, "assignment answered");
+                Assert.That(panel.LastRejection, Is.Null);
+                Assert.That(_root.ServerWorld.Snapshot().Trucks.Single(x => x.Id == truckId).RouteId, Is.EqualTo(routeId),
+                    "The pointer assigned the truck to the new route.");
+            }
+            finally
+            {
+                InputSystem.RemoveDevice(mouse);
+                unfocused.Dispose();
+                interaction.CloseScreen();
+            }
         }
     }
 }

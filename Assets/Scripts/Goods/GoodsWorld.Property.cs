@@ -120,7 +120,7 @@ namespace FoodFactoryGame.Goods
                 if (_state.Companies.First(x => x.Id == company).Cash < offer.PriceCents) return Reject("insufficient-funds");
 
                 // All checks precede this single locked mutation.
-                TryDebit(company, offer.PriceCents);
+                TryDebit(company, offer.PriceCents, new CashNote(LedgerProperty, payingSiteId, requestId, offerId: lotId));
                 var teammates = Teammates(company);
                 CreateProperty(offer, company);
                 PlaceStarterDock(offer);

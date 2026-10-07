@@ -52,10 +52,6 @@ namespace FoodFactoryGame.Session.WorldMap
             var root = document.rootVisualElement;
             root.Clear();
             _window = new VisualElement { name = "property" };
-            _window.style.position = Position.Absolute;
-            _window.style.left = new Length(50, LengthUnit.Percent);
-            _window.style.top = new Length(50, LengthUnit.Percent);
-            _window.style.translate = new Translate(new Length(-50, LengthUnit.Percent), new Length(-50, LengthUnit.Percent));
             _window.style.width = 340;
             _window.style.backgroundColor = Backdrop;
             _window.style.paddingLeft = _window.style.paddingRight = _window.style.paddingTop = _window.style.paddingBottom = 10;
@@ -89,7 +85,7 @@ namespace FoodFactoryGame.Session.WorldMap
             close.style.minWidth = 70;
             buttons.Add(close);
             _window.Add(buttons);
-            root.Add(_window);
+            root.Add(CentredWindow.Overlay("property-overlay", _window));
             _window.style.display = DisplayStyle.None;
         }
 

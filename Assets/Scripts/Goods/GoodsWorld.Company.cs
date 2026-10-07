@@ -14,6 +14,11 @@ namespace FoodFactoryGame.Goods
         // Whole cents.
         public long Cash;
         public List<string> SiteIds = new();
+        // Ledger (decision 0038, v20): the cash the company was created with, the sum of entries no longer kept (in a save
+        // upgraded from v19, all cash before the ledger), and the number of its last entry.
+        public long OpeningCents;
+        public long LedgerCarriedCents;
+        public long LedgerNextNumber;
     }
 
     public sealed partial class GoodsWorld
@@ -29,7 +34,12 @@ namespace FoodFactoryGame.Goods
                     || company.SiteIds.Distinct().Count() != company.SiteIds.Count
                     || company.SiteIds.Any(x => _state.Companies.Any(y => y.SiteIds.Contains(x))))
                     throw new ArgumentException("Invalid or duplicate company, or a site that does not exist or is already owned.");
-                _state.Companies.Add(JsonUtility.FromJson<GoodsCompany>(JsonUtility.ToJson(company)));
+                var added = JsonUtility.FromJson<GoodsCompany>(JsonUtility.ToJson(company));
+                // Its starting cash opens the ledger; nothing has been recorded yet.
+                added.OpeningCents = added.Cash;
+                added.LedgerCarriedCents = 0;
+                added.LedgerNextNumber = 0;
+                _state.Companies.Add(added);
                 InvalidateDiners();
                 _state.Revision++;
             }
@@ -58,29 +68,34 @@ namespace FoodFactoryGame.Goods
             {
                 if (_state.Companies.All(x => x.Id != companyId)) return "unknown-company";
                 if (delta == 0 || delta == long.MinValue) return "invalid-amount";
+                var note = new CashNote(LedgerAdjustment, "");
                 return Durably(savePath,
-                    () => (delta > 0 ? TryCredit(companyId, delta) : TryDebit(companyId, -delta)) ? null : "insufficient-funds",
+                    () => (delta > 0 ? TryCredit(companyId, delta, note) : TryDebit(companyId, -delta, note)) ? null : "insufficient-funds",
                     () => "persistence-unavailable");
             }
         }
 
-        // Call only under _gate, inside a commit. Overflow throws (checked) rather than wrapping.
-        private bool TryCredit(string companyId, long cents)
+        // Call only under _gate, inside a commit. Overflow throws (checked) rather than wrapping. Adds the ledger entry in the same
+        // mutation (decision 0038).
+        private bool TryCredit(string companyId, long cents, CashNote note)
         {
             var company = _state.Companies.FirstOrDefault(x => x.Id == companyId);
             if (company is null || cents <= 0) return false;
             checked { company.Cash += cents; }
             _state.Revision++;
+            AddLedgerEntry(company, cents, note);
             return true;
         }
 
-        // Call only under _gate, inside a commit. Refuses rather than letting the balance go below zero.
-        private bool TryDebit(string companyId, long cents)
+        // Call only under _gate, inside a commit. Refuses rather than letting the balance go below zero. Adds the ledger entry in
+        // the same mutation (decision 0038).
+        private bool TryDebit(string companyId, long cents, CashNote note)
         {
             var company = _state.Companies.FirstOrDefault(x => x.Id == companyId);
             if (company is null || cents <= 0 || company.Cash < cents) return false;
             company.Cash -= cents;
             _state.Revision++;
+            AddLedgerEntry(company, -cents, note);
             return true;
         }
 
@@ -94,6 +109,7 @@ namespace FoodFactoryGame.Goods
                 // A sale in progress must have a company to pay when it completes.
                 || state.Jobs.Where(x => x.IsSale).Any(x => !owned.Contains(state.Stations.First(y => y.Id == x.StationId).SiteId)))
                 throw new InvalidOperationException("Goods snapshot violates company invariants.");
+            ValidateLedger(state);
         }
     }
 }

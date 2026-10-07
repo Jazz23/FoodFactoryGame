@@ -78,7 +78,7 @@ namespace FoodFactoryGame.Goods
 
     [Serializable] public sealed class GoodsSnapshot
     {
-        public const int CurrentSchema = 19;
+        public const int CurrentSchema = 20;
         public int SchemaVersion = CurrentSchema;
         public string WorldId;
         public long ClockSeconds;
@@ -112,6 +112,8 @@ namespace FoodFactoryGame.Goods
         public long CustomerRandom;
         // Bought generated buildings (decision 0028, v14): which company owns which lot's site. Never removed.
         public List<GoodsProperty> Properties = new();
+        // Every company's latest cash changes (decision 0038, v20), oldest first; a view carries only its company's.
+        public List<GoodsLedgerEntry> Ledger = new();
     }
 
     public sealed partial class GoodsWorld
@@ -303,6 +305,8 @@ namespace FoodFactoryGame.Goods
                 view.Belts = view.Belts.Where(x => x.SiteId == siteId).ToList();
                 view.Buildings = view.Buildings.Where(x => x.SiteId == siteId).ToList();
                 view.Companies = view.Companies.Where(x => x.SiteIds.Contains(siteId)).ToList();
+                // The ledger reaches only the players of the company that owns the site (decision 0038).
+                view.Ledger = view.Ledger.Where(x => view.Companies.Any(y => y.Id == x.CompanyId)).ToList();
                 // Scripts reach clients through the employee object, not with every baseline.
                 view.Employees = view.Employees.Where(x => x.SiteId == siteId).ToList();
                 foreach (var employee in view.Employees) employee.Script = "";
@@ -643,7 +647,7 @@ namespace FoodFactoryGame.Goods
                 || state.Stations == null || state.Jobs == null || state.Equipment == null || state.SiteLayouts == null || state.Belts == null
                 || state.Companies == null || state.Buildings == null || state.Employees == null || state.Sites == null || state.Trucks == null
                 || state.Routes == null || state.Districts == null || state.Competitors == null || state.Customers == null
-                || state.Diners == null || state.Properties == null)
+                || state.Diners == null || state.Properties == null || state.Ledger == null)
                 throw new InvalidOperationException("Unsupported or invalid goods snapshot schema.");
             if (state.Locations.Any(x => x == null || string.IsNullOrWhiteSpace(x.Id) || string.IsNullOrWhiteSpace(x.SiteId) || x.Capacity < 1)
                 || state.Locations.GroupBy(x => x.Id).Any(x => x.Count() != 1)

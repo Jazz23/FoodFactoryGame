@@ -311,6 +311,8 @@ namespace FoodFactoryGame.Session.PlayModeTests
             Assert.That(_results["route"].Accepted && _results["truck-1"].Accepted && _results["truck-2"].Accepted, Is.True);
             var route = GoodsWorld.RouteIdFor(_root.Authenticator.LocalPlayerId, "route");
             _root.ServerWorld.Bootstrap(new GoodsLot { Id = "test-crates", ItemId = "crate", OwnerId = Start.SiteId, LocationId = pickup + ":in", Quantity = 8, SpoilAfterSeconds = 1_000_000 });
+            // TEST-ONLY: trucks drive ten times faster; the dock rule is checked on every server snapshot, one clock second at a time.
+            bridge.ClockRate = 10f;
             bridge.RequestAssignTruck("assign-1", $"buy:{_root.Authenticator.LocalPlayerId}:truck-1", route);
             bridge.RequestAssignTruck("assign-2", $"buy:{_root.Authenticator.LocalPlayerId}:truck-2", route);
             var docked = 0;

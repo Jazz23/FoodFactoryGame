@@ -31,6 +31,12 @@ namespace FoodFactoryGame.Goods.Network
         private string _savePath;
         private bool _persistenceFailed;
 
+        // TEST-ONLY: simulated seconds per real second on the server (1 in the game). Tests that only wait on the clock (bakes,
+        // customers, trucks) raise it to finish sooner; the rules are unchanged because a step of several seconds equals that
+        // many one-second steps. Reset to 1 when the server stops. Saves stay every CommitIntervalSeconds of clock time, so
+        // they come sooner in real time; the stats line keeps real time.
+        public float ClockRate { get; set; } = 1f;
+
         public event Action<GoodsOutcome> ResultReceived;
         public event Action<GoodsSnapshot> SiteReceived;
         // The customers at competitors near this client's avatar (decision 0033); presentation only.
@@ -72,6 +78,7 @@ namespace FoodFactoryGame.Goods.Network
             _statsRemainder = 0;
             _persistenceFailed = false;
             _serverEpoch = 0;
+            ClockRate = 1f;
         }
 
         public override void OnStopClient()
@@ -102,7 +109,7 @@ namespace FoodFactoryGame.Goods.Network
                 _statsRemainder = 0;
                 Debug.Log(GoodsSnapshotStore.Stats.Summary());
             }
-            _clockRemainder += Time.unscaledDeltaTime;
+            _clockRemainder += Time.unscaledDeltaTime * ClockRate;
             if (_clockRemainder < 1f) return;
             // While a commit is failing the clock waits, so memory never runs more than one interval ahead of the save.
             if (_persistenceFailed && !TryCommit()) return;

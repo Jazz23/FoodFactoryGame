@@ -23,6 +23,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
+using UnityEngine.UIElements;
 
 namespace FoodFactoryGame.Session.PlayModeTests
 {
@@ -726,6 +727,8 @@ namespace FoodFactoryGame.Session.PlayModeTests
             _root.ClientSubscription.ResultReceived += x => results[x.RequestId] = x;
             var me = _root.Authenticator.LocalPlayerId;
             var bridge = _root.ClientSubscription.Bridge;
+            // TEST-ONLY: the clock runs ten times faster; this test waits only on clock time and checks no exact interim value.
+            bridge.ClockRate = 10f;
             var inventory = GoodsWorld.InventoryLocationId(me);
             var startCash = _root.ClientSite.Companies.Single().Cash;
 
@@ -807,6 +810,76 @@ namespace FoodFactoryGame.Session.PlayModeTests
 
         // TEST-ONLY expectation from the supplier content: one oven ($150.00) and one pack of dough ($2.50); bread sells for $2.50.
         private const long SupplierSpend = 15000 + 250;
+
+        // Decision 0038 in a generated world: with no screen open the HUD says why the starting restaurant cannot sell (its register
+        // unstaffed, then empty), and the register screen says the same; with bread in it (TEST-ONLY seeding) it reads open. The
+        // ledger tab lists a supplier purchase and then a sale (TEST-ONLY district) as they happen. The readout writes nothing.
+        [UnityTest]
+        public IEnumerator TheHudSaysWhyTheRestaurantCannotSellAndTheLedgerFollowsCash()
+        {
+            yield return StartHost();
+            var hud = UnityEngine.Object.FindAnyObjectByType<PlayerHud>();
+            var interaction = UnityEngine.Object.FindAnyObjectByType<EquipmentInteraction>();
+            var results = new System.Collections.Generic.Dictionary<string, GoodsOutcome>();
+            _root.ClientSubscription.ResultReceived += x => results[x.RequestId] = x;
+            var me = _root.Authenticator.LocalPlayerId;
+            var bridge = _root.ClientSubscription.Bridge;
+            // TEST-ONLY: the clock runs ten times faster; this test waits only on clock time and checks no exact interim value.
+            bridge.ClockRate = 10f;
+            var line = hud.ScreenRoot.panel.visualTree.Q<Label>("hud-readiness");
+            yield return Until(() => hud.Readiness != null, "the readout");
+            Assert.That((hud.Readiness.Blocker, hud.Readiness.ReachableRegisters), Is.EqualTo((RestaurantReadiness.NoStaffedRegister, 1)));
+            Assert.That(hud.ReadinessText, Does.StartWith("Not selling: nobody works a register"));
+            Assert.That(line.resolvedStyle.display, Is.EqualTo(DisplayStyle.Flex), "Shown with no screen open.");
+
+            bridge.RequestStaff("staff", GeneratedWorld.StartCounterId, me);
+            yield return Until(() => results.ContainsKey("staff"), "staffing the register");
+            Assert.That(results["staff"].Accepted, Is.True, results["staff"].Reason);
+            yield return Until(() => hud.Readiness?.Blocker == RestaurantReadiness.NoEdibleMenuItem, "the empty-register blocker");
+            Assert.That(hud.ReadinessText, Does.StartWith("Not selling: no Bread in a worked register"));
+            interaction.OpenMachine(GeneratedWorld.StartCounterId);
+            yield return Until(() => hud.ScreenRoot.Q<Label>("hud-register-readiness") != null, "the register screen");
+            Assert.That(hud.ScreenRoot.Q<Label>("hud-register-readiness").text, Does.StartWith("Restaurant not selling: no Bread"));
+            Assert.That(hud.ScreenRoot.Q<Label>("hud-progress-label").text, Does.StartWith("Nothing to sell: put edible Bread in the input"),
+                "P0-05: an empty register says so.");
+            yield return null;
+            Assert.That(line.resolvedStyle.display, Is.EqualTo(DisplayStyle.None), "The world line hides while a screen is open.");
+            interaction.CloseScreen();
+
+            // A purchase reaches the ledger tab.
+            bridge.RequestPurchase("buy-dough", Start.SiteId, "supplier-dough-5");
+            yield return Until(() => results.ContainsKey("buy-dough"), "the purchase");
+            Assert.That(results["buy-dough"].Accepted, Is.True, results["buy-dough"].Reason);
+            yield return Until(() => _root.ClientSite.Ledger.Any(x => x.Kind == GoodsWorld.LedgerSupplierGoods && x.RequestId == "buy-dough"), "the purchase in the ledger");
+            var purchase = _root.ClientSite.Ledger.Single(x => x.RequestId == "buy-dough");
+            Assert.That(purchase.Cents, Is.EqualTo(-250));
+            interaction.ToggleInventory();
+            yield return Until(() => hud.ScreenRoot.Q<Button>("hud-tab-ledger") != null, "the inventory screen with its tabs");
+            hud.ShowLedger(true);
+            yield return Until(() => hud.ScreenRoot.Q($"hud-ledger-row-{purchase.Id}") != null, "the purchase row");
+
+            // TEST-ONLY: bread in the register and a busy district on the starting site, so a customer buys within seconds.
+            _root.ServerWorld.Bootstrap(new GoodsLot
+            {
+                Id = "test-bread", ItemId = "bread", OwnerId = Start.SiteId, LocationId = GeneratedWorld.StartCounterId + ":in", Quantity = 5, SpoilAfterSeconds = 3600
+            });
+            yield return Until(() => hud.Readiness?.Ready == true, "the open restaurant");
+            Assert.That(hud.ReadinessText, Does.StartWith("Open: "));
+            var map = _root.ServerWorld.Snapshot().Sites.Single(x => x.Id == Start.SiteId);
+            _root.ServerWorld.Bootstrap(new GoodsDistrict
+            {
+                Id = "test-district", Name = "Test", MapX = map.MapX, MapZ = map.MapZ, CustomersPerHour = 720, WealthPercent = 40,
+                AppearanceVariants = 1, LikedCuisines = { "bakery" }, DineInPercent = 0, RangeMetres = 5
+            });
+            yield return Until(() => _root.ClientSite.Ledger.Any(x => x.Kind == GoodsWorld.LedgerSale), "a sale in the ledger", 60f);
+            var sale = _root.ClientSite.Ledger.First(x => x.Kind == GoodsWorld.LedgerSale);
+            Assert.That((sale.Cents, sale.SiteId, sale.EquipmentId), Is.EqualTo((250L, Start.SiteId, GeneratedWorld.StartCounterId)));
+            yield return Until(() => hud.ScreenRoot.Q($"hud-ledger-row-{sale.Id}") != null, "the sale row");
+            Assert.That(hud.Readiness.RecentSales, Is.GreaterThanOrEqualTo(1));
+            var server = _root.ServerWorld.Snapshot();
+            Assert.That(server.Companies.All(x => GoodsWorld.LedgerBalances(server, x)), Is.True, "Opening + carried + entries == cash.");
+            interaction.CloseScreen();
+        }
 
         private static bool PathPassesNear(UnityEngine.AI.NavMeshPath path, System.Collections.Generic.List<Vector3> points, float distance)
         {

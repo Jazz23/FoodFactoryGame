@@ -1,0 +1,13 @@
+v19 -> v20 upgrade dry run (2026-10-07)
+
+Source: a real schema-v19 world.db made with the pre-ledger build in an isolated play session (WorldGen, seed piece-two,
+isolated temp save; a property and a truck bought), copied to the session scratchpad; the dry run used a second copy.
+The application database was never opened.
+
+Before load: sha256 2a9ae8194aaaf233284322bf657382759525dc9248c33569852ccd8904f09da8 (world.db, 626,688 bytes)
+Load: GoodsSnapshotStore.Load(copy) in the Editor (eval), new build (schema 20). No commit was made.
+Result: schema=20 revision=239 ledger=0
+        company-1 cash=95835000 opening=0 carried=95835000 next=0 balances=True
+        lots=3 equipment=4 trucks=1 properties=2 hasUncommitted=False
+After load: sha256 2a9ae8194aaaf233284322bf657382759525dc9248c33569852ccd8904f09da8 (unchanged; upgrade is in memory only,
+written as v20 only by the next commit)

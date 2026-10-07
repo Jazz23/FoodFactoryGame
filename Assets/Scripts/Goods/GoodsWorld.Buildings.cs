@@ -152,7 +152,7 @@ namespace FoodFactoryGame.Goods
                 if (_state.Companies.First(x => x.Id == company).Cash < price) return Reject("insufficient-funds");
 
                 // All checks precede this single locked mutation.
-                TryDebit(company, price);
+                TryDebit(company, price, new CashNote(LedgerFloor, building.SiteId, requestId));
                 if (!building.HasElevator)
                 {
                     building.ElevatorX = elevatorX;

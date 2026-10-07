@@ -82,6 +82,8 @@ namespace FoodFactoryGame.Goods.Tests
             var loaded = GoodsSnapshotStore.Load(PathForSave).Snapshot();
             Assert.That((loaded.Buildings.Single(x => x.Id == "factory").Floors, loaded.Companies.Single().Cash), Is.EqualTo((2, 3000 - FloorPrice)),
                 "Floor and payment commit together.");
+            var entry = loaded.Ledger.Single();
+            Assert.That((entry.Kind, entry.Cents, entry.RequestId), Is.EqualTo((GoodsWorld.LedgerFloor, -(long)FloorPrice, "floor-d")), "With its ledger entry (decision 0038).");
         }
 
         [Test]

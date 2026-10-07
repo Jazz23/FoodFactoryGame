@@ -111,6 +111,17 @@ namespace FoodFactoryGame.Goods
             return Touches(reached, piece.CellX, piece.CellZ, width, depth);
         }
 
+        // The cells customers reach on a site: from the lot's street edge (every edge of a dev site), never through a back door
+        // (decision 0037). The customer simulation and the client's readiness readout both use this.
+        public static HashSet<(int X, int Z)> CustomerReach(GoodsSnapshot state, string siteId, PropertyOffer offer) =>
+            Reached(Walkable(state, siteId, customers: true), StreetCells(state.SiteLayouts.FirstOrDefault(x => x.SiteId == siteId), offer));
+
+        // A register or table serves customers when it stands on the ground floor beside a cell they reach (decision 0034).
+        public static bool ServesCustomers(HashSet<(int X, int Z)> reach, GoodsEquipment piece) => piece.Level == 0 && Touches(reach, piece);
+
+        // A sale recipe sold at registers (decision 0024): the restaurant's menu.
+        public static bool IsMenuItem(RecipeDefinition recipe) => recipe != null && recipe.IsSale && recipe.StationKind == GoodsWorld.CounterKind;
+
         // A site holds a restaurant when one of its shells is a restaurant; its docks follow the restaurant dock rules.
         public static bool IsRestaurantSite(GoodsSnapshot state, string siteId) =>
             state.Buildings?.Any(x => x.SiteId == siteId && x.Kind == GoodsWorld.RestaurantKind) == true;

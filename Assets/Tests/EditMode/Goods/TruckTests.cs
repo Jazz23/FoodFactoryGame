@@ -343,6 +343,9 @@ namespace FoodFactoryGame.Goods.Tests
             Assert.That(Cash(), Is.EqualTo(25_000));
             Assert.That(_world.BuyDurably("boss", "buy-1", "shop", "van-offer", PathForSave).Revision, Is.EqualTo(bought.Revision), "Replayed.");
             Assert.That(Cash(), Is.EqualTo(25_000), "Charged once.");
+            var entry = _world.Snapshot().Ledger.Single(x => x.Kind == GoodsWorld.LedgerTruck);
+            Assert.That((entry.Cents, entry.SiteId, entry.RequestId, entry.EquipmentId, entry.OfferId), Is.EqualTo((-25_000L, "shop", "buy-1", "buy:boss:buy-1", "van-offer")),
+                "One ledger entry, also after the replay (decision 0038).");
 
             // It works like any other truck.
             Assert.That(Create().Accepted, Is.True);

@@ -26,7 +26,7 @@ using UnityEngine.UIElements;
 namespace FoodFactoryGame.Session.Equipment
 {
     [DisallowMultipleComponent]
-    public sealed class PlayerHud : MonoBehaviour
+    public sealed partial class PlayerHud : MonoBehaviour
     {
         public const string InventoryGrid = "inventory";
         public const string StorageGrid = "storage";
@@ -118,10 +118,6 @@ namespace FoodFactoryGame.Session.Equipment
             _hotbar.style.flexDirection = FlexDirection.Row;
             _hotbar.style.justifyContent = Justify.Center;
             _screen = new VisualElement { name = "hud-screen" };
-            _screen.style.position = Position.Absolute;
-            _screen.style.left = new Length(50, LengthUnit.Percent);
-            _screen.style.top = new Length(50, LengthUnit.Percent);
-            _screen.style.translate = new Translate(new Length(-50, LengthUnit.Percent), new Length(-50, LengthUnit.Percent));
             _screen.style.flexDirection = FlexDirection.Row;
             _screen.style.alignItems = Align.FlexStart;
             // The cursor stack is drawn above everything and never takes a click, so the slot under it receives the click.
@@ -138,8 +134,9 @@ namespace FoodFactoryGame.Session.Equipment
             _cash.style.textShadow = new TextShadow { offset = new Vector2(1f, 1f), color = Color.black };
             layer.Add(_crosshair);
             layer.Add(_cash);
+            CreateReadiness(layer);
             layer.Add(_hotbar);
-            layer.Add(_screen);
+            layer.Add(CentredWindow.Overlay("hud-screen-overlay", _screen));
             layer.Add(_cursor);
             root.Add(layer);
             interaction.HoveredEntry = HoveredEntry;
@@ -167,6 +164,7 @@ namespace FoodFactoryGame.Session.Equipment
                 _cash.text = FormatCash(_shownCash);
             }
             _screen.style.display = screenOpen ? DisplayStyle.Flex : DisplayStyle.None;
+            UpdateReadiness(site, active && hasCompany);
             if (!active)
             {
                 _cursor.style.display = DisplayStyle.None;
@@ -397,6 +395,9 @@ namespace FoodFactoryGame.Session.Equipment
             // The cursor stack stays on the pointer outside screens, so its count is shown there too.
             if (interaction.CursorGoods != null) text.Append('|').Append(interaction.CursorLots(_site).Sum(x => x.Quantity));
             if (interaction.Screen == InteractionScreen.None) return text.ToString();
+            // The ledger tab, and while it shows, each new entry (decision 0038).
+            text.Append("|ledger:").Append(_ledgerShown);
+            if (_ledgerShown) text.Append('/').Append(_site.Ledger.LastOrDefault()?.Id).Append('/').Append(_site.Companies.FirstOrDefault()?.Cash);
             var building = interaction.Buildings.LocalBuilding;
             text.Append('|').Append(building?.Id).Append(building?.Floors);
             foreach (var grid in _grids.OrderBy(x => x.Key, StringComparer.Ordinal))
@@ -478,6 +479,7 @@ namespace FoodFactoryGame.Session.Equipment
             _hoverLabel = null;
             _timers.Clear();
             _hovered = null;
+            _registerReadiness = null;
             var inventoryId = interaction.InventoryId;
             if (interaction.Screen is InteractionScreen.None or InteractionScreen.Employee or InteractionScreen.PickPosition or InteractionScreen.Logistics
                     or InteractionScreen.Build
@@ -500,7 +502,8 @@ namespace FoodFactoryGame.Session.Equipment
                     storage.Add(GridView(StorageGrid));
                     _screen.Add(storage);
                 }
-                if (interaction.Session.Offers.Count > 0) _screen.Add(SupplierWindow());
+                // The Supplier and the company ledger (decision 0038) share the right-hand window, one tab each.
+                if (interaction.Session.Offers.Count > 0) _screen.Add(_ledgerShown ? LedgerWindow(site) : SupplierWindow());
                 var building = interaction.Buildings.LocalBuilding;
                 if (building?.Kind == GoodsWorld.FactoryKind) _screen.Add(ConstructionWindow(building));
                 return;
@@ -514,6 +517,7 @@ namespace FoodFactoryGame.Session.Equipment
         private VisualElement SupplierWindow()
         {
             var window = Window("hud-supplier", "Supplier");
+            window.Insert(0, Tabs());
             // Truck offers are bought on the logistics screen (decision 0023); restaurant furnishings in build mode (decision 0034).
             foreach (var offer in interaction.Session.Offers.Where(x => x != null && x.Truck == null && (x.Equipment == null || string.IsNullOrEmpty(x.Equipment.Category))))
             {
@@ -620,6 +624,7 @@ namespace FoodFactoryGame.Session.Equipment
             _progressLabel.name = "hud-progress-label";
             window.Add(_progressLabel);
             if (equipment.Kind == GoodsWorld.CounterKind) window.Add(StaffRow(site, equipment));
+            if (equipment.Kind == GoodsWorld.CounterKind) window.Add(RegisterReadiness());
             return window;
         }
 
@@ -892,15 +897,16 @@ namespace FoodFactoryGame.Session.Equipment
         }
 
         // Why customers at an idle counter wait (decision 0024), naming the first blocker: no edible menu item in this counter,
-        // or every table seat taken while a dine-in customer queues. Otherwise they are on their way to being served.
+        // or every table seat taken while a dine-in customer queues. Otherwise they are on their way to being served. With nobody
+        // waiting it says whether the input holds anything to sell (P0-05: it used to say "keep ... in the input" when it was empty).
         private static string WaitingText(GoodsSnapshot site, GoodsEquipment counter, List<RecipeAsset> menu, List<string> ingredients, int waiting)
         {
             var food = string.Join(" or ", ingredients);
-            if (waiting == 0) return $"No customers waiting; keep {food} in the input";
-            var who = $"{waiting} customer{(waiting == 1 ? "" : "s")} waiting";
             var items = new HashSet<string>(menu.SelectMany(x => x.Inputs).Select(x => x.itemId));
-            if (!site.Lots.Any(x => x.LocationId == counter.InputLocationId && !x.Spoiled && items.Contains(x.ItemId)))
-                return $"{who}: put edible {food} in the input";
+            var edible = site.Lots.Where(x => x.LocationId == counter.InputLocationId && !x.Spoiled && items.Contains(x.ItemId)).Sum(x => x.Quantity);
+            if (waiting == 0) return edible == 0 ? $"Nothing to sell: put edible {food} in the input" : $"No customers waiting; {edible} {food} ready to sell";
+            var who = $"{waiting} customer{(waiting == 1 ? "" : "s")} waiting";
+            if (edible == 0) return $"{who}: put edible {food} in the input";
             var tables = site.Equipment.Where(x => GoodsWorld.IsTable(x) && x.State == EquipmentState.Placed).ToList();
             var freeSeats = tables.Sum(x => x.Seats) - site.Customers.Count(x => tables.Any(y => y.Id == x.TableId));
             if (freeSeats <= 0 && site.Customers.Any(x => x.State == CustomerState.Queued && x.DineIn))

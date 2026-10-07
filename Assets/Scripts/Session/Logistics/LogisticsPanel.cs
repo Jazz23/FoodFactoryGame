@@ -68,10 +68,6 @@ namespace FoodFactoryGame.Session.Logistics
             var root = document.rootVisualElement;
             root.Clear();
             _window = new VisualElement { name = "logistics" };
-            _window.style.position = Position.Absolute;
-            _window.style.left = new Length(50, LengthUnit.Percent);
-            _window.style.top = new Length(50, LengthUnit.Percent);
-            _window.style.translate = new Translate(new Length(-50, LengthUnit.Percent), new Length(-50, LengthUnit.Percent));
             _window.style.backgroundColor = Backdrop;
             Pad(_window, 10);
             _window.style.borderTopLeftRadius = _window.style.borderTopRightRadius = 4;
@@ -100,7 +96,7 @@ namespace FoodFactoryGame.Session.Logistics
             close.style.alignSelf = Align.FlexEnd;
             close.style.minWidth = 70;
             _window.Add(close);
-            root.Add(_window);
+            root.Add(CentredWindow.Overlay("logistics-overlay", _window));
             _window.style.display = DisplayStyle.None;
         }
 
@@ -402,11 +398,15 @@ namespace FoodFactoryGame.Session.Logistics
             row.style.marginTop = 3;
             var caption = Caption(label, 12, Muted);
             caption.style.width = 70;
+            caption.style.flexShrink = 0;
             row.Add(caption);
             row.Add(SmallButton("<", () => cycle(-1)));
+            // The value gives up width (and wraps) before the arrows do, so both arrows stay inside the card.
             var shown = Caption(value, 12, Color.white);
             shown.name = $"logistics-{field}-value-{key}";
-            shown.style.width = width;
+            shown.style.flexBasis = width;
+            shown.style.flexShrink = 1;
+            shown.style.minWidth = 0;
             shown.style.unityTextAlign = TextAnchor.MiddleCenter;
             row.Add(shown);
             row.Add(SmallButton(">", () => cycle(1)));
@@ -577,8 +577,11 @@ namespace FoodFactoryGame.Session.Logistics
 
         private static VisualElement Column(string name, int width)
         {
+            // A column narrows (to a floor) on a narrow screen instead of pushing the window past its edge.
             var column = new VisualElement { name = name };
-            column.style.width = width;
+            column.style.flexBasis = width;
+            column.style.flexShrink = 1;
+            column.style.minWidth = 200;
             return column;
         }
 
@@ -603,6 +606,7 @@ namespace FoodFactoryGame.Session.Logistics
             // Not focusable: a focused button would click again on every keyboard Submit (Enter/Space).
             var button = new Button(clicked) { text = text, focusable = false };
             button.style.minWidth = 24;
+            button.style.flexShrink = 0;
             return button;
         }
 

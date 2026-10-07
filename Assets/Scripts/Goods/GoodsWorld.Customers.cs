@@ -303,7 +303,7 @@ namespace FoodFactoryGame.Goods
                 if (_customerIndexDirty) RebuildCustomerIndex();
                 return _cachedDiners;
             }
-            var menu = _recipes.Values.Where(x => x.IsSale && x.StationKind == CounterKind).OrderBy(x => x.Id, StringComparer.Ordinal).ToList();
+            var menu = _recipes.Values.Where(RestaurantRules.IsMenuItem).OrderBy(x => x.Id, StringComparer.Ordinal).ToList();
             var diners = new List<Diner>();
             foreach (var site in _state.Sites)
             {
@@ -311,12 +311,10 @@ namespace FoodFactoryGame.Goods
                 var counters = placed.Where(x => x.Kind == CounterKind && !string.IsNullOrEmpty(x.StaffId)).ToList();
                 if (menu.Count == 0 || counters.Count == 0 || CompanyOfSiteLocked(site.Id) is null) continue;
                 // Customers walk in from the lot's street edge (every edge of a dev site) and never through a back door (decision 0037).
-                var reached = RestaurantRules.Reached(RestaurantRules.Walkable(_state, site.Id, customers: true),
-                    RestaurantRules.StreetCells(_state.SiteLayouts.FirstOrDefault(x => x.SiteId == site.Id),
-                        _propertyOffers?.Values.FirstOrDefault(x => x.SiteId == site.Id)));
-                counters = counters.Where(x => x.Level == 0 && RestaurantRules.Touches(reached, x)).ToList();
+                var reached = RestaurantRules.CustomerReach(_state, site.Id, _propertyOffers?.Values.FirstOrDefault(x => x.SiteId == site.Id));
+                counters = counters.Where(x => RestaurantRules.ServesCustomers(reached, x)).ToList();
                 if (counters.Count == 0) continue;
-                var tables = placed.Where(x => IsTable(x) && x.Level == 0 && RestaurantRules.Touches(reached, x)).ToList();
+                var tables = placed.Where(x => IsTable(x) && RestaurantRules.ServesCustomers(reached, x)).ToList();
                 diners.Add(new Diner
                 {
                     Id = site.Id, Player = true, MapX = site.MapX, MapZ = site.MapZ, Menu = menu, Counters = counters, Tables = tables,
@@ -521,7 +519,7 @@ namespace FoodFactoryGame.Goods
                         lot.Quantity -= take;
                         if (lot.Quantity == 0) _state.Lots.Remove(lot);
                     }
-                    TryCredit(company.Id, recipe.SaleCents);
+                    TryCredit(company.Id, recipe.SaleCents, new CashNote(LedgerSale, diner.Id, equipmentId: counter.Id, customerId: customer.Id, offerId: recipe.Id, clockSeconds: now));
                     price = recipe.SaleCents;
                     service = recipe.DurationSeconds;
                     tier = recipe.Tier;

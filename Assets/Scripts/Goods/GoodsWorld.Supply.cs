@@ -117,7 +117,7 @@ namespace FoodFactoryGame.Goods
                 var deliveredId = $"buy:{playerId}:{requestId}";
                 if (vehicle is not null)
                 {
-                    TryDebit(company, vehicle.PriceCents);
+                    TryDebit(company, vehicle.PriceCents, new CashNote(LedgerTruck, siteId, requestId, deliveredId, offerId: offerId));
                     AddTruck(new GoodsTruck
                     {
                         Id = deliveredId, CompanyId = company, Name = $"{vehicle.Name} {_state.Trucks.Count(x => x.CompanyId == company) + 1}",
@@ -131,7 +131,7 @@ namespace FoodFactoryGame.Goods
                 }
                 if (machine is not null)
                 {
-                    TryDebit(company, machine.PriceCents);
+                    TryDebit(company, machine.PriceCents, new CashNote(LedgerSupplierEquipment, siteId, requestId, deliveredId, offerId: offerId));
                     var equipment = JsonUtility.FromJson<GoodsEquipment>(JsonUtility.ToJson(machine.Equipment));
                     equipment.Id = deliveredId;
                     equipment.SiteId = siteId;
@@ -148,7 +148,7 @@ namespace FoodFactoryGame.Goods
                     _state.Outcomes[_state.Outcomes.Count - 1].EquipmentId = deliveredId;
                     return bought;
                 }
-                TryDebit(company, offer.PriceCents);
+                TryDebit(company, offer.PriceCents, new CashNote(LedgerSupplierGoods, siteId, requestId, offerId: offerId));
                 var lotId = deliveredId;
                 _state.Lots.Add(new GoodsLot
                 {

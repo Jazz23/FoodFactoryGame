@@ -33,8 +33,12 @@ namespace FoodFactoryGame.Session.PlayModeTests
         private int _uiByEvent;
         private int _uiUnpickable;
 
+        private UnfocusedUiInput _unfocused;
+
         private void AddDevices()
         {
+            // Clicks go through the devices whether or not the Editor has focus (the event route stays as a fallback).
+            _unfocused = new UnfocusedUiInput();
             _keyboard = InputSystem.AddDevice<Keyboard>();
             _mouse = InputSystem.AddDevice<Mouse>();
             _pointer = new Vector2(UnityEngine.Screen.width * 0.5f, UnityEngine.Screen.height * 0.5f);
@@ -207,8 +211,24 @@ namespace FoodFactoryGame.Session.PlayModeTests
         private IEnumerator GoBeside(GoodsEquipment piece)
         {
             var inside = SiteGrid.IsInterior(Shell(Server, piece.SiteId), piece.CellX, piece.CellZ);
+            var from = LocalAvatar().transform.position;
+            var wasIndoors = Indoors;
+            // A restaurant dock stands at a back door's doorstep (decision 0037): a player walks in by the front door and out by
+            // that back door, as a straight walk from the front door can run into the shell.
+            var shell = Shell(Server, piece.SiteId);
+            var back = inside || piece.Kind != GoodsWorld.DockKind || shell == null ? null
+                : SiteGrid.ServiceDoors(shell).Select(d => ((int X, int Z)?)d)
+                    .OrderBy(d => Math.Abs(d.Value.X - piece.CellX) + Math.Abs(d.Value.Z - piece.CellZ)).FirstOrDefault();
+            var step = back is { } door ? SiteGrid.Doorstep(shell, door.X, door.Z) : null;
             if (inside) yield return EnterBuilding(piece.SiteId);
+            else if (back is { } b && step is { } s)
+            {
+                yield return EnterBuilding(piece.SiteId);
+                var site = piece.SiteId;
+                yield return Route("out of the back door", CellPoint(site, 2 * b.X - s.X, 2 * b.Z - s.Z), CellPoint(site, b.X, b.Z), CellPoint(site, s.X, s.Z));
+            }
             else yield return LeaveBuilding();
+            if (!inside) Note($"walk to {piece.Id} outside: indoors {wasIndoors} at {from}, after leaving {Indoors} at {LocalAvatar().transform.position}, target {StandBeside(piece)}");
             yield return WalkTo(StandBeside(piece), 0.5f, $"beside {piece.Id}");
         }
 
@@ -336,6 +356,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
         {
             if (element == null) throw Failure($"{what}: not on screen");
             yield return Until(() => element.panel != null && element.resolvedStyle.display != DisplayStyle.None && element.worldBound.width > 0, $"{what} laid out", 5f);
+            var hudSignature = HudSignature();
             yield return ScrollIntoView(element, what);
             if (!element.enabledInHierarchy) throw Failure($"{what}: disabled");
             var centre = element.worldBound.center;
@@ -390,7 +411,16 @@ namespace FoodFactoryGame.Session.PlayModeTests
                 }
                 for (var frame = 0; frame < 10 && !Reacted(); frame++) yield return null;
                 _uiByEvent++;
-                if (!Reacted()) throw Failure($"{what}: neither the device press nor a UI pointer event had an effect");
+                Note($"UI route: {what}: the virtual mouse press had no effect in 10 frames; a UI pointer event {(Reacted() ? "did" : "did not")}; clicks armed {Interaction.ScreenClicksArmed}, element attached {element.panel != null}, mouse left {_mouse.leftButton.isPressed}, device enabled {_mouse.enabled}, Game view focused {Application.isFocused}");
+                if (!Reacted())
+                {
+                    var live = element.panel?.visualTree.Q(element.name);
+                    Note($"UI DIAG: {what}: screen {Interaction.Screen}, clicks armed {Interaction.ScreenClicksArmed}, element attached {element.panel != null}, "
+                        + $"same as the live '{element.name}' {ReferenceEquals(live, element)}, live bounds {live?.worldBound}, clicked bounds {element.worldBound}, "
+                        + $"pick now '{element.panel?.Pick(centre)?.name}', cursor {Interaction.CursorGoods?.ItemId ?? "none"}, rejection {Interaction.LastRejection ?? "none"}; "
+                        + $"HUD signature at the start: {hudSignature}; now: {HudSignature()}");
+                    throw Failure($"{what}: neither the device press nor a UI pointer event had an effect");
+                }
                 if (unpickable) Expect(false, $"UI: {what} cannot be clicked by a pointer; only a UI event sent straight to it worked (workaround)");
             }
             if (shift)
@@ -399,6 +429,10 @@ namespace FoodFactoryGame.Session.PlayModeTests
                 QueueKeys();
             }
         }
+
+        // The HUD's last rebuild signature (diagnostics only: a change means the screen was rebuilt).
+        private string HudSignature() =>
+            (string)typeof(PlayerHud).GetField("_signature", BindingFlags.NonPublic | BindingFlags.Instance)?.GetValue(Hud);
 
         private static string PickAllNames(IPanel panel, Vector2 point)
         {
@@ -425,6 +459,10 @@ namespace FoodFactoryGame.Session.PlayModeTests
             var cursor = Changed(() => (Interaction.CursorGoods?.ItemId, Interaction.CursorGoods?.LocationId, Interaction.HasPendingRequests));
             yield return ClickElement(HudElement($"hud-{grid}-slot-{index}"), what, () => cursor() || Interaction.HasPendingRequests);
             yield return Until(() => !Interaction.HasPendingRequests, $"the server's reply after {what}", 10f);
+            // A reply can arrive before the baseline that shows it; read the grids again only from that baseline or a later one
+            // (otherwise a stack the server already moved looks still there and the next click lands on a slot about to go).
+            var revision = Server.Revision;
+            yield return Until(() => Client != null && Client.Revision >= revision, $"the baseline after {what}", 10f);
             yield return Frames(3);
         }
 

@@ -106,7 +106,7 @@ namespace FoodFactoryGame.Goods
                 if (_state.Companies.First(x => x.Id == company).Cash < price) return Reject("insufficient-funds");
 
                 // All checks precede this single locked mutation.
-                TryDebit(company, price);
+                TryDebit(company, price, new CashNote(LedgerFurnish, siteId, requestId, $"buy:{playerId}:{requestId}:0", offerId: order.OfferId));
                 string first = null;
                 for (var index = 0; index < order.Placements.Count; index++)
                 {
@@ -196,7 +196,7 @@ namespace FoodFactoryGame.Goods
                 if (station != null) _state.Stations.Remove(station);
                 _state.Locations.RemoveAll(x => x.Id == piece.InputLocationId || x.Id == piece.OutputLocationId);
                 _state.Equipment.Remove(piece);
-                if (piece.ChargedCents > 0) TryCredit(company, piece.ChargedCents);
+                if (piece.ChargedCents > 0) TryCredit(company, piece.ChargedCents, new CashNote(LedgerSellBack, piece.SiteId, requestId, piece.Id));
                 InvalidateDiners();
                 var result = RecordCents(requestId, playerId, "sold", -piece.ChargedCents, piece.Id);
                 result.JobId = job?.Id;

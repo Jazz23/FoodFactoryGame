@@ -497,6 +497,20 @@ namespace FoodFactoryGame.Goods
                     GoodsWorld.AddBackDoor(state, building, null);
                 state.SchemaVersion = 19;
             }
+            // v19 had no ledger (decision 0038): the ledger starts empty and each company's cash so far is carried forward, so
+            // opening (unknown, 0) + carried + entries == cash holds from the first v20 revision. Cash itself does not change.
+            if (state != null && state.SchemaVersion == 19)
+            {
+                state.Ledger ??= new List<GoodsLedgerEntry>();
+                state.Ledger.Clear();
+                foreach (var company in (state.Companies ?? new()).Where(x => x != null))
+                {
+                    company.OpeningCents = 0;
+                    company.LedgerCarriedCents = company.Cash;
+                    company.LedgerNextNumber = 0;
+                }
+                state.SchemaVersion = 20;
+            }
             GoodsWorld.Validate(state);
             return state;
         }

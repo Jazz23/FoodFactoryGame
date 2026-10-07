@@ -106,6 +106,8 @@ Examples: strong preference for cheap fast food, high demand for fresh
 premium meals, preference for a cuisine family, or high lunch traffic
 but weak dinner traffic.
 
+- Customer arrival rates use the same game hour as road traffic (owner, 2026-10-07; `docs/starting-loop-plan.md`). The rates themselves are PROTOTYPE.
+
 ## World Generation
 
 Owner decisions recorded 2026-09-27:
@@ -366,6 +368,8 @@ Owner decisions, 2026-10-01; numbers and formulas are PROTOTYPE and open (`docs/
 - A restaurant may place any number of docks, each serving one truck at a time. Each dock stands outside the shell next to a back door and must be reachable from the street (section 5, owner 2026-10-06).
 
 - Loading is automatic: the truck arrives from the street and goods move between truck and dock at a limited rate. There is no loading animation, and the player makes no loading decisions beyond where the dock stands and which route it serves. Goods are real inventory throughout.
+
+- Ingredients bought from outside suppliers arrive by supplier truck at a restaurant dock the player picks; equipment purchases (machines, furniture, decor) stay instant. Supplier goods arrive fully fresh: they do not spoil on the supplier's truck. An order whose dock goes away is redirected to another dock of the restaurant or returned and refunded; goods are never deleted (owner, 2026-10-07; `docs/starting-loop-plan.md`).
 
 ## Roads
 

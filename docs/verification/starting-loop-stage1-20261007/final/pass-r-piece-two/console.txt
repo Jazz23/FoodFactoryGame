@@ -1,0 +1,12 @@
+S5 Log: [Goods] commits=11 avg=5.8ms max=13.2ms payload=70.0KB
+S7 Log: [Goods] commits=39 avg=6.0ms max=22.4ms payload=86.8KB
+S7 Log: [Goods] commits=45 avg=6.1ms max=22.4ms payload=94.8KB
+S7 Log: [Goods] commits=51 avg=6.2ms max=22.4ms payload=102.6KB
+S7 Log: [Goods] commits=57 avg=6.5ms max=22.4ms payload=108.3KB
+S7 Log: [Goods] commits=63 avg=6.6ms max=22.4ms payload=112.1KB
+S7 Log: [Goods] commits=69 avg=6.8ms max=22.4ms payload=112.9KB
+S7 Log: [Goods] commits=75 avg=7.0ms max=22.4ms payload=113.1KB
+S7 Log: [Goods] commits=81 avg=7.2ms max=22.4ms payload=111.2KB
+S7 Log: [Goods] commits=87 avg=7.4ms max=22.4ms payload=114.8KB
+S7 Log: [Goods] commits=93 avg=7.4ms max=22.4ms payload=111.1KB
+S12 Log: [Goods] commits=127 avg=7.1ms max=22.4ms payload=134.1KB

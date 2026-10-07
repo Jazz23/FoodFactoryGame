@@ -397,8 +397,8 @@ namespace FoodFactoryGame.Goods
 
                 // All checks precede this single locked mutation: the new building and the net payment together.
                 _state.Buildings[_state.Buildings.IndexOf(building)] = plan.Building;
-                if (net > 0) TryDebit(company, net);
-                else if (net < 0) TryCredit(company, -net);
+                if (net > 0) TryDebit(company, net, new CashNote(LedgerShell, building.SiteId, requestId));
+                else if (net < 0) TryCredit(company, -net, new CashNote(LedgerShell, building.SiteId, requestId));
                 InvalidateDiners();
                 return RecordCents(requestId, playerId, "shell-changed", net, null);
             }

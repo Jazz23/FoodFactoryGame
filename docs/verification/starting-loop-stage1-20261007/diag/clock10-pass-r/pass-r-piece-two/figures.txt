@@ -1,0 +1,1 @@
+Customer customer:district-residential-2:219: 204 samples 11-53 s; entered door; wall-cell samples 0; hidden 0

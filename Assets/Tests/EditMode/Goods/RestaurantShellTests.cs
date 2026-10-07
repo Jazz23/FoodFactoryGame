@@ -89,6 +89,8 @@ namespace FoodFactoryGame.Goods.Tests
             var grown = _world.OrderShell("chef", "grow", Resize(2, 2, 10, 6));
             Assert.That((grown.Accepted, grown.Reason, grown.Cents), Is.EqualTo((true, "shell-changed", plan.ChargeCents)));
             Assert.That(Cash, Is.EqualTo(StartCash - plan.ChargeCents));
+            var charge = _world.Snapshot().Ledger.Last();
+            Assert.That((charge.Kind, charge.Cents, charge.RequestId), Is.EqualTo((GoodsWorld.LedgerShell, -plan.ChargeCents, "grow")), "Ledger (decision 0038).");
             Assert.That((Shop.Width, Shop.Depth), Is.EqualTo((10, 6)));
             Assert.That(Ledger, Is.EqualTo(StartCash));
 
@@ -97,6 +99,8 @@ namespace FoodFactoryGame.Goods.Tests
             Assert.That(back.RefundCents, Is.EqualTo(plan.ChargeCents), "Everything the growth charged, the fee included, is refunded.");
             var shrunk = _world.OrderShell("chef", "shrink", Resize(2, 2, 8, 6));
             Assert.That((shrunk.Accepted, shrunk.Cents), Is.EqualTo((true, back.ChargeCents - back.RefundCents)));
+            var net = _world.Snapshot().Ledger.Last();
+            Assert.That((net.Kind, net.Cents, net.RequestId), Is.EqualTo((GoodsWorld.LedgerShell, -shrunk.Cents, "shrink")), "A net refund is a positive entry.");
             Assert.That(Shop.Structures.Where(x => x.Kind == GoodsWorld.FloorStructure), Is.Empty, "No paid floor is left outside.");
             Assert.That(Ledger, Is.EqualTo(StartCash));
         }
