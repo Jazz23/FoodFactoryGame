@@ -63,8 +63,8 @@ Accepted on 2026-10-06 ("implement P1 with your recommendations"), from the plan
   so a sold starter dock is never re-added.
 - **Dev site.** The dev restaurant gets a back door on its west wall at (9, 4) (doorstep (8, 4)), so dev docks can be placed. Its
   seeded dock at (0-1, 18) predates the rule and keeps working. This deviates from the plan's wording ("a back door beside its
-  seeded dock"): moving that dock would change the dev truck tests and old dev saves. Older dev saves keep their shell and have no
-  back door until the owner adds one.
+  seeded dock"): moving that dock would change the dev truck tests and old dev saves. Older dev saves keep their shell; the
+  v19 upgrade gives it a back door (owner answers below).
 - **Presentation.** Build mode has a Back door tool (door styles, kitchen leaf by default). The dock screen marks a restaurant dock
   that is not beside a back door. The hand-placement ghost reports the restaurant rules. Back doors use the art kit's kitchen
   door; **the planned "staff" sign is not made** (art, deferred).
@@ -77,15 +77,44 @@ Accepted on 2026-10-06 ("implement P1 with your recommendations"), from the plan
 | Back door two cells from the rear corner; starter dock beside it toward the street | `WorldGeometry.AddServiceYard` |
 | Back door price = door price ($150 + order fee, district-scaled) | `GoodsWorld.ShellDoorCents` |
 | A bought restaurant's dock is free and refunds nothing | `GoodsWorld.PlaceStarterDock` |
-| Doorsteps stay clear of object-layer pieces; belts are not checked | `RestaurantRules.DoorstepProblem` |
+| Doorsteps stay clear of object-layer pieces and belts | `RestaurantRules.DoorstepProblem`, `BeltProblem` |
+| Where an automatic back door goes (inside walkable, then farthest from customer doors, then lowest cell) | `GoodsWorld.AddBackDoor` |
 
-## Owner questions
+## Owner answers (2026-10-06, confirmed)
 
-1. A restaurant bought in a world created before generator v5 has no back door, so no new dock can be placed there until
-   the owner draws one. Should such restaurants get a back door automatically?
-2. Should belts be kept off back-door doorsteps too?
-3. Should removing the last customer door be refused, as removing the last back door is? Today a shell needs at least one
-   door of any kind (`no-door`).
+The three questions this record left open, plus one change the owner added:
+
+6. **Automatic back door: yes.** A restaurant from a world made before generator v5 gets a back door automatically.
+7. **Belts off doorsteps: yes.** Belts and lifts are kept off back-door doorsteps, like other object-layer pieces.
+8. **Last customer door: yes.** Removing the last customer door is refused, the way removing the last back door is.
+9. **Dock orientation.** Docks turn so the upright door frame stands against the wall (the owner asked for "rotated 180
+   degrees"; see the implementation note below).
+
+Implemented the same day:
+
+- **Automatic back door (goods snapshot schema v19).** `GoodsWorld.AddBackDoor` gives a restaurant without a back door one,
+  free (nothing charged, so removing it refunds nothing), in the kitchen style. It goes on an outer wall cell that may hold a
+  door (not a corner, door or window), whose doorstep is open, uncovered ground on the lot that a walk from the street edge
+  reaches. Preferred: a walkable cell inside the door, then the doorstep farthest from every customer door, then the lowest cell
+  (X, then Z). If no cell qualifies, nothing changes and the owner can still draw one. It runs (a) when a lot listed without a
+  back door (a layout made before generator v5) is bought, and (b) in the v18 to v19 save upgrade for every restaurant already
+  owned, older dev saves included. The upgrade has no lot listing, so a doorstep reached from any lot edge counts. Nothing else
+  moves; docks placed before the rule keep their "not beside a back door" mark unless the new door happens to be beside them.
+- **Belts (`RestaurantRules.BeltProblem`, reason `doorstep`).** A belt, or a lift with either end on the ground, may not be
+  placed on a back-door doorstep. The server's belt and lift placement and the client's belt and lift previews check it. A shell
+  order may not give a back door a doorstep that a belt or object-layer piece already covers (`doorstep`), whether a new back door
+  or a wall change that moves one; this also closes the matching gap for equipment. Belts already on a doorstep in an old save
+  stay where they are (no validation failure); turning such a belt is still allowed.
+- **Customer doors (`SiteGrid.CustomerDoors`, reason `no-customer-door`).** A customer door is a door on an outer wall (it has
+  a doorstep) that is not a back door; a door in an interior wall is neither. A restaurant that has a customer door keeps one;
+  the old `no-door` check still applies first.
+- **Dock orientation.** The dock model's upright door frame (and bumper) is on its front, local +Z, which is the way rotation 0
+  faces. The generator used to give the starter dock rotation 0 or 1 whatever side of the shell its yard was on, so the frame met
+  the wall only for yards on the low side (seed `piece-two`'s start is one) and faced away on the high side. Turning every dock
+  180 degrees would have broken the low-side ones, so instead: `WorldLayoutShells.ToOffer` now gives the starter dock the rotation
+  that faces the shell (0-3), and build mode turns a dock round when that puts more wall in front of it
+  (`BuildMode.FacingRotation`). Hand placement keeps the rotation the player picks. Stored layouts derive the new rotation for
+  docks placed from now on; starter docks already placed in saves keep the rotation they were saved with.
 
 ## Verification (2026-10-06)
 
@@ -96,3 +125,19 @@ Accepted on 2026-10-06 ("implement P1 with your recommendations"), from the plan
 - Running game: a Pass I playthrough on `piece-two` (steps S1, S2, S11 of the P0 fixture). Build mode, driven with the virtual
   mouse, placed a dock beside the back door; 146 of 162 outdoor anchors were refused as `not-beside-back-door` and 5 were
   accepted. Captures are in `docs/verification/back-door-20261006/`.
+
+## Verification of the owner answers (2026-10-06)
+
+Unity 6000.5.9f1, Editor test runner (MCP `run_tests`), isolated temp saves only:
+
+- EditMode `FoodFactoryGame.Goods.EditModeTests`: 232 matched, 232 passed. New in `BackDoorTests`: `TheLastCustomerDoorStays`,
+  `BeltsStayOffDoorsteps`, `ARestaurantListedWithoutABackDoorGetsOne`; the v17 save test now also checks the v19 back door
+  at (2, 6), and `RestaurantShellTests.V15SavesUpgrade...` expects the restaurant's new back door.
+- EditMode `FoodFactoryGame.World.EditModeTests`: 28/28. `FoodFactoryGame.Session.EditModeTests`: 125 matched, 124 passed,
+  1 skipped (the flag-gated P0 measurement). `GeneratedWorldCustomersTests.ANewWorldStartsWithItsBackDoorAndTheDockBesideIt` now
+  checks that every listed restaurant dock in the city faces its shell, with all four rotations in use.
+- PlayMode `FoodFactoryGame.Session.PlayModeTests`: 48 matched, 42 passed, 0 failed, 6 skipped (flag-gated captures and
+  playthroughs). No new console errors.
+- **Not yet verified in the running game:** the dock orientation. The rotation-to-model mapping (`SiteGridSpace.Rotation`, frame
+  at the model's +Z) was checked with an Editor render of the prefab, but no running-game capture of a high-side yard exists
+  yet. The independent visual review is still open.

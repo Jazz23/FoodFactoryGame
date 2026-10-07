@@ -78,7 +78,7 @@ namespace FoodFactoryGame.Goods
 
     [Serializable] public sealed class GoodsSnapshot
     {
-        public const int CurrentSchema = 18;
+        public const int CurrentSchema = 19;
         public int SchemaVersion = CurrentSchema;
         public string WorldId;
         public long ClockSeconds;

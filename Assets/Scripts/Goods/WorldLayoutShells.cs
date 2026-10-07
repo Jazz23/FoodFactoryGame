@@ -40,10 +40,19 @@ namespace FoodFactoryGame.Goods
                 HasDock = building.ServiceDock != null,
                 DockX = building.ServiceDock == null ? 0 : building.ServiceDock.X - lot.X,
                 DockZ = building.ServiceDock == null ? 0 : building.ServiceDock.Z - lot.Z,
-                // The dock content is 2 x 1 along X at rotation 0; a dock rectangle along Z is a quarter turn.
-                DockRotation = building.ServiceDock != null && building.ServiceDock.Depth > building.ServiceDock.Width ? 1 : 0,
+                DockRotation = DockRotation(building),
                 Floors = building.IsShell ? building.Floors : 1, PricePercent = pricePercent
             };
+        }
+
+        // The dock content is 2 x 1 along X at rotation 0 and faces +Z, its upright door frame on that side. The starter dock faces
+        // the shell (owner decision 2026-10-06), so the frame stands against the wall: a dock along Z is a quarter turn, and a
+        // dock on the high side of the shell is turned round.
+        private static int DockRotation(WorldBuilding building)
+        {
+            var dock = building.ServiceDock;
+            if (dock == null) return 0;
+            return dock.Depth > dock.Width ? (dock.X < building.X ? 1 : 3) : (dock.Z < building.Z ? 0 : 2);
         }
 
         public static SiteLayout SiteLayoutFor(WorldLot lot) => new() { SiteId = lot.SiteId, Width = lot.Width, Depth = lot.Depth };

@@ -78,7 +78,7 @@ the restart. Scope changes from its findings (P0-nn), all still subject to accep
   owner decision on 0035 Q5 or employees first (P0-02).
 
 ### P1 - Back door and dock rule (foundational; schema change)
-**Implemented 2026-10-06** with the recommended choices (side service yard; keep and mark): [decision 0037](decisions/0037-back-doors-and-the-dock-rule.md), [verification](verification/back-door-20261006.md). Open: the staff sign art, an independent visual review, and the owner questions in 0037.
+**Implemented 2026-10-06** with the recommended choices (side service yard; keep and mark): [decision 0037](decisions/0037-back-doors-and-the-dock-rule.md), [verification](verification/back-door-20261006.md). Open: the staff sign art and an independent visual review. The owner answered the questions in 0037 on 2026-10-06 (implemented, schema v19).
 
 **Domain (Goods):**
 - A door has a role, `customer` (default, everything existing) or `service` (back door). PROPOSAL: a back door is a door

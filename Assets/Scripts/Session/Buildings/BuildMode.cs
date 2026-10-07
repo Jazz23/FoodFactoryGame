@@ -446,7 +446,8 @@ namespace FoodFactoryGame.Session.Buildings
         private static bool IsWallCell(GoodsBuilding restaurant, int x, int z) => SiteGrid.IsPartition(restaurant, x, z) || SiteGrid.OnPerimeter(restaurant, x, z);
 
         // The rotation a piece is placed with at a cell: wall decor faces away from its wall (into a room if it can, else to any open
-        // cell), and a backed piece is turned round when that puts more wall behind it. Anything else keeps the chosen rotation.
+        // cell), a backed piece is turned round when that puts more wall behind it, and a dock when that puts more wall in front
+        // (its door frame). Anything else keeps the chosen rotation.
         public int FacingRotation(EquipmentDefinition definition, int cellX, int cellZ)
         {
             var site = session.ClientSite;
@@ -468,6 +469,17 @@ namespace FoodFactoryGame.Session.Buildings
                     bestScore = score;
                 }
                 return best;
+            }
+            if (definition.Kind == GoodsWorld.DockKind)
+            {
+                // A dock's upright door frame is its front: it turns round when that puts more wall in front of it.
+                int WallsAhead(int rotation)
+                {
+                    var (width, depth) = SiteGrid.Footprint(definition.Width, definition.Depth, rotation);
+                    return SiteGrid.BehindCells(cellX, cellZ, width, depth, (rotation + 2) % 4).Count(c => SiteGrid.WallAt(site, siteId, c.X, c.Z));
+                }
+                var turned = (Rotation + 2) % 4;
+                return WallsAhead(turned) > WallsAhead(Rotation) ? turned : Rotation;
             }
             if (definition.Mount != EquipmentMount.Backed) return Rotation;
             int WallsBehind(int rotation)

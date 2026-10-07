@@ -293,7 +293,10 @@ namespace FoodFactoryGame.Goods.Tests
             var counter = loaded.Equipment.Single(x => x.Id == "counter-old");
             Assert.That((loaded.SchemaVersion, counter.Kind, counter.StaffId, counter.Layer, counter.ChargedCents),
                 Is.EqualTo((GoodsSnapshot.CurrentSchema, GoodsWorld.CounterKind, "", "", 0L)), "The counter is the same register, unstaffed.");
-            Assert.That(loaded.Buildings.Select(x => (x.Id, x.Structures.Count, x.WallStyle)), Is.EquivalentTo(new[] { ("shop", 0, ""), ("mill", 0, "") }));
+            // The v19 upgrade gives the restaurant (not the factory) its back door, nothing else (owner decision 2026-10-06).
+            Assert.That(loaded.Buildings.Select(x => (x.Id, x.Structures.Count(s => s.Role != GoodsWorld.ServiceDoorRole), x.WallStyle)),
+                Is.EquivalentTo(new[] { ("shop", 0, ""), ("mill", 0, "") }));
+            Assert.That(loaded.Buildings.Select(x => (x.Id, SiteGrid.ServiceDoors(x).Count())), Is.EquivalentTo(new[] { ("shop", 1), ("mill", 0) }));
         }
     }
 }

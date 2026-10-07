@@ -282,6 +282,14 @@ namespace FoodFactoryGame.Goods
             // Decision 0037: a restaurant that has a back door keeps one (move one by placing the new door first), and a dock that
             // stood beside a back door still does: its door stays and its doorstep stays open.
             if (SiteGrid.ServiceDoors(current).Any() && !SiteGrid.ServiceDoors(next).Any()) return Fail("no-back-door");
+            // Customers enter only by customer doors (owner decision 2026-10-06): a restaurant that has one keeps one.
+            if (SiteGrid.CustomerDoors(current).Any() && !SiteGrid.CustomerDoors(next).Any()) return Fail("no-customer-door");
+            // A back door's doorstep stays clear of object-layer pieces and belts (decision 0037; belts since 2026-10-06), so a new
+            // back door, or a doorstep a wall change moves, may not land on one.
+            var oldSteps = SiteGrid.ServiceDoors(current).Select(d => SiteGrid.Doorstep(current, d.X, d.Z)).ToList();
+            if (SiteGrid.ServiceDoors(next).Select(d => SiteGrid.Doorstep(next, d.X, d.Z))
+                    .Any(s => s is { } step && !oldSteps.Contains(step) && RestaurantRules.Covered(state, current.SiteId, step.X, step.Z)))
+                return Fail("doorstep");
             var withNext = new GoodsSnapshot
             {
                 WorldId = state.WorldId, SiteLayouts = state.SiteLayouts, Equipment = state.Equipment,

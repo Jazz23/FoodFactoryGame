@@ -2,7 +2,8 @@
 // Walking: a site's ground cells are walkable unless a wall (perimeter, interior wall or window) or a placed object-layer piece
 // covers them; decor on the floor, walls, ceiling or tables never blocks. A piece is reached when a walkable cell beside its
 // footprint can be walked to from a source. Customers come from the street edge of a lot (any edge of a dev site) and never pass
-// a back door (decision 0037); trucks stop on the street edge. A restaurant dock stands beside a back door's doorstep.
+// a back door (decision 0037); trucks stop on the street edge. A restaurant dock stands beside a back door's doorstep;
+// no other object-layer piece and no belt covers that doorstep.
 // Ambience: one score per restaurant from its placed pieces' ambience points, with diminishing returns and a cap.
 using System;
 using System.Collections.Generic;
@@ -126,6 +127,22 @@ namespace FoodFactoryGame.Goods
             if (piece.Kind == GoodsWorld.DockKind || !string.IsNullOrEmpty(piece.Layer) || !IsRestaurantSite(state, piece.SiteId)) return null;
             var (width, depth) = SiteGrid.Footprint(piece.Width, piece.Depth, rotation);
             return Doorsteps(state, piece.SiteId).Any(c => SiteGrid.Overlaps(c.X, c.Z, 1, 1, cellX, cellZ, width, depth)) ? "doorstep" : null;
+        }
+
+        // Null unless a belt or lift with an end on the ground at the cell would cover the doorstep of a back door on a restaurant
+        // site ("doorstep", owner decision 2026-10-06).
+        public static string BeltProblem(GoodsSnapshot state, string siteId, int cellX, int cellZ, int level, int lift = 0) =>
+            (level == 0 || level + lift == 0) && IsRestaurantSite(state, siteId) && Doorsteps(state, siteId).Contains((cellX, cellZ)) ? "doorstep" : null;
+
+        // True when a placed object-layer piece (a dock included) or a belt with an end on the ground covers the cell.
+        public static bool Covered(GoodsSnapshot state, string siteId, int cellX, int cellZ)
+        {
+            foreach (var piece in state.Equipment.Where(x => x.SiteId == siteId && x.State == EquipmentState.Placed && x.Level == 0 && string.IsNullOrEmpty(x.Layer)))
+            {
+                var (width, depth) = SiteGrid.Footprint(piece.Width, piece.Depth, piece.Rotation);
+                if (SiteGrid.Overlaps(cellX, cellZ, 1, 1, piece.CellX, piece.CellZ, width, depth)) return true;
+            }
+            return (state.Belts ?? new List<GoodsBelt>()).Any(x => x.SiteId == siteId && x.CellX == cellX && x.CellZ == cellZ && (x.Level == 0 || x.ExitLevel == 0));
         }
 
         // Null unless a dock on a restaurant site would stand where it does not touch a back door's doorstep

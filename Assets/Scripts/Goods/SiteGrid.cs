@@ -172,6 +172,12 @@ namespace FoodFactoryGame.Goods
             (building.Structures ?? new List<GoodsStructure>()).Where(x => x != null && x.Kind == GoodsWorld.DoorStructure && x.Role == GoodsWorld.ServiceDoorRole
                 && IsDoor(building, x.X, x.Z)).Select(x => (x.X, x.Z));
 
+        // Every customer (front) door of a building: a door on an outer wall (it has a doorstep) that is not a back door.
+        public static IEnumerable<(int X, int Z)> CustomerDoors(GoodsBuilding building) =>
+            (building.Doors ?? new List<GridCell>()).Select(x => (x.X, x.Z))
+                .Concat((building.Structures ?? new List<GoodsStructure>()).Where(x => x != null && x.Kind == GoodsWorld.DoorStructure).Select(x => (x.X, x.Z)))
+                .Distinct().Where(c => IsDoor(building, c.X, c.Z) && !IsServiceDoor(building, c.X, c.Z) && Doorstep(building, c.X, c.Z) != null);
+
         // The doorstep of a door on an outer wall: the neighbour across the wall that is not interior (null for a door between two
         // rooms). Footprint perimeter cells and free walls count as wall line, door cells included. While a free-walled shell is open
         // (a wall taken out to be redrawn) it has no interior, so both sides qualify; then the side outside the footprint wins, which

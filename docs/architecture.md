@@ -731,9 +731,13 @@ Goods snapshot schema **v18**; `WorldGenerator.Version` 5; layout format 4. Veri
   `start-dock`, bought restaurants `dock:<site>` (free); the dev restaurant has a back door at (9, 4).
 - Implemented (presentation): build-mode Back door tool, dock-screen mark for docks placed before the rule, restaurant rules in
   the placement ghost, customer figures never open or route through back doors.
-- Keep and mark: docks placed before v18 keep serving trucks where they stand; older worlds have no yard and no back door until
-  the owner draws one.
-- Not done: the "staff" sign art; independent visual review. Undecided: the owner questions in decision 0037.
+- Keep and mark: docks placed before v18 keep serving trucks where they stand; older worlds have no yard.
+- Implemented (owner answers, 2026-10-06; goods snapshot schema **v19**): a restaurant without a back door gets one free
+  (`GoodsWorld.AddBackDoor`) when a pre-v5 lot is bought and in the v18 to v19 save upgrade; belts and lifts stay off
+  back-door doorsteps (`RestaurantRules.BeltProblem`, `doorstep`), and a shell order may not give a back door a covered doorstep;
+  the last customer door stays (`SiteGrid.CustomerDoors`, `no-customer-door`); starter docks face their shell and build mode
+  turns a dock to put its door frame against a wall.
+- Not done: the "staff" sign art; independent visual review; a running-game capture of the dock orientation.
 
 ## Baseline Test Evolution
 

@@ -5,7 +5,8 @@
 // purchase leaves no site, property or debit behind. Sites and properties are never removed. Ownership is public: every site
 // view carries all properties, so any client can colour the map by owner. The site grid covers exactly the lot; a restaurant or factory shell becomes the site's GoodsBuilding
 // (decision 0019) and the rest of the lot is ordinary outdoor cells. A generated restaurant's back door comes with its shell, and
-// on purchase the dock that comes with it is placed beside that door (decision 0037).
+// on purchase the dock that comes with it is placed beside that door (decision 0037). A restaurant listed without one (a layout
+// made before generator v5) is given one on purchase (AddBackDoor).
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -183,6 +184,44 @@ namespace FoodFactoryGame.Goods
 
         public const string BackDoorStyle = "kitchen";
 
+        // Gives a restaurant without a back door one (owner decision 2026-10-06: restaurants of worlds made before generator v5 get
+        // one automatically), free of charge like a generated one. The door goes on an outer wall cell that may hold a door, whose
+        // doorstep is open, uncovered ground on the lot that a walk from the street edge reaches. Preferred: the inside cell is
+        // walkable too, then the doorstep farthest from every customer door, then the lowest cell. Nothing changes when no cell
+        // qualifies; the owner can still draw one. Mutates the building, which must be the one in state.
+        internal static bool AddBackDoor(GoodsSnapshot state, GoodsBuilding building, PropertyOffer offer)
+        {
+            if (building.Kind != RestaurantKind || SiteGrid.ServiceDoors(building).Any()) return false;
+            var layout = state.SiteLayouts?.FirstOrDefault(x => x.SiteId == building.SiteId);
+            if (layout == null) return false;
+            building.Structures ??= new List<GoodsStructure>();
+            var walkable = RestaurantRules.Walkable(state, building.SiteId);
+            var reached = RestaurantRules.Reached(walkable, RestaurantRules.StreetCells(layout, offer));
+            var fronts = SiteGrid.CustomerDoors(building).Select(d => SiteGrid.Doorstep(building, d.X, d.Z)).OfType<(int X, int Z)>().ToList();
+            var cells = building.FreeWalls
+                ? building.Structures.Where(x => x.Kind == PartitionStructure && !SiteGrid.HasStructure(building, DoorStructure, x.X, x.Z) && !IsCorner(building, x.X, x.Z))
+                    .Select(x => (x.X, x.Z))
+                : Enumerable.Range(building.CellX, building.Width).SelectMany(x => Enumerable.Range(building.CellZ, building.Depth).Select(z => (X: x, Z: z)))
+                    .Where(c => SiteGrid.IsDoorCell(building, c.X, c.Z) && !building.Doors.Any(d => d.X == c.X && d.Z == c.Z));
+            var best = cells.Where(c => SiteGrid.WindowAt(building, c.X, c.Z) == null)
+                .Select(c => (Door: c, Step: SiteGrid.Doorstep(building, c.X, c.Z)))
+                .Where(c => c.Step is { } s && reached.Contains(s) && !RestaurantRules.Covered(state, building.SiteId, s.X, s.Z))
+                .Select(c =>
+                {
+                    var step = c.Step.Value;
+                    var (ix, iz) = (2 * c.Door.X - step.X, 2 * c.Door.Z - step.Z);
+                    var inside = ix >= 0 && iz >= 0 && ix < layout.Width && iz < layout.Depth && walkable[ix, iz];
+                    var far = fronts.Count == 0 ? 0 : fronts.Min(f => Math.Abs(f.X - step.X) + Math.Abs(f.Z - step.Z));
+                    return (c.Door, Inside: inside, Far: far);
+                })
+                .OrderByDescending(c => c.Inside).ThenByDescending(c => c.Far).ThenBy(c => c.Door.X).ThenBy(c => c.Door.Z)
+                .Select(c => ((int X, int Z)?)c.Door).FirstOrDefault();
+            if (best is not { } door) return false;
+            if (!building.FreeWalls) building.Doors.Add(new GridCell { X = door.X, Z = door.Z });
+            building.Structures.Add(new GoodsStructure { Kind = DoorStructure, X = door.X, Z = door.Z, Style = BackDoorStyle, Role = ServiceDoorRole });
+            return true;
+        }
+
         // The dock that came with a bought restaurant (decision 0037), from the supplier's dock content, placed free of charge (it
         // came with the building, so selling it refunds nothing). Call only under _gate, after CreateProperty. Nothing is placed
         // when no dock content is registered or something already stands there.
@@ -214,7 +253,12 @@ namespace FoodFactoryGame.Goods
         {
             Bootstrap(new GoodsSite { Id = offer.SiteId, Name = offer.BuildingId, MapX = offer.AccessX, MapZ = offer.AccessZ });
             Bootstrap(new SiteLayout { SiteId = offer.SiteId, Width = offer.Width, Depth = offer.Depth });
-            if (offer.IsShell) Bootstrap(BuildingOf(offer));
+            if (offer.IsShell)
+            {
+                Bootstrap(BuildingOf(offer));
+                // A lot listed from a layout made before generator v5 has no back door; the restaurant gets one.
+                AddBackDoor(_state, _state.Buildings.First(x => x.Id == offer.BuildingId), offer);
+            }
             _state.Properties.Add(new GoodsProperty { LotId = offer.LotId, SiteId = offer.SiteId, CompanyId = companyId });
             _state.Companies.First(x => x.Id == companyId).SiteIds.Add(offer.SiteId);
             InvalidateDiners();

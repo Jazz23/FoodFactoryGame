@@ -90,7 +90,8 @@ namespace FoodFactoryGame.Goods
                     return Record(requestId, playerId, true, "rotated", null);
                 }
                 var problem = SiteGrid.CellProblem(_state, siteId, cellX, cellZ, 1, 1, null, level)
-                    ?? (lift == 0 ? null : SiteGrid.CellProblem(_state, siteId, cellX, cellZ, 1, 1, null, level + lift));
+                    ?? (lift == 0 ? null : SiteGrid.CellProblem(_state, siteId, cellX, cellZ, 1, 1, null, level + lift))
+                    ?? RestaurantRules.BeltProblem(_state, siteId, cellX, cellZ, level, lift);
                 if (problem != null) return Record(requestId, playerId, false, problem, null);
                 var itemId = lift == 0 ? BeltItemId : LiftItemId;
                 var inventory = _state.Locations.FirstOrDefault(x => x.Id == InventoryLocationId(playerId));

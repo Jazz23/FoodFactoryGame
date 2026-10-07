@@ -488,6 +488,15 @@ namespace FoodFactoryGame.Goods
                     if (piece != null) piece.Role ??= "";
                 state.SchemaVersion = 18;
             }
+            // v18 restaurants of worlds made before generator v5 had no back door, so no new dock fit there (owner decision
+            // 2026-10-06): each such restaurant gets one, free, where GoodsWorld.AddBackDoor finds room. Without the lot listing the
+            // street is unknown, so a doorstep reached from any lot edge counts. Nothing else moves.
+            if (state != null && state.SchemaVersion == 18)
+            {
+                foreach (var building in (state.Buildings ?? new()).Where(x => x != null).ToList())
+                    GoodsWorld.AddBackDoor(state, building, null);
+                state.SchemaVersion = 19;
+            }
             GoodsWorld.Validate(state);
             return state;
         }

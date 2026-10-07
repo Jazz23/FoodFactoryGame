@@ -227,6 +227,17 @@ namespace FoodFactoryGame.Session.Tests
                 Is.EqualTo((GoodsWorld.DockKind, EquipmentState.Placed, start.DockX, start.DockZ, start.DockRotation, 0L)));
             Assert.That(RestaurantRules.BesideBackDoor(state, dock), Is.True);
             Assert.That(RestaurantRules.ReachesStreet(state, dock, start), Is.True, "Trucks reach it along the yard.");
+            // Owner decision 2026-10-06: every listed restaurant's dock faces its shell, so the door frame (the dock's front) stands
+            // against the wall, whichever side of the shell its yard is on.
+            var docks = WorldLayoutShells.PropertyOffers(stored.Layout).Where(x => x.HasDock).ToList();
+            Assert.That(docks.Select(x => x.DockRotation).Distinct().Count(), Is.EqualTo(4), "Yards lie on every side somewhere in the city.");
+            foreach (var offer in docks)
+            {
+                var (width, depth) = SiteGrid.Footprint(2, 1, offer.DockRotation);
+                var front = SiteGrid.BehindCells(offer.DockX, offer.DockZ, width, depth, (offer.DockRotation + 2) % 4).ToList();
+                Assert.That(front.All(c => SiteGrid.Overlaps(c.X, c.Z, 1, 1, offer.BuildingX, offer.BuildingZ, offer.BuildingWidth, offer.BuildingDepth)),
+                    Is.True, $"{offer.LotId}: the dock at ({offer.DockX},{offer.DockZ}) rotation {offer.DockRotation} faces its shell.");
+            }
             var counter = state.Equipment.Single(x => x.Id == GeneratedWorld.StartCounterId);
             var customers = RestaurantRules.Reached(RestaurantRules.Walkable(state, start.SiteId, customers: true),
                 RestaurantRules.StreetCells(state.SiteLayouts.Single(), start));

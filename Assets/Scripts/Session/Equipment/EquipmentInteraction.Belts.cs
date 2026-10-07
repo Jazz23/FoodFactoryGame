@@ -222,7 +222,8 @@ namespace FoodFactoryGame.Session.Equipment
         {
             if (_pendingBelts.ContainsKey(cell)) return null;
             if (FlatBeltAt(site, cell) != null) return null;
-            var problem = SiteGrid.CellProblem(site, session.ClientSiteId, cell.X, cell.Z, 1, 1, null, Level);
+            var problem = SiteGrid.CellProblem(site, session.ClientSiteId, cell.X, cell.Z, 1, 1, null, Level)
+                ?? RestaurantRules.BeltProblem(site, session.ClientSiteId, cell.X, cell.Z, Level);
             if (problem != null) return problem;
             return BeltsCarried(site) - _pendingBelts.Count(x => x.Value.NewBelt) > 0 ? null : "no-belts";
         }
@@ -480,7 +481,8 @@ namespace FoodFactoryGame.Session.Equipment
         {
             if (site.Belts.Any(x => x.Lift == LiftDirection && x.Level == Level && x.CellX == cell.X && x.CellZ == cell.Z)) return null;
             var problem = SiteGrid.CellProblem(site, session.ClientSiteId, cell.X, cell.Z, 1, 1, null, Level)
-                ?? SiteGrid.CellProblem(site, session.ClientSiteId, cell.X, cell.Z, 1, 1, null, Level + LiftDirection);
+                ?? SiteGrid.CellProblem(site, session.ClientSiteId, cell.X, cell.Z, 1, 1, null, Level + LiftDirection)
+                ?? RestaurantRules.BeltProblem(site, session.ClientSiteId, cell.X, cell.Z, Level, LiftDirection);
             if (problem != null) return problem;
             return LiftsCarried(site) > 0 ? null : "no-lifts";
         }

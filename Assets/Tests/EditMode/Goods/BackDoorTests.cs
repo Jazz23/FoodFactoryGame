@@ -3,7 +3,8 @@
 // street, and no other object-layer piece may cover a doorstep; a restaurant keeps at least one back door once it has one, and no
 // order takes away a back door or doorstep a dock stands beside; moving the last back door works as "place new, then remove old"
 // with exact refunds; a bought generated restaurant comes with its back door and a free dock beside it; v17 saves load with
-// customer doors and keep their docks where they stand. Isolated saves only.
+// customer doors, keep their docks where they stand and get a back door. Owner answers of 2026-10-06: the last customer door
+// stays, belts stay off doorsteps, and a restaurant listed or saved without a back door gets one. Isolated saves only.
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -219,6 +220,75 @@ namespace FoodFactoryGame.Goods.Tests
             Assert.That((dock.State, dock.CellX, dock.CellZ), Is.EqualTo((EquipmentState.Placed, 12, 9)), "Nothing moves.");
             Assert.That(RestaurantRules.ReachesStreet(upgraded, dock, null), Is.True, "Trucks still use it.");
             Assert.That(RestaurantRules.BesideBackDoor(upgraded, dock), Is.False, "It is marked as not beside a back door.");
+            // The v19 upgrade gives the shop a back door, free: the west wall cell whose doorstep is farthest from both customer doors
+            // ((5,1) and (10,4)), lowest cell first among equals.
+            Assert.That(SiteGrid.ServiceDoors(shop), Is.EqualTo(new[] { (2, 6) }));
+            Assert.That(shop.Structures.Single(x => x.Role == GoodsWorld.ServiceDoorRole).ChargedCents, Is.Zero);
+        }
+
+        // Owner decision 2026-10-06: removing the last customer door is refused, as removing the last back door is.
+        [Test]
+        public void TheLastCustomerDoorStays()
+        {
+            var ledger = Ledger;
+            Assert.That(Shell("back", ShellOrder.BackDoor, 9, 5).Accepted, Is.True);
+            Assert.That(Shell("remove-front", ShellOrder.Remove, 0, 0, (5, 2)).Reason, Is.EqualTo("no-customer-door"), "A back door is no way in for customers.");
+            Assert.That(Shell("second", ShellOrder.Door, 2, 4).Accepted, Is.True);
+            Assert.That(Shell("remove-front-again", ShellOrder.Remove, 0, 0, (5, 2)).Accepted, Is.True, "Another customer door is left.");
+            Assert.That(SiteGrid.CustomerDoors(Shop), Is.EqualTo(new[] { (2, 4) }));
+            Assert.That(Shell("remove-second", ShellOrder.Remove, 0, 0, (2, 4)).Reason, Is.EqualTo("no-customer-door"));
+            // A door in an interior wall is not a customer door.
+            Assert.That(Shell("room", ShellOrder.Partition, 0, 0, (6, 3), (6, 4), (6, 5), (6, 6)).Accepted, Is.True);
+            Assert.That(Shell("inner-door", ShellOrder.Door, 6, 4).Accepted, Is.True);
+            Assert.That(Shell("remove-second-again", ShellOrder.Remove, 0, 0, (2, 4)).Reason, Is.EqualTo("no-customer-door"));
+            Assert.That(Ledger, Is.EqualTo(ledger), "Every order charged or refunded exactly once.");
+        }
+
+        // Owner decision 2026-10-06: belts and lifts stay off back-door doorsteps, and a new back door may not open onto a belt.
+        [Test]
+        public void BeltsStayOffDoorsteps()
+        {
+            _world.RegisterItem(GoodsWorld.BeltItemId, 100);
+            _world.Bootstrap(new GoodsLot
+            {
+                Id = "belts", ItemId = GoodsWorld.BeltItemId, OwnerId = "resto", LocationId = "carried:chef", Quantity = 5, SpoilAfterSeconds = GoodsWorld.NonPerishableSeconds
+            });
+            Assert.That(_world.PlaceBelt("chef", "before", "resto", 10, 4, 1).Accepted, Is.True, "No back door yet.");
+            Assert.That(Shell("onto-belt", ShellOrder.BackDoor, 9, 4).Reason, Is.EqualTo("doorstep"), "A back door may not open onto a belt.");
+            Assert.That(_world.RemoveBelt("chef", "lift-belt", _world.Snapshot().Belts.Single().Id).Accepted, Is.True);
+            Assert.That(Shell("back", ShellOrder.BackDoor, 9, 4).Accepted, Is.True);
+            Assert.That(_world.PlaceBelt("chef", "on-step", "resto", 10, 4, 1).Reason, Is.EqualTo("doorstep"));
+            Assert.That(RestaurantRules.BeltProblem(_world.Snapshot(), "resto", 10, 4, 1, -1), Is.EqualTo("doorstep"), "A lift coming down onto it.");
+            Assert.That(RestaurantRules.BeltProblem(_world.Snapshot(), "resto", 10, 4, 1), Is.Null, "Off the ground it is no doorstep.");
+            Assert.That(_world.PlaceBelt("chef", "beside", "resto", 11, 4, 1).Accepted, Is.True, "Beside the doorstep is fine.");
+        }
+
+        // Owner decision 2026-10-06: a restaurant listed without a back door (a layout made before generator v5) gets one on purchase.
+        [Test]
+        public void ARestaurantListedWithoutABackDoorGetsOne()
+        {
+            var offer = new PropertyOffer
+            {
+                LotId = "lot-old", SiteId = "site-old", BuildingId = "old", Category = GoodsWorld.RestaurantKind, ForSale = true, PriceCents = 50_000,
+                LotX = 100, LotZ = 0, Width = 14, Depth = 14, AccessX = 107, AccessZ = 14, BuildingX = 0, BuildingZ = 0, BuildingWidth = 14, BuildingDepth = 12,
+                Doors = { new GridCell { X = 6, Z = 11 }, new GridCell { X = 7, Z = 11 } }
+            };
+            _world.RegisterPropertyOffers(new[] { offer });
+            Assert.That(_world.BuyProperty("chef", "buy", "resto", "lot-old").Accepted, Is.True);
+            var state = _world.Snapshot();
+            var shell = state.Buildings.Single(x => x.Id == "old");
+            // The shell fills the lot but for the street apron, so only the front wall has a doorstep the street reaches; the door
+            // goes there, as far from the customer doors as it can (both ends tie; the lowest cell wins).
+            Assert.That(SiteGrid.ServiceDoors(shell), Is.EqualTo(new[] { (1, 11) }));
+            Assert.That(SiteGrid.IsDoor(shell, 1, 11), Is.True, "The back door is an opening.");
+            Assert.That(shell.Structures.Single().ChargedCents, Is.Zero);
+            Assert.That(state.Companies.Single().Cash, Is.EqualTo(StartCash - 50_000), "Only the building is paid for.");
+            Assert.That(GoodsWorld.Restore(state), Is.Not.Null);
+            // A dock can now be placed beside it.
+            Assert.That(_world.BuyAndPlace("chef", "dock", new FurnishOrder
+            {
+                SiteId = "site-old", OfferId = "dock", Placements = { new GridPlacement { X = 2, Z = 12 } }
+            }).Accepted, Is.True);
         }
     }
 }
