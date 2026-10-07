@@ -78,7 +78,7 @@ namespace FoodFactoryGame.Goods
 
     [Serializable] public sealed class GoodsSnapshot
     {
-        public const int CurrentSchema = 17;
+        public const int CurrentSchema = 18;
         public int SchemaVersion = CurrentSchema;
         public string WorldId;
         public long ClockSeconds;
@@ -303,9 +303,13 @@ namespace FoodFactoryGame.Goods
                 view.Belts = view.Belts.Where(x => x.SiteId == siteId).ToList();
                 view.Buildings = view.Buildings.Where(x => x.SiteId == siteId).ToList();
                 view.Companies = view.Companies.Where(x => x.SiteIds.Contains(siteId)).ToList();
-                // Scripts reach clients through the employee object, not with every baseline.
+                // Scripts and task lists reach clients through the employee object, not with every baseline.
                 view.Employees = view.Employees.Where(x => x.SiteId == siteId).ToList();
-                foreach (var employee in view.Employees) employee.Script = "";
+                foreach (var employee in view.Employees)
+                {
+                    employee.Script = "";
+                    employee.Tasks = "";
+                }
                 ViewLogistics(view, siteId);
                 ViewCustomers(view, siteId);
                 // Properties stay whole: who owns which lot is public map information (decision 0028).

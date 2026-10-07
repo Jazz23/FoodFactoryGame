@@ -1,5 +1,5 @@
 // Verifies saved employee records: a record brings its grant and carried inventory, pose and script survive a save and load,
-// a failed script commit changes nothing, recovery rejects records without their grant or inventory, views hide scripts,
+// the visual task list saves with the script, a failed script commit changes nothing, recovery rejects records without their grant or inventory, views hide scripts,
 // and v8 saves load with no employees. Isolated saves only.
 using System;
 using System.IO;
@@ -87,6 +87,21 @@ namespace FoodFactoryGame.Goods.Tests
             var loaded = GoodsSnapshotStore.Load(PathForSave).Employees().Single();
             Assert.That((loaded.X, loaded.Y, loaded.Z, loaded.Yaw), Is.EqualTo((4f, 0.1f, -3f, 180f)));
             Assert.That((loaded.Script, loaded.ScriptRunning, loaded.Name), Is.EqualTo(("wait(1)", true, "A")));
+        }
+
+        [Test]
+        public void TaskListIsSavedWithTheScriptAndKeptWhenNotGiven()
+        {
+            var world = CreateWorld();
+            GoodsSnapshotStore.Save(world, PathForSave);
+            Assert.That(world.SetEmployeeScriptDurably("employee-a", "wait(1)", true, PathForSave, "{\"Tasks\":[]}"), Is.Null);
+            Assert.That(world.SetEmployeeScriptDurably("employee-a", "wait(2)", false, PathForSave), Is.Null);
+            var loaded = GoodsSnapshotStore.Load(PathForSave).Employees().Single();
+            Assert.That((loaded.Script, loaded.Tasks), Is.EqualTo(("wait(2)", "{\"Tasks\":[]}")), "A script without a list keeps the saved list.");
+            Assert.That(world.SetEmployeeScriptDurably("employee-a", "", false, PathForSave, new string('-', GoodsWorld.MaxEmployeeTasksLength + 1)),
+                Is.EqualTo("tasks-too-long"));
+            world.Grant("chef", "site");
+            Assert.That(world.View("chef", "site").Employees.Single().Tasks, Is.Empty, "Views hide task lists like scripts.");
         }
 
         [Test]

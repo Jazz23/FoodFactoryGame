@@ -709,7 +709,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
         }
 
         // A whole sale in the pre-equipped starting restaurant (decision 0030), with a listen-server teammate: the host buys an
-        // oven and dough from the supplier, places the oven inside the shell, bakes bread and puts it on the starting counter; a
+        // oven and dough from the supplier, places the oven inside the shell, switches it on, bakes bread and puts it on the starting counter; a
         // customer buys it, the company's cash goes up on both clients (the teammate also sees the customers), and the committed
         // save matches. The local NavMesh leads from the street through a door to the counter, and customer figures are drawn.
         [UnityTest]
@@ -748,6 +748,10 @@ namespace FoodFactoryGame.Session.PlayModeTests
             bridge.RequestTransfer("load-oven", dough.Id, oven.Id + ":in", 2);
             yield return Until(() => results.ContainsKey("load-oven"), "dough into the oven");
             Assert.That(results["load-oven"].Accepted, Is.True, results["load-oven"].Reason);
+            // The oven bakes only once switched on (decision 0037).
+            bridge.RequestSetPower("oven-on", oven.Id, true);
+            yield return Until(() => results.ContainsKey("oven-on"), "oven switched on");
+            Assert.That(results["oven-on"].Accepted, Is.True, results["oven-on"].Reason);
             yield return Until(() => _root.ClientSite.Lots.Any(x => x.LocationId == oven.Id + ":out" && x.ItemId == "bread"), "baked bread", 40f);
             var bread = _root.ClientSite.Lots.First(x => x.LocationId == oven.Id + ":out" && x.ItemId == "bread");
             bridge.RequestTransfer("stock-counter", bread.Id, GeneratedWorld.StartCounterId + ":in", bread.Quantity);

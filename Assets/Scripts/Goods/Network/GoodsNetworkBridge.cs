@@ -221,6 +221,21 @@ namespace FoodFactoryGame.Goods.Network
             if (IsClientStarted) ServerStartJob(requestId, stationId, recipeId);
         }
 
+        // Switches a manually powered machine (the oven) on or off (SetPowerDurably, decision 0037).
+        public void RequestSetPower(string requestId, string equipmentId, bool on)
+        {
+            if (IsClientStarted) ServerSetPower(requestId, equipmentId, on);
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        private void ServerSetPower(string requestId, string equipmentId, bool on, NetworkConnection sender = null)
+        {
+            if (!TryIdentify(sender, requestId, out var player)) return;
+            var result = _world.SetPowerDurably(player, requestId, equipmentId, on, _savePath);
+            Reply(sender, result);
+            if (result.Accepted) Broadcast();
+        }
+
         // Places a belt from the player's inventory on an empty cell, or turns the belt already there (PlaceBeltDurably).
         public void RequestPlaceBelt(string requestId, string siteId, int cellX, int cellZ, int direction, int level = 0)
         {
@@ -558,12 +573,12 @@ namespace FoodFactoryGame.Goods.Network
             if (IsServing) _world.SetEmployeePose(workerId, position.x, position.y, position.z, yaw);
         }
 
-        // Server-only: a worker's assigned script and whether it runs, committed before returning. Null when saved,
-        // otherwise the reason nothing changed.
-        public string RecordWorkerScript(string workerId, string script, bool running)
+        // Server-only: a worker's assigned script and whether it runs (and, unless null, its visual task list), committed
+        // before returning. Null when saved, otherwise the reason nothing changed.
+        public string RecordWorkerScript(string workerId, string script, bool running, string tasks = null)
         {
             if (!IsServing) return "persistence-unavailable";
-            return _world.SetEmployeeScriptDurably(workerId, script, running, _savePath);
+            return _world.SetEmployeeScriptDurably(workerId, script, running, _savePath, tasks);
         }
 
         // Server-only: the worker's authorized view of a site (null if it has no grant or the bridge is not serving).
@@ -588,6 +603,14 @@ namespace FoodFactoryGame.Goods.Network
 
         public GoodsOutcome WorkerPlaceBelt(string workerId, string siteId, int cellX, int cellZ, int direction) =>
             Worker(requestId => _world.PlaceBeltDurably(workerId, requestId, siteId, cellX, cellZ, direction, _savePath));
+
+        public GoodsOutcome WorkerSetPower(string workerId, string equipmentId, bool on) =>
+            Worker(requestId => _world.SetPowerDurably(workerId, requestId, equipmentId, on, _savePath));
+
+        // Server-only content queries for workers: whether a kind needs switching on, and what its recipes consume.
+        public bool RequiresPower(string kind) => IsServing && _world.RequiresPower(kind);
+
+        public IReadOnlyList<string> RecipeInputs(string kind) => IsServing ? _world.RecipeInputs(kind) : Array.Empty<string>();
 
         private GoodsOutcome Worker(Func<string, GoodsOutcome> request)
         {

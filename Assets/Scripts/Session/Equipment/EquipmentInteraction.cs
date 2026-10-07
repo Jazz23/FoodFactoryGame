@@ -40,6 +40,16 @@ namespace FoodFactoryGame.Session.Equipment
         Build
     }
 
+    // What a world pick on the employee screen is for: a cell or machine for the Lua text box, or a task's source,
+    // destination or machine (decision 0037).
+    public enum PickTarget
+    {
+        Position,
+        Source,
+        Destination,
+        Machine
+    }
+
     // One slot's goods stack (item and spoiled state, up to the item's max stack) in one container, carried on the cursor.
     // The lots stay where they are; Quantity is how many units a drop may move, and Slot names the HUD slot it came from.
     public sealed class CursorStack
@@ -305,7 +315,10 @@ namespace FoodFactoryGame.Session.Equipment
                         "Storage: click or shift+click to move goods in and out; hover a stack to see when it spoils; E or Esc closes" + suffix,
                     InteractionScreen.Logistics => "Logistics: set each truck's route and cargo, and move stock at remote sites; L or Esc closes" + suffix,
                     InteractionScreen.Property => "Property: Buy spends company cash on this building and its lot; E or Esc closes",
-                    InteractionScreen.Employee => "Employee: paste a Lua script and press Run; Stop halts it; Esc closes" + suffix,
+                    InteractionScreen.Employee => "Employee: add tasks (or edit the Lua) and press Run; Stop halts it; Esc closes" + suffix,
+                    InteractionScreen.PickPosition when PickMode != PickTarget.Position =>
+                        $"{PickMode switch { PickTarget.Source => "Set source", PickTarget.Destination => "Set destination", _ => "Select machine" }}: "
+                        + "look at a pulsing red one and click or press E; Esc returns" + (PickText != null ? $" [{PickText}]" : ""),
                     InteractionScreen.PickPosition => "Select world pos: look at a cell or a machine (red) and click to insert it into the script; Esc returns"
                         + (PickText != null ? $" [{PickText}]" : ""),
                     InteractionScreen.Machine => "Machine: put ingredients in the input, take results from the output (shift+click moves a stack); E or Esc closes" + suffix,
@@ -571,6 +584,16 @@ namespace FoodFactoryGame.Session.Equipment
             if (bridge == null || string.IsNullOrEmpty(registerId)) return;
             LastRejection = null;
             bridge.RequestStaff(Track(), registerId, staffId ?? "");
+        }
+
+        // Switches a manually powered machine (decision 0037, the oven) on or off; the server checks the grant and the kind.
+        public void SetPower(string equipmentId, bool on)
+        {
+            var bridge = _subscription?.Bridge;
+            if (bridge == null || string.IsNullOrEmpty(equipmentId)) return;
+            LastRejection = null;
+            Debug.Log($"[Equipment] Requesting that {equipmentId} be switched {(on ? "on" : "off")}.");
+            bridge.RequestSetPower(Track(), equipmentId, on);
         }
 
         // Opens and closes build mode (decision 0034, BuildMode): a screen of its own, so the world controls here stand aside

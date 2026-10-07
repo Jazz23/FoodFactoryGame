@@ -256,12 +256,15 @@ namespace FoodFactoryGame.Session
             ServerWorld.ReleaseStaffDurably(null, _options.WorldPath);
             // Recipes are content, not saved state, so they are registered on every start, including a recovered save.
             foreach (var recipe in recipes) ServerWorld.RegisterRecipe(recipe.ToDefinition());
+            // Kinds that run only while switched on (decision 0037), content like recipes.
+            foreach (var definition in equipmentDefinitions.Where(x => x != null && x.ManualPower)) ServerWorld.RegisterManualPower(definition.Kind);
             foreach (var offer in offers) offer.RegisterWith(ServerWorld);
             ServerWorld.RegisterFloorOffer(DevWorld.FloorOffer);
             // Like floors, the property catalog is content: the stored layout's lots (decision 0028), none without a layout. A
             // generated world registered its own while loading.
             if (ServerLayout != null && StartOffer == null) ServerWorld.RegisterPropertyOffers(WorldLayoutShells.PropertyOffers(ServerLayout.Layout));
-            // Machines run by themselves, Factorio-style (decision 0008); like recipes, this is configuration, not saved.
+            // Machines run by themselves, Factorio-style (decision 0008), once switched on where their kind needs it (decision
+            // 0037); like recipes, this is configuration, not saved.
             ServerWorld.AutomaticJobs = true;
             _registry = new PlayerRegistry(_options.RegistryPath);
             // PROTOTYPE: players start with the dev inventory and starter goods on the primary site in either kind of world.

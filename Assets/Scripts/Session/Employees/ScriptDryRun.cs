@@ -1,7 +1,7 @@
 // Checks a program the script assistant wrote: first that it parses, then that it survives a short run against stand-ins for
 // the employee API (EmployeeWorker's Lua calls). Stand-ins finish at once and return typical values: true for walking and
-// placing, 1 for take/put/count, one ID from find/holding, {0, 0} from position(). No goods, machines or world state are
-// touched, so the run can happen on the client. It catches what parsing cannot, such as arithmetic on the table position()
+// placing, 1 for take/put/count/room, one ID from find/holding, {"dough"} from accepts(), false from is_on() and {0, 0} from
+// position(). No goods, machines or world state are touched, so the run can happen on the client. It catches what parsing cannot, such as arithmetic on the table position()
 // returns or a call to a function the API does not have. Branches the stand-in values do not take go unchecked.
 using System;
 using System.Collections;
@@ -50,7 +50,10 @@ namespace FoodFactoryGame.Session.Employees
             ["wait"] = Returns(DynValue.True),
             ["place"] = Returns(DynValue.True),
             ["pick_up"] = Returns(DynValue.True),
-            ["place_belt"] = Returns(DynValue.True)
+            ["place_belt"] = Returns(DynValue.True),
+            ["turn_on"] = Returns(DynValue.True),
+            ["turn_off"] = Returns(DynValue.True),
+            ["toggle"] = Returns(DynValue.True)
         };
 
         private static Dictionary<string, Func<Script, CallbackArguments, DynValue>> Queries() => new()
@@ -60,6 +63,9 @@ namespace FoodFactoryGame.Session.Employees
             ["carrying"] = (_, _) => DynValue.NewNumber(1),
             ["holding"] = (lua, _) => DynValue.NewTable(new Table(lua, DynValue.NewString("machine-2"))),
             ["position"] = (lua, _) => EmployeeScript.Cell(lua, 0, 0),
+            ["accepts"] = (lua, _) => DynValue.NewTable(new Table(lua, DynValue.NewString("dough"))),
+            ["room"] = (_, _) => DynValue.NewNumber(1),
+            ["is_on"] = (_, _) => DynValue.False,
             ["say"] = (_, _) => DynValue.Nil
         };
 

@@ -11,6 +11,7 @@
 // before their first lot spoils, frozen (blue) while refrigerated because refrigeration pauses spoilage (decision 0018), and
 // the hover line gives the full time; a machine with no recipes (the fridge) opens as plain storage, and a loading dock as its
 // outgoing and incoming grids (decision 0022). Inside a factory the inventory screen also offers its next floor (decision 0020).
+// A machine with a power switch (decision 0037, the oven) shows it under its grids; it bakes only while switched on.
 // Presentation only: slot positions are this client's arrangement of the replicated stacks, never saved or sent, and
 // progress is interpolated for at most one clock step past the latest baseline.
 using System;
@@ -46,6 +47,7 @@ namespace FoodFactoryGame.Session.Equipment
         private static readonly Color Muted = new(0.7f, 0.7f, 0.75f, 1f);
         private static readonly Color Chilled = new(0.55f, 0.85f, 1f, 1f);
         // A running (not refrigerated) spoil timer turns this colour in the last tenth of the item's shelf life.
+        private static readonly Color PowerOn = new(0.3f, 0.75f, 0.35f, 1f);
         private static readonly Color SpoilingSoon = new(1f, 0.6f, 0.35f, 1f);
 
         [SerializeField] private UIDocument document;
@@ -406,6 +408,8 @@ namespace FoodFactoryGame.Session.Equipment
             foreach (var location in _site.Locations) text.Append('|').Append(location.Id).Append(location.Capacity);
             // An open register shows who works it and who could (decision 0034).
             var open = _site.Equipment.FirstOrDefault(x => x.Id == interaction.OpenMachineId);
+            // The power switch (decision 0037) shows the server's state, and waits while a request is out.
+            if (open != null && HasPowerSwitch(open.Kind)) text.Append("|power:").Append(open.PoweredOn).Append(interaction.HasPendingRequests);
             if (open?.Kind == GoodsWorld.CounterKind)
             {
                 text.Append("|staff:").Append(open.StaffId).Append('|').Append(interaction.HasPendingRequests);
@@ -619,8 +623,55 @@ namespace FoodFactoryGame.Session.Equipment
             _progressLabel.name = "hud-progress-label";
             window.Add(_progressLabel);
             if (equipment.Kind == GoodsWorld.CounterKind) window.Add(StaffRow(site, equipment));
+            if (HasPowerSwitch(equipment.Kind)) window.Add(PowerRow(equipment));
             return window;
         }
+
+        private bool HasPowerSwitch(string kind) =>
+            interaction.Session.EquipmentDefinitions.Any(x => x != null && x.Kind == kind && x.ManualPower);
+
+        // A machine with a power switch (decision 0037, the oven) bakes only while it is on: a sliding switch that asks the
+        // server to flip it. Rebuilt with the server's answer (Signature).
+        private VisualElement PowerRow(GoodsEquipment equipment)
+        {
+            var row = new VisualElement { name = "hud-power" };
+            row.style.flexDirection = FlexDirection.Row;
+            row.style.alignItems = Align.Center;
+            row.style.marginTop = 6;
+            var on = equipment.PoweredOn;
+            var label = Caption(interaction.HasPendingRequests ? "Switching..." : on ? "Power: on" : "Power: off",
+                12, on ? Color.white : Spoiled);
+            label.name = "hud-power-label";
+            label.style.flexGrow = 1;
+            row.Add(label);
+            var track = new VisualElement { name = "hud-power-switch" };
+            track.style.width = 46;
+            track.style.height = 22;
+            track.style.backgroundColor = on ? PowerOn : SlotEdgeDark;
+            SetBorder(track, SlotEdgeLight, 1);
+            track.style.borderTopLeftRadius = track.style.borderTopRightRadius = 11;
+            track.style.borderBottomLeftRadius = track.style.borderBottomRightRadius = 11;
+            var knob = new VisualElement { pickingMode = PickingMode.Ignore };
+            knob.style.position = Position.Absolute;
+            knob.style.top = 2;
+            knob.style.left = on ? 26 : 2;
+            knob.style.width = knob.style.height = 16;
+            knob.style.backgroundColor = Color.white;
+            knob.style.borderTopLeftRadius = knob.style.borderTopRightRadius = 8;
+            knob.style.borderBottomLeftRadius = knob.style.borderBottomRightRadius = 8;
+            track.Add(knob);
+            var equipmentId = equipment.Id;
+            track.RegisterCallback<ClickEvent>(_ =>
+            {
+                if (!interaction.HasPendingRequests) ClickPower(equipmentId, !on);
+            });
+            track.SetEnabled(!interaction.HasPendingRequests);
+            row.Add(track);
+            return row;
+        }
+
+        // Flips a machine's power switch, like the switch. Public so tests drive the same path.
+        public void ClickPower(string equipmentId, bool on) => interaction.SetPower(equipmentId, on);
 
         // A register (decision 0034) sells only while someone works it: who does, and a button to work it or leave it.
         private VisualElement StaffRow(GoodsSnapshot site, GoodsEquipment register)
@@ -849,6 +900,8 @@ namespace FoodFactoryGame.Session.Equipment
                 _progressLabel.text = $"Serving a customer: {food}for {FormatCash(serving.PaidCents)}"
                     + (waiting > 0 ? $"; {waiting} waiting" : "");
             }
+            else if (job == null && equipment != null && HasPowerSwitch(equipment.Kind) && !equipment.PoweredOn)
+                _progressLabel.text = "Off: switch it on to bake";
             else if (job == null)
             {
                 var recipes = interaction.Session.Recipes.Where(x => x != null && x.StationKind == equipment?.Kind).ToList();
@@ -870,6 +923,12 @@ namespace FoodFactoryGame.Session.Equipment
             {
                 fraction = 1f;
                 _progressLabel.text = $"Done, waiting: output full ({ItemName(job.OutputItemId)})";
+            }
+            else if (equipment != null && HasPowerSwitch(equipment.Kind) && !equipment.PoweredOn)
+            {
+                // Switched off mid-batch (decision 0037): the batch waits where it is.
+                fraction = Mathf.Clamp01((float)(job.DurationSeconds - job.RemainingSeconds) / job.DurationSeconds);
+                _progressLabel.text = $"Paused (off): {ItemName(job.OutputItemId)} {job.DurationSeconds - job.RemainingSeconds}/{job.DurationSeconds} s";
             }
             else
             {

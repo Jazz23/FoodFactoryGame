@@ -22,12 +22,16 @@ namespace FoodFactoryGame.Goods
         // line after recovery, since interpreter state is not saved.
         public string Script = "";
         public bool ScriptRunning;
+        // The visual task list (JSON, EmployeeTaskList) the script was generated from; empty when there is none. The client
+        // treats a script that no longer matches its generated text as hand-edited (detached from these tasks).
+        public string Tasks = "";
     }
 
     public sealed partial class GoodsWorld
     {
         public const string EmployeePrefix = "employee-";
         public const int MaxEmployeeScriptLength = 16000;
+        public const int MaxEmployeeTasksLength = 16000;
 
         // Server-only seed/hire path: adds the record, its site grant and its carried inventory (created with handSlots slots,
         // or an existing one reused) in memory. Callers commit. Throws ArgumentException for an invalid or duplicate record.
@@ -37,7 +41,8 @@ namespace FoodFactoryGame.Goods
             {
                 if (employee == null || string.IsNullOrWhiteSpace(employee.Id) || !employee.Id.StartsWith(EmployeePrefix, StringComparison.Ordinal)
                     || _state.Employees.Any(x => x.Id == employee.Id) || _state.Locations.All(x => x.SiteId != employee.SiteId)
-                    || handSlots < 1 || !ValidPose(employee) || (employee.Script ?? "").Length > MaxEmployeeScriptLength)
+                    || handSlots < 1 || !ValidPose(employee) || (employee.Script ?? "").Length > MaxEmployeeScriptLength
+                    || (employee.Tasks ?? "").Length > MaxEmployeeTasksLength)
                     throw new ArgumentException("Invalid or duplicate employee, or a site that does not exist.");
                 var handsId = InventoryLocationId(employee.Id);
                 var hands = _state.Locations.FirstOrDefault(x => x.Id == handsId);
@@ -49,6 +54,7 @@ namespace FoodFactoryGame.Goods
                     _state.Grants.Add(new GoodsGrant { PlayerId = employee.Id, SiteId = employee.SiteId });
                 var copy = JsonUtility.FromJson<GoodsEmployee>(JsonUtility.ToJson(employee));
                 copy.Script ??= "";
+                copy.Tasks ??= "";
                 _state.Employees.Add(copy);
                 _state.Revision++;
             }
@@ -79,21 +85,25 @@ namespace FoodFactoryGame.Goods
             }
         }
 
-        // Server-only: assigns a program (and whether it runs) and commits it before returning, with any pending ticks.
-        // Returns null when committed, otherwise unknown-employee, script-too-long or persistence-unavailable (state unchanged).
-        public string SetEmployeeScriptDurably(string employeeId, string script, bool running, string savePath)
+        // Server-only: assigns a program (and whether it runs) and, unless tasks is null, the visual task list it came from,
+        // and commits them before returning, with any pending ticks. Returns null when committed, otherwise unknown-employee,
+        // script-too-long, tasks-too-long or persistence-unavailable (state unchanged).
+        public string SetEmployeeScriptDurably(string employeeId, string script, bool running, string savePath, string tasks = null)
         {
             lock (_gate)
             {
                 script ??= "";
                 if (_state.Employees.All(x => x.Id != employeeId)) return "unknown-employee";
                 if (script.Length > MaxEmployeeScriptLength) return "script-too-long";
+                if (tasks != null && tasks.Length > MaxEmployeeTasksLength) return "tasks-too-long";
                 return Durably(savePath, () =>
                 {
                     var employee = _state.Employees.First(x => x.Id == employeeId);
-                    if (employee.Script == script && employee.ScriptRunning == running) return (string)null;
+                    var nextTasks = tasks ?? employee.Tasks;
+                    if (employee.Script == script && employee.ScriptRunning == running && employee.Tasks == nextTasks) return (string)null;
                     employee.Script = script;
                     employee.ScriptRunning = running;
+                    employee.Tasks = nextTasks;
                     _state.Revision++;
                     return null;
                 }, () => "persistence-unavailable");
@@ -108,6 +118,7 @@ namespace FoodFactoryGame.Goods
         {
             if (state.Employees.Any(x => x == null || string.IsNullOrWhiteSpace(x.Id) || !x.Id.StartsWith(EmployeePrefix, StringComparison.Ordinal)
                     || !ValidPose(x) || x.Script == null || x.Script.Length > MaxEmployeeScriptLength
+                    || x.Tasks == null || x.Tasks.Length > MaxEmployeeTasksLength
                     || !state.Locations.Any(y => y.Id == InventoryLocationId(x.Id) && y.SiteId == x.SiteId)
                     || !state.Grants.Any(y => y.PlayerId == x.Id && y.SiteId == x.SiteId))
                 || state.Employees.GroupBy(x => x.Id).Any(x => x.Count() != 1))

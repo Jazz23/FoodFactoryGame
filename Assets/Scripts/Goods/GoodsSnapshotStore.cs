@@ -480,6 +480,15 @@ namespace FoodFactoryGame.Goods
             // v16 had no free walls (decision 0036); every shell's FreeWalls reads false, so its perimeter stays implied. The version
             // still changes so an older build refuses a v17 save instead of drawing free walls as a rectangle.
             if (state != null && state.SchemaVersion == 16) state.SchemaVersion = 17;
+            // v17 had no employee task lists or machine power switches (decision 0037): employees load with no visual tasks
+            // (a saved script then shows as hand-edited Lua) and every machine loads switched off, so an oven mid-batch
+            // pauses until a player or employee turns it on.
+            if (state != null && state.SchemaVersion == 17)
+            {
+                foreach (var employee in state.Employees ?? new()) if (employee != null) employee.Tasks ??= "";
+                foreach (var equipment in state.Equipment ?? new()) if (equipment != null) equipment.PoweredOn = false;
+                state.SchemaVersion = 18;
+            }
             GoodsWorld.Validate(state);
             return state;
         }

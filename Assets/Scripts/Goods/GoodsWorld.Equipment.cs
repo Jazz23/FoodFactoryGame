@@ -50,6 +50,10 @@ namespace FoodFactoryGame.Goods
         // A register (kind counter) is the restaurant's sale point and sells only while staffed (decision 0034): the player or
         // employee working it, empty when unstaffed. Empty on every other piece.
         public string StaffId = "";
+        // Decision 0037 (schema v18): whether the machine's power switch is on. Only kinds registered as manually powered
+        // (GoodsWorld.RegisterManualPower, the oven) read it: such a station starts and advances batches only while it is on.
+        // Picking the piece up or selling it switches it off.
+        public bool PoweredOn;
 
         public string InputLocationId => Id + ":in";
         public string OutputLocationId => Id + ":out";
@@ -189,6 +193,7 @@ namespace FoodFactoryGame.Goods
                 equipment.State = EquipmentState.Held;
                 equipment.HolderId = playerId;
                 equipment.StaffId = "";
+                equipment.PoweredOn = false;
                 equipment.CellX = equipment.CellZ = equipment.Rotation = equipment.Level = 0;
                 InvalidateDinersFor(equipment);
                 var result = Record(requestId, playerId, true, "picked-up", null);

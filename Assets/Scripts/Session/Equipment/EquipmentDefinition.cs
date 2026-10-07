@@ -52,6 +52,8 @@ namespace FoodFactoryGame.Session.Equipment
         [SerializeField] private bool hideFromAbove;
         // False for decor and furniture without goods or seats: clicking it opens nothing (its unused buffers stay closed).
         [SerializeField] private bool opensScreen = true;
+        // Decision 0037: the machine has a power switch and starts and advances batches only while it is on (the oven).
+        [SerializeField] private bool manualPower;
 
         public string Kind => kind;
         public int Width => width;
@@ -71,6 +73,7 @@ namespace FoodFactoryGame.Session.Equipment
         public float MountHeight => mountHeight;
         public bool HideFromAbove => hideFromAbove;
         public bool OpensScreen => opensScreen;
+        public bool ManualPower => manualPower;
 
         public GoodsEquipment CreatePlaced(string id, string siteId, int cellX, int cellZ, int rotation) => new()
         {

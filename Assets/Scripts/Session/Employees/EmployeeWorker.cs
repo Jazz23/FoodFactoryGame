@@ -5,7 +5,9 @@
 // its hands are ordinary lots: stopping or replacing a script never deletes or duplicates them. A transfer needs the
 // employee within reach of the place's footprint on the server. NetworkTransform replicates the pose; every peer animates
 // from observed movement and shows the carried box from the replicated Carrying flag. The pose and the assigned script (and
-// whether it runs) are saved with the record; after a restart a running script starts again from its first line.
+// whether it runs) are saved with the record; after a restart a running script starts again from its first line. The visual
+// task list the script was generated from (EmployeeTaskList, decision 0037) is saved and replicated beside it for the
+// script screen; the server never interprets it, only the Lua runs.
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -48,6 +50,7 @@ namespace FoodFactoryGame.Session.Employees
         private readonly SyncVar<bool> _carrying = new();
         private readonly SyncVar<string> _status = new("Idle");
         private readonly SyncVar<string> _source = new("");
+        private readonly SyncVar<string> _tasks = new("");
 
         // Server-only, from the saved record (Configure).
         private GoodsEmployee _record;
@@ -71,6 +74,8 @@ namespace FoodFactoryGame.Session.Employees
         public string Status => _status.Value;
         // The last program assigned to this employee (saved with it), so the script screen can show it again.
         public string Source => _source.Value;
+        // The saved visual task list (EmployeeTaskList JSON), empty when there is none.
+        public string Tasks => _tasks.Value;
         private string HandsId => GoodsWorld.InventoryLocationId(_employeeId);
 
         private void Awake()
@@ -97,6 +102,7 @@ namespace FoodFactoryGame.Session.Employees
             _id.Value = _employeeId;
             _name.Value = string.IsNullOrWhiteSpace(_record.Name) ? _employeeId : _record.Name;
             _source.Value = _record.Script ?? "";
+            _tasks.Value = _record.Tasks ?? "";
             agent.enabled = true;
             if (!agent.isOnNavMesh && NavMesh.SamplePosition(transform.position, out var hit, 2f, NavMesh.AllAreas))
                 agent.Warp(hit.position);
@@ -121,10 +127,11 @@ namespace FoodFactoryGame.Session.Employees
             DistanceCulling.Apply(gameObject);
         }
 
-        // Client request: run this program, replacing any running one. Goods in the employee's hands stay there.
-        public void RequestRun(string source)
+        // Client request: run this program, replacing any running one, and save the visual task list it came from (null keeps
+        // the saved one). Goods in the employee's hands stay there.
+        public void RequestRun(string source, string tasks = null)
         {
-            if (IsClientStarted) ServerRun(source ?? "");
+            if (IsClientStarted) ServerRun(source ?? "", tasks);
         }
 
         public void RequestStop()
@@ -133,16 +140,16 @@ namespace FoodFactoryGame.Session.Employees
         }
 
         [ServerRpc(RequireOwnership = false)]
-        private void ServerRun(string source, NetworkConnection sender = null)
+        private void ServerRun(string source, string tasks, NetworkConnection sender = null)
         {
             if (!Authorized(sender)) return;
             Halt();
-            Begin(source, false);
+            Begin(source, false, tasks);
         }
 
         // Compiles the program and saves it as this employee's running assignment before it starts; neither happens if the
         // program does not compile or the save fails.
-        private void Begin(string source, bool restarted)
+        private void Begin(string source, bool restarted, string tasks = null)
         {
             EmployeeScript script;
             try
@@ -155,7 +162,7 @@ namespace FoodFactoryGame.Session.Employees
                 if (restarted) Record(source, false);
                 return;
             }
-            var problem = Record(source, true);
+            var problem = Record(source, true, tasks);
             if (problem != null)
             {
                 _status.Value = "Error: could not save the script (" + problem + ")";
@@ -164,15 +171,16 @@ namespace FoodFactoryGame.Session.Employees
             _lastMessage = null;
             _script = script;
             _source.Value = source;
+            if (tasks != null) _tasks.Value = tasks;
             _status.Value = restarted ? "Running (restarted after the server restarted)" : "Running";
             Debug.Log($"[Employee] {_employeeId} {(restarted ? "restarted its saved" : "started a")} script ({source.Length} characters).");
         }
 
         // Saves the assignment with the employee; null when saved, otherwise the reason.
-        private string Record(string source, bool running)
+        private string Record(string source, bool running, string tasks = null)
         {
             var bridge = Bridge;
-            return bridge == null ? "persistence-unavailable" : bridge.RecordWorkerScript(_employeeId, source, running);
+            return bridge == null ? "persistence-unavailable" : bridge.RecordWorkerScript(_employeeId, source, running, tasks);
         }
 
         [ServerRpc(RequireOwnership = false)]
@@ -271,7 +279,10 @@ namespace FoodFactoryGame.Session.Employees
             ["wait"] = Wait,
             ["place"] = PlaceMachine,
             ["pick_up"] = PickUpMachine,
-            ["place_belt"] = PlaceBelt
+            ["place_belt"] = PlaceBelt,
+            ["turn_on"] = (args, result) => SwitchPower(args, result, true),
+            ["turn_off"] = (args, result) => SwitchPower(args, result, false),
+            ["toggle"] = (args, result) => SwitchPower(args, result, null)
         };
 
         private Dictionary<string, Func<Script, CallbackArguments, DynValue>> Queries() => new()
@@ -281,6 +292,9 @@ namespace FoodFactoryGame.Session.Employees
             ["carrying"] = (_, _) => DynValue.NewNumber(View()?.Lots.Where(x => x.LocationId == HandsId).Sum(x => x.Quantity) ?? 0),
             ["holding"] = Holding,
             ["position"] = Position,
+            ["accepts"] = Accepts,
+            ["room"] = Room,
+            ["is_on"] = IsOn,
             ["say"] = (_, args) =>
             {
                 Say(string.Join(" ", args.GetArray().Select(x => x.ToPrintString())));
@@ -335,11 +349,12 @@ namespace FoodFactoryGame.Session.Employees
             result.Set(DynValue.True);
         }
 
-        // take(place, item, amount): walks to a place and picks up to amount units of an item (any item if nil; as many as fit if
-        // amount is nil). Unspoiled goods only. Returns the number taken, and a reason when it is 0.
+        // take(place, items, amount): walks to a place and picks up to amount units of the items (see ItemFilter: an item, a list,
+        // {except = {...}}, or nil for any; as many as fit if amount is nil). Unspoiled goods only. Returns the number taken, and a
+        // reason when it is 0.
         private IEnumerator Take(CallbackArguments args, EmployeeScript.Result result)
         {
-            var item = OptionalString(args, 1);
+            var item = ItemFilter.From(args[1]);
             var amount = OptionalAmount(args, 2);
             var place = Container(args[0]);
             if (place.Problem != null)
@@ -347,7 +362,7 @@ namespace FoodFactoryGame.Session.Employees
                 result.Set(DynValue.NewNumber(0), DynValue.NewString(place.Problem));
                 yield break;
             }
-            _status.Value = $"Running: fetching {(item ?? "goods")} from {place.Name}";
+            _status.Value = $"Running: fetching {item.Label} from {place.Name}";
             var walk = Walk(place, result);
             while (walk.MoveNext()) yield return null;
             if (!result.Value.IsNil()) yield break;
@@ -355,11 +370,11 @@ namespace FoodFactoryGame.Session.Employees
             result.Set(DynValue.NewNumber(moved), moved > 0 ? DynValue.Nil : DynValue.NewString(reason));
         }
 
-        // put(place, item, amount): walks to a place and puts carried goods in (all items if nil, all units if amount is nil).
+        // put(place, items, amount): walks to a place and puts carried goods in (all items if nil, all units if amount is nil).
         // Returns the number put, and a reason when it is 0.
         private IEnumerator Put(CallbackArguments args, EmployeeScript.Result result)
         {
-            var item = OptionalString(args, 1);
+            var item = ItemFilter.From(args[1]);
             var amount = OptionalAmount(args, 2);
             var place = Container(args[0]);
             if (place.Problem != null)
@@ -367,7 +382,7 @@ namespace FoodFactoryGame.Session.Employees
                 result.Set(DynValue.NewNumber(0), DynValue.NewString(place.Problem));
                 yield break;
             }
-            _status.Value = $"Running: delivering {(item ?? "goods")} to {place.Name}";
+            _status.Value = $"Running: delivering {item.Label} to {place.Name}";
             var walk = Walk(place, result);
             while (walk.MoveNext()) yield return null;
             if (!result.Value.IsNil()) yield break;
@@ -463,6 +478,30 @@ namespace FoodFactoryGame.Session.Employees
             result.Set(outcome?.Accepted == true ? DynValue.True : DynValue.False, Reason(outcome));
         }
 
+        // turn_on(machine) / turn_off(machine) / toggle(machine): walks to a machine with a power switch (an ID, or the nearest
+        // of a kind, such as "oven") and flips it (decision 0037). on is null to toggle. Returns true, or false and a reason.
+        private IEnumerator SwitchPower(CallbackArguments args, EmployeeScript.Result result, bool? on)
+        {
+            var view = View();
+            var place = Resolve(args[0], view);
+            var kind = place.EquipmentId == null ? null : view?.Equipment.FirstOrDefault(x => x.Id == place.EquipmentId)?.Kind;
+            if (place.Problem == null && place.EquipmentId == null) place.Problem = $"{place.Name} is not a machine";
+            if (place.Problem == null && Bridge?.RequiresPower(kind) != true) place.Problem = $"{place.Name} has no power switch";
+            if (place.Problem != null)
+            {
+                result.Set(DynValue.False, DynValue.NewString(place.Problem));
+                yield break;
+            }
+            _status.Value = $"Running: {(on == null ? "toggling" : on.Value ? "switching on" : "switching off")} {place.Name}";
+            var walk = Walk(place, result);
+            while (walk.MoveNext()) yield return null;
+            if (!result.Value.IsNil()) yield break;
+            var target = on ?? View()?.Equipment.FirstOrDefault(x => x.Id == place.EquipmentId)?.PoweredOn != true;
+            var outcome = Bridge?.WorkerSetPower(_employeeId, place.EquipmentId, target);
+            Debug.Log($"[Employee] {_employeeId} switching {place.EquipmentId} {(target ? "on" : "off")}: {outcome?.Reason ?? "unavailable"}.");
+            result.Set(outcome?.Accepted == true ? DynValue.True : DynValue.False, Reason(outcome));
+        }
+
         private static DynValue Reason(GoodsOutcome outcome) => outcome == null ? DynValue.NewString("the world is not available")
             : outcome.Accepted ? DynValue.Nil : DynValue.NewString(outcome.Reason);
 
@@ -475,17 +514,63 @@ namespace FoodFactoryGame.Session.Employees
             result.Set(DynValue.True);
         }
 
-        // count(place, item): units of an item (all items if nil) at a place; "hands" counts what the employee carries.
+        // count(place, items): units of the items (all items if nil) at a place; "hands" counts what the employee carries. A
+        // machine buffer ("<id>:out") counts only that buffer.
         private DynValue Count(Script _, CallbackArguments args)
         {
             var view = View();
             var target = OptionalString(args, 0) ?? "hands";
-            var item = OptionalString(args, 1);
+            var item = ItemFilter.From(args[1]);
             var place = Resolve(target, view);
             if (view == null || place.Problem != null) return DynValue.NewNumber(0);
             var locations = new HashSet<string>(place.TakeFrom.Append(place.PutInto));
-            return DynValue.NewNumber(view.Lots.Where(x => locations.Contains(x.LocationId) && (item == null || x.ItemId == item))
+            return DynValue.NewNumber(view.Lots.Where(x => locations.Contains(x.LocationId) && item.Allows(x.ItemId))
                 .Sum(x => x.Quantity));
+        }
+
+        // accepts(place, except): the items a place takes, as a filter for take()/count()/room(): a machine's recipe inputs (the
+        // oven takes dough), minus the except list; nil for a place that takes anything (storage, the fridge) unless an except
+        // list is given, which then comes back as {except = {...}}.
+        private DynValue Accepts(Script lua, CallbackArguments args)
+        {
+            var view = View();
+            var place = Resolve(args[0], view);
+            var excluded = ItemFilter.Names(args[1]);
+            var kind = place.EquipmentId == null ? null : view?.Equipment.FirstOrDefault(x => x.Id == place.EquipmentId)?.Kind;
+            var inputs = kind == null ? Array.Empty<string>() : Bridge?.RecipeInputs(kind) ?? Array.Empty<string>();
+            var table = new Table(lua);
+            if (inputs.Count == 0)
+            {
+                if (excluded.Count == 0) return DynValue.Nil;
+                var except = new Table(lua);
+                foreach (var name in excluded) except.Append(DynValue.NewString(name));
+                table["except"] = except;
+                return DynValue.NewTable(table);
+            }
+            foreach (var input in inputs.Where(x => !excluded.Contains(x))) table.Append(DynValue.NewString(input));
+            return DynValue.NewTable(table);
+        }
+
+        // room(place, items): the most units of any one of the items (any item on the site if nil) the place could take now.
+        private DynValue Room(Script _, CallbackArguments args)
+        {
+            var view = View();
+            var place = Resolve(args[0], view);
+            var item = ItemFilter.From(args[1]);
+            if (view == null || place.Problem != null || place.PutInto == null) return DynValue.NewNumber(0);
+            var candidates = item.Only ?? new HashSet<string>(view.Lots.Select(x => x.ItemId).Where(item.Allows));
+            var room = candidates.Select(x => GoodsSlots.FreeUnits(view, place.PutInto, x, false, _session.MaxStack))
+                .DefaultIfEmpty(0).Max();
+            return DynValue.NewNumber(room);
+        }
+
+        // is_on(machine): whether a machine's power switch is on (false for a machine without one, or no machine).
+        private DynValue IsOn(Script _, CallbackArguments args)
+        {
+            var view = View();
+            var place = Resolve(args[0], view);
+            return DynValue.NewBoolean(place.EquipmentId != null
+                && view?.Equipment.FirstOrDefault(x => x.Id == place.EquipmentId)?.PoweredOn == true);
         }
 
         // holding(kind): IDs of the machines the employee holds (of a kind, or all), ready for place().
@@ -577,6 +662,57 @@ namespace FoodFactoryGame.Session.Employees
             if (value.IsNil()) return int.MaxValue;
             var number = value.CastToNumber() ?? throw new ScriptRuntimeException("amount must be a number");
             return (int)Math.Max(0, Math.Min(int.MaxValue, Math.Floor(number)));
+        }
+
+        // Which items a goods call may move: nil (any), an item ID, a list of IDs, or {except = {...}} (any but those); a list
+        // may carry an except too. An empty list allows nothing.
+        private sealed class ItemFilter
+        {
+            public HashSet<string> Only;
+            public HashSet<string> Except = new(StringComparer.Ordinal);
+
+            public bool Any => Only == null && Except.Count == 0;
+
+            public string Label => Only != null ? (Only.Count == 0 ? "nothing" : string.Join("/", Only.OrderBy(x => x, StringComparer.Ordinal)))
+                : Except.Count > 0 ? "goods except " + string.Join("/", Except.OrderBy(x => x, StringComparer.Ordinal)) : "goods";
+
+            public bool Allows(string itemId) => (Only == null || Only.Contains(itemId)) && !Except.Contains(itemId);
+
+            public static ItemFilter From(DynValue value)
+            {
+                var filter = new ItemFilter();
+                if (value.IsNil()) return filter;
+                if (value.Type != DataType.Table)
+                {
+                    filter.Only = new HashSet<string>(StringComparer.Ordinal) { value.CastToString() };
+                    return filter;
+                }
+                var listed = Names(value);
+                var except = value.Table.Get("except");
+                filter.Except = Names(except);
+                // A table that is only {except = ...} allows anything else; any other table is a list, even an empty one.
+                if (listed.Count > 0 || except.IsNil()) filter.Only = listed;
+                return filter;
+            }
+
+            // The strings in a Lua list (a lone string counts as a list of one); empty for nil.
+            public static HashSet<string> Names(DynValue value)
+            {
+                var names = new HashSet<string>(StringComparer.Ordinal);
+                if (value.IsNil()) return names;
+                if (value.Type != DataType.Table)
+                {
+                    names.Add(value.CastToString());
+                    return names;
+                }
+                for (var index = 1; ; index++)
+                {
+                    var entry = value.Table.Get(index);
+                    if (entry.IsNil()) break;
+                    names.Add(entry.CastToString());
+                }
+                return names;
+            }
         }
 
         // ---- Places ----
@@ -764,7 +900,7 @@ namespace FoodFactoryGame.Session.Employees
 
         // Moves up to amount units (of one item, or any) from the sources into the destination, one server transfer per lot,
         // as many as the destination's slots take. Returns the units moved and, if none, the reason.
-        private (int Moved, string Reason) MoveGoods(IReadOnlyList<string> sources, string destination, string item, int amount,
+        private (int Moved, string Reason) MoveGoods(IReadOnlyList<string> sources, string destination, ItemFilter item, int amount,
             bool includeSpoiled)
         {
             var bridge = Bridge;
@@ -772,19 +908,19 @@ namespace FoodFactoryGame.Session.Employees
             if (DistanceToLocation(destination, sources) is var distance && distance > reach + 0.25f)
                 return (0, "too far away");
             var moved = 0;
-            var reason = item == null ? "nothing there" : $"no {item} there";
+            var reason = item.Any ? "nothing there" : $"no {item.Label} there";
             foreach (var source in sources)
             {
                 while (moved < amount)
                 {
                     var view = bridge.WorkerView(_employeeId, _siteId);
                     var lot = view?.Lots
-                        .Where(x => x.LocationId == source && (item == null || x.ItemId == item) && (includeSpoiled || !x.Spoiled))
+                        .Where(x => x.LocationId == source && item.Allows(x.ItemId) && (includeSpoiled || !x.Spoiled))
                         .OrderByDescending(x => x.ExposureSeconds).ThenBy(x => x.Id, StringComparer.Ordinal)
                         .FirstOrDefault(x => GoodsSlots.FreeUnits(view, destination, x.ItemId, x.Spoiled, _session.MaxStack) > 0);
                     if (lot == null)
                     {
-                        if (view?.Lots.Any(x => x.LocationId == source && (item == null || x.ItemId == item)) == true)
+                        if (view?.Lots.Any(x => x.LocationId == source && item.Allows(x.ItemId)) == true)
                             reason = source == HandsId ? "no room there" : "hands are full";
                         break;
                     }
@@ -803,7 +939,7 @@ namespace FoodFactoryGame.Session.Employees
                 }
             }
             RefreshCarrying(bridge.WorkerView(_employeeId, _siteId));
-            if (moved > 0) Debug.Log($"[Employee] {_employeeId} moved {moved} {(item ?? "goods")} into {destination}.");
+            if (moved > 0) Debug.Log($"[Employee] {_employeeId} moved {moved} {item.Label} into {destination}.");
             return (moved, reason);
         }
 

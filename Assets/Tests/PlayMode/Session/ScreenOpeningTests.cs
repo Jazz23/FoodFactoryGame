@@ -1,9 +1,9 @@
 // Opening screens from the world through the real SampleScene host (the scene with the employee prefab): the employee script
 // screen opens without focusing its text box, so the E press that opened it is never typed into the script, and the hidden
 // text box gives up focus once closed, and the left click that opened it does not focus it either; E closes it unless the
-// text box has focus; a left click opens the storage only while it is the highlighted hover target; the Assistant tab writes
-// a parsing reply into the script text box or shows the error after three bad replies (a fake model; the real one is an
-// Explicit test since it loads 1.1 GB). Every save and identity path is a unique temporary directory.
+// text box has focus; a left click opens the storage only while it is the highlighted hover target. The employee screen
+// opens on its Tasks tab (decision 0037): tasks generate the Lua, a hand edit detaches the list until reset, and picking a
+// source pulses only valid targets and sets the picked one. Every save and identity path is a unique temporary directory.
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -12,7 +12,6 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
-using System.Threading.Tasks;
 using FoodFactoryGame.Session.Employees;
 using FoodFactoryGame.Session.Equipment;
 using FoodFactoryGame.Session.Player;
@@ -126,6 +125,8 @@ namespace FoodFactoryGame.Session.PlayModeTests
             // Opened by E: its "e" arrives after the screen opened, as logged in play, and nothing takes it.
             _interaction.OpenEmployeeScreen(employee);
             yield return Frames(2);
+            panel.ShowLua(true);
+            yield return null;
             var opened = panel.SourceField.value;
             Type(panel, KeyCode.E, 'e');
             yield return Frames(3);
@@ -146,21 +147,6 @@ namespace FoodFactoryGame.Session.PlayModeTests
             Assert.That(panel.SourceField.focusController?.focusedElement, Is.Null, "The hidden text box kept focus.");
         }
 
-        private sealed class FakeModel : IScriptModel
-        {
-            private readonly Queue<string> _replies;
-            public int Asked;
-            public FakeModel(params string[] replies) => _replies = new Queue<string>(replies);
-            public Task Reset() => Task.CompletedTask;
-
-            public async Task<string> Ask(string message)
-            {
-                Asked++;
-                await Task.Yield();
-                return _replies.Dequeue();
-            }
-        }
-
         private IEnumerator OpenEmployee(EmployeeScriptPanel panel)
         {
             EmployeeWorker employee = null;
@@ -171,57 +157,103 @@ namespace FoodFactoryGame.Session.PlayModeTests
         }
 
         [UnityTest]
-        public IEnumerator AssistantTabWritesTheCorrectedScriptIntoTheScriptTab()
+        public IEnumerator EmployeeScreenOpensOnTasksAndTasksGenerateTheLua()
         {
             var panel = UnityEngine.Object.FindAnyObjectByType<EmployeeScriptPanel>();
-            var model = new FakeModel("```lua\nwhile true do\n```", "```lua\nsay(\"hi\")\n```");
-            panel.UseModel(model);
             yield return OpenEmployee(panel);
-            panel.ShowAssistant(true);
+            Assert.That(panel.LuaShown, Is.False, "The Tasks tab is the default.");
+            Assert.That(panel.Window.Q("employee-script-tab-assistant"), Is.Null, "The assistant tab is disabled.");
+            Assert.That(panel.Detached, Is.False);
+
+            panel.AddTask();
+            panel.AddTask();
+            panel.SetTaskType(1, EmployeeTaskType.Power);
+            panel.SetTaskPower(1, EmployeeTaskPower.Toggle);
             yield return null;
-            Assert.That(panel.PromptField.resolvedStyle.display, Is.EqualTo(DisplayStyle.Flex));
-            Assert.That(panel.SourceField.resolvedStyle.display, Is.EqualTo(DisplayStyle.None));
-            panel.PromptField.value = "say hi";
-            panel.ClickGenerate();
-            yield return Until(() => !panel.Generating, "generation finished");
-            Assert.That(model.Asked, Is.EqualTo(2), "The syntax error was sent back once.");
-            Assert.That(panel.SourceField.value, Is.EqualTo("say(\"hi\")\n"));
-            Assert.That(panel.AssistantShown, Is.False, "The Script tab shows the new program.");
-            Assert.That(panel.AssistantStatus, Does.Contain("2 attempts"));
+            Assert.That(panel.SourceField.value, Is.EqualTo(panel.Draft.ToLua()));
+            Assert.That(panel.TaskList.Q<Toggle>("employee-task-1-on").enabledSelf, Is.False, "Toggle greys out on.");
+            Assert.That(panel.TaskList.Q<Toggle>("employee-task-1-off").enabledSelf, Is.False, "Toggle greys out off.");
+
+            // A hand edit on the Lua tab detaches the list, and Reset brings the generated Lua back.
+            panel.ShowLua(true);
+            panel.SourceField.value += "say(\"hi\")\n";
+            panel.ShowLua(false);
+            yield return null;
+            Assert.That(panel.Detached, Is.True);
+            Assert.That(panel.Window.Q("employee-script-detached").resolvedStyle.display, Is.EqualTo(DisplayStyle.Flex));
+            panel.AddTask();
+            Assert.That(panel.Draft.Tasks.Count, Is.EqualTo(2), "A detached list is locked.");
+            panel.ResetToTasks();
+            Assert.That(panel.Detached, Is.False);
+            Assert.That(panel.SourceField.value, Is.EqualTo(panel.Draft.ToLua()));
         }
 
         [UnityTest]
-        public IEnumerator AssistantTabShowsTheErrorAndKeepsTheDraftAfterThreeBadReplies()
+        public IEnumerator SettingASourcePulsesValidTargetsAndSetsThePickedOne()
         {
             var panel = UnityEngine.Object.FindAnyObjectByType<EmployeeScriptPanel>();
-            var model = new FakeModel("end", "end", "end", "say(1)");
-            panel.UseModel(model);
             yield return OpenEmployee(panel);
-            var draft = panel.SourceField.value;
-            panel.ShowAssistant(true);
-            panel.PromptField.value = "anything";
-            panel.ClickGenerate();
-            yield return Until(() => !panel.Generating, "generation finished");
-            Assert.That(model.Asked, Is.EqualTo(3));
-            Assert.That(panel.SourceField.value, Is.EqualTo(draft));
-            Assert.That(panel.AssistantShown, Is.True);
-            Assert.That(panel.AssistantStatus, Does.Contain("could not write a working script in 3 attempts"));
+            panel.AddTask();
+            panel.ClickPick(0, PickTarget.Source);
+            yield return Frames(2);
+            Assert.That(_interaction.Screen, Is.EqualTo(InteractionScreen.PickPosition));
+            Assert.That(panel.Window.resolvedStyle.display, Is.EqualTo(DisplayStyle.None), "The screen hides while picking.");
+            Assert.That(_interaction.PickTargets.OfType<SiteLocationMarker>().Any(), Is.True, "The storage pulses.");
+            Assert.That(_interaction.PickTargets.OfType<EquipmentVisual>().Any(), Is.True, "Machines pulse.");
+            Assert.That(_interaction.PickTargets.All(x => x.GetComponentsInChildren<Renderer>()
+                .Any(r => r.sharedMaterials.Any(m => m != null && m.name is "PulseOutline" or "PickOutline"))), Is.True, "Every target is outlined red.");
+
+            // Esc cancels the pick and leaves the task unchanged.
+            yield return Key(UnityEngine.InputSystem.Key.Escape);
+            Assert.That(_interaction.Screen, Is.EqualTo(InteractionScreen.Employee));
+            Assert.That(panel.Draft.Tasks[0].Source, Is.Empty);
+            Assert.That(_interaction.PickTargets, Is.Empty, "Nothing pulses after the pick.");
+            Assert.That(UnityEngine.Object.FindObjectsByType<Renderer>().Any(r => r.sharedMaterials.Any(m => m != null && m.name == "PulseOutline")),
+                Is.False, "The outlines are removed after the pick.");
+
+            // A machine pick offers only machines with a power switch.
+            panel.SetTaskType(0, EmployeeTaskType.Power);
+            panel.ClickPick(0, PickTarget.Machine);
+            yield return Frames(2);
+            Assert.That(_interaction.PickTargets, Is.Not.Empty, "The oven pulses.");
+            Assert.That(_interaction.PickTargets.All(x => x is EquipmentVisual { Kind: "oven" }), Is.True, "Only ovens pulse.");
+            yield return Key(UnityEngine.InputSystem.Key.Escape);
+
+            // The picked place lands on the task and in the generated Lua.
+            panel.SetTaskType(0, EmployeeTaskType.Move);
+            panel.SetPlace(panel.Draft, panel.Draft.Tasks[0], PickTarget.Source, "storage");
+            Assert.That(panel.Draft.Tasks[0].Source, Is.EqualTo("storage"));
+            Assert.That(panel.TaskList.Q<Label>("employee-task-0-source-label").text, Is.EqualTo("Storage"));
+            Assert.That(panel.SourceField.value, Does.Contain("-- 1. Move any valid item from storage to ?"));
         }
 
-        // Loads the shipped model (about 1.1 GB, seconds to minutes on CPU), so it runs only when selected by name.
-        [UnityTest, Explicit("Loads the local language model")]
-        public IEnumerator LocalModelWritesAParsingScript()
+        // End to end through the real employee: tasks built on the Tasks tab run as the generated Lua on the server, which carries
+        // dough from the storage into the oven and switches the oven on, so bread comes out; the list is saved with the script.
+        [UnityTest]
+        public IEnumerator EmployeeRunsItsTasksAndTheOvenBakes()
         {
-            Assume.That(LocalScriptModel.Default.Installed, "Model not installed: FoodFactory > Download Script Assistant Model.");
             var panel = UnityEngine.Object.FindAnyObjectByType<EmployeeScriptPanel>();
             yield return OpenEmployee(panel);
-            panel.ShowAssistant(true);
-            panel.PromptField.value = "Repeat forever: carry 2 dough from the storage to the fridge, say how many you moved, then wait 3 seconds.";
-            panel.ClickGenerate();
-            yield return Until(() => !panel.Generating, "generation finished", 600f);
-            Debug.Log($"Assistant: {panel.AssistantStatus}\n{panel.SourceField.value}");
-            Assert.That(panel.AssistantShown, Is.False, panel.AssistantStatus);
-            Assert.That(ScriptDryRun.Check(panel.SourceField.value), Is.Null);
+            var employee = _interaction.OpenEmployee;
+            var output = DevWorld.OvenId + ":out";
+            Assert.That(_root.ClientSite.Equipment.Single(x => x.Id == DevWorld.OvenId).PoweredOn, Is.False, "The dev oven starts off.");
+
+            panel.AddTask();
+            panel.SetPlace(panel.Draft, panel.Draft.Tasks[0], PickTarget.Source, "storage");
+            panel.SetPlace(panel.Draft, panel.Draft.Tasks[0], PickTarget.Destination, DevWorld.OvenId + ":in");
+            panel.AddTask();
+            panel.SetTaskType(1, EmployeeTaskType.Power);
+            panel.SetPlace(panel.Draft, panel.Draft.Tasks[1], PickTarget.Machine, DevWorld.OvenId);
+            Assert.That(panel.Detached, Is.False);
+            panel.ClickRun();
+            yield return Until(() => employee.Status.StartsWith("Running"), "the employee runs its tasks");
+            yield return Until(() => _root.ClientSite.Equipment.Single(x => x.Id == DevWorld.OvenId).PoweredOn, "the employee switches the oven on", 60f);
+            yield return Until(() => _root.ClientSite.Lots.Any(x => x.LocationId == output && x.ItemId == "bread"), "bread from the oven", 60f);
+            Assert.That(employee.Status, Does.Not.StartWith("Error"), employee.Status);
+            var saved = _root.ServerWorld.Employees().Single(x => x.Id == employee.EmployeeId);
+            Assert.That(saved.Tasks, Is.EqualTo(panel.Draft.ToJson()));
+            Assert.That(saved.Script, Is.EqualTo(panel.Draft.ToLua()));
+            panel.ClickStop();
         }
 
         [UnityTest]
@@ -240,6 +272,8 @@ namespace FoodFactoryGame.Session.PlayModeTests
             // With the text box focused, E is text: the screen stays open.
             _interaction.OpenEmployeeScreen(employee);
             yield return Frames(2);
+            panel.ShowLua(true);
+            yield return null;
             panel.SourceField.Focus();
             yield return null;
             yield return Key(UnityEngine.InputSystem.Key.E);
@@ -276,6 +310,8 @@ namespace FoodFactoryGame.Session.PlayModeTests
             yield return Frames(2);
             _interaction.OpenEmployeeScreen(employee);
             yield return Frames(3);
+            panel.ShowLua(true);
+            yield return null;
             PressTextBox(panel);
             yield return null;
             Assert.That(panel.Window.resolvedStyle.display, Is.EqualTo(DisplayStyle.Flex));

@@ -84,7 +84,9 @@ namespace FoodFactoryGame.Session.Equipment
                 var position = SiteGridSpace.Center(site.Layout, equipment) + (definition == null ? Vector3.zero : EquipmentModel.MountOffset(definition, rotation, againstWall));
                 if (definition != null && definition.Mount == EquipmentMount.Tabletop) position.y = TableTop(site, equipment, position.y);
                 visual.transform.SetPositionAndRotation(position, rotation);
-                visual.SetRunning(site.Snapshot.Jobs.Any(x => x.StationId == equipment.Id && x.State == StationJobState.Running));
+                // A machine with a power switch (decision 0037) shows whether it is switched on; others whether a batch runs.
+                visual.SetRunning(definition != null && definition.ManualPower ? equipment.PoweredOn
+                    : site.Snapshot.Jobs.Any(x => x.StationId == equipment.Id && x.State == StationJobState.Running));
             }
         }
 
