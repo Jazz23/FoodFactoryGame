@@ -78,7 +78,7 @@ namespace FoodFactoryGame.Goods
 
     [Serializable] public sealed class GoodsSnapshot
     {
-        public const int CurrentSchema = 18;
+        public const int CurrentSchema = 19;
         public int SchemaVersion = CurrentSchema;
         public string WorldId;
         public long ClockSeconds;
@@ -113,6 +113,11 @@ namespace FoodFactoryGame.Goods
         // never handed to another. Older saves read 0; an ID already in use is skipped.
         public long NextPieceNumber;
         public long CustomerRandom;
+        // Decision 0039 (v19): the last game hour whose wages were charged, and the counter that numbers hired employees.
+        public long WagesPaidHour;
+        public long NextEmployeeNumber;
+        // View-only: wages per game hour of every employee of the viewed site's company. Always 0 in a stored world.
+        public long CompanyWageCentsPerHour;
         // Bought generated buildings (decision 0028, v14): which company owns which lot's site. Never removed.
         public List<GoodsProperty> Properties = new();
     }
@@ -313,6 +318,7 @@ namespace FoodFactoryGame.Goods
                     employee.Script = "";
                     employee.Tasks = "";
                 }
+                view.CompanyWageCentsPerHour = CompanyWagesLocked(_state, siteId);
                 ViewLogistics(view, siteId);
                 ViewCustomers(view, siteId);
                 // Properties stay whole: who owns which lot is public map information (decision 0028).
@@ -350,6 +356,7 @@ namespace FoodFactoryGame.Goods
                 MoveBeltItems(seconds);
                 MoveTrucks(seconds);
                 AdvanceCustomers(seconds);
+                PayWages();
                 _state.Revision++;
             }
         }
@@ -650,7 +657,7 @@ namespace FoodFactoryGame.Goods
                 || state.Stations == null || state.Jobs == null || state.Equipment == null || state.SiteLayouts == null || state.Belts == null
                 || state.Companies == null || state.Buildings == null || state.Employees == null || state.Sites == null || state.Trucks == null
                 || state.Routes == null || state.Districts == null || state.Competitors == null || state.Customers == null
-                || state.Diners == null || state.Properties == null)
+                || state.Diners == null || state.Properties == null || state.CompanyWageCentsPerHour != 0)
                 throw new InvalidOperationException("Unsupported or invalid goods snapshot schema.");
             if (state.Locations.Any(x => x == null || string.IsNullOrWhiteSpace(x.Id) || string.IsNullOrWhiteSpace(x.SiteId) || x.Capacity < 1)
                 || state.Locations.GroupBy(x => x.Id).Any(x => x.Count() != 1)

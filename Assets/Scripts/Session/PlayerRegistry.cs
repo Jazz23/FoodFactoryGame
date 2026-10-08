@@ -1,5 +1,6 @@
 // Server-only SQLite registry mapping a hashed client secret to a stable player ID (raw secrets are never stored), and each
-// player's last pose, so rejoining starts where they left (schema v2, decision 0031).
+// player's last pose, so rejoining starts where they left (schema v2, decision 0031), and each player's settings (schema v3:
+// the wage warning of decision 0039).
 using System;
 using System.IO;
 using System.Linq;
@@ -30,7 +31,9 @@ namespace FoodFactoryGame.Session
 
     public sealed class PlayerRegistry : IDisposable
     {
-        public const int SchemaVersion = 2;
+        public const int SchemaVersion = 3;
+        // Decision 0039 PROTOTYPE default: warn when company cash covers less than this many game hours of wages.
+        public const int DefaultWageWarningHours = 1;
         public const int MaxNameLength = 32;
         public const int MinSecretLength = 32;
         public const int MaxSecretLength = 128;
@@ -64,15 +67,18 @@ namespace FoodFactoryGame.Session
                             + "secret_hash TEXT NOT NULL UNIQUE, "
                             + "created_utc INTEGER NOT NULL)");
                         CreatePoses();
+                        CreateSettings();
                         _db.Execute($"PRAGMA user_version = {SchemaVersion}");
                     });
                 }
-                else if (version == 1)
+                else if (version < SchemaVersion)
                 {
                     // v1 -> v2: where each player last stood (decision 0031); players without a row spawn at the default point.
+                    // v2 -> v3: player settings (decision 0039); players without a row use the defaults.
                     _db.RunInTransaction(() =>
                     {
-                        CreatePoses();
+                        if (version < 2) CreatePoses();
+                        CreateSettings();
                         _db.Execute($"PRAGMA user_version = {SchemaVersion}");
                     });
                 }
@@ -141,6 +147,52 @@ namespace FoodFactoryGame.Session
 
         private void CreatePoses() => _db.Execute("CREATE TABLE IF NOT EXISTS player_poses ("
             + "player_id TEXT PRIMARY KEY NOT NULL, x REAL NOT NULL, y REAL NOT NULL, z REAL NOT NULL, yaw REAL NOT NULL)");
+
+        private void CreateSettings() => _db.Execute("CREATE TABLE IF NOT EXISTS player_settings ("
+            + "player_id TEXT PRIMARY KEY NOT NULL, wage_warning_hours INTEGER NOT NULL)");
+
+        // The player's wage warning (game hours of wages; decision 0039), or the default when none is saved or the store is
+        // unavailable.
+        public int WageWarningHoursOf(string playerId)
+        {
+            lock (_gate)
+            {
+                try
+                {
+                    var row = _db.Query<SettingsRow>("SELECT wage_warning_hours AS WageWarningHours FROM player_settings WHERE player_id = ?",
+                        playerId).FirstOrDefault();
+                    return row?.WageWarningHours ?? DefaultWageWarningHours;
+                }
+                catch (SQLiteException)
+                {
+                    return DefaultWageWarningHours;
+                }
+            }
+        }
+
+        // Saves the player's wage warning; a negative value is refused. Returns false when it is refused or the store is
+        // unavailable.
+        public bool SaveWageWarningHours(string playerId, int hours)
+        {
+            if (string.IsNullOrWhiteSpace(playerId) || hours < 0) return false;
+            lock (_gate)
+            {
+                try
+                {
+                    _db.Execute("INSERT OR REPLACE INTO player_settings (player_id, wage_warning_hours) VALUES (?, ?)", playerId, hours);
+                    return true;
+                }
+                catch (SQLiteException)
+                {
+                    return false;
+                }
+            }
+        }
+
+        private sealed class SettingsRow
+        {
+            public int WageWarningHours { get; set; }
+        }
 
         // Where a player last stood (scene metres and degrees about up), saved when they leave or the server stops, so they
         // rejoin there (owner decision, 0031). Non-finite values are refused. Returns false when the store is unavailable.

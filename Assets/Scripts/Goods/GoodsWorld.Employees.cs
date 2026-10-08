@@ -25,6 +25,8 @@ namespace FoodFactoryGame.Goods
         // The visual task list (JSON, EmployeeTaskList) the script was generated from; empty when there is none. The client
         // treats a script that no longer matches its generated text as hand-edited (detached from these tasks).
         public string Tasks = "";
+        // Decision 0039: the last wage charge failed for lack of cash, so the employee does no work until it is paid again.
+        public bool Unpaid;
     }
 
     public sealed partial class GoodsWorld
@@ -119,9 +121,11 @@ namespace FoodFactoryGame.Goods
             if (state.Employees.Any(x => x == null || string.IsNullOrWhiteSpace(x.Id) || !x.Id.StartsWith(EmployeePrefix, StringComparison.Ordinal)
                     || !ValidPose(x) || x.Script == null || x.Script.Length > MaxEmployeeScriptLength
                     || x.Tasks == null || x.Tasks.Length > MaxEmployeeTasksLength
+                    || (x.Unpaid && !state.Companies.Any(y => y.SiteIds.Contains(x.SiteId)))
                     || !state.Locations.Any(y => y.Id == InventoryLocationId(x.Id) && y.SiteId == x.SiteId)
                     || !state.Grants.Any(y => y.PlayerId == x.Id && y.SiteId == x.SiteId))
-                || state.Employees.GroupBy(x => x.Id).Any(x => x.Count() != 1))
+                || state.Employees.GroupBy(x => x.Id).Any(x => x.Count() != 1)
+                || state.WagesPaidHour < 0 || state.WagesPaidHour > state.ClockSeconds / GameHourSeconds || state.NextEmployeeNumber < 0)
                 throw new InvalidOperationException("Goods snapshot has an invalid employee, or one without its grant and carried inventory.");
         }
     }

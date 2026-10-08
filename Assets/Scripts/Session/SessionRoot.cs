@@ -320,6 +320,10 @@ namespace FoodFactoryGame.Session
             if (bridge == null || ServerWorld == null) yield break;
             bridge.InitializeServer(ServerWorld, authenticator.PlayerIdOf, _options.WorldPath, MapPositionOf);
             ServerBridge = bridge;
+            var registry = _registry;
+            if (registry != null) bridge.ConfigurePlayerSettings(registry.WageWarningHoursOf, registry.SaveWageWarningHours);
+            // A scene without the employee prefab cannot show employees, so it does not hire them (decision 0039).
+            if (employeePrefab != null) bridge.ConfigureWorkforce(ScenePoseOf, SpawnEmployee, DespawnEmployee);
             SpawnEmployees(bridge);
         }
 
@@ -327,12 +331,34 @@ namespace FoodFactoryGame.Session
         private void SpawnEmployees(GoodsNetworkBridge bridge)
         {
             if (employeePrefab == null) return;
-            foreach (var record in bridge.Employees())
-            {
-                var worker = Instantiate(employeePrefab, new Vector3(record.X, record.Y, record.Z), Quaternion.Euler(0f, record.Yaw, 0f));
-                worker.Configure(record);
-                networkManager.ServerManager.Spawn(worker.gameObject);
-            }
+            foreach (var record in bridge.Employees()) SpawnEmployee(record);
+        }
+
+        // Spawns the worker of a record that has none (a hire, decision 0039, or the saved records at start).
+        private void SpawnEmployee(GoodsEmployee record)
+        {
+            if (employeePrefab == null || record == null || WorkerOf(record.Id) != null) return;
+            var worker = Instantiate(employeePrefab, new Vector3(record.X, record.Y, record.Z), Quaternion.Euler(0f, record.Yaw, 0f));
+            worker.Configure(record);
+            networkManager.ServerManager.Spawn(worker.gameObject);
+        }
+
+        // A fired employee's worker leaves the scene (decision 0039).
+        private void DespawnEmployee(string employeeId)
+        {
+            var worker = WorkerOf(employeeId);
+            if (worker != null) networkManager.ServerManager.Despawn(worker.gameObject);
+        }
+
+        private static EmployeeWorker WorkerOf(string employeeId) =>
+            FindObjectsByType<EmployeeWorker>().FirstOrDefault(x => x.ServerEmployeeId == employeeId);
+
+        // Server: where a new hire stands, a metre to the right of the hiring player's avatar (the server's copy of it).
+        private (Vector3 Position, float Yaw)? ScenePoseOf(NetworkConnection connection)
+        {
+            if (connection == null || !_avatars.TryGetValue(connection, out var entry) || entry.Avatar == null) return null;
+            var avatar = entry.Avatar.transform;
+            return (avatar.position + avatar.right, avatar.eulerAngles.y);
         }
 
         private void ReleaseServer()

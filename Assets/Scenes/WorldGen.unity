@@ -119,6 +119,76 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!1 &16160435
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 16160438}
+  - component: {fileID: 16160437}
+  - component: {fileID: 16160436}
+  m_Layer: 0
+  m_Name: EmployeeScriptPanel
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &16160436
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 16160435}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: db03e7ea2505ec34788212bd8ca4136c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: FoodFactoryGame.Session::FoodFactoryGame.Session.Employees.EmployeeScriptPanel
+  document: {fileID: 16160437}
+  interaction: {fileID: 1162993844}
+--- !u!114 &16160437
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 16160435}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 19102, guid: 0000000000000000e000000000000000, type: 0}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.dll::UnityEngine.UIElements.UIDocument
+  m_PanelSettings: {fileID: 11400000, guid: 4ce2abbea3080ac4698637a6f6a2457d, type: 2}
+  m_ParentUI: {fileID: 0}
+  sourceAsset: {fileID: 0}
+  m_SortingOrder: 2
+  m_Position: 0
+  m_WorldSpaceSizeMode: 1
+  m_WorldSpaceWidth: 1920
+  m_WorldSpaceHeight: 1080
+  m_PivotReferenceSize: 0
+  m_Pivot: 0
+  m_WorldSpaceCollider: {fileID: 0}
+--- !u!4 &16160438
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 16160435}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &69068495
 GameObject:
   m_ObjectHideFlags: 0
@@ -917,7 +987,6 @@ MonoBehaviour:
   cellMaterial: {fileID: 2100000, guid: 59a2540f30abc6b4b88039103bc39e1d, type: 2}
   ghostModelMaterial: {fileID: 2100000, guid: 2c850730491a74a45ae513a8bcf63592, type: 2}
   buildAction: {fileID: 3388803307934452406, guid: 052faaac586de48259a63d0c4782560b, type: 3}
-  confirmAction: {fileID: 6791782765022485387, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   placeAction: {fileID: -4487983323273826484, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   removeAction: {fileID: -1373323977448128999, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   rotateAction: {fileID: 217353679148390079, guid: 052faaac586de48259a63d0c4782560b, type: 3}
@@ -1937,7 +2006,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: d475718ff5e959f42afa709ea6a6f2fb, type: 2}
   - {fileID: 11400000, guid: 95674000aedac4a4c8b426b0ae974bc8, type: 2}
   - {fileID: 11400000, guid: 2253f4f7713fb4f489e518720832924e, type: 2}
-  employeePrefab: {fileID: 0}
+  employeePrefab: {fileID: 3871209734584190898, guid: d675bfae1b7b45c4eb3bf2b6d4169b0e, type: 3}
   worldLayoutBridgePrefab: {fileID: 5401561713227846444, guid: 9adec4ced5bf52241811ec7486509649, type: 3}
   saveFolder: worldgen
   readCommandLine: 1
@@ -2180,3 +2249,4 @@ SceneRoots:
   - {fileID: 1910108729}
   - {fileID: 1018102765}
   - {fileID: 103802103}
+  - {fileID: 16160438}

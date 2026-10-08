@@ -32,6 +32,18 @@ namespace FoodFactoryGame.Goods.Network
         private bool _persistenceFailed;
 
         public event Action<GoodsOutcome> ResultReceived;
+        // Client: this player's wage warning setting (decision 0039), in game hours of wages; sent on request and after a change.
+        public event Action<int> WageWarningReceived;
+        // Server-only workforce hooks from the session (ConfigureWorkforce): where a connection's avatar stands in the scene, so a
+        // hire appears beside the player, and what to spawn or despawn once a hire or firing is committed. Without them a
+        // scene cannot show employees, so hiring is refused.
+        private Func<NetworkConnection, (Vector3 Position, float Yaw)?> _scenePoseOf;
+        private Action<GoodsEmployee> _hired;
+        private Action<string> _fired;
+        // Server-only player settings store (the SQLite player registry, decision 0011), from the session.
+        private Func<string, int> _wageWarningOf;
+        private Func<string, int, bool> _saveWageWarning;
+        public const int MaxWageWarningHours = 48;
         public event Action<GoodsSnapshot> SiteReceived;
         // The customers at competitors near this client's avatar (decision 0033); presentation only.
         public event Action<GoodsCrowdView> CrowdReceived;
@@ -58,8 +70,29 @@ namespace FoodFactoryGame.Goods.Network
             GoodsSnapshotStore.Stats.Reset();
         }
 
+        // Server-only: lets this scene hire and fire employees (see the fields above).
+        public void ConfigureWorkforce(Func<NetworkConnection, (Vector3 Position, float Yaw)?> scenePoseOf, Action<GoodsEmployee> hired,
+            Action<string> fired)
+        {
+            _scenePoseOf = scenePoseOf;
+            _hired = hired;
+            _fired = fired;
+        }
+
+        // Server-only: where each player's wage warning setting is kept.
+        public void ConfigurePlayerSettings(Func<string, int> wageWarningOf, Func<string, int, bool> saveWageWarning)
+        {
+            _wageWarningOf = wageWarningOf;
+            _saveWageWarning = saveWageWarning;
+        }
+
         public override void OnStopServer()
         {
+            _scenePoseOf = null;
+            _hired = null;
+            _fired = null;
+            _wageWarningOf = null;
+            _saveWageWarning = null;
             _subscriptions.Clear();
             _crowdSent.Clear();
             CloseSave();
@@ -235,6 +268,73 @@ namespace FoodFactoryGame.Goods.Network
             Reply(sender, result);
             if (result.Accepted) Broadcast();
         }
+
+        // Hires an employee for the site the player stands on; it appears beside them (HireDurably, decision 0039).
+        public void RequestHire(string requestId)
+        {
+            if (IsClientStarted) ServerHire(requestId);
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        private void ServerHire(string requestId, NetworkConnection sender = null)
+        {
+            if (!TryIdentify(sender, requestId, out var player)) return;
+            var pose = _hired == null ? null : _scenePoseOf?.Invoke(sender);
+            var result = pose == null
+                ? new GoodsOutcome { RequestId = requestId, PlayerId = player, Accepted = false, Reason = "hiring-unavailable" }
+                : _world.HireDurably(player, requestId, pose.Value.Position.x, pose.Value.Position.y, pose.Value.Position.z,
+                    pose.Value.Yaw, _savePath);
+            Reply(sender, result);
+            if (!result.Accepted) return;
+            // A replayed hire names the same employee; the session spawns a worker only for a record that has none.
+            var record = _world.Employees().Find(x => x.Id == result.EquipmentId);
+            if (record != null) _hired?.Invoke(record);
+            Broadcast();
+        }
+
+        // Fires an employee whose hands are empty (FireDurably, decision 0039).
+        public void RequestFire(string requestId, string employeeId)
+        {
+            if (IsClientStarted) ServerFire(requestId, employeeId);
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        private void ServerFire(string requestId, string employeeId, NetworkConnection sender = null)
+        {
+            if (!TryIdentify(sender, requestId, out var player)) return;
+            var result = _world.FireDurably(player, requestId, employeeId, _savePath);
+            Reply(sender, result);
+            if (!result.Accepted) return;
+            _fired?.Invoke(result.EquipmentId);
+            Broadcast();
+        }
+
+        // Asks for this player's wage warning setting; the answer arrives as WageWarningReceived.
+        public void RequestWageWarning()
+        {
+            if (IsClientStarted) ServerWageWarning(-1);
+        }
+
+        // Saves this player's wage warning setting (0 to MaxWageWarningHours game hours of wages left in company cash).
+        public void RequestSetWageWarning(int hours)
+        {
+            if (IsClientStarted) ServerWageWarning(Mathf.Clamp(hours, 0, MaxWageWarningHours));
+        }
+
+        // hours < 0 only reads. The reply is what the store holds afterwards, so a failed save shows the old value.
+        [ServerRpc(RequireOwnership = false)]
+        private void ServerWageWarning(int hours, NetworkConnection sender = null)
+        {
+            if (sender == null || _world == null || _resolvePlayer == null || _wageWarningOf == null) return;
+            var player = _resolvePlayer(sender);
+            if (string.IsNullOrWhiteSpace(player)) return;
+            if (hours >= 0 && _saveWageWarning?.Invoke(player, Mathf.Clamp(hours, 0, MaxWageWarningHours)) != true)
+                Debug.LogWarning($"[Goods] Could not save the wage warning setting of {player}.");
+            TargetWageWarning(sender, _wageWarningOf(player));
+        }
+
+        [TargetRpc]
+        private void TargetWageWarning(NetworkConnection connection, int hours) => WageWarningReceived?.Invoke(hours);
 
         // Places a belt from the player's inventory on an empty cell, or turns the belt already there (PlaceBeltDurably).
         public void RequestPlaceBelt(string requestId, string siteId, int cellX, int cellZ, int direction, int level = 0)
@@ -588,6 +688,7 @@ namespace FoodFactoryGame.Goods.Network
         public GoodsOutcome WorkerTransfer(string workerId, TransferIntent intent)
         {
             if (!IsServing) return new GoodsOutcome { Accepted = false, Reason = "persistence-unavailable" };
+            if (_world.IsUnpaid(workerId)) return new GoodsOutcome { Accepted = false, Reason = "unpaid" };
             var result = _world.TransferDurably(workerId, intent, _savePath);
             if (result.Accepted) Broadcast();
             return result;
@@ -596,25 +697,29 @@ namespace FoodFactoryGame.Goods.Network
         // Server-only: a worker places a machine it holds, picks one up, or lays a belt from its hands, through the same durable,
         // validated paths as a player's requests; accepted changes are broadcast. Ground floor only (the NavMesh covers it).
         public GoodsOutcome WorkerPlace(string workerId, string equipmentId, int cellX, int cellZ, int rotation) =>
-            Worker(requestId => _world.PlaceDurably(workerId, requestId, equipmentId, cellX, cellZ, rotation, _savePath));
+            Worker(workerId, requestId => _world.PlaceDurably(workerId, requestId, equipmentId, cellX, cellZ, rotation, _savePath));
 
         public GoodsOutcome WorkerPickUp(string workerId, string equipmentId) =>
-            Worker(requestId => _world.PickUpDurably(workerId, requestId, equipmentId, _savePath));
+            Worker(workerId, requestId => _world.PickUpDurably(workerId, requestId, equipmentId, _savePath));
 
         public GoodsOutcome WorkerPlaceBelt(string workerId, string siteId, int cellX, int cellZ, int direction) =>
-            Worker(requestId => _world.PlaceBeltDurably(workerId, requestId, siteId, cellX, cellZ, direction, _savePath));
+            Worker(workerId, requestId => _world.PlaceBeltDurably(workerId, requestId, siteId, cellX, cellZ, direction, _savePath));
 
         public GoodsOutcome WorkerSetPower(string workerId, string equipmentId, bool on) =>
-            Worker(requestId => _world.SetPowerDurably(workerId, requestId, equipmentId, on, _savePath));
+            Worker(workerId, requestId => _world.SetPowerDurably(workerId, requestId, equipmentId, on, _savePath));
 
         // Server-only content queries for workers: whether a kind needs switching on, and what its recipes consume.
         public bool RequiresPower(string kind) => IsServing && _world.RequiresPower(kind);
 
         public IReadOnlyList<string> RecipeInputs(string kind) => IsServing ? _world.RecipeInputs(kind) : Array.Empty<string>();
 
-        private GoodsOutcome Worker(Func<string, GoodsOutcome> request)
+        // Server-only: whether an employee is waiting to be paid (decision 0039); it does no work meanwhile.
+        public bool IsUnpaid(string workerId) => IsServing && _world.IsUnpaid(workerId);
+
+        private GoodsOutcome Worker(string workerId, Func<string, GoodsOutcome> request)
         {
             if (!IsServing) return new GoodsOutcome { Accepted = false, Reason = "persistence-unavailable" };
+            if (_world.IsUnpaid(workerId)) return new GoodsOutcome { Accepted = false, Reason = "unpaid" };
             var result = request(Guid.NewGuid().ToString("N"));
             if (result.Accepted) Broadcast();
             return result;

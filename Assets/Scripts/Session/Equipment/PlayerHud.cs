@@ -12,6 +12,8 @@
 // the hover line gives the full time; a machine with no recipes (the fridge) opens as plain storage, and a loading dock as its
 // outgoing and incoming grids (decision 0022). Inside a factory the inventory screen also offers its next floor (decision 0020).
 // A machine with a power switch (decision 0037, the oven) shows it under its grids; it bakes only while switched on.
+// Under the cash are the game clock and, when the company's cash is running short of its wages or employees are unpaid, a
+// warning whose threshold each player sets; the inventory screen has a Staff window to hire and fire (decision 0039).
 // Presentation only: slot positions are this client's arrangement of the replicated stacks, never saved or sent, and
 // progress is interpolated for at most one clock step past the latest baseline.
 using System;
@@ -77,6 +79,8 @@ namespace FoodFactoryGame.Session.Equipment
         private Label _cash;
         // Balance the cash label shows, so the text is rebuilt only when it changes (never a real balance before the first).
         private long _shownCash = long.MinValue;
+        private Label _clock;
+        private Label _wageWarning;
         private VisualElement _screen;
         private VisualElement _cursor;
         private VisualElement _progressFill;
@@ -137,8 +141,27 @@ namespace FoodFactoryGame.Session.Equipment
             _cash.style.right = 16;
             _cash.style.unityFontStyleAndWeight = FontStyle.Bold;
             _cash.style.textShadow = new TextShadow { offset = new Vector2(1f, 1f), color = Color.black };
+            // Game clock and wage warning (decision 0039), under the cash.
+            _clock = Caption("", 14, Color.white);
+            _clock.name = "hud-clock";
+            _clock.style.position = Position.Absolute;
+            _clock.style.top = 36;
+            _clock.style.right = 16;
+            _clock.style.textShadow = new TextShadow { offset = new Vector2(1f, 1f), color = Color.black };
+            _wageWarning = Caption("", 13, SpoilingSoon);
+            _wageWarning.name = "hud-wage-warning";
+            _wageWarning.style.position = Position.Absolute;
+            _wageWarning.style.top = 56;
+            _wageWarning.style.right = 16;
+            _wageWarning.style.maxWidth = 420;
+            _wageWarning.style.whiteSpace = WhiteSpace.Normal;
+            _wageWarning.style.unityTextAlign = TextAnchor.UpperRight;
+            _wageWarning.style.unityFontStyleAndWeight = FontStyle.Bold;
+            _wageWarning.style.textShadow = new TextShadow { offset = new Vector2(1f, 1f), color = Color.black };
             layer.Add(_crosshair);
             layer.Add(_cash);
+            layer.Add(_clock);
+            layer.Add(_wageWarning);
             layer.Add(_hotbar);
             layer.Add(_screen);
             layer.Add(_cursor);
@@ -167,6 +190,7 @@ namespace FoodFactoryGame.Session.Equipment
                 _shownCash = site.Companies[0].Cash;
                 _cash.text = FormatCash(_shownCash);
             }
+            UpdateClock(active ? site : null);
             _screen.style.display = screenOpen ? DisplayStyle.Flex : DisplayStyle.None;
             if (!active)
             {
@@ -186,6 +210,41 @@ namespace FoodFactoryGame.Session.Equipment
             UpdateCursor(screenOpen);
             UpdateProgress(site);
             UpdateSpoilage(site);
+        }
+
+        // The game clock, and the wage warning (decision 0039): shown while employees are unpaid, or while company cash covers
+        // fewer game hours of wages than this player's setting (0 turns the early warning off).
+        private void UpdateClock(GoodsSnapshot site)
+        {
+            if (site == null)
+            {
+                _clock.style.display = _wageWarning.style.display = DisplayStyle.None;
+                return;
+            }
+            var (day, hour, minute) = GoodsWorld.GameTime(site.ClockSeconds);
+            _clock.style.display = DisplayStyle.Flex;
+            var clock = $"Day {day}, {hour:00}:{minute:00}";
+            if (_clock.text != clock) _clock.text = clock;
+            var warning = WageWarning(site, interaction.WageWarningHours);
+            _wageWarning.style.display = warning == null ? DisplayStyle.None : DisplayStyle.Flex;
+            if (warning != null && _wageWarning.text != warning) _wageWarning.text = warning;
+        }
+
+        // The warning text for a site baseline, or null when nothing needs saying. Public so tests check the rule directly.
+        public static string WageWarning(GoodsSnapshot site, int warningHours)
+        {
+            if (site?.Companies is not { Count: > 0 }) return null;
+            var unpaid = site.Employees.Count(x => x.Unpaid);
+            var wages = site.CompanyWageCentsPerHour;
+            if (unpaid > 0)
+                return $"{unpaid} employee{(unpaid == 1 ? " is" : "s are")} unpaid and waiting outside until cash covers "
+                    + $"{FormatCash(GoodsWorld.WageCentsPerHour)} each";
+            var cash = site.Companies[0].Cash;
+            if (wages <= 0 || warningHours <= 0 || cash >= warningHours * wages) return null;
+            var minutes = Math.Max(0, GoodsWorld.NextWageSeconds(site) - site.ClockSeconds) * 60 / GoodsWorld.GameHourSeconds;
+            return cash < wages
+                ? $"Employees will stop at the next wages in {minutes} min: {FormatCash(cash)} does not cover {FormatCash(wages)}"
+                : $"Employees will stop soon: cash covers {cash / wages} of {warningHours} h of wages ({FormatCash(wages)}/h)";
         }
 
         // Handles a click on a grid slot: pick up, put down, rearrange or drop onto another container. Public so tests can
@@ -406,6 +465,14 @@ namespace FoodFactoryGame.Session.Equipment
                 foreach (var slot in grid.Value) text.Append('|').Append(slot == null ? "" : $"{slot.Key}:{slot.Count}:{slot.Carried}");
             }
             foreach (var location in _site.Locations) text.Append('|').Append(location.Id).Append(location.Capacity);
+            // The Staff window (decision 0039): who works here, who is unpaid or holding goods, the cap and the warning setting.
+            if (interaction.Screen == InteractionScreen.Inventory)
+            {
+                text.Append("|staff:").Append(interaction.HasPendingRequests).Append('/').Append(interaction.WageWarningHours)
+                    .Append('/').Append(GoodsWorld.EmployeeCap(_site, GoodsWorld.ViewSiteId(_site)));
+                foreach (var employee in _site.Employees)
+                    text.Append('|').Append(employee.Id).Append(employee.Unpaid).Append(Holding(_site, employee.Id));
+            }
             // An open register shows who works it and who could (decision 0034).
             var open = _site.Equipment.FirstOrDefault(x => x.Id == interaction.OpenMachineId);
             // The power switch (decision 0037) shows the server's state, and waits while a request is out.
@@ -503,7 +570,16 @@ namespace FoodFactoryGame.Session.Equipment
                     storage.Add(GridView(StorageGrid));
                     _screen.Add(storage);
                 }
-                if (interaction.Session.Offers.Count > 0) _screen.Add(SupplierWindow());
+                // Supplier and Staff share one column, so the screen is no wider than it was with the supplier alone.
+                var side = new VisualElement { name = "hud-side-column" };
+                if (interaction.Session.Offers.Count > 0) side.Add(SupplierWindow());
+                if (site.Companies is { Count: > 0 })
+                {
+                    var staff = StaffWindow(site);
+                    if (side.childCount > 0) staff.style.marginTop = 6;
+                    side.Add(staff);
+                }
+                if (side.childCount > 0) _screen.Add(side);
                 var building = interaction.Buildings.LocalBuilding;
                 if (building?.Kind == GoodsWorld.FactoryKind) _screen.Add(ConstructionWindow(building));
                 return;
@@ -541,6 +617,79 @@ namespace FoodFactoryGame.Session.Equipment
             }
             return window;
         }
+
+        // Staff (decision 0039): this site's employees against its cap, the wage, a Hire button, each employee with a Fire button
+        // (refused by the server while its hands hold anything, so it is disabled then), and this player's warning setting.
+        private VisualElement StaffWindow(GoodsSnapshot site)
+        {
+            var window = Window("hud-staff-window", "Staff");
+            var siteId = GoodsWorld.ViewSiteId(site);
+            var cap = GoodsWorld.EmployeeCap(site, siteId);
+            var count = site.Employees.Count;
+            var pending = interaction.HasPendingRequests;
+            var summary = Caption($"Employees: {count} of {cap}  ·  {FormatCash(GoodsWorld.WageCentsPerHour)} per game hour each", 12, Color.white, 2);
+            summary.name = "hud-staff-count";
+            window.Add(summary);
+            var hire = new Button(ClickHire) { name = "hud-hire", text = count >= cap ? "Hire (site is full)" : "Hire", focusable = false };
+            hire.style.alignSelf = Align.FlexStart;
+            hire.style.marginTop = 4;
+            hire.SetEnabled(!pending && count < cap);
+            window.Add(hire);
+            foreach (var employee in site.Employees)
+            {
+                var row = new VisualElement { name = $"hud-employee-{employee.Id}" };
+                row.style.flexDirection = FlexDirection.Row;
+                row.style.alignItems = Align.Center;
+                row.style.marginTop = 4;
+                var holding = Holding(site, employee.Id);
+                var state = employee.Unpaid ? "unpaid, waiting outside" : holding ? "holding goods" : "paid";
+                var label = Caption($"{employee.Name}  ({state})", 12, employee.Unpaid ? Spoiled : Color.white);
+                label.style.minWidth = 200;
+                row.Add(label);
+                var id = employee.Id;
+                var fire = new Button(() => ClickFire(id)) { name = $"hud-fire-{id}", text = "Fire", focusable = false };
+                fire.SetEnabled(!pending && !holding);
+                row.Add(fire);
+                window.Add(row);
+                if (holding) window.Add(Caption("Empty their hands on their screen to fire them.", 11, Muted));
+            }
+            var setting = new VisualElement { name = "hud-wage-warning-setting" };
+            setting.style.flexDirection = FlexDirection.Row;
+            setting.style.alignItems = Align.Center;
+            setting.style.marginTop = 8;
+            var hours = interaction.WageWarningHours;
+            var less = new Button(() => ClickWageWarning(-1)) { name = "hud-wage-warning-less", text = "-", focusable = false };
+            var more = new Button(() => ClickWageWarning(1)) { name = "hud-wage-warning-more", text = "+", focusable = false };
+            less.SetEnabled(hours > 0);
+            more.SetEnabled(hours < Goods.Network.GoodsNetworkBridge.MaxWageWarningHours);
+            setting.Add(Caption("Warn when cash covers under", 12, Muted));
+            setting.Add(less);
+            var value = Caption(hours == 0 ? "off" : $"{hours} h", 12, Color.white);
+            value.name = "hud-wage-warning-hours";
+            value.style.minWidth = 30;
+            value.style.unityTextAlign = TextAnchor.MiddleCenter;
+            setting.Add(value);
+            setting.Add(more);
+            setting.Add(Caption("of wages", 12, Muted));
+            window.Add(setting);
+            return window;
+        }
+
+        // Whether an employee's hands hold goods or a machine (it cannot be fired then).
+        private static bool Holding(GoodsSnapshot site, string employeeId)
+        {
+            var hands = GoodsWorld.InventoryLocationId(employeeId);
+            return site.Lots.Any(x => x.LocationId == hands)
+                || site.Equipment.Any(x => x.State == EquipmentState.Held && x.HolderId == employeeId);
+        }
+
+        // Hire, Fire and the warning buttons. Public so tests drive the same paths as the buttons.
+        public void ClickHire() => interaction.Hire();
+
+        public void ClickFire(string employeeId) => interaction.Fire(employeeId);
+
+        public void ClickWageWarning(int change) =>
+            interaction.SetWageWarningHours(Mathf.Clamp(interaction.WageWarningHours + change, 0, Goods.Network.GoodsNetworkBridge.MaxWageWarningHours));
 
         // Buys one pack of the offer, like its Buy button. Public so tests can drive the same path as the button.
         public void ClickOffer(string offerId) => interaction.Buy(offerId);

@@ -7,7 +7,9 @@
 // from observed movement and shows the carried box from the replicated Carrying flag. The pose and the assigned script (and
 // whether it runs) are saved with the record; after a restart a running script starts again from its first line. The visual
 // task list the script was generated from (EmployeeTaskList, decision 0037) is saved and replicated beside it for the
-// script screen; the server never interprets it, only the Lua runs.
+// script screen; the server never interprets it, only the Lua runs. An employee its company cannot pay (decision 0039) stops at
+// once wherever its script is, walks outside the restaurant holding whatever it held, and waits; once paid again it restarts its
+// script from the top. Its running assignment stays saved meanwhile.
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -51,6 +53,7 @@ namespace FoodFactoryGame.Session.Employees
         private readonly SyncVar<string> _status = new("Idle");
         private readonly SyncVar<string> _source = new("");
         private readonly SyncVar<string> _tasks = new("");
+        private readonly SyncVar<bool> _unpaid = new();
 
         // Server-only, from the saved record (Configure).
         private GoodsEmployee _record;
@@ -67,6 +70,12 @@ namespace FoodFactoryGame.Session.Employees
         private EmployeeScript _script;
         // The script's last say()/print(), kept on the status line after it ends.
         private string _lastMessage;
+        // Server-only, while unpaid: whether the script restarts once paid, where the employee waits, and when it next checks.
+        private bool _resumeScript;
+        private Vector3? _outside;
+        private float _nextPayCheck;
+        private float _nextOutsidePath;
+        private float _nextNavMeshTry;
 
         public string EmployeeId => _id.Value;
         public string DisplayName => _name.Value;
@@ -76,6 +85,10 @@ namespace FoodFactoryGame.Session.Employees
         public string Source => _source.Value;
         // The saved visual task list (EmployeeTaskList JSON), empty when there is none.
         public string Tasks => _tasks.Value;
+        // Waiting outside to be paid (decision 0039).
+        public bool Unpaid => _unpaid.Value;
+        // Server-only: the record this worker acts for, set before it spawns.
+        public string ServerEmployeeId => _employeeId;
         private string HandsId => GoodsWorld.InventoryLocationId(_employeeId);
 
         private void Awake()
@@ -104,13 +117,18 @@ namespace FoodFactoryGame.Session.Employees
             _source.Value = _record.Script ?? "";
             _tasks.Value = _record.Tasks ?? "";
             agent.enabled = true;
-            if (!agent.isOnNavMesh && NavMesh.SamplePosition(transform.position, out var hit, 2f, NavMesh.AllAreas))
-                agent.Warp(hit.position);
+            PlaceOnNavMesh();
             agent.stoppingDistance = 0.05f;
             _recordedPosition = transform.position;
             _recordedYaw = transform.eulerAngles.y;
-            // Interpreter state is not saved, so a script that was running starts again from its first line.
-            if (_record.ScriptRunning && !string.IsNullOrEmpty(_record.Script)) Begin(_record.Script, true);
+            // Interpreter state is not saved, so a script that was running starts again from its first line, unless the
+            // employee is waiting to be paid: then it starts once paid.
+            if (_record.Unpaid)
+            {
+                _resumeScript = _record.ScriptRunning && !string.IsNullOrEmpty(_record.Script);
+                GoUnpaid();
+            }
+            else if (_record.ScriptRunning && !string.IsNullOrEmpty(_record.Script)) Begin(_record.Script, true);
         }
 
         public override void OnStopServer()
@@ -145,6 +163,11 @@ namespace FoodFactoryGame.Session.Employees
             if (!Authorized(sender)) return;
             Halt();
             Begin(source, false, tasks);
+            // An unpaid employee keeps the program as its assignment and runs it once paid.
+            if (!_unpaid.Value || _script == null) return;
+            _script = null;
+            _resumeScript = true;
+            _status.Value = "Unpaid: will run the script once the company can pay its wage";
         }
 
         // Compiles the program and saves it as this employee's running assignment before it starts; neither happens if the
@@ -187,10 +210,11 @@ namespace FoodFactoryGame.Session.Employees
         private void ServerStop(NetworkConnection sender = null)
         {
             if (!Authorized(sender)) return;
-            var wasRunning = _script != null;
+            var wasRunning = _script != null || _resumeScript;
+            _resumeScript = false;
             Halt();
             if (wasRunning) Record(_source.Value, false);
-            _status.Value = "Stopped";
+            _status.Value = _unpaid.Value ? "Stopped (unpaid: waiting outside)" : "Stopped";
         }
 
         private bool Authorized(NetworkConnection sender)
@@ -234,12 +258,133 @@ namespace FoodFactoryGame.Session.Employees
                 RefreshCarrying(bridge.WorkerView(_employeeId, _siteId));
             }
             RecordPose(bridge);
+            if (!agent.isOnNavMesh && Time.time >= _nextNavMeshTry) PlaceOnNavMesh();
+            if (Time.time >= _nextPayCheck)
+            {
+                _nextPayCheck = Time.time + 0.5f;
+                var unpaid = bridge.IsUnpaid(_employeeId);
+                if (unpaid && !_unpaid.Value)
+                {
+                    _resumeScript = _script != null;
+                    GoUnpaid();
+                }
+                else if (!unpaid && _unpaid.Value) GoPaid();
+            }
+            if (_unpaid.Value)
+            {
+                WalkOutside();
+                return;
+            }
             if (_script == null || _script.Step()) return;
             _status.Value = _script.State == EmployeeScriptState.Failed ? "Error: " + _script.Error
                 : "Finished" + (_lastMessage != null ? $" (last said: {_lastMessage})" : "");
             _script = null;
             Record(_source.Value, false);
             if (agent.isOnNavMesh) agent.ResetPath();
+        }
+
+        // A generated lot's NavMesh is built at runtime (SiteNavigation) and rebuilt when its shell changes, and a hire stands
+        // beside a player who may be anywhere on the map, so an employee off the NavMesh tries again each second: near where it
+        // stands, else the nearest walkable point on its own lot.
+        private void PlaceOnNavMesh()
+        {
+            _nextNavMeshTry = Time.time + 1f;
+            if (!agent.enabled || agent.isOnNavMesh) return;
+            if (NavMesh.SamplePosition(transform.position, out var hit, 2f, NavMesh.AllAreas))
+            {
+                agent.Warp(hit.position);
+                return;
+            }
+            var layout = View()?.SiteLayouts.FirstOrDefault(x => x.SiteId == _siteId);
+            if (layout == null) return;
+            var reach = Mathf.Max(layout.Width, layout.Depth) * SiteGrid.CellSize;
+            if (NavMesh.SamplePosition(SiteGridSpace.Origin(layout), out hit, reach, NavMesh.AllAreas)) agent.Warp(hit.position);
+        }
+
+        // Stops at once, wherever the script is, keeping whatever the hands hold, and heads outside (decision 0039).
+        private void GoUnpaid()
+        {
+            Halt();
+            _unpaid.Value = true;
+            _outside = OutsidePoint();
+            _nextOutsidePath = 0f;
+            _status.Value = "Unpaid: waiting outside until the company can pay its wage";
+            Debug.Log($"[Employee] {_employeeId} is unpaid and stops work{(_outside == null ? "" : " to wait outside")}.");
+        }
+
+        // Paid again: the script restarts from its first line, as after a server restart.
+        private void GoPaid()
+        {
+            _unpaid.Value = false;
+            _outside = null;
+            if (agent.enabled && agent.isOnNavMesh) agent.ResetPath();
+            var resume = _resumeScript && !string.IsNullOrEmpty(_source.Value);
+            _resumeScript = false;
+            Debug.Log($"[Employee] {_employeeId} is paid again{(resume ? " and restarts its script" : "")}.");
+            if (!resume)
+            {
+                _status.Value = "Idle (paid again)";
+                return;
+            }
+            Begin(_source.Value, false);
+            if (_script != null) _status.Value = "Running (paid again, restarted from the top)";
+        }
+
+        private void WalkOutside()
+        {
+            if (_outside == null || !agent.enabled || !agent.isOnNavMesh || Time.time < _nextOutsidePath) return;
+            _nextOutsidePath = Time.time + 1f;
+            var offset = _outside.Value - transform.position;
+            offset.y = 0f;
+            if (offset.sqrMagnitude > StandTolerance * StandTolerance) agent.SetDestination(_outside.Value);
+        }
+
+        // A walkable point outside the site's buildings that the employee can walk to, the shortest walk first: the street in
+        // front of a generated lot, else around the buildings' footprints. Null when there is none (it then waits where it is).
+        private Vector3? OutsidePoint()
+        {
+            var view = View();
+            var layout = view?.SiteLayouts.FirstOrDefault(x => x.SiteId == _siteId);
+            if (layout == null || !agent.enabled || !agent.isOnNavMesh) return null;
+            var buildings = view.Buildings.Where(x => x.SiteId == _siteId).ToList();
+            var footprints = buildings.Select(x =>
+            {
+                var center = SiteGridSpace.FootprintCenter(layout, x.CellX, x.CellZ, x.Width, x.Depth);
+                var size = new Vector2(x.Width * SiteGrid.CellSize, x.Depth * SiteGrid.CellSize);
+                return new Rect(center.x - size.x * 0.5f, center.z - size.y * 0.5f, size.x, size.y);
+            }).ToList();
+            var candidates = new List<Vector3>();
+            var outward = Customers.SiteStreet.Outward(layout, buildings);
+            if (outward != null) candidates.AddRange(Customers.SiteStreet.Points(layout, outward.Value));
+            const float margin = 2f;
+            var floor = SiteGridSpace.FloorHeight(layout, 0);
+            foreach (var area in footprints)
+            {
+                var outer = new Rect(area.xMin - margin, area.yMin - margin, area.width + margin * 2f, area.height + margin * 2f);
+                foreach (var point in new[]
+                         {
+                             new Vector2(outer.xMin, area.center.y), new Vector2(outer.xMax, area.center.y), new Vector2(area.center.x, outer.yMin),
+                             new Vector2(area.center.x, outer.yMax), new Vector2(outer.xMin, outer.yMin), new Vector2(outer.xMin, outer.yMax),
+                             new Vector2(outer.xMax, outer.yMin), new Vector2(outer.xMax, outer.yMax)
+                         })
+                    candidates.Add(new Vector3(point.x, floor, point.y));
+            }
+            var path = new NavMeshPath();
+            var best = float.MaxValue;
+            Vector3? found = null;
+            foreach (var candidate in candidates)
+            {
+                if (!NavMesh.SamplePosition(candidate, out var hit, 1.5f, NavMesh.AllAreas)) continue;
+                if (footprints.Any(x => x.Contains(new Vector2(hit.position.x, hit.position.z)))) continue;
+                if (!NavMesh.CalculatePath(transform.position, hit.position, NavMesh.AllAreas, path) || path.status != NavMeshPathStatus.PathComplete) continue;
+                var length = 0f;
+                var corners = path.corners;
+                for (var index = 1; index < corners.Length; index++) length += Vector3.Distance(corners[index - 1], corners[index]);
+                if (length >= best) continue;
+                best = length;
+                found = hit.position;
+            }
+            return found;
         }
 
         // The pose is saved with the world's next commit (at most one tick-commit interval later), not committed each move.

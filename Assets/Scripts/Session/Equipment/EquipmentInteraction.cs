@@ -596,6 +596,32 @@ namespace FoodFactoryGame.Session.Equipment
             bridge.RequestSetPower(Track(), equipmentId, on);
         }
 
+        // Hires an employee for the site the avatar stands on (decision 0039); it appears beside the avatar once the server
+        // accepts. The server checks the company and the site's cap.
+        public void Hire()
+        {
+            var bridge = _subscription?.Bridge;
+            if (bridge == null) return;
+            LastRejection = null;
+            Debug.Log("[Equipment] Requesting a hire.");
+            bridge.RequestHire(Track());
+        }
+
+        // Fires an employee; the server refuses while its hands hold anything (decision 0039).
+        public void Fire(string employeeId)
+        {
+            var bridge = _subscription?.Bridge;
+            if (bridge == null || string.IsNullOrEmpty(employeeId)) return;
+            LastRejection = null;
+            Debug.Log($"[Equipment] Requesting that {employeeId} be fired.");
+            bridge.RequestFire(Track(), employeeId);
+        }
+
+        // Saves when the wage warning appears, in game hours of wages left (decision 0039); stored for this player on the server.
+        public void SetWageWarningHours(int hours) => _subscription?.Bridge?.RequestSetWageWarning(hours);
+
+        public int WageWarningHours => _subscription?.WageWarningHours ?? PlayerRegistry.DefaultWageWarningHours;
+
         // Opens and closes build mode (decision 0034, BuildMode): a screen of its own, so the world controls here stand aside
         // while it is open.
         public bool OpenBuild()

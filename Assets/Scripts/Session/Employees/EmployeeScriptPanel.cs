@@ -10,7 +10,8 @@
 // screen unless a text box has focus, where it is typed.
 // On the Lua tab, "Select world pos" inserts a cell's or machine's Lua text at the text box's caret (replacing any selection);
 // the draft survives because the screen stays open while hidden. "Give" buttons hand the employee one of each machine kind
-// the player holds, for its script's place().
+// the player holds, for its script's place(). The Hands row shows what the employee holds, one small square per hand slot;
+// clicking one takes that stack into the player's inventory with an ordinary server-checked transfer (decision 0039).
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -65,6 +66,8 @@ namespace FoodFactoryGame.Session.Employees
         private Label _status;
         private VisualElement _give;
         private string _giveKinds;
+        private VisualElement _hands;
+        private string _handsKey;
         private EmployeeWorker _shown;
         private Button _tasksTab;
         private Button _luaTab;
@@ -93,6 +96,7 @@ namespace FoodFactoryGame.Session.Employees
         // True while the Lua draft is not what the task list generates (edited by hand).
         public bool Detached => _source != null && (_source.value ?? "") != _draft.ToLua();
         public ScrollView TaskList => _list;
+        public VisualElement Hands => _hands;
 
         private void Start()
         {
@@ -177,6 +181,12 @@ namespace FoodFactoryGame.Session.Employees
             _status.style.whiteSpace = WhiteSpace.Normal;
             _window.Add(_status);
 
+            _hands = new VisualElement { name = "employee-hands" };
+            _hands.style.flexDirection = FlexDirection.Row;
+            _hands.style.alignItems = Align.Center;
+            _hands.style.marginTop = 6;
+            _window.Add(_hands);
+
             var buttons = new VisualElement();
             buttons.style.flexDirection = FlexDirection.Row;
             buttons.style.marginTop = 6;
@@ -219,6 +229,7 @@ namespace FoodFactoryGame.Session.Employees
                 _shown = employee;
                 if (employee == null) return;
                 _title.text = $"{employee.DisplayName} ({employee.EmployeeId})";
+                _handsKey = null;
                 _draft = EmployeeTaskList.FromJson(employee.Tasks);
                 // A script that does not match its saved list (or one saved before task lists existed) opens detached.
                 _source.value = string.IsNullOrEmpty(employee.Source) ? _draft.ToLua() : employee.Source;
@@ -235,10 +246,11 @@ namespace FoodFactoryGame.Session.Employees
                 _anchor = _source.selectIndex;
             }
             RefreshGive();
+            RefreshHands();
             UpdateCaret(_source, _caretBar);
             var status = employee.Status ?? "";
             _status.text = $"Status: {status}{(employee.Carrying ? "  (carrying a box)" : "")}";
-            _status.style.color = status.StartsWith("Error") ? Error : Muted;
+            _status.style.color = status.StartsWith("Error") || employee.Unpaid ? Error : Muted;
         }
 
         // Sends the Lua draft to the server with the task list it came from. Public so tests drive the same path as the button.
@@ -636,6 +648,66 @@ namespace FoodFactoryGame.Session.Employees
             }
             foreach (var (kind, count) in held)
                 _give.Add(Button("employee-script-give-" + kind, $"{kind} ({count})", () => interaction.GiveMachine(kind)));
+        }
+
+        // One small square per hand slot showing what the employee holds (item and count); rebuilt only when that changes.
+        private void RefreshHands()
+        {
+            var site = interaction.Session.ClientSite;
+            var handsId = GoodsWorld.InventoryLocationId(_shown.EmployeeId);
+            var capacity = site?.Locations.FirstOrDefault(x => x.Id == handsId)?.Capacity ?? 0;
+            var stacks = site?.Lots.Where(x => x.LocationId == handsId).GroupBy(x => (x.ItemId, x.Spoiled))
+                .OrderBy(x => x.Key.ItemId, StringComparer.Ordinal).ThenBy(x => x.Key.Spoiled)
+                .Select(x => (x.Key.ItemId, x.Key.Spoiled, Count: x.Sum(y => y.Quantity))).ToList() ?? new();
+            var key = capacity + "|" + string.Join(",", stacks.Select(x => $"{x.ItemId}:{x.Spoiled}:{x.Count}"));
+            if (key == _handsKey) return;
+            _handsKey = key;
+            _hands.Clear();
+            var caption = Caption(stacks.Count == 0 ? "Hands (empty):" : "Hands (click to take):", 12, Muted);
+            caption.style.marginRight = 6;
+            _hands.Add(caption);
+            for (var index = 0; index < Math.Max(capacity, stacks.Count); index++)
+            {
+                var stack = index < stacks.Count ? stacks[index] : default;
+                var full = index < stacks.Count;
+                var slot = new Button(full ? () => ClickHand(stack.ItemId, stack.Spoiled) : (Action)null)
+                {
+                    name = $"employee-hand-{index}", text = "", focusable = false
+                };
+                slot.style.width = slot.style.height = 34;
+                slot.style.marginLeft = slot.style.marginRight = 1;
+                slot.style.paddingLeft = slot.style.paddingRight = slot.style.paddingTop = slot.style.paddingBottom = 0;
+                slot.style.backgroundColor = Inset;
+                if (full)
+                {
+                    var item = interaction.Session.Items.FirstOrDefault(x => x != null && x.Id == stack.ItemId);
+                    if (item?.Icon != null)
+                    {
+                        slot.style.backgroundImage = new StyleBackground(item.Icon);
+                        slot.style.backgroundSize = new BackgroundSize(BackgroundSizeType.Contain);
+                    }
+                    else slot.Add(Caption(item?.DisplayName ?? stack.ItemId, 9, Color.white));
+                    var count = Caption(stack.Count.ToString(), 11, stack.Spoiled ? Error : Color.white);
+                    count.style.position = Position.Absolute;
+                    count.style.right = 2;
+                    count.style.bottom = 0;
+                    count.style.unityFontStyleAndWeight = FontStyle.Bold;
+                    slot.Add(count);
+                    slot.tooltip = $"{stack.Count} {item?.DisplayName ?? stack.ItemId}{(stack.Spoiled ? " (spoiled)" : "")}";
+                }
+                _hands.Add(slot);
+            }
+        }
+
+        // Takes one of the employee's hand stacks into the player's inventory, as much as fits, like clicking its square. Public
+        // so tests drive the same path.
+        public void ClickHand(string itemId, bool spoiled)
+        {
+            var site = interaction.Session.ClientSite;
+            if (_shown == null || site == null || interaction.InventoryId == null) return;
+            var handsId = GoodsWorld.InventoryLocationId(_shown.EmployeeId);
+            var count = site.Lots.Where(x => x.LocationId == handsId && x.ItemId == itemId && x.Spoiled == spoiled).Sum(x => x.Quantity);
+            if (count > 0) interaction.TransferStack(handsId, itemId, spoiled, count, interaction.InventoryId);
         }
 
         // ---- Building blocks ----

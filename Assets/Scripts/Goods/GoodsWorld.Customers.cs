@@ -308,7 +308,7 @@ namespace FoodFactoryGame.Goods
             foreach (var site in _state.Sites)
             {
                 var placed = _state.Equipment.Where(x => x.SiteId == site.Id && x.State == EquipmentState.Placed).OrderBy(x => x.Id, StringComparer.Ordinal).ToList();
-                var counters = placed.Where(x => x.Kind == CounterKind && !string.IsNullOrEmpty(x.StaffId)).ToList();
+                var counters = placed.Where(x => x.Kind == CounterKind && !string.IsNullOrEmpty(x.StaffId) && !UnpaidLocked(x.StaffId)).ToList();
                 if (menu.Count == 0 || counters.Count == 0 || CompanyOfSiteLocked(site.Id) is null) continue;
                 var reached = RestaurantRules.Reached(RestaurantRules.Walkable(_state, site.Id),
                     RestaurantRules.EdgeCells(_state.SiteLayouts.FirstOrDefault(x => x.SiteId == site.Id)));

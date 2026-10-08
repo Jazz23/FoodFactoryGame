@@ -269,6 +269,28 @@ Open: hiring, wages, firing and more employees; which players may command an emp
 - Power: a player's switch-off holds against employees (`GoodsEquipment.HeldOff`, reason `held-off`) until a player switches on.
 - Employee screen: the Lua text box scrolls and follows the caret.
 
+## Implemented: hiring, wages and the game clock (2026-10-08)
+
+[Decision 0039](decisions/0039-hiring-wages-and-game-clock.md), goods snapshot schema **v19**, player registry schema **v3**.
+
+- Domain (`GoodsWorld.Wages.cs`): `Hire`/`Fire` (replayable; hire at the player's inventory site under `EmployeeCap`, one per
+  25 interior cells over all storeys, at least 1; fire refused `holding`). `PayWages` charges $10 per employee each game hour
+  (60 clock seconds) inside the clock step, in hire order, marking unpaid whoever cash cannot cover, and pays one hour (never
+  back pay) once cash covers it. `WagesPaidHour` makes a recovered save neither repeat nor skip a charge. A register staffed by
+  an unpaid employee serves nobody.
+- Server/session: hire/fire RPCs; the hire spawns beside the hiring avatar, a firing despawns the worker; only scenes whose
+  `SessionRoot` has the employee prefab hire (`SampleScene`, and `WorldGen` via `AgentScripts/InstallWorldGenEmployees.cs`;
+  `DevSite` refuses `hiring-unavailable`). In generated worlds a host builds a lot's runtime NavMesh for drawn lots and for
+  every lot with employees (`SiteNavigation`), and a worker off the NavMesh re-places itself each second.
+  Worker actions are refused `unpaid`. `EmployeeWorker` stops an unpaid employee at once, walks it outside and restarts its
+  script once paid.
+- Each player's wage warning threshold is saved in `players.db` (`player_settings`). The HUD shows the game clock and the
+  warning, the inventory screen has a Staff window (hire, fire, warning setting), and the employee screen has a hands row whose
+  squares move a stack into the player's inventory.
+
+Not done or open: a running-game capture; a separate-process multiplayer check; employees on a dedicated `-server` in a
+generated world (no scene placement without a client); hiring in `DevSite`; the cap-shrink rule and the other open items of 0039.
+
 ## Implemented: conveyor lifts (2026-09-24)
 
 Decision: [0021](decisions/0021-conveyor-lifts.md). GDD section 27 conveyor lifts between factory floors. Goods snapshot schema **v10**.
@@ -614,7 +636,7 @@ the goods schema (v15) are unchanged. Evidence: [verification record](verificati
 - Player and employee operational rules should be shared; input and AI choose actions through those rules.
 - Visual objects must not become the sole owners of authoritative simulation state.
 
-These remain accepted contracts; only the bounded goods slice, its station jobs, equipment placement, the working oven, conveyor belts, company cash, the sell counter, supplier purchases, equipment purchases, spoilage timing/refrigeration, building shells, factory floors, conveyor lifts, trucks with loading docks, truck routes and fleet, customers, the procedural world layout, restaurant building, and trucks on generated roads with city traffic above have a runtime interface. Customer purchases credit cash inside the clock tick; supplier purchases, floor orders, shell orders, buy-and-place orders and sales are the player payment commands. Trucks move goods between sites only inside the clock tick, through their own cargo locations.
+These remain accepted contracts; only the bounded goods slice, its station jobs, equipment placement, the working oven, conveyor belts, company cash, the sell counter, supplier purchases, equipment purchases, spoilage timing/refrigeration, building shells, factory floors, conveyor lifts, trucks with loading docks, truck routes and fleet, customers, the procedural world layout, restaurant building, trucks on generated roads with city traffic, and hiring and wages above have a runtime interface. Customer purchases credit cash inside the clock tick; supplier purchases, floor orders, shell orders, buy-and-place orders and sales are the player payment commands. Trucks move goods between sites only inside the clock tick, through their own cargo locations.
 
 ## Planned / Undecided
 
@@ -624,6 +646,7 @@ These remain accepted contracts; only the bounded goods slice, its station jobs,
 - Offline progression, host migration, discovery/lobbies/relay, and the shipped hosting model remain undecided. A direct-IP development host/join flow exists (decision 0005).
 - SQLite is the storage for all persisted data (decision 0011): the goods world (with its write-once world layout, decision 0026), player registry (with each player's last pose, decision 0031) and client identity. MoonSharp runs the prototype employee scripts (above); no wider scripting or modding role is selected.
 - Customers: first build and local visual customers implemented (above, decision 0024), and in generated worlds with map districts and lot-linked competitors (decision 0030); multi-camera out-of-view spawning, menus, customer groups, competitor AI and demand balancing remain open; competitors' customers are drawn (decision 0033, above), with the 100-figure cap over the Editor frame budget open. The benchmarked choice model in the test assembly ([record](verification/customer-choice-benchmark-20260925.md)) is a separate prototype, not the runtime code.
+- Hiring, wages and a game clock: implemented (above, decision 0039); its PROTOTYPE values and open items stay undecided.
 - Multiplayer smoke tests and representative scale benchmarks follow implementation; current tests do not establish replication correctness or the 60 FPS target.
 
 ## Standalone restaurant art kit (2026-10-01)

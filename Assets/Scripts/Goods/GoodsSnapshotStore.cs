@@ -489,6 +489,15 @@ namespace FoodFactoryGame.Goods
                 foreach (var equipment in state.Equipment ?? new()) if (equipment != null) equipment.PoweredOn = false;
                 state.SchemaVersion = 18;
             }
+            // v18 had no wages (decision 0039): the hours already on the clock count as paid, so loading never charges back pay,
+            // and nobody is unpaid.
+            if (state != null && state.SchemaVersion == 18)
+            {
+                state.WagesPaidHour = Math.Max(0, state.ClockSeconds) / GoodsWorld.GameHourSeconds;
+                state.NextEmployeeNumber = 0;
+                foreach (var employee in state.Employees ?? new()) if (employee != null) employee.Unpaid = false;
+                state.SchemaVersion = 19;
+            }
             GoodsWorld.Validate(state);
             return state;
         }

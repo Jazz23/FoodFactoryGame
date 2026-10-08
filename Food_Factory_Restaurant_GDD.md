@@ -168,6 +168,31 @@ Owner decisions recorded 2026-09-27:
 
 - Need wages; employees use a simple workforce model with no deep personal stats, needs, moods, or skill simulation.
 
+### Hiring and Wages (owner decision 2026-10-08, decision 0039)
+
+- Players hire and fire employees from their inventory screen at an owned site. Hiring and firing are free. An employee
+  belongs to the site that hired it; moving employees between sites comes later.
+
+- Each site allows 1 employee per 25 floor cells across all its storeys, minimum 1 (prototype value).
+
+- An employee holding goods cannot be fired; the player takes the goods out first. The employee screen shows the employee's
+  hand slot, and players can take items out of it at any time.
+
+- Each employee costs a flat wage per game hour, working or idle ($10, prototype value).
+
+- Cash never goes below zero to pay wages. An employee who cannot be paid stops at once, wherever it is in its work, walks
+  outside the restaurant and waits there with whatever it holds. When the company can pay again, it walks back in and starts
+  its work from the top.
+
+- A HUD warning tells the player employees will stop soon; each player chooses when it appears.
+
+### Game Clock (owner decision 2026-10-08)
+
+- The world has a game clock: 1 game hour is 1 real minute, so a game day is 24 real minutes. The HUD shows the day and time.
+
+- For now the clock drives wages and the time display only. Day/night lighting, opening hours and demand by time of day are not
+  decided.
+
 # 5. Buildings, Space & Construction
 
 - Buildings occupy physical land and have editable interiors. New
@@ -442,7 +467,7 @@ Owner decisions, 2026-10-01; numbers and formulas are PROTOTYPE and open (`docs/
 
 - Ingredients and outside supplies.
 
-- Employee wages.
+- Employee wages: a flat rate per game hour per employee (section 4, Hiring and Wages).
 
 - Land/building purchases.
 
@@ -556,6 +581,9 @@ support them.
 - Logistics routes: LOCKED - player manually creates pickup/dropoff routes and assigns vehicles.
 
 - Employee simulation depth: LOCKED - simple workforce; employees mainly differ by wage and assignment.
+
+- Hiring and wages: LOCKED - free hire/fire per site with an area-based cap, flat wage per game hour, unpaid employees stop and
+  wait outside instead of the company going into debt (section 4, 2026-10-08). Bankruptcy and loans remain open.
 
 - External sales: LOCKED - non-player restaurants and distributors can
   buy player-produced food; contract/pricing details TBD.

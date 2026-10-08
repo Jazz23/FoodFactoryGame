@@ -2,7 +2,8 @@
 // baseline, and forwards this client's command results so presentation can send requests through the same bridge. The server
 // names the primary site in its join answer (the dev site, or a generated world's starting restaurant); nothing is subscribed
 // before it is known. It can also watch the company's other sites for remote management (decision 0022); their baselines are
-// kept apart from the primary one. It also keeps the latest crowd: the customers at competitors near its avatar (decision 0033).
+// kept apart from the primary one. It also keeps the latest crowd: the customers at competitors near its avatar (decision 0033),
+// and this player's wage warning setting (decision 0039), asked for once subscribed.
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -34,6 +35,9 @@ namespace FoodFactoryGame.Session
         // The site this client subscribes to (null until the server names it); requests that name a site (purchases) use it.
         public string SiteId => _siteId;
         public event Action<GoodsOutcome> ResultReceived;
+        // Game hours of wages below which the HUD warns that employees will stop (decision 0039); the default until the server
+        // sends this player's saved setting.
+        public int WageWarningHours { get; private set; } = PlayerRegistry.DefaultWageWarningHours;
         public string LastRejection { get; private set; }
 
         // Sets the primary site from the server's join answer. A different site (another world) drops the old baselines and
@@ -78,7 +82,9 @@ namespace FoodFactoryGame.Session
             _bridge.SiteReceived += OnSite;
             _bridge.CrowdReceived += OnCrowd;
             _bridge.ResultReceived += OnResult;
+            _bridge.WageWarningReceived += OnWageWarning;
             _bridge.RequestSite(_siteId);
+            _bridge.RequestWageWarning();
             foreach (var site in _watched) _bridge.RequestSite(site);
         }
 
@@ -101,6 +107,7 @@ namespace FoodFactoryGame.Session
                 _bridge.SiteReceived -= OnSite;
                 _bridge.CrowdReceived -= OnCrowd;
                 _bridge.ResultReceived -= OnResult;
+                _bridge.WageWarningReceived -= OnWageWarning;
             }
             _bridge = null;
             Latest = null;
@@ -122,6 +129,8 @@ namespace FoodFactoryGame.Session
         }
 
         private void OnCrowd(GoodsCrowdView crowd) => LatestCrowd = crowd;
+
+        private void OnWageWarning(int hours) => WageWarningHours = hours;
 
         private void OnResult(GoodsOutcome outcome)
         {

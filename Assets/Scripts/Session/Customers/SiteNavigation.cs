@@ -2,6 +2,8 @@
 // over the lot and a street band in front of it, with the shell's ground-floor walls built in as obstacles so paths use the
 // doors, at the site's place in the scene. It is rebuilt when the site, its size or its buildings change, and removed when the site stops being drawn; placed equipment carves it by itself
 // (EquipmentPresenter's obstacles). Presentation only: customer figures and employees walk on it, the simulation never reads it.
+// On a host it is also built for every generated lot that has employees (decision 0039), read from the server world, so an
+// employee keeps walking at a restaurant far from the local camera; how far the player is never decides whether one can work.
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -28,6 +30,10 @@ namespace FoodFactoryGame.Session.Customers
 
         private readonly Dictionary<string, Built> _built = new();
         private int _shown = -1;
+        // Host only: generated lots with employees, from the server world, rechecked every StaffedCheckSeconds.
+        private const float StaffedCheckSeconds = 2f;
+        private readonly List<(SiteLayout Layout, GoodsSnapshot Snapshot)> _staffed = new();
+        private float _nextStaffedCheck;
 
         // What the current site's NavMesh was built from; empty when none is built.
         public string BuiltFor => BuiltForSite(session.ClientSiteId);
@@ -38,22 +44,48 @@ namespace FoodFactoryGame.Session.Customers
         private void Update()
         {
             var drawn = session.DrawnSites;
-            if (drawn.Version == _shown) return;
-            _shown = drawn.Version;
-            var keys = new Dictionary<string, (string Key, DrawnSite Site, Vector2Int Outward)>();
-            foreach (var site in drawn.Sites)
+            var staffedChanged = Time.unscaledTime >= _nextStaffedCheck && RefreshStaffed();
+            if ((drawn == null || drawn.Version == _shown) && !staffedChanged) return;
+            if (drawn != null) _shown = drawn.Version;
+            var keys = new Dictionary<string, (string Key, SiteLayout Layout, GoodsSnapshot Snapshot, Vector2Int Outward)>();
+            // A drawn site's baseline is the client's; a staffed one that is not drawn uses the server's view of it.
+            var sources = (drawn?.Sites.Select(x => (x.SiteId, x.Layout, x.Snapshot)) ?? Enumerable.Empty<(string, SiteLayout, GoodsSnapshot)>())
+                .Concat(_staffed.Select(x => (x.Layout.SiteId, x.Layout, x.Snapshot)));
+            foreach (var (siteId, layout, snapshot) in sources)
             {
-                var outward = SiteStreet.Outward(site.Layout, site.Snapshot.Buildings);
-                if (outward != null) keys[site.SiteId] = (Key(site.Layout, site.Snapshot, outward.Value), site, outward.Value);
+                if (keys.ContainsKey(siteId)) continue;
+                var outward = SiteStreet.Outward(layout, snapshot.Buildings);
+                if (outward != null) keys[siteId] = (Key(layout, snapshot, outward.Value), layout, snapshot, outward.Value);
             }
             foreach (var siteId in _built.Keys.Where(x => !keys.TryGetValue(x, out var key) || key.Key != _built[x].Key).ToList())
             {
                 Remove(_built[siteId]);
                 _built.Remove(siteId);
             }
-            foreach (var (siteId, (key, site, outward)) in keys)
-                if (!_built.ContainsKey(siteId)) _built[siteId] = Build(site.Layout, site.Snapshot, outward, key);
+            foreach (var (siteId, (key, layout, snapshot, outward)) in keys)
+                if (!_built.ContainsKey(siteId)) _built[siteId] = Build(layout, snapshot, outward, key);
         }
+
+        // Host only: rereads which sites have employees and their buildings. True when that changed what would be built.
+        private bool RefreshStaffed()
+        {
+            _nextStaffedCheck = Time.unscaledTime + StaffedCheckSeconds;
+            var world = session.ServerWorld;
+            var before = string.Join("|", _staffed.Select(x => x.Layout.SiteId + Signature(x.Snapshot)));
+            _staffed.Clear();
+            if (world != null)
+                foreach (var employee in world.Employees().GroupBy(x => x.SiteId).Select(x => x.First()))
+                {
+                    // The employee's own view: it is granted its site.
+                    var view = world.View(employee.Id, employee.SiteId);
+                    var layout = view?.SiteLayouts.FirstOrDefault(x => x.SiteId == employee.SiteId);
+                    if (layout != null) _staffed.Add((layout, view));
+                }
+            return before != string.Join("|", _staffed.Select(x => x.Layout.SiteId + Signature(x.Snapshot)));
+        }
+
+        private static string Signature(GoodsSnapshot site) =>
+            string.Join(",", site.Buildings.Select(x => $"{x.Id}:{x.CellX},{x.CellZ},{x.Width},{x.Depth},{x.Structures?.Count}"));
 
         private static string Key(SiteLayout layout, GoodsSnapshot site, Vector2Int outward)
         {

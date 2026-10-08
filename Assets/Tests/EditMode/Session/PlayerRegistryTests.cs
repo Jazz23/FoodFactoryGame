@@ -222,6 +222,42 @@ namespace FoodFactoryGame.Session.Tests
             Assert.That(check.ExecuteScalar<int>("PRAGMA user_version"), Is.EqualTo(PlayerRegistry.SchemaVersion));
         }
 
+        // Decision 0039: each player's wage warning is kept in the registry (schema v3), defaulting to one game hour.
+        [Test]
+        public void WageWarningIsSavedPerPlayerAndSurvivesReopening()
+        {
+            _registry = new PlayerRegistry(RegistryPath);
+            var alice = _registry.RegisterOrResolve("Alice", SecretA).PlayerId;
+            var bob = _registry.RegisterOrResolve("Bob", SecretB).PlayerId;
+            Assert.That(_registry.WageWarningHoursOf(alice), Is.EqualTo(PlayerRegistry.DefaultWageWarningHours));
+            Assert.That(_registry.SaveWageWarningHours(alice, 6), Is.True);
+            Assert.That(_registry.SaveWageWarningHours(alice, 0), Is.True, "0 turns the early warning off.");
+            Assert.That(_registry.SaveWageWarningHours(alice, -1), Is.False);
+            _registry.Dispose();
+            _registry = new PlayerRegistry(RegistryPath);
+            Assert.That((_registry.WageWarningHoursOf(alice), _registry.WageWarningHoursOf(bob)), Is.EqualTo((0, PlayerRegistry.DefaultWageWarningHours)));
+        }
+
+        [Test]
+        public void VersionTwoRegistryGainsSettingsAndKeepsPoses()
+        {
+            using (var db = new SQLiteConnection(RegistryPath))
+            {
+                db.Execute("CREATE TABLE players (player_id TEXT PRIMARY KEY NOT NULL, display_name TEXT NOT NULL, "
+                    + "secret_hash TEXT NOT NULL UNIQUE, created_utc INTEGER NOT NULL)");
+                db.Execute("CREATE TABLE player_poses (player_id TEXT PRIMARY KEY NOT NULL, x REAL NOT NULL, y REAL NOT NULL, z REAL NOT NULL, yaw REAL NOT NULL)");
+                db.Execute("INSERT INTO players VALUES ('player-old', 'Old', ?, 0)", PlayerRegistry.HashSecret(SecretA));
+                db.Execute("INSERT INTO player_poses VALUES ('player-old', 1, 2, 3, 4)");
+                db.Execute("PRAGMA user_version = 2");
+            }
+            _registry = new PlayerRegistry(RegistryPath);
+            Assert.That(_registry.PoseOf("player-old"), Is.EqualTo(((float X, float Y, float Z, float Yaw)?)(1f, 2f, 3f, 4f)));
+            Assert.That(_registry.WageWarningHoursOf("player-old"), Is.EqualTo(PlayerRegistry.DefaultWageWarningHours));
+            Assert.That(_registry.SaveWageWarningHours("player-old", 3), Is.True);
+            using var check = new SQLiteConnection(RegistryPath);
+            Assert.That(check.ExecuteScalar<int>("PRAGMA user_version"), Is.EqualTo(PlayerRegistry.SchemaVersion));
+        }
+
         [Test]
         public void DurableGrantRejectsUnknownSiteWithoutWriting()
         {
