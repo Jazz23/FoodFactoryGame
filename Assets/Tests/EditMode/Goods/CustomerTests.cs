@@ -60,7 +60,7 @@ namespace FoodFactoryGame.Goods.Tests
             Inputs = { new RecipeInput { ItemId = "bread", Quantity = 1 } }, OutputItemId = "", SaleCents = 250
         };
 
-        private static GoodsDistrict District(int customersPerHour = 3600, int mapZ = 20, int range = 100) => new()
+        private static GoodsDistrict District(int customersPerHour = 60, int mapZ = 20, int range = 100) => new()
         {
             Id = "district", Name = "Test", MapZ = mapZ, CustomersPerHour = customersPerHour, WealthPercent = 50,
             AppearanceVariants = 3, LikedCuisines = { "bakery" }, DineInPercent = 50, RangeMetres = range
@@ -110,7 +110,7 @@ namespace FoodFactoryGame.Goods.Tests
             Assert.That(state.Customers, Is.Not.Empty);
             Assert.That(state.Customers.Select(x => x.RestaurantId).Distinct(), Is.SubsetOf(new[] { "restaurant", "near" }));
             Assert.That(state.Customers.Select(x => x.Appearance), Is.All.InRange(0, 2));
-            Assert.That(state.Districts.Single().SpawnProgress, Is.Zero, "120 s at 3600 an hour leaves nothing over.");
+            Assert.That(state.Districts.Single().SpawnProgress, Is.Zero, "120 s at 60 a game hour leaves nothing over.");
             Assert.DoesNotThrow(() => GoodsWorld.Validate(state));
         }
 

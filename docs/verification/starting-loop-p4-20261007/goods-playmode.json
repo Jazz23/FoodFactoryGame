@@ -1,0 +1,27 @@
+﻿{
+    "status":  "completed",
+    "duration":  13.14,
+    "summary":  {
+                    "total":  2,
+                    "passed":  2,
+                    "failed":  0,
+                    "skipped":  0,
+                    "inconclusive":  0
+                },
+    "results":  [
+                    {
+                        "FullName":  "FoodFactoryGame.Goods.PlayModeTests.GoodsListenServerTests.HostAndRemoteUseRpcForGrantTransferRejectionAndUnobservedTime",
+                        "Status":  "Passed",
+                        "Duration":  12.397437,
+                        "Message":  null,
+                        "StackTrace":  null
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Goods.PlayModeTests.GoodsListenServerTests.PropertyPurchaseRepliesAndReachesEverySubscriber",
+                        "Status":  "Passed",
+                        "Duration":  0.7119969,
+                        "Message":  null,
+                        "StackTrace":  null
+                    }
+                ]
+}

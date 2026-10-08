@@ -48,7 +48,8 @@ namespace FoodFactoryGame.World
         // 4 (2026-10-02): larger restaurants (decision 0036).
         // 5 (2026-10-06): every restaurant lot has a service yard beside the shell with a back door and a starter dock (layout
         // format 4, decision 0037).
-        public const int Version = 5;
+        // 6 (2026-10-07): district customer rates count game hours (layout format 5, decision 0039); nothing else changes.
+        public const int Version = 6;
 
         // extraRule adds problems of its own (tests use it to force retries); it cannot waive validator problems.
         public static WorldGenerationResult Generate(string requestedSeed, ulong seed, WorldSettings settings = null,

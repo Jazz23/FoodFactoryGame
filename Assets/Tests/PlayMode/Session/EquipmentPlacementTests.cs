@@ -327,7 +327,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
             });
             _root.ServerWorld.Bootstrap(new GoodsDistrict
             {
-                Id = "test-district", Name = "Test", MapZ = 10, CustomersPerHour = 3600, WealthPercent = 50, LikedCuisines = { "bakery" },
+                Id = "test-district", Name = "Test", MapZ = 10, CustomersPerHour = 60, WealthPercent = 50, LikedCuisines = { "bakery" },
                 RangeMetres = 20
             });
             GoodsSnapshotStore.Save(_root.ServerWorld, _root.Options.WorldPath);

@@ -1,7 +1,7 @@
 // P0 measurement M1 (docs/starting-loop-p0-plan.md): the demand rate a basic starting restaurant sees, measured headless. A
 // generated world for each P0 seed is created on an isolated save with the real content, its starting register is stocked with
 // TEST-ONLY bread that does not spoil during the run and worked by a TEST-ONLY player, and the world is advanced two clock hours
-// (7200 clock seconds, the unit districts' CustomersPerHour use). Per clock hour it records customers created in the city, the
+// (7200 clock seconds, the unit districts' CustomersPerHour used before decision 0039). Per clock hour it records customers created in the city, the
 // ones that chose this restaurant, its sales and walk-outs, and the first arrival and sale. Writes the numbers to
 // docs/verification/starting-loop-baseline-20261006/m1-demand.txt. Runs only on request (Temp/starting-loop.flag), like the
 // PlayMode playthrough; it judges nothing, so it fails only if the world cannot be made.

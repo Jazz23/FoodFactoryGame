@@ -240,7 +240,7 @@ namespace FoodFactoryGame.Goods.Tests
                 world.Bootstrap(new GoodsCompetitor { Id = "rival", Name = "Rival", Cuisine = "bakery", Tier = 1, PriceCents = 250, Servers = 1, ServiceSeconds = 4, Seats = 4 });
                 world.Bootstrap(new GoodsDistrict
                 {
-                    Id = "d", Name = "D", MapZ = 10, CustomersPerHour = 3600, WealthPercent = 50, AppearanceVariants = 1, LikedCuisines = { "bakery" },
+                    Id = "d", Name = "D", MapZ = 10, CustomersPerHour = 60, WealthPercent = 50, AppearanceVariants = 1, LikedCuisines = { "bakery" },
                     DineInPercent = 0, RangeMetres = 100, SpawnProgress = 0
                 });
                 world.Advance(400);

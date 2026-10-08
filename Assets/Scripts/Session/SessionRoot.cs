@@ -265,9 +265,11 @@ namespace FoodFactoryGame.Session
             // Machines run by themselves, Factorio-style (decision 0008); like recipes, this is configuration, not saved.
             ServerWorld.AutomaticJobs = true;
             _registry = new PlayerRegistry(_options.RegistryPath);
-            // PROTOTYPE: players start with the dev inventory and starter goods on the primary site in either kind of world.
+            // PROTOTYPE: players start with the dev inventory on the primary site in either kind of world; a generated world's start
+            // kit is dough only (decision 0039), the dev world keeps its starter goods.
             authenticator.ConfigureServer(new SessionAdmission(_registry, ServerWorld, primarySite, _options.WorldPath,
-                DevWorld.InventoryCapacity, DevWorld.StarterGoods, StartOffer == null ? DevWorld.RemoteSiteIds : null));
+                DevWorld.InventoryCapacity, StartOffer == null ? DevWorld.StarterGoods : GeneratedWorld.StarterGoods,
+                StartOffer == null ? DevWorld.RemoteSiteIds : null));
             SetStatus("Starting server...");
             if (!networkManager.ServerManager.StartConnection()) throw new InvalidOperationException("Transport refused to start the server.");
         }

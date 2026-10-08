@@ -1,4 +1,4 @@
-// Customers (decision 0024): districts create customers at their own rate; each customer scores the restaurants in range once,
+// Customers (decision 0024): districts create customers at their own rate per game hour (decision 0039); each customer scores the restaurants in range once,
 // when it appears or after walking out of a queue, travels there, queues at the counter, buys a menu item (a sale recipe)
 // once it can be served (and, to dine in, once a seat is free), then eats at a table or leaves with takeaway. A purchase
 // takes the goods from a counter's input and pays the site's company inside the clock tick, so goods, cash, the seat and the
@@ -8,6 +8,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using FoodFactoryGame.World;
 using UnityEngine;
 
 namespace FoodFactoryGame.Goods
@@ -19,6 +20,7 @@ namespace FoodFactoryGame.Goods
         public string Name;
         public int MapX;
         public int MapZ;
+        // Customers per game hour (GameClock.HourSeconds clock seconds, decision 0039; per 3600 clock s before schema v21).
         public int CustomersPerHour;
         // 0 poor to 100 wealthy: wealthier customers value higher-tier food and mind prices less.
         public int WealthPercent;
@@ -30,7 +32,7 @@ namespace FoodFactoryGame.Goods
         public int DineInPercent;
         // Restaurants farther than this (Manhattan metres, like roads) are not considered.
         public int RangeMetres;
-        // Customer-seconds accumulated toward the next customer; below 3600.
+        // Customer-seconds accumulated toward the next customer; below GameClock.HourSeconds.
         public long SpawnProgress;
     }
 
@@ -275,9 +277,9 @@ namespace FoodFactoryGame.Goods
             foreach (var district in _state.Districts)
             {
                 district.SpawnProgress += district.CustomersPerHour;
-                while (district.SpawnProgress >= 3600)
+                while (district.SpawnProgress >= GameClock.HourSeconds)
                 {
-                    district.SpawnProgress -= 3600;
+                    district.SpawnProgress -= GameClock.HourSeconds;
                     Spawn(district, diners);
                 }
             }
@@ -597,7 +599,7 @@ namespace FoodFactoryGame.Goods
             if (state.NextCustomerNumber < 0
                 || state.Districts.Any(x => x is null || string.IsNullOrWhiteSpace(x.Id) || x.Name is null || x.CustomersPerHour < 0
                     || x.WealthPercent is < 0 or > 100 || x.DineInPercent is < 0 or > 100 || x.AppearanceVariants < 1
-                    || x.Appearance is null || x.LikedCuisines is null || x.RangeMetres < 1 || x.SpawnProgress is < 0 or >= 3600)
+                    || x.Appearance is null || x.LikedCuisines is null || x.RangeMetres < 1 || x.SpawnProgress < 0 || x.SpawnProgress >= GameClock.HourSeconds)
                 || state.Districts.GroupBy(x => x.Id).Any(x => x.Count() != 1)
                 || state.Competitors.Any(x => x is null || string.IsNullOrWhiteSpace(x.Id) || x.Name is null || x.Cuisine is null
                     || x.Tier < 1 || x.PriceCents < 1 || x.Servers < 1 || x.ServiceSeconds < 1 || x.Seats < 0

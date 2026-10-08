@@ -18,9 +18,18 @@ namespace FoodFactoryGame.Session
 {
     public static class GeneratedWorld
     {
-        // PROTOTYPE starting capital of the one company every player joins (owner, 2026-09-29: $1,000,000), in whole cents.
         public const string CompanyId = "company-1";
-        public const long StartingCash = 100_000_000;
+        // PROTOTYPE starting capital of the one company every player joins, in whole cents (owner decision 9 of the starting-loop
+        // plan, 2026-10-07; decision 0039): about an oven, a fridge, a few tables and an hour of dough. Only a new world gets it;
+        // an older world keeps its cash (it was $1,000,000).
+        public const long StartingCash = 70_000;
+        // PROTOTYPE start kit of each player admitted to a generated world (decision 0039): dough for two full bakes, nothing else.
+        // DevSite keeps DevWorld.StarterGoods.
+        public const int StarterDough = 20;
+        public static IReadOnlyList<GoodsLot> StarterGoods => new[]
+        {
+            new GoodsLot { ItemId = DevWorld.DoughItemId, Quantity = StarterDough, SpoilAfterSeconds = DevWorld.DoughSpoilAfterSeconds }
+        };
         // Layout format that has lots (decision 0028); older formats keep the dev site beside the map.
         public const int FirstFormat = 3;
         public const string StartCounterId = "start-counter";

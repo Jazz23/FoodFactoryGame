@@ -513,11 +513,19 @@ namespace FoodFactoryGame.Session.PlayModeTests
             var loaded = Time.realtimeSinceStartup;
             if (_devices) yield return LoadOvenWithDevices(oven);
             else
+            {
+                // The oven's input holds one stack (20 dough); since decision 0039 the player holds more than that (20 + 5 bought),
+                // so only what fits goes in and the rest stays in hand.
+                var room = Server.Locations.Single(x => x.Id == oven.InputLocationId).Capacity * _root.MaxStack("dough");
                 foreach (var lot in Server.Lots.Where(x => x.LocationId == Inventory && x.ItemId == "dough").ToList())
                 {
-                    yield return Request("load-oven", id => Bridge.RequestTransfer(id, lot.Id, oven.InputLocationId, lot.Quantity));
+                    var amount = (int)Math.Min(lot.Quantity, room - Units(Server, oven.InputLocationId, "dough"));
+                    if (amount <= 0) break;
+                    yield return Request("load-oven", id => Bridge.RequestTransfer(id, lot.Id, oven.InputLocationId, amount));
                     Check(Last.Accepted, "dough into the oven refused: " + Last.Reason);
                 }
+                Note($"dough kept in hand {Units(Server, Inventory, "dough")}");
+            }
             var inOven = Units(Server, oven.InputLocationId, "dough") + Server.Jobs.Where(x => x.StationId == oven.Id).SelectMany(x => x.Inputs).Sum(x => (long)x.Quantity);
             Note($"dough in the oven {inOven}");
             yield return Until(() => Server.Jobs.Any(x => x.StationId == oven.Id) || Units(Server, oven.OutputLocationId, "bread") > 0, "the oven to start by itself", 10f);
@@ -889,6 +897,17 @@ namespace FoodFactoryGame.Session.PlayModeTests
             _diner = NearestForSale();
             var distance = Vector3.Distance(SitePlacement.Active.SiteOrigin(Start.SiteId), SitePlacement.Active.SiteOrigin(_diner.SiteId));
             Note($"nearest restaurant for sale {_diner.LotId} ({_diner.BuildingId}), {Cash(_diner.PriceCents)}, {distance:F0} m from the start site");
+            // TEST-ONLY funding: since decision 0039 the company starts with $700, and a second restaurant is no longer part of the
+            // loop (plan decision 5; P5 rewrites this step). The adjustment is in the ledger, and the books are re-based on it so
+            // conservation still covers everything else.
+            if (Server.Companies.Single().Cash < _diner.PriceCents + Offer("supplier-truck").PriceCents + Offer("supplier-dock").PriceCents)
+            {
+                var before = Server.Companies.Single().Cash;
+                Check(_root.ServerWorld.AdjustCashDurably(GeneratedWorld.CompanyId, 100_000_000, _root.Options.WorldPath) == null, "TEST-ONLY funding refused");
+                yield return Until(() => _root.ClientSite.Companies.Single().Cash == before + 100_000_000, "TEST-ONLY funding reaches the client");
+                _books = Take(Server);
+                Note($"TEST-ONLY funding {Cash(100_000_000)} before buying (cash was {Cash(before)}); books re-based");
+            }
             var cash = Server.Companies.Single().Cash;
             Check(cash >= _diner.PriceCents, "the company cannot afford the nearest restaurant");
             if (_devices) yield return BuyPropertyWithDevices(_diner);

@@ -143,32 +143,34 @@ namespace FoodFactoryGame.World
 
         public int MaxAttempts = 8;
 
+        // CustomersPerHour counts game hours (GameClock, decision 0039): the generator v5 numbers per 3600 clock s divided by
+        // GameClock.RetuneDivisor.
         public List<DistrictProfile> Districts = new()
         {
             new DistrictProfile
             {
-                Kind = DistrictKind.Downtown, Id = "downtown", MinRecipeTier = 1, CustomersPerHour = 900, TrafficPercent = 90,
+                Kind = DistrictKind.Downtown, Id = "downtown", MinRecipeTier = 1, CustomersPerHour = 90, TrafficPercent = 90,
                 PricePercent = 250, MinLocalStreets = 3, MaxLocalStreets = 3, MinGap = 0, MaxGap = 1, StreetTreePercent = 70, YardTreePercent = 15,
                 RestaurantWeight = 30, OfficeWeight = 45, ApartmentWeight = 25,
                 Cuisines = Weights(("fast-food", 40), ("noodles", 30), ("bakery", 20), ("grill", 10))
             },
             new DistrictProfile
             {
-                Kind = DistrictKind.Residential, Id = "residential", MinRecipeTier = 1, CustomersPerHour = 500, TrafficPercent = 40,
+                Kind = DistrictKind.Residential, Id = "residential", MinRecipeTier = 1, CustomersPerHour = 50, TrafficPercent = 40,
                 PricePercent = 60, MinLocalStreets = 2, MaxLocalStreets = 3, MinGap = 1, MaxGap = 3, StreetTreePercent = 75, YardTreePercent = 35,
                 RestaurantWeight = 20, HouseWeight = 55, ApartmentWeight = 25,
                 Cuisines = Weights(("bakery", 30), ("fast-food", 30), ("noodles", 25), ("grill", 15))
             },
             new DistrictProfile
             {
-                Kind = DistrictKind.Wealthy, Id = "wealthy", MinRecipeTier = 3, CustomersPerHour = 350, TrafficPercent = 30,
+                Kind = DistrictKind.Wealthy, Id = "wealthy", MinRecipeTier = 3, CustomersPerHour = 35, TrafficPercent = 30,
                 PricePercent = 300, MinLocalStreets = 2, MaxLocalStreets = 2, MinGap = 2, MaxGap = 4, StreetTreePercent = 90, YardTreePercent = 50,
                 RestaurantWeight = 20, HouseWeight = 70, ApartmentWeight = 10,
                 Cuisines = Weights(("fine-dining", 40), ("bakery", 30), ("grill", 20), ("noodles", 10))
             },
             new DistrictProfile
             {
-                Kind = DistrictKind.Industrial, Id = "industrial", MinRecipeTier = 1, CustomersPerHour = 120, TrafficPercent = 60,
+                Kind = DistrictKind.Industrial, Id = "industrial", MinRecipeTier = 1, CustomersPerHour = 12, TrafficPercent = 60,
                 PricePercent = 40, MinLocalStreets = 1, MaxLocalStreets = 2, MinGap = 2, MaxGap = 4, StreetTreePercent = 15, YardTreePercent = 6,
                 RestaurantWeight = 8, FactoryWeight = 92,
                 Cuisines = Weights(("fast-food", 60), ("grill", 30), ("noodles", 10))

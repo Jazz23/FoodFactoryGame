@@ -2,7 +2,7 @@
 
 Date: 2026-10-06. Revised 2026-10-07 after P0, P1 and the owner's answers to the plan's open questions.
 
-Status: **accepted in direction (owner, 2026-10-07).** The owner's decisions are under
+Status: **accepted in direction (owner, 2026-10-07).** P4 implemented 2026-10-07. The owner's decisions are under
 [Owner decisions recorded](#owner-decisions-recorded). Values marked PROTOTYPE are open. Each piece gets a decision record in
 `docs/decisions/` when it is implemented, and its status goes in `docs/architecture.md`. Still-open questions are under
 [Still open](#still-open).
@@ -64,12 +64,12 @@ criteria here.
 
 | Loop step | State in a generated world |
 |---|---|
-| Start | `company-1` with $1,000,000 (PROTOTYPE); restaurant with `start-counter`, `start-table`, a back door and `start-dock` in a side service yard (generator v5). The player spawns on the apron holding the dev starter goods (5 dough, 50 belts, 10 lifts). |
+| Start | `company-1` with $700 (PROTOTYPE, 0039; older worlds keep their cash); restaurant with `start-counter`, `start-table`, a back door and `start-dock` in a side service yard (generator v6). The player spawns on the apron holding 20 dough and nothing else (0039). |
 | Buy ingredients | Supplier window: instant, goods land in the player's inventory (0014 stand-in). One ingredient: dough. |
 | Docks / trucks | Docks beside a back door (0037). Player trucks drive generated roads between owned sites. The truck card's route controls work by pointer (P0-01 fixed 2026-10-07). No supplier trucks. |
 | Cook | Dough → bread in the 3x3 oven ($150). 10 bread in 99 s. Bread lasts 3600 s. |
 | Sell | Register sells only while staffed; staffing persists while the player cooks and ends on leaving or restart (0035). |
-| Customers | Front doors only (0037). Measured (P0): 5-12 sales per 3600 clock s, first sale 300-600 clock s after opening; in 10 real minutes, 1-2 sales. |
+| Customers | Front doors only (0037). Rates per 60 s game hour since 0039. Measured (P4, M-P4, stocked and staffed register): first sale 120-174 clock s, 0.5-1.0 sales per real minute, about 800 customers in the city (P0: first sale 300-600 s, 0.1-0.2 a minute). |
 | Feedback | The HUD says why the restaurant cannot sell, with no screen open and in the register screen; a server-written ledger records every cash change, shown in a Ledger tab (0038, fixes P0-05 and P0-06). |
 | Expand | Build mode: walls, doors, back doors, tables, decor, docks. Net cost previewed exactly (P0 S10). |
 
@@ -124,7 +124,9 @@ The loop fails silently: an unstaffed register, an empty register and unreachabl
 
 ### P4 - Start state and pacing
 
-Every value stays PROTOTYPE.
+Status: **implemented 2026-10-07** ([plan](starting-loop-p4-plan.md), [0039](decisions/0039-demand-on-the-game-hour-and-start-kit.md),
+[record](verification/starting-loop-p4-20261007.md)). Goods snapshot v21, layout format 5, generator v6. The playthrough rerun on the new start is pending. The first-customer
+target (about a minute) is not reached by rate alone; options are with the owner (Still open 1). Every value stays PROTOTYPE.
 
 - **Start kit and cash** (decision 9). Generated worlds only; `DevSite` and its tests keep the dev starter goods.
 - **Demand on the traffic hour** (decision 10). Re-base `GoodsDistrict.CustomersPerHour` (`GoodsWorld.Customers.cs`) on
@@ -203,9 +205,11 @@ per world, factories' back doors, price and margin changes (decision 10).
 
 ## Still open
 
-1. **Pacing target numbers** (P4): confirm "first customer within about a minute" and the sales rate a basic setup should
-   reach, once P4 has measured the re-based demand.
+1. **First customer** (P4): the owner confirmed "within about a minute" (2026-10-07). Measured: customers walk 60-66 s from
+   the nearest blocks, and the first arrival was 81-219 s in every run, so spawn rate alone cannot reach it. Options in
+   [0039](decisions/0039-demand-on-the-game-hour-and-start-kit.md): accept about two minutes, spawn customers nearer the
+   street, a faster walk, or divisor 6 (about 1,400 customers in the city).
 2. **Supplier depot placement and older worlds** (P2): generator change or world-creation placement; the design goes to
    the owner before P2 is implemented.
-3. PROTOTYPE values: dough held at start, starting cash, the full-dock timeout, the spoil-soon warning window, ledger
+3. PROTOTYPE values: 20 dough held at start, $700 starting cash and re-tune divisor 10 (P4, owner-confirmed as starting points), the full-dock timeout, the spoil-soon warning window, ledger
    retention.

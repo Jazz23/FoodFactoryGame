@@ -2,7 +2,9 @@
 // creates the starting restaurant's site once, owned by its one company with the PROTOTYPE cash and no dev seed (customers and
 // the starting counter and table: GeneratedWorldCustomersTests), and
 // reloads without changing; layouts without lots, and a format 3 save made before piece 2, keep the dev world; joining grants
-// the starting site with an inventory and every other site of the company without one; players spawn on the starting apron.
+// the starting site with an inventory (the dough-only start kit, decision 0039) and every other site of the company without one;
+// the starting cash covers a basic kit; an older world loads with re-tuned district rates and its cash; players spawn on the
+// starting apron.
 using System;
 using System.IO;
 using System.Linq;
@@ -36,6 +38,22 @@ namespace FoodFactoryGame.Session.Tests
         private StoredWorldLayout Layout() => WorldGeneration.PrepareLayout(WorldPath, LegacyPath, DevWorld.WorldId, "piece-two");
 
         private GoodsWorld Open(StoredWorldLayout stored) => GeneratedWorld.LoadOrCreate(WorldPath, stored, SessionTestFiles.ContentItems());
+
+        private string LatestPayload()
+        {
+            using var db = new SQLite.SQLiteConnection(WorldPath, SQLite.SQLiteOpenFlags.ReadOnly);
+            return db.ExecuteScalar<string>("SELECT payload FROM snapshots ORDER BY revision DESC LIMIT 1");
+        }
+
+        // TEST-ONLY: replaces the latest row with an older-schema payload and its checksum (base64 SHA-256, as GoodsSnapshotStore).
+        private void ReplaceLatestPayload(string payload)
+        {
+            using var sha = System.Security.Cryptography.SHA256.Create();
+            var digest = Convert.ToBase64String(sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(payload)));
+            using var db = new SQLite.SQLiteConnection(WorldPath, SQLite.SQLiteOpenFlags.ReadWrite);
+            db.Execute("UPDATE snapshots SET payload = ?, sha256 = ?, schema_version = ? WHERE revision = (SELECT MAX(revision) FROM snapshots)",
+                payload, digest, JsonUtility.FromJson<GoodsSnapshot>(payload).SchemaVersion);
+        }
 
         [Test]
         public void ANewWorldCreatesTheStartingSiteOnceAndReloadsUnchanged()
@@ -94,7 +112,7 @@ namespace FoodFactoryGame.Session.Tests
             GoodsSnapshotStore.Save(world, WorldPath);
 
             using var registry = new PlayerRegistry(Path.Combine(_directory, SessionOptions.RegistryFileName));
-            var admission = new SessionAdmission(registry, world, start.SiteId, WorldPath, DevWorld.InventoryCapacity, DevWorld.StarterGoods);
+            var admission = new SessionAdmission(registry, world, start.SiteId, WorldPath, DevWorld.InventoryCapacity, GeneratedWorld.StarterGoods);
             Assert.That(admission.PrimarySiteId, Is.EqualTo(start.SiteId));
             var player = admission.Admit("Tester", new string('b', 43)).PlayerId;
             Assert.That(player, Is.Not.Null);
@@ -102,8 +120,45 @@ namespace FoodFactoryGame.Session.Tests
             Assert.That((saved.CanView(player, start.SiteId), saved.CanView(player, other.SiteId)), Is.EqualTo((true, true)));
             var inventory = saved.Snapshot().Locations.Single(x => x.Id == GoodsWorld.InventoryLocationId(player));
             Assert.That(inventory.SiteId, Is.EqualTo(start.SiteId), "The inventory is on the starting site only.");
-            Assert.That(saved.Snapshot().Lots.Where(x => x.LocationId == inventory.Id).Sum(x => x.Quantity),
-                Is.EqualTo(DevWorld.StarterGoods.Sum(x => x.Quantity)));
+            Assert.That(saved.Snapshot().Lots.Where(x => x.LocationId == inventory.Id).Select(x => (x.ItemId, x.Quantity, x.SpoilAfterSeconds)),
+                Is.EqualTo(new[] { (DevWorld.DoughItemId, GeneratedWorld.StarterDough, DevWorld.DoughSpoilAfterSeconds) }),
+                "Decision 0039: a generated world's start kit is dough only, no belts or lifts.");
+        }
+
+        // Decision 0039 (owner decision 9): the starting cash covers about an oven, a fridge, a few tables and an hour of dough,
+        // priced from the real offers, with less than 2x slack, so a price change shows up here.
+        [Test]
+        public void TheStartingCashCoversABasicKitAndLittleMore()
+        {
+            long Price(string name) => UnityEditor.AssetDatabase.LoadAssetAtPath<Equipment.OfferAsset>($"Assets/Content/Offers/{name}.asset").PriceCents;
+            var dough = UnityEditor.AssetDatabase.LoadAssetAtPath<Equipment.OfferAsset>("Assets/Content/Offers/Dough5.asset");
+            // PROTOTYPE: an hour of dough at about one sale a real minute (the pacing target), in whole packs.
+            var hourOfDough = (60 + dough.Quantity - 1) / dough.Quantity * dough.PriceCents;
+            var kit = Price("Oven1") + Price("Fridge1") + 3 * Price("Table1") + hourOfDough;
+            TestContext.WriteLine($"basic kit {kit} cents, starting cash {GeneratedWorld.StartingCash} cents");
+            Assert.That(GeneratedWorld.StartingCash, Is.GreaterThanOrEqualTo(kit).And.LessThan(2 * kit));
+        }
+
+        // Decision 0039: a world created before the game hour (goods v20, layout format 4) loads with its districts re-tuned in
+        // memory, gains no second copy of any district, and keeps its cash.
+        [Test]
+        public void AnOlderWorldLoadsWithReTunedDistrictsAndItsCash()
+        {
+            var stored = Layout();
+            var world = Open(stored);
+            var created = world.Snapshot();
+            // TEST-ONLY: the same world as decision 0038 left it, with $1,000,000 and per-3600 s district rates in a v20 save.
+            Assert.That(world.AdjustCashDurably(GeneratedWorld.CompanyId, 100_000_000 - GeneratedWorld.StartingCash, WorldPath), Is.Null);
+            var payload = LatestPayload();
+            var v20 = System.Text.RegularExpressions.Regex.Replace(payload, "\"CustomersPerHour\":(\\d+)",
+                    m => $"\"CustomersPerHour\":{int.Parse(m.Groups[1].Value) * GameClock.RetuneDivisor}")
+                .Replace($"\"SchemaVersion\":{GoodsSnapshot.CurrentSchema}", "\"SchemaVersion\":20");
+            ReplaceLatestPayload(v20);
+
+            var loaded = Open(stored).Snapshot();
+            Assert.That(loaded.Districts.Select(x => (x.Id, x.CustomersPerHour)), Is.EqualTo(created.Districts.Select(x => (x.Id, x.CustomersPerHour))),
+                "Rates come back as the game-hour rates a new world gets; no district is added twice.");
+            Assert.That(loaded.Companies.Single().Cash, Is.EqualTo(100_000_000L), "An older world keeps its cash.");
         }
 
         [Test]

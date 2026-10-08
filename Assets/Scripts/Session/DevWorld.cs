@@ -117,9 +117,10 @@ namespace FoodFactoryGame.Session
         public const int TableCellX = 11;
         public const int TableCellZ = 3;
 
+        // Customers per game hour (decision 0039): 240 per 3600 clock s re-tuned like every older rate, about one every 2.5 s.
         public static GoodsDistrict District() => new()
         {
-            Id = DistrictId, Name = "Old Town", MapX = 0, MapZ = 60, CustomersPerHour = 240, WealthPercent = 40,
+            Id = DistrictId, Name = "Old Town", MapX = 0, MapZ = 60, CustomersPerHour = 24, WealthPercent = 40,
             Appearance = "old-town", AppearanceVariants = 4, LikedCuisines = new List<string> { "bakery" }, DineInPercent = 70,
             RangeMetres = 400
         };

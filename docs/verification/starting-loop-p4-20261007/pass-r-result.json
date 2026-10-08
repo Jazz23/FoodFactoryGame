@@ -1,0 +1,20 @@
+﻿{
+    "status":  "completed",
+    "duration":  76.28,
+    "summary":  {
+                    "total":  1,
+                    "passed":  0,
+                    "failed":  1,
+                    "skipped":  0,
+                    "inconclusive":  0
+                },
+    "results":  [
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.StartingLoopPlaythroughTests.PassRequestsFirstSeed",
+                        "Status":  "Failed",
+                        "Duration":  76.2649167,
+                        "Message":  "  Steps not passing (records in E:\\Projects\\Unity\\FoodFactoryGame\\docs\\verification\\starting-loop-p4-20261007\\pass-r-piece-two).\r\n  Expected: \u003cempty\u003e\r\n  But was:  \u003c \"S5 fail: dough into the oven refused: capacity\", \"S6 blocked: needs S5\", \"S7 blocked: needs S6\", \"S8 blocked: needs S7\", \"S9 blocked: needs S6\" \u003e\r\n",
+                        "StackTrace":  "at FoodFactoryGame.Session.PlayModeTests.StartingLoopPlaythroughTests+\u003cPlay\u003ed__121.MoveNext () [0x00535] in E:\\Projects\\Unity\\FoodFactoryGame\\Assets\\Tests\\PlayMode\\Session\\StartingLoopPlaythroughTests.cs:220\r\nat UnityEngine.TestTools.TestEnumerator+\u003cExecute\u003ed__7.MoveNext () [0x0003a] in .\\Library\\PackageCache\\com.unity.test-framework@1405238725ab\\UnityEngine.TestRunner\\NUnitExtensions\\Attributes\\TestEnumerator.cs:44\r\n"
+                    }
+                ]
+}

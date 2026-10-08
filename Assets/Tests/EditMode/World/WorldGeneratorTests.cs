@@ -15,9 +15,10 @@ namespace FoodFactoryGame.World.Tests
     public sealed class WorldGeneratorTests
     {
         private const ulong KnownSeed = 20260927;
-        // WorldLayoutText.Hash of generator v5's layout for KnownSeed (v1's was c8aed6b7…4269, v2's 6e12b0fd…b598, the pin before v5
-        // 5667d34e…47ec). Changing it requires bumping WorldGenerator.Version.
-        private const string KnownHash = "d0a58a011d03fa053ddb5e3df9726dd67115863b6289e56dbdd8bd2f82768d7f";
+        // WorldLayoutText.Hash of generator v6's layout for KnownSeed (v1's was c8aed6b7…4269, v2's 6e12b0fd…b598, the pin before v5
+        // 5667d34e…47ec, v5's d0a58a01…8d7f). Changing it requires bumping WorldGenerator.Version.
+        private const string KnownHash = "75040b43e7bb5f33b7d01c5d70c59049bd0aaa760ebc495d581fb7e412bd4855";
+        private const string KnownHashV5 = "d0a58a011d03fa053ddb5e3df9726dd67115863b6289e56dbdd8bd2f82768d7f";
         private const int SeedCount = 120;
 
         private static WorldLayout Generate(ulong seed) => WorldGenerator.Generate(seed.ToString(), seed).Layout;
@@ -28,10 +29,22 @@ namespace FoodFactoryGame.World.Tests
             var first = WorldLayoutText.Write(Generate(KnownSeed));
             var second = WorldLayoutText.Write(Generate(KnownSeed));
             Assert.That(second, Is.EqualTo(first));
-            Assert.That(first, Does.StartWith("food-factory-world-layout 4\ngenerator 5\n").And.Contains("\nlot lot-").And.Contains("\nservice restaurant-"),
-                "the same lots, service yards and IDs, in format 4");
+            Assert.That(first, Does.StartWith("food-factory-world-layout 5\ngenerator 6\n").And.Contains("\nlot lot-").And.Contains("\nservice restaurant-"),
+                "the same lots, service yards and IDs, in format 5");
             TestContext.WriteLine($"seed {KnownSeed}: sha256 {WorldLayoutText.Hash(first)}, {first.Length} chars");
             Assert.That(WorldLayoutText.Hash(first), Is.EqualTo(KnownHash), "Generator output changed: bump WorldGenerator.Version and re-pin.");
+        }
+
+        // Decision 0039: generator v6 is v5 with district rates per game hour. Written back in format 4 with v5's per-3600 s
+        // rates, its layout is byte for byte v5's.
+        [Test]
+        public void GeneratorV6IsV5WithGameHourRates()
+        {
+            var layout = Generate(KnownSeed);
+            layout.FormatVersion = 4;
+            layout.GeneratorVersion = 5;
+            foreach (var district in layout.Districts) district.CustomersPerHour *= GameClock.RetuneDivisor;
+            Assert.That(WorldLayoutText.Hash(WorldLayoutText.Write(layout)), Is.EqualTo(KnownHashV5));
         }
 
         [Test]
@@ -48,7 +61,7 @@ namespace FoodFactoryGame.World.Tests
             var read = WorldLayoutText.Read(text);
             Assert.That(WorldLayoutText.Write(read), Is.EqualTo(text));
             Assert.That(read.RequestedSeed, Is.EqualTo("Sunny Valley"));
-            Assert.That(read.FormatVersion, Is.EqualTo(4));
+            Assert.That(read.FormatVersion, Is.EqualTo(5));
             Assert.That(read.Buildings.Where(x => x.ServiceYard != null).Select(x => (x.Id, x.ServiceYard.X, x.ServiceYard.Z, x.ServiceYard.Width, x.ServiceYard.Depth, x.BackDoor.X, x.BackDoor.Z, x.ServiceDock.X, x.ServiceDock.Z, x.ServiceDock.Width, x.ServiceDock.Depth)),
                 Is.EqualTo(layout.Buildings.Where(x => x.ServiceYard != null).Select(x => (x.Id, x.ServiceYard.X, x.ServiceYard.Z, x.ServiceYard.Width, x.ServiceYard.Depth, x.BackDoor.X, x.BackDoor.Z, x.ServiceDock.X, x.ServiceDock.Z, x.ServiceDock.Width, x.ServiceDock.Depth))).And.Not.Empty,
                 "service yards round-trip");

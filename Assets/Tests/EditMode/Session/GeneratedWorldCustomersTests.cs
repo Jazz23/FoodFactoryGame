@@ -74,7 +74,7 @@ namespace FoodFactoryGame.Session.Tests
             foreach (var district in layout.Districts)
             {
                 var blocks = districts.Where(x => x.Id.StartsWith($"district-{district.Id}-", StringComparison.Ordinal)).ToList();
-                Assert.That(blocks.Sum(x => x.CustomersPerHour), Is.EqualTo(district.CustomersPerHour), $"{district.Id} shares its whole rate.");
+                Assert.That(blocks.Sum(x => x.CustomersPerHour), Is.EqualTo(layout.RatePerGameHour(district)), $"{district.Id} shares its whole rate.");
                 for (var block = 0; block < district.Areas.Count; block++)
                 {
                     var area = district.Areas[block];

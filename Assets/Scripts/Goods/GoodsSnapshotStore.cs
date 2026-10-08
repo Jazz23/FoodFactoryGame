@@ -11,6 +11,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using FoodFactoryGame.World;
 using SQLite;
 using UnityEngine;
 
@@ -510,6 +511,18 @@ namespace FoodFactoryGame.Goods
                     company.LedgerNextNumber = 0;
                 }
                 state.SchemaVersion = 20;
+            }
+            // v20 counted district rates per 3600 clock s; v21 counts them per game hour (decision 0039). Reading the old numbers
+            // per game hour would multiply demand by 60, so each rate is re-tuned by GameClock.FromClockHourRate, and the progress
+            // toward the next customer keeps its fraction of a customer. No goods, cash or customers change.
+            if (state != null && state.SchemaVersion == 20)
+            {
+                foreach (var district in (state.Districts ?? new()).Where(x => x != null))
+                {
+                    district.CustomersPerHour = GameClock.FromClockHourRate(district.CustomersPerHour);
+                    district.SpawnProgress = district.SpawnProgress is >= 0 and < 3600 ? district.SpawnProgress * GameClock.HourSeconds / 3600 : district.SpawnProgress;
+                }
+                state.SchemaVersion = 21;
             }
             GoodsWorld.Validate(state);
             return state;

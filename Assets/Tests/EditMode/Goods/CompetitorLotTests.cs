@@ -133,14 +133,14 @@ namespace FoodFactoryGame.Goods.Tests
             // West district (x = 0, range 100) and east district (x = 1000, range 150); competitors every 50 m from -300 to 1300.
             world.Bootstrap(new GoodsDistrict
             {
-                Id = "west", Name = "West", MapX = 0, CustomersPerHour = 3600, WealthPercent = 50, AppearanceVariants = 1,
+                Id = "west", Name = "West", MapX = 0, CustomersPerHour = 60, WealthPercent = 50, AppearanceVariants = 1,
                 LikedCuisines = { "bakery" }, DineInPercent = 0, RangeMetres = 100
             });
             for (var x = -300; x <= 1300; x += 50) world.Bootstrap(Competitor($"c{x}", mapX: x));
             world.Advance(60);
             world.Bootstrap(new GoodsDistrict
             {
-                Id = "east", Name = "East", MapX = 1000, CustomersPerHour = 3600, WealthPercent = 50, AppearanceVariants = 1,
+                Id = "east", Name = "East", MapX = 1000, CustomersPerHour = 60, WealthPercent = 50, AppearanceVariants = 1,
                 LikedCuisines = { "bakery" }, DineInPercent = 0, RangeMetres = 150
             });
             world.Advance(60);

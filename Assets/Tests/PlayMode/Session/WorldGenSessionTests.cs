@@ -108,6 +108,17 @@ namespace FoodFactoryGame.Session.PlayModeTests
 
         private PropertyOffer Start => _root.StartOffer;
 
+        // TEST-ONLY funding (decision 0039 cut the starting cash to $700): tests that buy buildings get $1,000,000 more through the
+        // tools' cash adjustment, recorded in the ledger, and wait until the client sees it. Gameplay values are unchanged.
+        private const long TestFundingCents = 100_000_000;
+
+        private IEnumerator Fund()
+        {
+            var cash = _root.ServerWorld.Snapshot().Companies.Single(x => x.Id == GeneratedWorld.CompanyId).Cash;
+            Assert.That(_root.ServerWorld.AdjustCashDurably(GeneratedWorld.CompanyId, TestFundingCents, _root.Options.WorldPath), Is.Null);
+            yield return Until(() => _root.ClientSite.Companies.Single().Cash == cash + TestFundingCents, "TEST-ONLY funding reaches the client");
+        }
+
         // The host's own avatar: a remote client in the same process owns one too, so ownership alone is ambiguous.
         private PlayerAvatar LocalAvatar() =>
             UnityEngine.Object.FindObjectsByType<PlayerAvatar>().FirstOrDefault(x => x.IsOwner && x.NetworkManager == _root.NetworkManager);
@@ -122,6 +133,8 @@ namespace FoodFactoryGame.Session.PlayModeTests
             Assert.That(site.Companies.Single().Cash, Is.EqualTo(GeneratedWorld.StartingCash));
             Assert.That(site.Properties.Single().LotId, Is.EqualTo(Start.LotId));
             Assert.That(site.Locations.Single(x => x.Id == GoodsWorld.InventoryLocationId(_root.Authenticator.LocalPlayerId)).SiteId, Is.EqualTo(Start.SiteId));
+            Assert.That(site.Lots.Where(x => x.LocationId == GoodsWorld.InventoryLocationId(_root.Authenticator.LocalPlayerId)).Select(x => (x.ItemId, x.Quantity)),
+                Is.EqualTo(new[] { (DevWorld.DoughItemId, GeneratedWorld.StarterDough) }), "Decision 0039: the start kit is dough only, no belts or lifts.");
             Assert.That(site.Equipment.Select(x => x.Id), Is.EquivalentTo(new[] { GeneratedWorld.StartCounterId, GeneratedWorld.StartTableId, GeneratedWorld.StartDockId }),
                 "Pre-equipped with a counter and a table (decision 0030) and the dock beside the back door (decision 0037).");
             Assert.That(RestaurantRules.BesideBackDoor(site, site.Equipment.Single(x => x.Id == GeneratedWorld.StartDockId)), Is.True);
@@ -202,6 +215,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
         public IEnumerator ABoughtRestaurantIsDrawnWhereItStands()
         {
             yield return StartHost();
+            yield return Fund();
             var results = new System.Collections.Generic.Dictionary<string, GoodsOutcome>();
             _root.ClientSubscription.ResultReceived += x => results[x.RequestId] = x;
             var diner = NearestForSaleRestaurant();
@@ -237,6 +251,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
         public IEnumerator WalkingIntoABoughtRestaurantCarriesTheGoodsThere()
         {
             yield return StartHost();
+            yield return Fund();
             var results = new System.Collections.Generic.Dictionary<string, GoodsOutcome>();
             _root.ClientSubscription.ResultReceived += x => results[x.RequestId] = x;
             var me = _root.Authenticator.LocalPlayerId;
@@ -295,7 +310,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
             });
             _root.ServerWorld.Bootstrap(new GoodsDistrict
             {
-                Id = "test-district", Name = "Test", MapX = diner.AccessX, MapZ = diner.AccessZ, CustomersPerHour = 720, WealthPercent = 40,
+                Id = "test-district", Name = "Test", MapX = diner.AccessX, MapZ = diner.AccessZ, CustomersPerHour = 12, WealthPercent = 40,
                 AppearanceVariants = 1, LikedCuisines = { "bakery" }, DineInPercent = 50, RangeMetres = 5
             });
             var figures = UnityEngine.Object.FindAnyObjectByType<Customers.CustomerPresenter>();
@@ -315,6 +330,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
         public IEnumerator RejoiningStartsWhereThePlayerLeftWithTheGoods()
         {
             yield return StartHost();
+            yield return Fund();
             var diner = NearestForSaleRestaurant();
             var me = _root.Authenticator.LocalPlayerId;
             _root.ClientSubscription.Bridge.RequestBuyProperty("buy-near", Start.SiteId, diner.LotId);
@@ -356,6 +372,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
         public IEnumerator ATeammateSeesTheHostEnterAndBuildInTheSecondSite()
         {
             yield return StartHost();
+            yield return Fund();
             CreateRemote();
             Assert.That(_remote.ClientManager.StartConnection(), Is.True);
             yield return Until(() => { _remoteSite.Tick(); return _remoteSite.Latest != null; }, "remote baseline of the starting site");
@@ -415,6 +432,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
             var output = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "docs", "verification", "several-sites-20260930"));
             Directory.CreateDirectory(output);
             yield return StartHost();
+            yield return Fund();
             yield return Until(() => LocalAvatar() != null, "local avatar");
             yield return new WaitForSeconds(2f);
             var one = new System.Collections.Generic.List<float>();
@@ -518,6 +536,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
 
         private IEnumerator TruckOnARoute(PropertyOffer diner, int hour)
         {
+            yield return Fund();
             var results = new System.Collections.Generic.Dictionary<string, GoodsOutcome>();
             _root.ClientSubscription.ResultReceived += x => results[x.RequestId] = x;
             var me = _root.Authenticator.LocalPlayerId;
@@ -770,7 +789,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
             var map = _root.ServerWorld.Snapshot().Sites.Single(x => x.Id == Start.SiteId);
             _root.ServerWorld.Bootstrap(new GoodsDistrict
             {
-                Id = "test-district", Name = "Test", MapX = map.MapX, MapZ = map.MapZ, CustomersPerHour = 720, WealthPercent = 40,
+                Id = "test-district", Name = "Test", MapX = map.MapX, MapZ = map.MapZ, CustomersPerHour = 12, WealthPercent = 40,
                 AppearanceVariants = 1, LikedCuisines = { "bakery" }, DineInPercent = 50, RangeMetres = 5
             });
             yield return Until(() => _root.ClientSite.Companies.Single().Cash > startCash - SupplierSpend, "a customer buys bread", 60f);
@@ -868,7 +887,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
             var map = _root.ServerWorld.Snapshot().Sites.Single(x => x.Id == Start.SiteId);
             _root.ServerWorld.Bootstrap(new GoodsDistrict
             {
-                Id = "test-district", Name = "Test", MapX = map.MapX, MapZ = map.MapZ, CustomersPerHour = 720, WealthPercent = 40,
+                Id = "test-district", Name = "Test", MapX = map.MapX, MapZ = map.MapZ, CustomersPerHour = 12, WealthPercent = 40,
                 AppearanceVariants = 1, LikedCuisines = { "bakery" }, DineInPercent = 0, RangeMetres = 5
             });
             yield return Until(() => _root.ClientSite.Ledger.Any(x => x.Kind == GoodsWorld.LedgerSale), "a sale in the ledger", 60f);
