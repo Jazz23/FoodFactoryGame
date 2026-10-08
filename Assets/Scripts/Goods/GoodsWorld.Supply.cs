@@ -112,8 +112,8 @@ namespace FoodFactoryGame.Goods
                 if (_state.Companies.First(x => x.Id == company).Cash < (offer?.PriceCents ?? machine?.PriceCents ?? vehicle.PriceCents))
                     return Reject("insufficient-funds");
 
-                // All checks precede this single locked mutation: pay, then deliver under a request-derived ID, which is unique
-                // because an accepted request replays instead of running again.
+                // All checks precede this single locked mutation: pay, then deliver: a machine under a short NewEquipmentId, a truck
+                // or lot under a request-derived ID, which is unique because an accepted request replays instead of running again.
                 var deliveredId = $"buy:{playerId}:{requestId}";
                 if (vehicle is not null)
                 {
@@ -133,7 +133,7 @@ namespace FoodFactoryGame.Goods
                 {
                     TryDebit(company, machine.PriceCents);
                     var equipment = JsonUtility.FromJson<GoodsEquipment>(JsonUtility.ToJson(machine.Equipment));
-                    equipment.Id = deliveredId;
+                    equipment.Id = NewEquipmentId(equipment.Kind);
                     equipment.SiteId = siteId;
                     equipment.State = EquipmentState.Held;
                     equipment.HolderId = playerId;
@@ -144,8 +144,8 @@ namespace FoodFactoryGame.Goods
                     equipment.Layer ??= "";
                     _state.Equipment.Add(equipment);
                     var bought = Record(requestId, playerId, true, "bought", null);
-                    bought.EquipmentId = deliveredId;
-                    _state.Outcomes[_state.Outcomes.Count - 1].EquipmentId = deliveredId;
+                    bought.EquipmentId = equipment.Id;
+                    _state.Outcomes[_state.Outcomes.Count - 1].EquipmentId = equipment.Id;
                     return bought;
                 }
                 TryDebit(company, offer.PriceCents);

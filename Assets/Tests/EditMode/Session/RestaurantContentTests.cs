@@ -54,7 +54,7 @@ namespace FoodFactoryGame.Session.Tests
                     Assert.That(missing, Is.Empty, $"{scenePath}: kit models nobody can build.");
                     var mode = objects.SelectMany(x => x.GetComponentsInChildren<BuildMode>(true)).Single();
                     using var serialized = new SerializedObject(mode);
-                    foreach (var (field, action) in new[] { ("buildAction", "Player/Build"), ("confirmAction", "Player/BuildConfirm"), ("placeAction", "Player/Place"),
+                    foreach (var (field, action) in new[] { ("buildAction", "Player/Build"), ("placeAction", "Player/Place"),
                                  ("removeAction", "Player/Remove"), ("rotateAction", "Player/Rotate"), ("pointAction", "Player/Point") })
                     {
                         var reference = serialized.FindProperty(field).objectReferenceValue as InputActionReference;

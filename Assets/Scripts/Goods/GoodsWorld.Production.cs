@@ -122,7 +122,8 @@ namespace FoodFactoryGame.Goods
 
         // Volatile primitive for tests. Live request handlers must call SetPowerDurably. Switches a placed, manually powered
         // machine on or off for an actor granted its site (a player or employee); switching it to the state it is already in
-        // is accepted and changes nothing.
+        // is accepted and changes nothing. A player's switch-off holds against employees (GoodsEquipment.HeldOff): an employee's
+        // switch-on is refused with held-off until a player switches the machine on.
         public GoodsOutcome SetPower(string playerId, string requestId, string equipmentId, bool on)
         {
             lock (_gate)
@@ -137,8 +138,12 @@ namespace FoodFactoryGame.Goods
                 if (equipment.State != EquipmentState.Placed) return Record(requestId, playerId, false, "not-placed", null);
                 if (!_manualPowerKinds.Contains(equipment.Kind)) return Record(requestId, playerId, false, "no-power-switch", null);
 
+                var employee = _state.Employees.Any(x => x.Id == playerId);
+                if (on && employee && equipment.HeldOff) return Record(requestId, playerId, false, "held-off", null);
+
                 // All checks precede this single locked mutation. A machine switched on may start a batch at once.
                 equipment.PoweredOn = on;
+                equipment.HeldOff = !on && (equipment.HeldOff || !employee);
                 if (on && _automaticJobs)
                 {
                     var station = _state.Stations.FirstOrDefault(x => x.Id == equipment.Id);

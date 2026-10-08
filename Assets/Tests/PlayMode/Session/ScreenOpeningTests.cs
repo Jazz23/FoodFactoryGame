@@ -147,6 +147,36 @@ namespace FoodFactoryGame.Session.PlayModeTests
             Assert.That(panel.SourceField.focusController?.focusedElement, Is.Null, "The hidden text box kept focus.");
         }
 
+        // Owner feedback 0038: a long script scrolls inside the Lua tab's text box (the screen keeps its size), and moving the
+        // caret down past the visible lines scrolls them into view.
+        [UnityTest]
+        public IEnumerator LongLuaScrollsAndFollowsTheCaret()
+        {
+            var panel = UnityEngine.Object.FindAnyObjectByType<EmployeeScriptPanel>();
+            yield return OpenEmployee(panel);
+            panel.ShowLua(true);
+            yield return Frames(2);
+            var height = panel.Window.layout.height;
+            panel.SourceField.value = string.Join("\n", Enumerable.Range(1, 80).Select(x => $"say(\"line {x}\")"));
+            yield return Frames(3);
+            Assert.That(panel.Window.layout.height, Is.EqualTo(height).Within(1f), "The screen does not grow with the script.");
+            var scroll = panel.SourceField.Q<ScrollView>();
+            Assert.That(scroll, Is.Not.Null, "The text box scrolls.");
+            Assert.That(scroll.scrollOffset.y, Is.Zero);
+
+            panel.SourceField.Focus();
+            panel.SourceField.SelectRange(0, 0);
+            yield return null;
+            var editor = panel.SourceField.Q<TextElement>();
+            for (var line = 0; line < 60; line++)
+                using (var down = KeyDownEvent.GetPooled(Event.KeyboardEvent("down"))) editor.SendEvent(down);
+            yield return Frames(3);
+            Assert.That(panel.SourceField.cursorIndex, Is.GreaterThan(panel.SourceField.value.Length / 2), "The caret moved down.");
+            Assert.That(scroll.scrollOffset.y, Is.GreaterThan(0f), "The text scrolled to keep the caret in view.");
+            panel.SourceField.Blur();
+            _interaction.CloseScreen();
+        }
+
         private IEnumerator OpenEmployee(EmployeeScriptPanel panel)
         {
             EmployeeWorker employee = null;

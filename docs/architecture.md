@@ -257,6 +257,18 @@ Open: hiring, wages, firing and more employees; which players may command an emp
 - New Lua API: `turn_on`/`turn_off`/`toggle`/`is_on(machine)`, `accepts(place, except)` and `room(place, items)`. `take`/`put`/`count` take an item filter (an ID, a list or `{except = {...}}`).
 - Evidence and what is not checked: see decision 0037.
 
+## Implemented: owner feedback round 2 (2026-10-07)
+
+[Decision 0038](decisions/0038-owner-feedback-round-2.md). No goods schema version change.
+
+- Build mode: drags are ordered on release (no Confirm; `Player/BuildConfirm` is unused). Remove (right mouse) is held still for
+  `BuildMode.HoldSeconds` (0.75 s) over something removable, with a filling ring at the pointer. It targets the piece whose collider is under the pointer
+  (`BuildMode.PointedPiece`), else the cell of the solid surface under the pointer (`PointedCell`: a wall, door or window anywhere on it, or the floor) and its door, window, wall or non-wall/ceiling piece.
+- Short equipment IDs `<kind>-<n>` for new pieces (`GoodsSnapshot.NextPieceNumber`, never reused). Existing pieces, trucks and
+  goods lots keep their IDs.
+- Power: a player's switch-off holds against employees (`GoodsEquipment.HeldOff`, reason `held-off`) until a player switches on.
+- Employee screen: the Lua text box scrolls and follows the caret.
+
 ## Implemented: conveyor lifts (2026-09-24)
 
 Decision: [0021](decisions/0021-conveyor-lifts.md). GDD section 27 conveyor lifts between factory floors. Goods snapshot schema **v10**.
@@ -658,6 +670,7 @@ Goods snapshot schema **v16**. Evidence: [verification record](verification/rest
   wall finish, with style choices) and the catalog by category. The pointer cell shows a ghost and cell tint from the shared rules
   plus the company's cash, with charge, refund and net or the refusal reason; clicks place single pieces, drags wait for
   Player/BuildConfirm (Enter) or the Confirm button; Remove (right mouse) sells or removes what is under the pointer.
+  (Superseded by decision 0038: drags are ordered on release, with no Confirm. Remove is held for 0.75 s on the pointed object.)
 - Presentation: `RestaurantStyleCatalog` and `RestaurantShellModel` draw restaurant ground storeys from the art kit (wall graph
   with 2 m pieces and end posts, doorway bays with frames and leaves, window bays, serving hatch) with one invisible collider and
   carving obstacle per wall cell; `EquipmentModel` mounts decor (flush floors, wall faces, ceilings, table tops).

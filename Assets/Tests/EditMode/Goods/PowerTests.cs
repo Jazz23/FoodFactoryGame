@@ -94,6 +94,32 @@ namespace FoodFactoryGame.Goods.Tests
             Assert.That(OvenJob()?.RemainingSeconds, Is.EqualTo(5), "The next batch starts while it stays on.");
         }
 
+        // Owner feedback 0038: an employee's "turn on" task must not undo a player's switch-off; a player's switch-on lifts it.
+        [Test]
+        public void APlayersSwitchOffHoldsAgainstEmployees()
+        {
+            _world.Bootstrap(new GoodsEmployee { Id = "employee-a", SiteId = "site", Name = "A" }, 2);
+            Assert.That(_world.SetPower("employee-a", "e-on", "oven-1", true).Accepted, Is.True, "An employee may switch it on.");
+            Assert.That(_world.SetPower("employee-a", "e-off", "oven-1", false).Accepted, Is.True);
+            Assert.That(_world.Snapshot().Equipment.Single(x => x.Id == "oven-1").HeldOff, Is.False, "An employee's switch-off holds nothing.");
+            Assert.That(_world.SetPower("employee-a", "e-on-2", "oven-1", true).Accepted, Is.True);
+            _world.Advance(2);
+
+            Assert.That(_world.SetPower("chef", "off", "oven-1", false).Accepted, Is.True);
+            Assert.That(_world.Snapshot().Equipment.Single(x => x.Id == "oven-1").HeldOff, Is.True);
+            var refused = _world.SetPower("employee-a", "e-on-3", "oven-1", true);
+            Assert.That((refused.Accepted, refused.Reason), Is.EqualTo((false, "held-off")));
+            _world.Advance(10);
+            Assert.That(OvenJob()?.RemainingSeconds, Is.EqualTo(3), "The batch stays paused.");
+
+            Assert.That(_world.SetPower("chef", "on", "oven-1", true).Accepted, Is.True);
+            Assert.That(_world.Snapshot().Equipment.Single(x => x.Id == "oven-1").HeldOff, Is.False);
+            _world.Advance(3);
+            Assert.That(Output("oven-1:out"), Is.EqualTo(1), "The batch resumes where it paused.");
+            Assert.That(_world.SetPower("employee-a", "e-off-2", "oven-1", false).Accepted, Is.True);
+            Assert.That(_world.SetPower("employee-a", "e-on-4", "oven-1", true).Accepted, Is.True);
+        }
+
         [Test]
         public void OnlyGrantedActorsFlipAPlacedSwitch()
         {

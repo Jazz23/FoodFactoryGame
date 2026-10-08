@@ -109,6 +109,9 @@ namespace FoodFactoryGame.Goods
         public List<GoodsCustomer> Customers = new();
         public List<GoodsDiner> Diners = new();
         public long NextCustomerNumber;
+        // Bought equipment is numbered "<kind>-<n>" from this world-wide counter (owner feedback 0038), so a sold piece's ID is
+        // never handed to another. Older saves read 0; an ID already in use is skipped.
+        public long NextPieceNumber;
         public long CustomerRandom;
         // Bought generated buildings (decision 0028, v14): which company owns which lot's site. Never removed.
         public List<GoodsProperty> Properties = new();

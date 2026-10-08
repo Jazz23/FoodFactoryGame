@@ -173,12 +173,10 @@ namespace FoodFactoryGame.Session.PlayModeTests
             yield return Until(() => Shell(RemoteLatest()).FreeWalls && !SiteGrid.IsWall(Shell(RemoteLatest()), outer.X, outer.Z), "the teammate sees the opening");
             Assert.That(SiteGrid.InteriorCells(Shell(_root.ClientSite)), Is.Empty, "An open shell encloses nothing.");
             build.SelectTool(BuildTool.Wall, "plaster");
+            var drawn = build.PreviewDrag(outer, outer);
+            Assert.That(drawn.Problem, Is.Null, drawn.Problem);
+            Assert.That(drawn.NetCents, Is.GreaterThan(0));
             build.Drag(outer, outer);
-            Assert.That(build.HasPending, Is.True, "A drawn wall waits for Confirm.");
-            Assert.That(build.PendingPreview.Problem, Is.Null, build.PendingPreview.Problem);
-            var charge = build.PendingPreview.NetCents;
-            Assert.That(charge, Is.GreaterThan(0));
-            build.Confirm();
             yield return Until(() => SiteGrid.IsWall(Shell(_root.ClientSite), outer.X, outer.Z), "host sees the outer wall again");
             Assert.That(build.LastRejection, Is.Null);
             yield return Until(() => SiteGrid.IsWall(Shell(RemoteLatest()), outer.X, outer.Z), "the teammate sees the outer wall again");
@@ -186,13 +184,12 @@ namespace FoodFactoryGame.Session.PlayModeTests
                 Is.EqualTo((before.CellX, before.CellZ, before.Width, before.Depth)), "The footprint follows the walls.");
             Assert.That(SiteGrid.InteriorCells(Shell(_root.ClientSite)).Count(), Is.EqualTo((before.Width - 2) * (before.Depth - 2)), "The room is closed again.");
 
-            // An interior wall of two cells, drawn and confirmed.
+            // An interior wall of two cells, ordered when the drag ends.
             var site = _root.ClientSite;
             var wall = FreeInterior(site, 1, 2);
             build.SelectTool(BuildTool.Wall, "brick");
+            Assert.That(build.PreviewDrag(wall, (wall.X, wall.Z + 1)).Problem, Is.Null);
             build.Drag(wall, (wall.X, wall.Z + 1));
-            Assert.That(build.PendingPreview.Problem, Is.Null, build.PendingPreview.Problem);
-            build.Confirm();
             yield return Until(() => Shell(RemoteLatest()).Structures.Count(s => s.Kind == GoodsWorld.PartitionStructure && s.Style == "brick") == 2, "the teammate sees the interior wall");
             var buildings = UnityEngine.Object.FindAnyObjectByType<BuildingPresenter>();
             yield return Until(() => buildings.ShellOf(Shell(_root.ClientSite).Id)?.GetComponentsInChildren<Transform>().Any(t => t.name.StartsWith("RT_Wall_Brick")) == true,
@@ -244,6 +241,102 @@ namespace FoodFactoryGame.Session.PlayModeTests
             Assert.That(rig.BuildFocus.HasValue, Is.False, "Leaving build mode returns the camera to the avatar.");
         }
 
+        // Owner feedback 0038: a wall clock gets a short ID and is sold by pointing at the clock itself (not the floor cell under
+        // the pointer) and holding the right mouse button for BuildMode.HoldSeconds while the wheel fills; letting go early sells
+        // nothing. Driven through a virtual mouse and the Player action map.
+        [UnityTest]
+        public IEnumerator HoldingRemoveOnAWallClockSellsItOnceTheWheelFills()
+        {
+            yield return StartHost();
+            yield return OpenBuild();
+            var build = Build;
+            var shell = Shell(_root.ClientSite);
+            var cell = Enumerable.Range(shell.CellX + 2, shell.Width - 4).Select(x => (X: x, Z: shell.CellZ + shell.Depth - 1))
+                .First(c => SiteGrid.IsWall(shell, c.X, c.Z) && SiteGrid.CellProblem(_root.ClientSite, Start.SiteId, c.X, c.Z, 1, 1, null, 0, SiteGrid.WallLayer) == null);
+            build.SelectOffer("supplier-rt-wall-clock");
+            build.PressAt(cell);
+            build.ReleaseAt(cell);
+            yield return Until(() => _root.ClientSite.Equipment.Any(x => x.Kind == "rt-wall-clock"), "the clock is placed on release");
+            var clock = _root.ClientSite.Equipment.Single(x => x.Kind == "rt-wall-clock");
+            Assert.That(clock.Id, Does.Match("^rt-wall-clock-[0-9]+$"), "Bought pieces get short IDs.");
+            build.ClearSelection();
+            var presenter = UnityEngine.Object.FindAnyObjectByType<EquipmentPresenter>();
+            yield return Until(() => presenter.Visuals.ContainsKey(clock.Id), "the clock's visual");
+            yield return new WaitForSeconds(1f);
+            var camera = LocalAvatar().CameraRig.GetComponentInChildren<Camera>();
+            var screen = (Vector2)camera.WorldToScreenPoint(presenter.Visuals[clock.Id].GetComponentInChildren<Collider>().bounds.center);
+            var mouse = InputSystem.AddDevice<Mouse>();
+            void Mouse(bool right) => InputSystem.QueueStateEvent(mouse, new UnityEngine.InputSystem.LowLevel.MouseState { position = screen }
+                .WithButton(UnityEngine.InputSystem.LowLevel.MouseButton.Right, right));
+            try
+            {
+                var wheel = UnityEngine.UIElements.UQueryExtensions.Q(build.Window.panel.visualTree, "build-hold-wheel");
+                Assert.That(wheel, Is.Not.Null);
+
+                // A right press on empty floor starts no hold and shows no wheel.
+                var empty = FreeInterior(_root.ClientSite, 1, 1);
+                var layout = _root.ClientSite.SiteLayouts.Single(x => x.SiteId == Start.SiteId);
+                var target = screen;
+                screen = camera.WorldToScreenPoint(SiteGridSpace.FootprintCenter(layout, empty.X, empty.Z, 1, 1));
+                Mouse(false);
+                yield return null;
+                Mouse(true);
+                yield return new WaitForSeconds(BuildMode.HoldSeconds * 0.5f);
+                Assert.That((build.RemoveProgress, wheel.resolvedStyle.display), Is.EqualTo((0f, UnityEngine.UIElements.DisplayStyle.None)),
+                    "Nothing to remove: no wheel.");
+                Mouse(false);
+                yield return null;
+                screen = target;
+
+                Mouse(false);
+                yield return null;
+                yield return null;
+                Assert.That(build.PointedPieceId, Is.EqualTo(clock.Id), "The pointer is on the clock, high on its wall.");
+
+                Mouse(true);
+                yield return new WaitForSeconds(BuildMode.HoldSeconds * 0.4f);
+                Assert.That(build.RemoveProgress, Is.InRange(0.1f, 0.9f));
+                Assert.That(wheel.resolvedStyle.display, Is.EqualTo(UnityEngine.UIElements.DisplayStyle.Flex), "The wheel shows while holding.");
+                Mouse(false);
+                yield return null;
+                yield return null;
+                Assert.That(build.RemoveProgress, Is.Zero);
+                yield return null;
+                Assert.That(wheel.resolvedStyle.display, Is.EqualTo(UnityEngine.UIElements.DisplayStyle.None));
+                yield return new WaitForSeconds(BuildMode.HoldSeconds);
+                Assert.That(_root.ServerWorld.Snapshot().Equipment.Any(x => x.Id == clock.Id), Is.True, "Letting go early sells nothing.");
+
+                var cash = _root.ClientSite.Companies.Single().Cash;
+                var pressed = Time.unscaledTime;
+                Mouse(true);
+                yield return Until(() => _root.ClientSite.Equipment.All(x => x.Id != clock.Id), "the clock is sold");
+                Assert.That(Time.unscaledTime - pressed, Is.GreaterThanOrEqualTo(BuildMode.HoldSeconds - 0.05f));
+                Assert.That(_root.ClientSite.Companies.Single().Cash, Is.EqualTo(cash + clock.ChargedCents), "Sold for its recorded price.");
+                Assert.That(build.LastRejection, Is.Null);
+                Mouse(false);
+                yield return null;
+
+                // A wall is removed by pointing high on it, not at its base: the cell is the wall's, not the floor behind it.
+                var walled = Shell(_root.ClientSite);
+                var wallCell = Enumerable.Range(walled.CellX + 2, walled.Width - 4).Select(x => (X: x, Z: cell.Z))
+                    .First(c => c.X != cell.X && SiteGrid.IsWall(walled, c.X, c.Z) && SiteGrid.WindowAt(walled, c.X, c.Z) == null
+                        && !SiteGrid.IsDoor(walled, c.X, c.Z));
+                screen = camera.WorldToScreenPoint(SiteGridSpace.FootprintCenter(layout, wallCell.X, wallCell.Z, 1, 1)
+                    + Vector3.up * (SiteGridSpace.LevelHeight - 0.2f));
+                Mouse(false);
+                yield return null;
+                yield return null;
+                Assert.That(build.PointedCell, Is.EqualTo(((int, int)?)wallCell), "The wall under the pointer, not the floor behind it.");
+                Mouse(true);
+                yield return Until(() => !SiteGrid.IsWall(Shell(_root.ClientSite), wallCell.X, wallCell.Z), "the wall is removed");
+                Mouse(false);
+            }
+            finally
+            {
+                InputSystem.RemoveDevice(mouse);
+            }
+        }
+
         [UnityTest]
         public IEnumerator RegisterStaffingReplicatesAndEndsWhenThePlayerLeaves()
         {
@@ -285,7 +378,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
             yield return Until(() => _root.ClientSubscription.Remote(diner.SiteId) != null, "the second site's baseline");
 
             // A dock in each yard, on the street side, through the build-mode order (one charge, placed at once).
-            string PlaceDock(PropertyOffer lot, GoodsSnapshot snapshot, string request)
+            void PlaceDock(PropertyOffer lot, GoodsSnapshot snapshot, string request)
             {
                 var template = _root.Offers.Single(x => x.Id == "supplier-dock").Equipment.CreateTemplate();
                 var shell = snapshot.Buildings.Single(x => x.SiteId == lot.SiteId);
@@ -295,20 +388,22 @@ namespace FoodFactoryGame.Session.PlayModeTests
                     .First(c => GoodsWorld.FurnishProblem(snapshot, lot.SiteId, template, new[] { new GridPlacement { X = c.X, Z = c.Z, Rotation = c.Rotation } }, 0, lot) == null);
                 bridge.RequestBuyAndPlace(request, new FurnishOrder
                     { SiteId = lot.SiteId, OfferId = "supplier-dock", Placements = { new GridPlacement { X = cell.X, Z = cell.Z, Rotation = cell.Rotation } } });
-                return $"buy:{_root.Authenticator.LocalPlayerId}:{request}:0";
             }
-            var pickup = PlaceDock(Start, _root.ClientSite, "dock-start");
-            var dropoff = PlaceDock(diner, _root.ClientSubscription.Remote(diner.SiteId), "dock-diner");
+            PlaceDock(Start, _root.ClientSite, "dock-start");
+            PlaceDock(diner, _root.ClientSubscription.Remote(diner.SiteId), "dock-diner");
             yield return Until(() => _results.ContainsKey("dock-start") && _results.ContainsKey("dock-diner"), "both docks");
             Assert.That((_results["dock-start"].Accepted, _results["dock-diner"].Accepted), Is.EqualTo((true, true)),
                 _results["dock-start"].Reason + " / " + _results["dock-diner"].Reason);
+            var pickup = _results["dock-start"].EquipmentId;
+            var dropoff = _results["dock-diner"].EquipmentId;
 
             // Two trucks on one route; TEST-ONLY goods straight into the pickup dock's outgoing buffer on the server.
             bridge.RequestCreateRoute("route", pickup, dropoff, Array.Empty<string>());
             bridge.RequestPurchase("truck-1", Start.SiteId, "supplier-truck");
             bridge.RequestPurchase("truck-2", Start.SiteId, "supplier-truck");
             yield return Until(() => _results.ContainsKey("route") && _results.ContainsKey("truck-1") && _results.ContainsKey("truck-2"), "route and trucks");
-            Assert.That(_results["route"].Accepted && _results["truck-1"].Accepted && _results["truck-2"].Accepted, Is.True);
+            Assert.That(_results["route"].Accepted && _results["truck-1"].Accepted && _results["truck-2"].Accepted, Is.True,
+                $"{_results["route"].Reason} / {_results["truck-1"].Reason} / {_results["truck-2"].Reason}");
             var route = GoodsWorld.RouteIdFor(_root.Authenticator.LocalPlayerId, "route");
             _root.ServerWorld.Bootstrap(new GoodsLot { Id = "test-crates", ItemId = "crate", OwnerId = Start.SiteId, LocationId = pickup + ":in", Quantity = 8, SpoilAfterSeconds = 1_000_000 });
             bridge.RequestAssignTruck("assign-1", $"buy:{_root.Authenticator.LocalPlayerId}:truck-1", route);

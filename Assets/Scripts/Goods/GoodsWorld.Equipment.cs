@@ -54,6 +54,9 @@ namespace FoodFactoryGame.Goods
         // (GoodsWorld.RegisterManualPower, the oven) read it: such a station starts and advances batches only while it is on.
         // Picking the piece up or selling it switches it off.
         public bool PoweredOn;
+        // True while a player's switch-off holds: employees may not switch the machine back on until a player does (owner
+        // feedback 0038). Cleared by any switch-on and whenever PoweredOn is cleared by a pickup or sale.
+        public bool HeldOff;
 
         public string InputLocationId => Id + ":in";
         public string OutputLocationId => Id + ":out";
@@ -72,6 +75,16 @@ namespace FoodFactoryGame.Goods
         public const string CarriedPrefix = "carried:";
 
         public static string InventoryLocationId(string playerId) => CarriedPrefix + playerId;
+
+        // A short, never reused ID for new equipment, "<kind>-<n>" (such as "oven-12"), short enough to type in an employee
+        // script. Called inside a locked mutation; skips any ID a piece, station or truck already has.
+        private string NewEquipmentId(string kind)
+        {
+            string id;
+            do id = $"{kind}-{++_state.NextPieceNumber}";
+            while (_state.Equipment.Any(x => x.Id == id) || _state.Stations.Any(x => x.Id == id) || _state.Trucks.Any(x => x.Id == id));
+            return id;
+        }
 
         public void Bootstrap(SiteLayout layout)
         {
@@ -194,6 +207,7 @@ namespace FoodFactoryGame.Goods
                 equipment.HolderId = playerId;
                 equipment.StaffId = "";
                 equipment.PoweredOn = false;
+                equipment.HeldOff = false;
                 equipment.CellX = equipment.CellZ = equipment.Rotation = equipment.Level = 0;
                 InvalidateDinersFor(equipment);
                 var result = Record(requestId, playerId, true, "picked-up", null);

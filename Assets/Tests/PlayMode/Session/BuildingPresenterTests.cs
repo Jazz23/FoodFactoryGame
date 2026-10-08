@@ -9,6 +9,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
+using FoodFactoryGame.Goods;
 using FoodFactoryGame.Session.Buildings;
 using FoodFactoryGame.Session.Equipment;
 using FoodFactoryGame.Session.Player;
@@ -183,8 +184,9 @@ namespace FoodFactoryGame.Session.PlayModeTests
             // A bought oven placed upstairs lands on level 1, then disappears when the avatar rides down.
             var bridge = _root.ClientSubscription.Bridge;
             bridge.RequestPurchase("buy-oven", DevWorld.SiteId, _root.Offers.First(x => x != null && x.Equipment != null && x.Equipment.Kind == "oven").Id);
-            yield return Until(() => _root.ClientSite.Equipment.Any(x => x.Id == $"buy:{interaction.LocalPlayerId}:buy-oven"), "bought oven");
-            var ovenId = $"buy:{interaction.LocalPlayerId}:buy-oven";
+            var me = interaction.LocalPlayerId;
+            yield return Until(() => _root.ClientSite.Equipment.Any(x => x.Kind == "oven" && x.State == EquipmentState.Held && x.HolderId == me), "bought oven");
+            var ovenId = _root.ClientSite.Equipment.Single(x => x.Kind == "oven" && x.State == EquipmentState.Held && x.HolderId == me).Id;
             bridge.RequestPlace("place-upstairs", ovenId, 16, 11, 0, 1);
             yield return Until(() => _root.ClientSite.Equipment.Any(x => x.Id == ovenId && x.Level == 1), "oven on level 1");
             var visuals = UnityEngine.Object.FindAnyObjectByType<EquipmentPresenter>();

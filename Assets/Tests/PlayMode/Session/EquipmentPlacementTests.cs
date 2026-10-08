@@ -550,6 +550,65 @@ namespace FoodFactoryGame.Session.PlayModeTests
             }
         }
 
+        // Decision 0037: the oven's power switch, clicked through UI Toolkit pointer events at its on-screen position (so whatever
+        // the panel picks there takes the press), turns the oven on; switched off mid-batch the batch keeps its remaining time,
+        // and switched on again it resumes from there.
+        [UnityTest]
+        public IEnumerator PowerSwitchClickPausesAndResumesABatch()
+        {
+            yield return StartHost();
+            var interaction = UnityEngine.Object.FindAnyObjectByType<EquipmentInteraction>();
+            var hud = UnityEngine.Object.FindAnyObjectByType<PlayerHud>();
+            var oven = DevWorld.OvenId;
+            StationJob Job() => _root.ServerWorld.Snapshot().Jobs.SingleOrDefault(x => x.StationId == oven);
+            bool On() => _root.ClientSite.Equipment.Single(x => x.Id == oven).PoweredOn;
+            void ClickSwitch()
+            {
+                var track = hud.ScreenRoot.Q("hud-power-switch");
+                Assert.That(track, Is.Not.Null, "the power switch");
+                var center = track.worldBound.center;
+                var picked = track.panel.Pick(center);
+                Assert.That(picked == track || track.Contains(picked), Is.True, $"The switch takes the click, not {picked?.name}.");
+                foreach (var type in new[] { EventType.MouseDown, EventType.MouseUp })
+                {
+                    var systemEvent = new Event { type = type, button = 0, clickCount = 1, mousePosition = center };
+                    using EventBase pointer = type == EventType.MouseDown ? PointerDownEvent.GetPooled(systemEvent) : PointerUpEvent.GetPooled(systemEvent);
+                    picked.SendEvent(pointer);
+                }
+            }
+
+            yield return Until(() =>
+            {
+                if (interaction.Screen == InteractionScreen.None) interaction.OpenMachine(oven);
+                return interaction.Screen == InteractionScreen.Machine && interaction.ScreenClicksArmed;
+            }, "oven screen");
+            yield return null;
+            hud.QuickTransferSlot(PlayerHud.InventoryGrid, hud.SlotOf(PlayerHud.InventoryGrid, "dough"));
+            yield return Until(() => _root.ClientSite.Lots.Any(x => x.LocationId == _root.ClientSite.Equipment.Single(e => e.Id == oven).InputLocationId)
+                && !interaction.HasPendingRequests, "dough in the input");
+            yield return null;
+            Assert.That(Job(), Is.Null, "An oven that is off does not bake.");
+
+            ClickSwitch();
+            yield return Until(() => On() && Job() != null && !interaction.HasPendingRequests, "switched on and baking");
+            yield return new WaitForSeconds(2.2f);
+            yield return null;
+            ClickSwitch();
+            yield return Until(() => !On() && !interaction.HasPendingRequests, "switched off");
+            var paused = Job();
+            Assert.That(paused, Is.Not.Null, "Switching off keeps the batch.");
+            Assert.That(paused.RemainingSeconds, Is.LessThan(paused.DurationSeconds), "The batch had progressed.");
+            var remaining = paused.RemainingSeconds;
+            yield return new WaitForSeconds(2.5f);
+            Assert.That(Job()?.RemainingSeconds, Is.EqualTo(remaining), "A switched-off oven's batch waits where it is.");
+            yield return null;
+            ClickSwitch();
+            yield return Until(() => On() && !interaction.HasPendingRequests, "switched on again");
+            yield return Until(() => Job() == null || Job().RemainingSeconds < remaining, "the batch resumes");
+            Assert.That(Job() == null || Job().RemainingSeconds > 0 || Job().State == StationJobState.Blocked, Is.True);
+            interaction.CloseScreen();
+        }
+
         // With a virtual mouse over an inventory stack and a virtual keyboard, a hotbar key assigns the stack's item to that
         // slot; dropping a cursor stack on a hotbar button moves the assignment there; the key then selects it in the world.
         [UnityTest]

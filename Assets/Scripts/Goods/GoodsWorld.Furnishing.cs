@@ -79,7 +79,7 @@ namespace FoodFactoryGame.Goods
         // Volatile primitive for tests. Live request handlers must call BuyAndPlaceDurably.
         // Checks, in order: identity and replay; a grant on the site (forbidden); an equipment offer (invalid-offer); the site's
         // company (no-company) and grid (no-layout); every placement (FurnishProblem); the price of all pieces (insufficient-funds).
-        // Pieces get IDs buy:<player>:<request>:<n>. Only the accepted order is recorded, so a retry replays and never pays twice.
+        // Pieces get short IDs <kind>-<n> (NewEquipmentId). Only the accepted order is recorded, so a retry replays and never pays twice.
         public GoodsOutcome BuyAndPlace(string playerId, string requestId, FurnishOrder order)
         {
             lock (_gate)
@@ -111,7 +111,7 @@ namespace FoodFactoryGame.Goods
                 {
                     var placement = order.Placements[index];
                     var piece = JsonUtility.FromJson<GoodsEquipment>(JsonUtility.ToJson(offer.Equipment));
-                    piece.Id = $"buy:{playerId}:{requestId}:{index}";
+                    piece.Id = NewEquipmentId(piece.Kind);
                     piece.SiteId = siteId;
                     piece.State = EquipmentState.Placed;
                     piece.HolderId = "";

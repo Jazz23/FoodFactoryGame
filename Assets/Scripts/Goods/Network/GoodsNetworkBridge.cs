@@ -637,7 +637,7 @@ namespace FoodFactoryGame.Goods.Network
             if (string.IsNullOrWhiteSpace(player) || !_world.CanView(player, siteId))
             {
                 Unsubscribe(sender, siteId);
-                TargetResult(sender, "", false, "subscription-forbidden", "", "", 0, 0);
+                TargetResult(sender, "", false, "subscription-forbidden", "", "", "", 0, 0);
                 return;
             }
             if (!_subscriptions.TryGetValue(sender, out var sites)) _subscriptions[sender] = sites = new HashSet<string>();
@@ -676,7 +676,7 @@ namespace FoodFactoryGame.Goods.Network
             if (string.IsNullOrWhiteSpace(player) || _persistenceFailed)
             {
                 TargetResult(sender, requestId, false,
-                    _persistenceFailed ? "persistence-unavailable" : "unauthenticated", "", "", 0, 0);
+                    _persistenceFailed ? "persistence-unavailable" : "unauthenticated", "", "", "", 0, 0);
                 return false;
             }
             return true;
@@ -684,16 +684,17 @@ namespace FoodFactoryGame.Goods.Network
 
         private void Reply(NetworkConnection connection, GoodsOutcome result) => TargetResult(connection,
             result.RequestId ?? "", result.Accepted, result.Reason ?? "", result.MovedLotId ?? "",
-            result.ReservationId ?? "", result.Revision, result.Cents);
+            result.ReservationId ?? "", result.EquipmentId ?? "", result.Revision, result.Cents);
 
+        // equipmentId: the machine, piece or truck the request created (its ID is not derived from the request, decision 0038).
         [TargetRpc]
         private void TargetResult(NetworkConnection connection, string requestId, bool accepted, string reason,
-            string movedLotId, string reservationId, long revision, long cents)
+            string movedLotId, string reservationId, string equipmentId, long revision, long cents)
         {
             ResultReceived?.Invoke(new GoodsOutcome
             {
-                RequestId = requestId, Accepted = accepted, Reason = reason,
-                MovedLotId = movedLotId, ReservationId = reservationId, Revision = revision, Cents = cents
+                RequestId = requestId, Accepted = accepted, Reason = reason, MovedLotId = movedLotId,
+                ReservationId = reservationId, EquipmentId = equipmentId, Revision = revision, Cents = cents
             });
         }
 

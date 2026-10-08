@@ -4,9 +4,12 @@
 // removed alike, anywhere in the lot. The pointer's cell shows a ghost tinted by validity: the same pure rules the server applies
 // (GoodsWorld.PlanShell, FurnishProblem, SiteGrid) plus the company's cash, with the price, refund and net amount, or the reason it
 // would be refused. A click places a single piece, door or window; dragging draws a line of wall, restyles a line of walls or
-// fills an area with a piece, which waits for Confirm (BuildConfirm, Enter) or Cancel (CloseScreen, Esc). A right click (Remove)
-// without dragging sells the piece under the pointer, or removes the door, window or wall there, for its recorded refund; a right
-// drag tilts the camera instead (OrbitCameraRig), Move pans it and Zoom zooms it. Cancel and ClearCursor (X) clear the selected
+// fills an area with a piece, ordered as soon as the button is released (owner feedback 0038: no Confirm); Esc during a drag drops
+// it. Holding Remove (right mouse) still for HoldSeconds, while a wheel at the pointer fills, sells the piece the pointer is on (the
+// piece's own colliders, so wall and ceiling decor is aimed at directly) or, with no piece there, removes the door, window or wall
+// the pointer is on (any part of it, not just its base), or sells a piece standing on the floor cell the pointer is on, for its
+// recorded refund; a press on nothing removable shows no wheel; moving the pointer while holding tilts the camera
+// instead (OrbitCameraRig), Move pans it and Zoom zooms it. Cancel and ClearCursor (X) clear the selected
 // tool or item. Wall decor turns to face away from its wall and a backed piece (a sink) turns its back to a wall when one is
 // behind either way round. Every order is a request; nothing changes here until the next replicated baseline, and the server's
 // reason is shown when it refuses. Controls come from the Player action map (Input System).
@@ -59,8 +62,11 @@ namespace FoodFactoryGame.Session.Buildings
         private static readonly string[] Sections = { "Restaurant", "Furniture", "Decor", "Lighting", "Surfaces", "Architecture", "Service" };
         private const string EquipmentSection = "Equipment";
         private const int MaxHighlights = 400;
-        // A right press that moves the pointer further than this (pixels) before release tilts the camera instead of removing.
+        // A right press that moves the pointer further than this (pixels) tilts the camera instead of removing.
         private const float ClickSlop = 8f;
+        // How long Remove is held still to sell or remove what the pointer is on.
+        public const float HoldSeconds = 0.75f;
+        private const float WheelSize = 34f;
 
         [SerializeField] private SessionRoot session;
         [SerializeField] private EquipmentInteraction interaction;
@@ -70,7 +76,6 @@ namespace FoodFactoryGame.Session.Buildings
         [SerializeField] private Material cellMaterial;
         [SerializeField] private Material ghostModelMaterial;
         [SerializeField] private InputActionReference buildAction;
-        [SerializeField] private InputActionReference confirmAction;
         [SerializeField] private InputActionReference placeAction;
         [SerializeField] private InputActionReference removeAction;
         [SerializeField] private InputActionReference rotateAction;
@@ -92,8 +97,13 @@ namespace FoodFactoryGame.Session.Buildings
         private (int X, int Z)? _dragStart;
         private (int X, int Z)? _hover;
         private Vector2? _removePress;
-        private object _pendingOrder;
-        private BuildPreview _pendingPreview;
+        private float _removeStart;
+        // The placed piece on the current site the pointer is on (its colliders), or null.
+        private string _pointed;
+        // The cell a removal aims at: the cell of the solid surface under the pointer (a wall's side or top, a door, the floor),
+        // so a wall is removed by pointing anywhere on it; the floor cell under the pointer when nothing solid is hit.
+        private (int X, int Z)? _removeCell;
+        private VisualElement _holdWheel;
         private bool _wasActive;
         private VisualElement _window;
         private Label _cash;
@@ -102,7 +112,6 @@ namespace FoodFactoryGame.Session.Buildings
         private VisualElement _tools;
         private VisualElement _styles;
         private VisualElement _catalog;
-        private Button _confirm;
         private int _catalogVersion = -1;
         private string _shownTools;
 
@@ -112,8 +121,10 @@ namespace FoodFactoryGame.Session.Buildings
         public string OfferId { get; private set; }
         public int Rotation { get; private set; }
         public BuildPreview Preview { get; private set; } = new();
-        public bool HasPending => _pendingOrder != null;
-        public BuildPreview PendingPreview => _pendingPreview;
+        // 0 to 1 while Remove is held still over the lot; the sale or removal is ordered at 1.
+        public float RemoveProgress => _removePress.HasValue ? Mathf.Clamp01((Time.unscaledTime - _removeStart) / HoldSeconds) : 0f;
+        public string PointedPieceId => _pointed;
+        public (int X, int Z)? PointedCell => _removeCell;
         public string LastRejection { get; private set; }
         public bool HasPendingRequests => _pendingRequests.Count > 0;
         // Tests and tools aim at a cell directly; null uses the pointer.
@@ -129,9 +140,7 @@ namespace FoodFactoryGame.Session.Buildings
         {
             _block ??= new MaterialPropertyBlock();
             buildAction.action.performed += OnBuild;
-            confirmAction.action.performed += OnConfirm;
             buildAction.action.Enable();
-            confirmAction.action.Enable();
             interaction.BuildEscape = CancelPending;
             interaction.BuildClear = ClearSelection;
         }
@@ -139,9 +148,7 @@ namespace FoodFactoryGame.Session.Buildings
         private void OnDisable()
         {
             buildAction.action.performed -= OnBuild;
-            confirmAction.action.performed -= OnConfirm;
             buildAction.action.Disable();
-            confirmAction.action.Disable();
             if (interaction != null && interaction.BuildEscape == CancelPending) interaction.BuildEscape = null;
             if (interaction != null && interaction.BuildClear == ClearSelection) interaction.BuildClear = null;
             Subscribe(null);
@@ -151,11 +158,6 @@ namespace FoodFactoryGame.Session.Buildings
         private void Start() => BuildPanel();
 
         private void OnBuild(InputAction.CallbackContext _) => Toggle();
-
-        private void OnConfirm(InputAction.CallbackContext _)
-        {
-            if (Active) Confirm();
-        }
 
         // Opens build mode on the current site, or leaves it.
         public void Toggle()
@@ -184,7 +186,7 @@ namespace FoodFactoryGame.Session.Buildings
 
         public void Rotate() => Rotation = (Rotation + 1) % 4;
 
-        // Cancel and ClearCursor (X): drops the drawn order and the chosen tool or item, so the pointer carries nothing.
+        // Cancel and ClearCursor (X): drops a drag in progress and the chosen tool or item, so the pointer carries nothing.
         public void ClearSelection()
         {
             Tool = BuildTool.None;
@@ -214,6 +216,8 @@ namespace FoodFactoryGame.Session.Buildings
             if (_window != null) _window.style.display = active ? DisplayStyle.Flex : DisplayStyle.None;
             if (!active)
             {
+                _removePress = null;
+                ShowWheel();
                 ShowWorld(false);
                 return;
             }
@@ -225,19 +229,34 @@ namespace FoodFactoryGame.Session.Buildings
             var rig = buildings.LocalAvatar != null ? buildings.LocalAvatar.CameraRig : null;
             if (rig != null) rig.BuildControls = !overPanel;
             var pointer = pointAction.action.ReadValue<Vector2>();
+            (int X, int Z)? surface = null;
+            _pointed = !overPanel && ForcedHover == null ? PointedPiece(pointer, layout, out surface) : null;
+            _removeCell = surface ?? _hover;
+            // What a hold would sell or remove now; with nothing there, a right press starts no hold and shows no wheel.
+            var removal = RemovalPlan(_removeCell, _pointed, out var removalOrder);
             if (!overPanel && ForcedHover == null)
             {
-                if (placeAction.action.WasPressedThisFrame() && _hover.HasValue && interaction.ScreenClicksArmed) PressAt(_hover.Value);
+                if (placeAction.action.WasPressedThisFrame() && _hover.HasValue && interaction.ScreenClicksArmed)
+                    PressAt(Tool == BuildTool.Sell ? _removeCell ?? _hover.Value : _hover.Value);
                 if (placeAction.action.WasReleasedThisFrame() && _dragStart.HasValue) ReleaseAt(_hover ?? _dragStart.Value);
-                if (removeAction.action.WasPressedThisFrame()) _removePress = pointer;
+                if (removeAction.action.WasPressedThisFrame() && removalOrder != null)
+                {
+                    _removePress = pointer;
+                    _removeStart = Time.unscaledTime;
+                }
             }
-            // Remove acts on release, and only when the press did not drag (a drag tilts the camera).
-            if (removeAction.action.WasReleasedThisFrame())
-            {
-                if (_removePress.HasValue && (pointer - _removePress.Value).magnitude <= ClickSlop && _hover.HasValue && !overPanel) RemoveAt(_hover.Value);
+            // Remove acts once held still for HoldSeconds; releasing early does nothing, and moving tilts the camera instead.
+            if (_removePress.HasValue && (!removeAction.action.IsPressed() || overPanel || removalOrder == null
+                    || (pointer - _removePress.Value).magnitude > ClickSlop))
                 _removePress = null;
+            if (_removePress.HasValue && RemoveProgress >= 1f)
+            {
+                _removePress = null;
+                if (_removeCell.HasValue || _pointed != null) RemoveAt(_removeCell ?? (0, 0), _pointed, _removeCell.HasValue);
             }
-            Preview = _pendingPreview ?? (_hover.HasValue ? Plan(_dragStart ?? _hover.Value, _hover.Value, out _) : new BuildPreview());
+            Preview = _removePress.HasValue ? removal
+                : _hover.HasValue ? Plan(_dragStart ?? _hover.Value, _hover.Value, out _) : new BuildPreview();
+            ShowWheel();
             ShowWorld(true);
             RefreshPanel();
         }
@@ -268,7 +287,7 @@ namespace FoodFactoryGame.Session.Buildings
         // Click: single-cell tools act at once; drawing tools start a drag.
         public void PressAt((int X, int Z) cell)
         {
-            if (_pendingOrder != null) CancelPending();
+            CancelPending();
             switch (Tool)
             {
                 case BuildTool.None:
@@ -282,7 +301,7 @@ namespace FoodFactoryGame.Session.Buildings
                     _dragStart = cell;
                     break;
                 case BuildTool.Sell:
-                    RemoveAt(cell);
+                    RemoveAt(cell, _pointed);
                     break;
                 default:
                     Send(Plan(cell, cell, out var order), order);
@@ -290,53 +309,39 @@ namespace FoodFactoryGame.Session.Buildings
             }
         }
 
-        // Ends a drag: a piece dragged on one cell places at once; anything else waits for Confirm.
+        // Ends a drag (or a click) and orders what was drawn at once.
         public void ReleaseAt((int X, int Z) cell)
         {
             if (!_dragStart.HasValue) return;
             var start = _dragStart.Value;
             _dragStart = null;
             var preview = Plan(start, cell, out var order);
-            if (Tool == BuildTool.Item && start == cell)
-            {
-                Send(preview, order);
-                return;
-            }
-            _pendingOrder = order;
-            _pendingPreview = preview;
+            Send(preview, order);
         }
 
-        // Draws from one cell to another and leaves the order waiting for Confirm, as a mouse drag does.
+        // Draws from one cell to another and orders it, as a mouse drag does.
         public void Drag((int X, int Z) from, (int X, int Z) to)
         {
             PressAt(from);
             if (_dragStart.HasValue) ReleaseAt(to);
         }
 
-        public void Confirm()
-        {
-            if (_pendingOrder == null) return;
-            var order = _pendingOrder;
-            var preview = _pendingPreview;
-            _pendingOrder = null;
-            _pendingPreview = null;
-            Send(preview, order);
-        }
+        // What the active tool would order for a drag between two cells, without ordering it.
+        public BuildPreview PreviewDrag((int X, int Z) from, (int X, int Z) to) => Plan(from, to, out _);
 
-        // Esc: drops an unconfirmed order or drag; true when there was one (so build mode stays open).
+        // Esc: drops a drag in progress; true when there was one (so build mode stays open).
         public bool CancelPending()
         {
-            var had = _pendingOrder != null || _dragStart.HasValue;
-            _pendingOrder = null;
-            _pendingPreview = null;
+            var had = _dragStart.HasValue;
             _dragStart = null;
             return had;
         }
 
-        // Right click: sells the piece under the pointer (topmost layer first) or removes the door, window or interior wall there.
-        public void RemoveAt((int X, int Z) cell)
+        // Sells a placed piece (pieceId, the one the pointer is on) or, without one, removes the door, window or wall on the cell or
+        // sells a piece standing on it; wall and ceiling decor is sold only by pointing at it. useCell false ignores the cell.
+        public void RemoveAt((int X, int Z) cell, string pieceId = null, bool useCell = true)
         {
-            var preview = RemovalPlan(cell, out var order);
+            var preview = RemovalPlan(useCell ? cell : null, pieceId, out var order);
             Send(preview, order);
         }
 
@@ -377,7 +382,7 @@ namespace FoodFactoryGame.Session.Buildings
             var preview = new BuildPreview();
             var restaurant = Restaurant;
             if (Tool == BuildTool.None) return preview;
-            if (Tool == BuildTool.Sell) return RemovalPlan(to, out order);
+            if (Tool == BuildTool.Sell) return RemovalPlan(ForcedHover == null ? _removeCell ?? to : to, _pointed, out order);
             if (Tool == BuildTool.Item) return ItemPlan(from, to, out order);
             if (restaurant == null)
             {
@@ -543,17 +548,19 @@ namespace FoodFactoryGame.Session.Buildings
             return preview;
         }
 
-        // The sale of the piece under a cell (tabletop, wall, ceiling, object, then floor layer) or the removal of the door,
-        // window or interior wall there.
-        private BuildPreview RemovalPlan((int X, int Z) cell, out object order)
+        // The sale of the given piece, else of a piece standing on the cell (tabletop, object, then floor layer; wall and ceiling
+        // decor hangs away from its cell, so it is only sold by pointing at it), else the removal of the door, window or wall there.
+        private BuildPreview RemovalPlan((int X, int Z)? target, string pieceId, out object order)
         {
             order = null;
             var preview = new BuildPreview { Removal = true };
             var site = session.ClientSite;
-            var layers = new[] { SiteGrid.TabletopLayer, SiteGrid.WallLayer, SiteGrid.CeilingLayer, SiteGrid.ObjectLayer, SiteGrid.FloorLayer };
-            var piece = site.Equipment.Where(x => x.SiteId == session.ClientSiteId && x.State == EquipmentState.Placed && x.Level == 0
-                    && SiteGrid.Contains(x, cell.X, cell.Z, 1, 1))
-                .OrderBy(x => Array.IndexOf(layers, x.Layer ?? "")).FirstOrDefault();
+            var layers = new[] { SiteGrid.TabletopLayer, SiteGrid.ObjectLayer, SiteGrid.FloorLayer };
+            var placed = site.Equipment.Where(x => x.SiteId == session.ClientSiteId && x.State == EquipmentState.Placed && x.Level == 0);
+            var piece = pieceId != null ? placed.FirstOrDefault(x => x.Id == pieceId)
+                : target is { } at ? placed.Where(x => Array.IndexOf(layers, x.Layer ?? "") >= 0 && SiteGrid.Contains(x, at.X, at.Z, 1, 1))
+                    .OrderBy(x => Array.IndexOf(layers, x.Layer ?? "")).FirstOrDefault()
+                : null;
             if (piece != null)
             {
                 var definition = session.EquipmentDefinitions.FirstOrDefault(x => x != null && x.Kind == piece.Kind);
@@ -568,6 +575,11 @@ namespace FoodFactoryGame.Session.Buildings
                 return preview;
             }
             var restaurant = Restaurant;
+            if (target is not { } cell)
+            {
+                preview.Problem = "nothing-here";
+                return preview;
+            }
             if (restaurant != null && (SiteGrid.WindowAt(restaurant, cell.X, cell.Z) != null || SiteGrid.IsDoor(restaurant, cell.X, cell.Z)
                     || IsWallCell(restaurant, cell.X, cell.Z)))
             {
@@ -604,10 +616,54 @@ namespace FoodFactoryGame.Session.Buildings
 
         private string Name(string style) => buildings.RestaurantStyles != null ? buildings.RestaurantStyles.NameOf(style) : style;
 
-        private (int X, int Z)? PointerCell(SiteLayout layout)
+        private Camera BuildCamera()
         {
             var rig = buildings.LocalAvatar != null ? buildings.LocalAvatar.CameraRig : null;
-            var camera = rig != null ? rig.GetComponentInChildren<Camera>() : null;
+            return rig != null ? rig.GetComponentInChildren<Camera>() : null;
+        }
+
+        // The placed piece of the current site whose collider (trigger or not) the pointer is on: the nearest piece hit before
+        // anything solid, or inside the first solid thing hit (wall decor hangs within its wall cell's collider box). Anything
+        // further, behind a wall or the floor, is never picked. Pieces drawn hidden in build mode (ceiling panels) and avatars are
+        // looked through. surface is the lot cell of the first solid thing hit (just inside it), or null.
+        private string PointedPiece(Vector2 pointer, SiteLayout layout, out (int X, int Z)? surface)
+        {
+            surface = null;
+            var camera = BuildCamera();
+            if (camera == null) return null;
+            Collider blocker = null;
+            var blockedAt = float.PositiveInfinity;
+            var ray = camera.ScreenPointToRay(pointer);
+            var hits = Physics.RaycastAll(ray, 500f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Collide);
+            foreach (var hit in hits.OrderBy(x => x.distance))
+            {
+                if (hit.collider.GetComponentInParent<PlayerAvatar>() != null) continue;
+                var visual = hit.collider.GetComponentInParent<EquipmentVisual>();
+                if (visual == null)
+                {
+                    if (blocker == null && !hit.collider.isTrigger)
+                    {
+                        blocker = hit.collider;
+                        blockedAt = hit.distance;
+                        var (x, z) = SiteGridSpace.AnchorAt(layout, hit.point + ray.direction * 0.05f, 1, 1);
+                        if (x >= 0 && z >= 0 && x < layout.Width && z < layout.Depth) surface = (x, z);
+                    }
+                    continue;
+                }
+                // Inside the wall that was hit counts only for decor on the face turned to the camera (it faces its root's forward).
+                if (hit.distance > blockedAt && (!blocker.bounds.Contains(hit.point) || Vector3.Dot(ray.direction, visual.transform.forward) >= 0f))
+                    return null;
+                if (!visual.GetComponentsInChildren<Renderer>().Any(x => x.enabled)) continue;
+                if (session.ClientSite?.Equipment.Any(x => x.Id == visual.EquipmentId && x.SiteId == session.ClientSiteId
+                        && x.State == EquipmentState.Placed) == true)
+                    return visual.EquipmentId;
+            }
+            return null;
+        }
+
+        private (int X, int Z)? PointerCell(SiteLayout layout)
+        {
+            var camera = BuildCamera();
             if (camera == null) return null;
             var ray = camera.ScreenPointToRay(pointAction.action.ReadValue<Vector2>());
             var floor = new Plane(Vector3.up, Vector3.up * SiteGridSpace.FloorHeight(layout, 0));
@@ -641,7 +697,7 @@ namespace FoodFactoryGame.Session.Buildings
                 _highlights[index].transform.position = SiteGridSpace.FootprintCenter(layout, cells[index].X, cells[index].Z, 1, 1) + Vector3.up * 0.04f;
                 Tint(_highlights[index], color);
             }
-            var offer = shown && Tool == BuildTool.Item && _pendingOrder == null && _hover.HasValue
+            var offer = shown && Tool == BuildTool.Item && !_removePress.HasValue && _hover.HasValue
                 ? session.Offers.FirstOrDefault(x => x != null && x.Id == OfferId && x.Equipment != null) : null;
             ShowGhost(offer?.Equipment);
             if (_ghost == null || offer == null) return;
@@ -790,8 +846,6 @@ namespace FoodFactoryGame.Session.Buildings
             buttons.style.flexDirection = FlexDirection.Row;
             buttons.style.marginTop = 6;
             // Not focusable: a focused button would click again on every keyboard Submit (Enter/Space).
-            _confirm = new Button(Confirm) { name = "build-confirm", text = "Confirm", focusable = false };
-            buttons.Add(_confirm);
             buttons.Add(new Button(ClearSelection) { name = "build-cancel", text = "Cancel", focusable = false });
             buttons.Add(new Button(Toggle) { name = "build-leave", text = "Leave", focusable = false });
             _window.Add(buttons);
@@ -799,6 +853,47 @@ namespace FoodFactoryGame.Session.Buildings
             foreach (var child in _window.Children()) child.style.flexShrink = child is ScrollView ? 1 : 0;
             root.Add(_window);
             _window.style.display = DisplayStyle.None;
+            // The hold-to-remove wheel: a ring that fills clockwise from the top as Remove is held.
+            _holdWheel = new VisualElement { name = "build-hold-wheel", pickingMode = PickingMode.Ignore };
+            _holdWheel.style.position = Position.Absolute;
+            _holdWheel.style.width = _holdWheel.style.height = WheelSize;
+            _holdWheel.style.display = DisplayStyle.None;
+            _holdWheel.generateVisualContent += DrawWheel;
+            root.Add(_holdWheel);
+        }
+
+        private void DrawWheel(MeshGenerationContext context)
+        {
+            var painter = context.painter2D;
+            var center = new Vector2(WheelSize * 0.5f, WheelSize * 0.5f);
+            var radius = WheelSize * 0.5f - 4f;
+            painter.lineWidth = 6f;
+            painter.strokeColor = new Color(0f, 0f, 0f, 0.55f);
+            painter.BeginPath();
+            painter.Arc(center, radius, Angle.Degrees(0f), Angle.Degrees(360f));
+            painter.Stroke();
+            var progress = RemoveProgress;
+            if (progress <= 0f) return;
+            painter.lineWidth = 4f;
+            painter.lineCap = LineCap.Round;
+            painter.strokeColor = new Color(removeColor.r, removeColor.g, removeColor.b, 1f);
+            painter.BeginPath();
+            painter.Arc(center, radius, Angle.Degrees(-90f), Angle.Degrees(-90f + 360f * progress));
+            painter.Stroke();
+        }
+
+        // Centres the wheel on the pointer while Remove is held, and hides it otherwise.
+        private void ShowWheel()
+        {
+            if (_holdWheel?.panel == null) return;
+            var holding = _removePress.HasValue;
+            _holdWheel.style.display = holding ? DisplayStyle.Flex : DisplayStyle.None;
+            if (!holding) return;
+            var pointer = pointAction.action.ReadValue<Vector2>();
+            var position = RuntimePanelUtils.ScreenToPanel(_holdWheel.panel, new Vector2(pointer.x, UnityEngine.Screen.height - pointer.y));
+            _holdWheel.style.left = position.x - WheelSize * 0.5f;
+            _holdWheel.style.top = position.y - WheelSize * 0.5f;
+            _holdWheel.MarkDirtyRepaint();
         }
 
         private void RefreshPanel()
@@ -822,9 +917,8 @@ namespace FoodFactoryGame.Session.Buildings
             var money = preview.ChargeCents == 0 && preview.RefundCents == 0 ? "free"
                 : $"charge {PlayerHud.FormatCash(preview.ChargeCents)}, refund {PlayerHud.FormatCash(preview.RefundCents)}, net {(preview.NetCents < 0 ? "+" : "-")}{PlayerHud.FormatCash(Math.Abs(preview.NetCents))}";
             _preview.text = string.IsNullOrEmpty(preview.Label) && preview.Problem == null ? " "
-                : $"{preview.Label}: {money}" + (preview.Problem != null ? $"  [{preview.Problem}]" : HasPending ? "  (Confirm or Esc)" : "");
+                : $"{preview.Label}: {money}" + (preview.Problem != null ? $"  [{preview.Problem}]" : "");
             _preview.style.color = preview.Problem != null ? Error : Color.white;
-            _confirm.SetEnabled(HasPending && _pendingPreview?.Problem == null);
             _status.text = HasPendingRequests ? "Waiting for the server..." : string.IsNullOrEmpty(LastRejection) ? " " : $"Refused: {LastRejection}";
         }
 

@@ -184,7 +184,7 @@ namespace FoodFactoryGame.Session.Equipment
         // Set by the HUD: the machine or item of the stack under the pointer on an open screen (null when none), so a hotbar
         // key there assigns it to that slot instead of selecting the slot.
         public Func<HotbarEntry> HoveredEntry { get; set; }
-        // Set by build mode: true when Esc was taken to cancel an unconfirmed order instead of closing the screen.
+        // Set by build mode: true when Esc was taken to cancel a drag in progress instead of closing the screen.
         public Func<bool> BuildEscape { get; set; }
         // Set by build mode: ClearCursor (X) there clears its selected tool or item.
         public Action BuildClear { get; set; }
@@ -306,7 +306,7 @@ namespace FoodFactoryGame.Session.Equipment
                     // A sale station (decision 0013) has no results to take: it sells its input for the company.
                     InteractionScreen.Machine when _openMachineSells =>
                         "Register: put edible goods in the input; customers queue and pay here only while someone works it (Work this register); E or Esc closes" + suffix,
-                    InteractionScreen.Build => "Build mode: pick a tool or item, click to place, drag to draw, Enter or Confirm to order, right click sells or removes, X or Cancel clears the selection; WASD pans, the wheel zooms, right drag tilts; B or Esc leaves" + suffix,
+                    InteractionScreen.Build => "Build mode: pick a tool or item, click to place, drag to draw (ordered on release), hold right click on something to sell or remove it, X or Cancel clears the selection; WASD pans, the wheel zooms, right drag tilts; B or Esc leaves" + suffix,
                     InteractionScreen.Machine when _openMachineTable =>
                         "Table: customers who dine in buy only once a seat is free, then sit here to eat; right click picks it up when nobody sits here; E or Esc closes" + suffix,
                     InteractionScreen.Machine when _openMachineDock =>
@@ -694,7 +694,7 @@ namespace FoodFactoryGame.Session.Equipment
         // left) until the next click.
         private void OnCloseScreen(InputAction.CallbackContext _)
         {
-            // Build mode first drops a drawn but unconfirmed order; the next Esc leaves it.
+            // Build mode first drops a drag in progress; the next Esc leaves it.
             if (Screen == InteractionScreen.Build && BuildEscape?.Invoke() == true) return;
             if (Screen == InteractionScreen.PickPosition) CancelPick();
             else if (Screen != InteractionScreen.None) CloseScreen();

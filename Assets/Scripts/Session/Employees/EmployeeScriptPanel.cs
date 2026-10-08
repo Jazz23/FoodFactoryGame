@@ -157,6 +157,11 @@ namespace FoodFactoryGame.Session.Employees
             _luaPage.style.height = PageHeight;
             _source = Editor("employee-script-source", 0f, out _caretBar);
             _source.style.flexGrow = 1;
+            // The box keeps the page's height and scrolls its text instead of growing; the text box scrolls the caret into view
+            // as it moves.
+            _source.style.flexShrink = 1;
+            _source.style.minHeight = 0;
+            _source.verticalScrollerVisibility = ScrollerVisibility.Auto;
             _source.RegisterValueChangedCallback(_ => RefreshDetached());
             _luaPage.Add(_source);
             var pick = Button("employee-script-pick", "Select world pos", ClickSelectWorldPos);

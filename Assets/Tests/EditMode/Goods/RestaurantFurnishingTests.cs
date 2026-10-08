@@ -76,16 +76,26 @@ namespace FoodFactoryGame.Goods.Tests
             }
         }
 
-        private GoodsOutcome Furnish(string request, string offer, params (int X, int Z, int Rotation)[] cells) => _world.BuyAndPlace("chef", request,
-            new FurnishOrder { SiteId = "resto", OfferId = offer, Placements = cells.Select(c => new GridPlacement { X = c.X, Z = c.Z, Rotation = c.Rotation }).ToList() });
+        private GoodsOutcome Furnish(string request, string offer, params (int X, int Z, int Rotation)[] cells)
+        {
+            var outcome = _world.BuyAndPlace("chef", request,
+                new FurnishOrder { SiteId = "resto", OfferId = offer, Placements = cells.Select(c => new GridPlacement { X = c.X, Z = c.Z, Rotation = c.Rotation }).ToList() });
+            if (outcome.Accepted) _placed[request] = outcome.EquipmentId;
+            return outcome;
+        }
 
-        private string Placed(string request, int index = 0) => $"buy:chef:{request}:{index}";
+        // The first piece an accepted order placed.
+        private readonly Dictionary<string, string> _placed = new();
+        private string Placed(string request) => _placed[request];
 
         [Test]
         public void BuyAndPlaceChargesOnceForAllPiecesOrChangesNothing()
         {
             var bought = Furnish("tables", "table", (3, 5, 0), (5, 5, 0), (7, 5, 0));
-            Assert.That((bought.Accepted, bought.Cents, bought.EquipmentId), Is.EqualTo((true, 12000L, Placed("tables"))));
+            Assert.That((bought.Accepted, bought.Cents, bought.EquipmentId), Is.EqualTo((true, 12000L, $"{GoodsWorld.TableKind}-1")),
+                "Pieces get short <kind>-<n> IDs.");
+            Assert.That(_world.Snapshot().Equipment.Where(x => x.Kind == GoodsWorld.TableKind && x.Id.StartsWith(GoodsWorld.TableKind + "-")).Select(x => x.Id),
+                Is.EquivalentTo(new[] { "1", "2", "3" }.Select(n => $"{GoodsWorld.TableKind}-{n}")));
             Assert.That(_world.Snapshot().Equipment.Where(x => x.Kind == GoodsWorld.TableKind).Select(x => x.ChargedCents), Is.All.EqualTo(4000));
             Assert.That(Cash, Is.EqualTo(StartCash - 12000));
 

@@ -487,6 +487,10 @@ namespace FoodFactoryGame.Session.Employees
             var kind = place.EquipmentId == null ? null : view?.Equipment.FirstOrDefault(x => x.Id == place.EquipmentId)?.Kind;
             if (place.Problem == null && place.EquipmentId == null) place.Problem = $"{place.Name} is not a machine";
             if (place.Problem == null && Bridge?.RequiresPower(kind) != true) place.Problem = $"{place.Name} has no power switch";
+            // A player's switch-off holds until a player switches it on (the server refuses held-off), so do not walk there.
+            var machine = view?.Equipment.FirstOrDefault(x => x.Id == place.EquipmentId);
+            if (place.Problem == null && machine is { HeldOff: true, PoweredOn: false } && on != false)
+                place.Problem = $"{place.Name} was switched off by a player";
             if (place.Problem != null)
             {
                 result.Set(DynValue.False, DynValue.NewString(place.Problem));
