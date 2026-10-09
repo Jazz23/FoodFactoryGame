@@ -12,7 +12,9 @@
 // instead (OrbitCameraRig), Move pans it and Zoom zooms it. Cancel and ClearCursor (X) clear the selected
 // tool or item. Wall decor turns to face away from its wall and a backed piece (a sink) turns its back to a wall when one is
 // behind either way round. Every order is a request; nothing changes here until the next replicated baseline, and the server's
-// reason is shown when it refuses. Controls come from the Player action map (Input System).
+// reason is shown when it refuses. Controls come from the Player action map (Input System). Leaving build mode remembers its
+// camera (focus, distance, tilt and turn) and the next opening on the same site returns to it, unless the avatar has since
+// moved more than RememberedViewReach from that focus, which frames the lot again.
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -53,11 +55,6 @@ namespace FoodFactoryGame.Session.Buildings
     public sealed class BuildMode : MonoBehaviour
     {
         private static readonly int BaseColor = Shader.PropertyToID("_BaseColor");
-        private static readonly Color Backdrop = new(0.17f, 0.17f, 0.19f, 0.96f);
-        private static readonly Color Heading = new(1f, 0.9f, 0.74f, 1f);
-        private static readonly Color Muted = new(0.72f, 0.72f, 0.76f, 1f);
-        private static readonly Color Error = new(0.95f, 0.45f, 0.4f, 1f);
-        private static readonly Color Chosen = new(0.98f, 0.66f, 0.2f, 1f);
         // Catalog sections in palette order; equipment without a category (machines, the supplier's pieces) is listed last.
         private static readonly string[] Sections = { "Restaurant", "Furniture", "Decor", "Lighting", "Surfaces", "Architecture", "Service" };
         private const string EquipmentSection = "Equipment";
@@ -67,6 +64,8 @@ namespace FoodFactoryGame.Session.Buildings
         // How long Remove is held still to sell or remove what the pointer is on.
         public const float HoldSeconds = 0.75f;
         private const float WheelSize = 34f;
+        // Farthest (metres across the ground) the avatar may be from the remembered build focus for build mode to reopen there.
+        public const float RememberedViewReach = 20f;
 
         [SerializeField] private SessionRoot session;
         [SerializeField] private EquipmentInteraction interaction;
@@ -107,13 +106,17 @@ namespace FoodFactoryGame.Session.Buildings
         private bool _wasActive;
         private VisualElement _window;
         private Label _cash;
+        private Label _ambience;
         private Label _preview;
         private Label _status;
         private VisualElement _tools;
         private VisualElement _styles;
+        private Label _stylesHeading;
         private VisualElement _catalog;
         private int _catalogVersion = -1;
         private string _shownTools;
+        // The build camera when build mode was last left (this client's presentation only, never saved or sent).
+        private (string SiteId, Vector3 Focus, float Distance, float Yaw, float Pitch)? _rememberedView;
 
         public bool Active => interaction != null && interaction.Screen == InteractionScreen.Build;
         public BuildTool Tool { get; private set; } = BuildTool.None;
@@ -270,18 +273,35 @@ namespace FoodFactoryGame.Session.Buildings
                 var focus = SiteGridSpace.FootprintCenter(layout, 0, 0, layout.Width, layout.Depth);
                 // Frames the whole lot for a 60 degree camera beside the panel.
                 var distance = Mathf.Max(layout.Width, layout.Depth) * 1.1f + 4f;
-                if (rig != null) rig.SetBuildView(focus, distance);
+                if (rig != null)
+                {
+                    if (_rememberedView is { } view && view.SiteId == session.ClientSiteId && Near(view.Focus))
+                        rig.SetBuildView(view.Focus, view.Distance, view.Yaw, view.Pitch);
+                    else rig.SetBuildView(focus, distance);
+                }
                 buildings.EditedSiteId = session.ClientSiteId;
                 LastRejection = null;
                 _catalogVersion = -1;
             }
             else
             {
+                if (rig != null && rig.BuildFocus.HasValue)
+                    _rememberedView = (session.ClientSiteId, rig.BuildFocus.Value, rig.BuildDistance, rig.BuildYaw, rig.BuildPitch);
                 if (rig != null) rig.SetBuildView(null, 0f);
                 buildings.EditedSiteId = null;
                 CancelPending();
                 _dragStart = null;
             }
+        }
+
+        // Whether the avatar stands within RememberedViewReach of a build focus, across the ground.
+        private bool Near(Vector3 focus)
+        {
+            var avatar = buildings.LocalAvatar;
+            if (avatar == null) return false;
+            var offset = avatar.transform.position - focus;
+            offset.y = 0f;
+            return offset.magnitude <= RememberedViewReach;
         }
 
         // Click: single-cell tools act at once; drawing tools start a drag.
@@ -806,51 +826,114 @@ namespace FoodFactoryGame.Session.Buildings
             if (document == null) return;
             var root = document.rootVisualElement;
             root.Clear();
+            // A HudTheme window on the right, from the top (the HUD's cash card hides in build mode; this panel shows the cash)
+            // down to the bottom edge.
             _window = new VisualElement { name = "build" };
-            // On the right, below the HUD's cash readout and clear of the session readout (top left) and the hotbar.
             _window.style.position = Position.Absolute;
-            _window.style.right = 10;
-            _window.style.top = 60;
-            _window.style.bottom = 10;
-            _window.style.width = 320;
-            _window.style.backgroundColor = Backdrop;
-            _window.style.paddingLeft = _window.style.paddingRight = _window.style.paddingTop = _window.style.paddingBottom = 8;
-            var title = Caption("Build", 17, Heading);
-            title.style.unityFontStyleAndWeight = FontStyle.Bold;
-            _window.Add(title);
-            _cash = Caption("", 12, Muted, 2);
+            _window.style.right = 24;
+            _window.style.top = 24;
+            _window.style.bottom = 24;
+            _window.style.width = 340;
+            HudTheme.StylePanel(_window, 0);
+
+            var head = new VisualElement();
+            head.style.flexShrink = 0;
+            head.style.paddingLeft = head.style.paddingRight = 18;
+            head.style.paddingTop = 16;
+            head.style.paddingBottom = 12;
+            head.style.borderBottomWidth = 1;
+            head.style.borderBottomColor = HudTheme.Edge;
+            var top = HudTheme.Row();
+            top.Add(HudTheme.Label("Build", 17, HudTheme.Text, true));
+            top.Add(HudTheme.Spacer());
+            top.Add(HudTheme.IconButton("build-close", "✕", Toggle));
+            head.Add(top);
+            var money = HudTheme.Row();
+            money.style.marginTop = 10;
+            money.style.alignItems = Align.FlexEnd;
+            var cash = new VisualElement { pickingMode = PickingMode.Ignore };
+            cash.Add(HudTheme.Eyebrow("Cash"));
+            _cash = HudTheme.Label("", 18, HudTheme.Text, true);
             _cash.name = "build-cash";
-            _window.Add(_cash);
+            _cash.style.marginTop = 1;
+            cash.Add(_cash);
+            money.Add(cash);
+            money.Add(HudTheme.Spacer());
+            var ambience = new VisualElement { pickingMode = PickingMode.Ignore };
+            ambience.style.alignItems = Align.FlexEnd;
+            ambience.Add(HudTheme.Eyebrow("Ambience"));
+            _ambience = HudTheme.Label("", 14, HudTheme.TextSoft, true);
+            _ambience.name = "build-ambience";
+            _ambience.style.marginTop = 3;
+            ambience.Add(_ambience);
+            money.Add(ambience);
+            head.Add(money);
+            _window.Add(head);
+
+            var body = new VisualElement();
+            body.style.flexGrow = 1;
+            body.style.flexShrink = 1;
+            body.style.minHeight = 0;
+            body.style.paddingLeft = body.style.paddingRight = 18;
+            body.style.paddingTop = 14;
+            body.Add(HudTheme.Eyebrow("Tools"));
             _tools = new VisualElement { name = "build-tools" };
             _tools.style.flexDirection = FlexDirection.Row;
             _tools.style.flexWrap = Wrap.Wrap;
             _tools.style.marginTop = 6;
-            _window.Add(_tools);
+            _tools.style.marginLeft = _tools.style.marginRight = -3;
+            body.Add(_tools);
+            _stylesHeading = HudTheme.Eyebrow("Style");
+            _stylesHeading.style.marginTop = 10;
+            body.Add(_stylesHeading);
             _styles = new VisualElement { name = "build-styles" };
             _styles.style.flexDirection = FlexDirection.Row;
             _styles.style.flexWrap = Wrap.Wrap;
-            _window.Add(_styles);
+            _styles.style.marginTop = 6;
+            _styles.style.marginLeft = _styles.style.marginRight = -3;
+            body.Add(_styles);
+            var catalogHeading = HudTheme.Eyebrow("Catalog");
+            catalogHeading.style.marginTop = 14;
+            body.Add(catalogHeading);
             var scroll = new ScrollView(ScrollViewMode.Vertical) { name = "build-catalog-scroll" };
             scroll.style.flexGrow = 1;
+            scroll.style.minHeight = 0;
             scroll.style.marginTop = 6;
+            scroll.style.marginBottom = 10;
+            HudTheme.StyleScroller(scroll);
             _catalog = new VisualElement { name = "build-catalog" };
             scroll.Add(_catalog);
-            _window.Add(scroll);
-            _preview = Caption(" ", 13, Color.white, 6);
-            _preview.name = "build-preview";
-            _window.Add(_preview);
-            _status = Caption(" ", 12, Error, 2);
-            _status.name = "build-status";
-            _window.Add(_status);
-            var buttons = new VisualElement();
-            buttons.style.flexDirection = FlexDirection.Row;
-            buttons.style.marginTop = 6;
-            // Not focusable: a focused button would click again on every keyboard Submit (Enter/Space).
-            buttons.Add(new Button(ClearSelection) { name = "build-cancel", text = "Cancel", focusable = false });
-            buttons.Add(new Button(Toggle) { name = "build-leave", text = "Leave", focusable = false });
-            _window.Add(buttons);
+            body.Add(scroll);
             // Rows keep their height in the fixed-height column; only the catalog scrolls.
-            foreach (var child in _window.Children()) child.style.flexShrink = child is ScrollView ? 1 : 0;
+            foreach (var child in body.Children()) child.style.flexShrink = child is ScrollView ? 1 : 0;
+            _window.Add(body);
+
+            var footer = new VisualElement();
+            footer.style.flexShrink = 0;
+            footer.style.paddingLeft = footer.style.paddingRight = 18;
+            footer.style.paddingTop = 12;
+            footer.style.paddingBottom = 16;
+            footer.style.borderTopWidth = 1;
+            footer.style.borderTopColor = HudTheme.Edge;
+            _preview = HudTheme.Label(" ", 13, HudTheme.Text);
+            _preview.name = "build-preview";
+            _preview.style.whiteSpace = WhiteSpace.Normal;
+            footer.Add(_preview);
+            _status = HudTheme.Label(" ", 12, HudTheme.DangerText);
+            _status.name = "build-status";
+            _status.style.marginTop = 3;
+            _status.style.whiteSpace = WhiteSpace.Normal;
+            footer.Add(_status);
+            var buttons = HudTheme.Row();
+            buttons.style.marginTop = 10;
+            var clear = HudTheme.Button("build-cancel", "Clear selection", ClearSelection);
+            clear.style.flexGrow = 1;
+            buttons.Add(clear);
+            var leave = HudTheme.Button("build-leave", "Leave", Toggle, HudButton.Primary);
+            leave.style.marginLeft = 8;
+            buttons.Add(leave);
+            footer.Add(buttons);
+            _window.Add(footer);
             root.Add(_window);
             _window.style.display = DisplayStyle.None;
             // The hold-to-remove wheel: a ring that fills clockwise from the top as Remove is held.
@@ -901,7 +984,10 @@ namespace FoodFactoryGame.Session.Buildings
             if (_window == null) return;
             var site = session.ClientSite;
             var company = site.Companies.FirstOrDefault(x => x.SiteIds.Contains(session.ClientSiteId));
-            _cash.text = $"Company cash {PlayerHud.FormatCash(company?.Cash ?? 0)}   Ambience {RestaurantRules.Ambience(site, session.ClientSiteId)}/{RestaurantRules.AmbienceCap}";
+            var cash = PlayerHud.FormatCash(company?.Cash ?? 0);
+            if (_cash.text != cash) _cash.text = cash;
+            var ambience = $"{RestaurantRules.Ambience(site, session.ClientSiteId)} / {RestaurantRules.AmbienceCap}";
+            if (_ambience.text != ambience) _ambience.text = ambience;
             var key = $"{Tool}|{Style}|{OfferId}";
             if (_shownTools != key)
             {
@@ -916,21 +1002,23 @@ namespace FoodFactoryGame.Session.Buildings
             var preview = Preview;
             var money = preview.ChargeCents == 0 && preview.RefundCents == 0 ? "free"
                 : $"charge {PlayerHud.FormatCash(preview.ChargeCents)}, refund {PlayerHud.FormatCash(preview.RefundCents)}, net {(preview.NetCents < 0 ? "+" : "-")}{PlayerHud.FormatCash(Math.Abs(preview.NetCents))}";
-            _preview.text = string.IsNullOrEmpty(preview.Label) && preview.Problem == null ? " "
-                : $"{preview.Label}: {money}" + (preview.Problem != null ? $"  [{preview.Problem}]" : "");
-            _preview.style.color = preview.Problem != null ? Error : Color.white;
-            _status.text = HasPendingRequests ? "Waiting for the server..." : string.IsNullOrEmpty(LastRejection) ? " " : $"Refused: {LastRejection}";
+            var idle = string.IsNullOrEmpty(preview.Label) && preview.Problem == null;
+            _preview.text = idle ? Hint() : $"{preview.Label}: {money}" + (preview.Problem != null ? $"  [{preview.Problem}]" : "");
+            _preview.style.color = preview.Problem != null ? HudTheme.DangerText : idle ? HudTheme.Muted : HudTheme.Text;
+            _status.text = HasPendingRequests ? "Waiting for the server..." : string.IsNullOrEmpty(LastRejection) ? "" : $"Refused: {LastRejection}";
+            _status.style.display = _status.text.Length == 0 ? DisplayStyle.None : DisplayStyle.Flex;
         }
+
+        // What to do next, while nothing is previewed.
+        private string Hint() => Tool == BuildTool.None
+            ? "Pick a tool or an item. Hold right click on something to sell or remove it."
+            : "Click to place, drag to draw. R rotates; X clears.";
 
         private void FillTools()
         {
             _tools.Clear();
-            void ToolButton(BuildTool tool, string text)
-            {
-                var button = new Button(() => SelectTool(tool)) { name = $"build-tool-{tool.ToString().ToLowerInvariant()}", text = text, focusable = false };
-                if (Tool == tool) button.style.color = Chosen;
-                _tools.Add(button);
-            }
+            void ToolButton(BuildTool tool, string text) =>
+                _tools.Add(Chip($"build-tool-{tool.ToString().ToLowerInvariant()}", text, Tool == tool, () => SelectTool(tool)));
             ToolButton(BuildTool.Sell, "Sell / remove");
             ToolButton(BuildTool.Wall, "Wall");
             ToolButton(BuildTool.Door, "Door");
@@ -944,15 +1032,24 @@ namespace FoodFactoryGame.Session.Buildings
                 BuildTool.Window => GoodsWorld.WindowStyles,
                 _ => Array.Empty<string>()
             };
+            _stylesHeading.style.display = styles.Any() ? DisplayStyle.Flex : DisplayStyle.None;
             foreach (var style in styles)
             {
                 var chosen = style;
-                var button = new Button(() => SelectTool(Tool, chosen)) { name = $"build-style-{style}", text = Name(style), focusable = false };
-                if (Style == style) button.style.color = Chosen;
-                _styles.Add(button);
+                _styles.Add(Chip($"build-style-{style}", Name(style), Style == style, () => SelectTool(Tool, chosen)));
             }
-            foreach (var row in _catalog.Query<VisualElement>(className: "build-item").ToList())
-                row.style.backgroundColor = (string)row.userData == OfferId ? new Color(0.35f, 0.3f, 0.2f, 1f) : Color.clear;
+            foreach (var row in _catalog.Query<VisualElement>(className: "build-item").ToList()) StyleItem(row, false);
+        }
+
+        // A tool or style choice: amber when chosen, a neutral chip otherwise.
+        private static Button Chip(string name, string text, bool chosen, Action clicked)
+        {
+            var button = HudTheme.Button(name, text, clicked, chosen ? HudButton.Primary : HudButton.Secondary, 32);
+            button.style.marginLeft = button.style.marginRight = 3;
+            button.style.marginTop = button.style.marginBottom = 3;
+            button.style.paddingLeft = button.style.paddingRight = 12;
+            button.style.fontSize = 13;
+            return button;
         }
 
         private void FillCatalog()
@@ -963,40 +1060,63 @@ namespace FoodFactoryGame.Session.Buildings
             {
                 var inSection = offers.Where(x => (string.IsNullOrEmpty(x.Equipment.Category) ? EquipmentSection : x.Equipment.Category) == section).ToList();
                 if (inSection.Count == 0) continue;
-                var heading = Caption(section, 13, Heading, 8);
-                heading.style.unityFontStyleAndWeight = FontStyle.Bold;
+                var heading = HudTheme.Label(section, 13, HudTheme.TextSoft, true);
+                heading.style.marginTop = _catalog.childCount == 0 ? 2 : 12;
+                heading.style.marginBottom = 6;
                 _catalog.Add(heading);
                 foreach (var offer in inSection)
                 {
+                    var id = offer.Id;
+                    // The whole card picks the item.
                     var row = new VisualElement { name = $"build-item-{offer.Id}", userData = offer.Id };
                     row.AddToClassList("build-item");
                     row.style.flexDirection = FlexDirection.Row;
                     row.style.alignItems = Align.Center;
-                    row.style.marginTop = 2;
+                    row.style.marginBottom = 6;
+                    row.style.paddingLeft = row.style.paddingRight = 10;
+                    row.style.paddingTop = row.style.paddingBottom = 7;
+                    HudTheme.Radius(row, 10);
                     var icon = new VisualElement { pickingMode = PickingMode.Ignore };
-                    icon.style.width = icon.style.height = 28;
-                    if (offer.Equipment.Icon != null) icon.style.backgroundImage = new StyleBackground(offer.Equipment.Icon);
+                    icon.style.width = icon.style.height = 34;
+                    icon.style.flexShrink = 0;
+                    if (offer.Equipment.Icon != null)
+                    {
+                        icon.style.backgroundImage = new StyleBackground(offer.Equipment.Icon);
+                        icon.style.backgroundSize = new BackgroundSize(BackgroundSizeType.Contain);
+                    }
+                    else
+                    {
+                        icon.style.backgroundColor = HudTheme.SlotEmpty;
+                        HudTheme.Radius(icon, 8);
+                    }
                     row.Add(icon);
-                    var label = Caption($"{offer.Equipment.DisplayName}  {PlayerHud.FormatCash(offer.PriceCents)}", 12, Color.white);
-                    label.style.flexGrow = 1;
-                    label.style.marginLeft = 6;
-                    row.Add(label);
-                    var id = offer.Id;
-                    row.Add(new Button(() => SelectOffer(id)) { name = $"build-pick-{id}", text = "Place", focusable = false });
+                    var text = new VisualElement { pickingMode = PickingMode.Ignore };
+                    text.style.flexGrow = 1;
+                    text.style.flexShrink = 1;
+                    text.style.marginLeft = 10;
+                    var label = HudTheme.Label(offer.Equipment.DisplayName, 13, HudTheme.Text, true);
+                    label.style.whiteSpace = WhiteSpace.Normal;
+                    text.Add(label);
+                    var price = HudTheme.Label(PlayerHud.FormatCash(offer.PriceCents), 12, HudTheme.Muted);
+                    price.style.marginTop = 2;
+                    text.Add(price);
+                    row.Add(text);
+                    row.RegisterCallback<PointerEnterEvent>(_ => StyleItem(row, true));
+                    row.RegisterCallback<PointerLeaveEvent>(_ => StyleItem(row, false));
+                    row.RegisterCallback<ClickEvent>(_ => SelectOffer(id));
+                    StyleItem(row, false);
                     _catalog.Add(row);
                 }
             }
             _shownTools = null;
         }
 
-        private static Label Caption(string text, int size, Color color, int marginTop = 0)
+        // A catalog card: an amber edge when it is the chosen item, a lighter fill under the pointer.
+        private void StyleItem(VisualElement row, bool hovered)
         {
-            var label = new Label(text) { pickingMode = PickingMode.Ignore };
-            label.style.fontSize = size;
-            label.style.color = color;
-            label.style.marginTop = marginTop;
-            label.style.whiteSpace = WhiteSpace.Normal;
-            return label;
+            var chosen = (string)row.userData == OfferId;
+            row.style.backgroundColor = hovered ? HudTheme.Control : HudTheme.Card;
+            HudTheme.Border(row, chosen ? HudTheme.Accent : HudTheme.CardEdge, 1);
         }
     }
 }

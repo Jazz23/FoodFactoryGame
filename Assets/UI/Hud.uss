@@ -1,0 +1,6 @@
+/* Custom text properties that inline styles cannot set (HudTheme.TextFieldClass): a light caret and a blue selection on the
+   HUD's dark text boxes. */
+.hud-text-field {
+    --unity-cursor-color: #ECE8E1;
+    --unity-selection-color: rgba(89, 140, 255, 0.45);
+}

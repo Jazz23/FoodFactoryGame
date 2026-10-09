@@ -6,7 +6,8 @@
 // and including the crosshair's cell (its projection on that line); the drag carries on from there. Rotate while dragging
 // over any belt does nothing. Rotate may be held through the drag: the line then follows the crosshair round each turn.
 // Rotate without a drag turns the cursor direction, or with no belts on the cursor the belt under the
-// crosshair. Holding Remove takes up every belt the crosshair passes over. With any other goods on the cursor, aiming at a
+// crosshair. Holding Remove on a belt fills a wheel at the crosshair (PlayerHud) for BuildMode.HoldSeconds, like removing in build
+// mode, then takes it up; for the rest of that press every belt the crosshair passes over is taken up at once. With any other goods on the cursor, aiming at a
 // belt shows a ghost of the item where it would land and PlaceItem (Z) puts exactly one on the belt. TakeItem (F), whatever
 // the cursor holds, takes the riding item nearest the crosshair off the aimed belt into the inventory.
 // Each belt is its own request; pending ones are drawn as ghosts until the baseline shows them, and the server re-checks all.
@@ -48,6 +49,11 @@ namespace FoodFactoryGame.Session.Equipment
         // or accepted but not yet gone from the baseline), which are not asked for again until Remove is released.
         private readonly Dictionary<string, string> _removingBelts = new();
         private readonly HashSet<string> _refusedRemovals = new();
+        // The belt Remove is being held on (and since when), and whether this press already took one up, which makes the
+        // rest of the sweep immediate.
+        private string _beltHoldId;
+        private float _beltHoldStart;
+        private bool _beltSweep;
         private readonly Dictionary<BeltShape, List<(GameObject Root, Renderer[] Renderers)>> _beltGhosts = new();
         private bool _dragging;
         // Floor the pending belts (keyed by cell) were placed on; changing floors drops their ghosts and ends a drag.
@@ -78,6 +84,9 @@ namespace FoodFactoryGame.Session.Equipment
         // Cell and belt under the crosshair as of the last frame (tests and HUD).
         public (int X, int Z)? AimCell => _aimCell;
         public GoodsBelt AimBelt => _aimBelt;
+        // 0 to 1 while Remove is held on a belt before the first one of the press is taken up; the HUD draws it as a wheel.
+        public float BeltRemoveProgress => _beltHoldId == null ? 0f
+            : Mathf.Clamp01((Time.unscaledTime - _beltHoldStart) / FoodFactoryGame.Session.Buildings.BuildMode.HoldSeconds);
 
         // Belt and item modes, run from Update while no screen is open. Returns false (with the belt ghosts hidden) when the
         // cursor carries no goods, so the machine controls take over.
@@ -95,8 +104,14 @@ namespace FoodFactoryGame.Session.Equipment
             _aimCell = null;
             _aimBelt = null;
             if (active) Aim(site, layout);
-            if (!removeAction.action.IsPressed()) _refusedRemovals.Clear();
+            if (!removeAction.action.IsPressed())
+            {
+                _refusedRemovals.Clear();
+                _beltHoldId = null;
+                _beltSweep = false;
+            }
             else if (active && !_released) RemoveAimedBelt();
+            else _beltHoldId = null;
             if (!active || CursorGoods == null)
             {
                 _dragging = false;
@@ -115,7 +130,7 @@ namespace FoodFactoryGame.Session.Equipment
                 var way = LiftDirection > 0 ? "up" : "down";
                 var flip = _flipLiftAction?.GetBindingDisplayString() ?? "FlipLift";
                 Status = $"Lifts ({LiftsCarried(site)}, {way}): click places a lift carrying items {way} a floor to the belt in front, "
-                    + $"{flip} flips up/down, R turns, right click removes, X clears" + (problem == null ? "" : $" [{problem}]") + suffix;
+                    + $"{flip} flips up/down, R turns, hold right click removes, X clears" + (problem == null ? "" : $" [{problem}]") + suffix;
                 return true;
             }
             HideLiftGhosts();
@@ -124,7 +139,7 @@ namespace FoodFactoryGame.Session.Equipment
                 ShowItemGhost(null, default);
                 UpdateBeltBuild(site, layout);
                 var held = BeltsCarried(site);
-                Status = $"Belts ({held}): drag to lay a line, R turns (while dragging: a corner out to the crosshair), right click removes, F takes an item off, X clears"
+                Status = $"Belts ({held}): drag to lay a line, R turns (while dragging: a corner out to the crosshair), hold right click removes, F takes an item off, X clears"
                     + (held == 0 ? " [no-belts]" : "") + suffix;
                 return true;
             }
@@ -335,7 +350,23 @@ namespace FoodFactoryGame.Session.Equipment
         {
             var bridge = _subscription?.Bridge;
             if (bridge == null || _aimBelt == null || _removingBelts.ContainsValue(_aimBelt.Id) || _refusedRemovals.Contains(_aimBelt.Id)
-                || _pendingBelts.ContainsKey((_aimBelt.CellX, _aimBelt.CellZ))) return;
+                || _pendingBelts.ContainsKey((_aimBelt.CellX, _aimBelt.CellZ)))
+            {
+                _beltHoldId = null;
+                return;
+            }
+            if (!_beltSweep)
+            {
+                // Moving onto another belt restarts the wheel; it acts once full.
+                if (_beltHoldId != _aimBelt.Id)
+                {
+                    _beltHoldId = _aimBelt.Id;
+                    _beltHoldStart = Time.unscaledTime;
+                }
+                if (BeltRemoveProgress < 1f) return;
+                _beltHoldId = null;
+                _beltSweep = true;
+            }
             var requestId = Track();
             _removingBelts[requestId] = _aimBelt.Id;
             bridge.RequestRemoveBelt(requestId, _aimBelt.Id);
@@ -366,6 +397,7 @@ namespace FoodFactoryGame.Session.Equipment
                 LastRejection = "belt-empty";
                 return;
             }
+            NoteItem(nearest.ItemId);
             bridge.RequestTakeFromBelt(Track(), nearest.Id);
         }
 
@@ -387,6 +419,7 @@ namespace FoodFactoryGame.Session.Equipment
                 LastRejection = "belt-full";
                 return;
             }
+            NoteItem(lot.ItemId);
             bridge.RequestPlaceOnBelt(Track(), lot.Id, _aimBelt.Id);
         }
 

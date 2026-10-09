@@ -96,7 +96,7 @@ namespace FoodFactoryGame.Session.Tests
                 }
                 var panels = objects.SelectMany(x => x.GetComponents<SessionPanel>()).ToArray();
                 Assert.That(panels.Length, Is.EqualTo(1));
-                AssertAssigned(panels[0], "document", "session", "equipment");
+                AssertAssigned(panels[0], "document", "session");
 
                 // Equipment is shown from replicated state; the scene itself holds no equipment instance.
                 var presenters = objects.SelectMany(x => x.GetComponents<EquipmentPresenter>()).ToArray();

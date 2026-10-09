@@ -14,6 +14,9 @@
 // A machine with a power switch (decision 0037, the oven) shows it under its grids; it bakes only while switched on.
 // Under the cash are the game clock and, when the company's cash is running short of its wages or employees are unpaid, a
 // warning whose threshold each player sets; the inventory screen has a Staff window to hire and fire (decision 0039).
+// Below those an alert names the edible stack closest to spoiling outside the cold, and while the crosshair is on something
+// with a screen a prompt under it names the interact key. While Remove is held on a belt a wheel at the crosshair (or the free
+// pointer) fills until the belt is taken up (EquipmentInteraction.BeltRemoveProgress). Everything is drawn in HudTheme's look.
 // Presentation only: slot positions are this client's arrangement of the replicated stacks, never saved or sent, and
 // progress is interpolated for at most one clock step past the latest baseline.
 using System;
@@ -36,21 +39,22 @@ namespace FoodFactoryGame.Session.Equipment
         public const string OutputGrid = "output";
         public const int GridColumns = 10;
 
-        private const int SlotSize = 48;
-        private const int IconSize = 42;
-        private static readonly Color Backdrop = new(0.19f, 0.19f, 0.2f, 0.97f);
-        private static readonly Color Inset = new(0.11f, 0.11f, 0.12f, 1f);
-        private static readonly Color SlotFill = new(0.33f, 0.33f, 0.35f, 1f);
-        private static readonly Color SlotEdgeLight = new(0.47f, 0.47f, 0.5f, 1f);
-        private static readonly Color SlotEdgeDark = new(0.08f, 0.08f, 0.09f, 1f);
-        private static readonly Color Highlight = new(0.98f, 0.66f, 0.2f, 1f);
-        private static readonly Color Heading = new(1f, 0.9f, 0.74f, 1f);
-        private static readonly Color Spoiled = new(0.95f, 0.35f, 0.3f, 1f);
-        private static readonly Color Muted = new(0.7f, 0.7f, 0.75f, 1f);
-        private static readonly Color Chilled = new(0.55f, 0.85f, 1f, 1f);
+        // Two 10-column grids and the side column must fit a 1440-wide panel, so grid slots are a little smaller than the
+        // hotbar's.
+        private const int SlotSize = 44;
+        private const int HotbarSlotSize = 56;
+        private const int IconSize = 36;
+        private const int SideColumnWidth = 320;
+        // Space between slots (each slot has half of it as margin on every side).
+        private const int SlotGap = 4;
+        private const float WheelSize = 34f;
+        private static readonly Color Highlight = HudTheme.Accent;
+        private static readonly Color Heading = HudTheme.Text;
+        private static readonly Color Spoiled = HudTheme.DangerText;
+        private static readonly Color Muted = HudTheme.Muted;
+        private static readonly Color Chilled = HudTheme.Chilled;
         // A running (not refrigerated) spoil timer turns this colour in the last tenth of the item's shelf life.
-        private static readonly Color PowerOn = new(0.3f, 0.75f, 0.35f, 1f);
-        private static readonly Color SpoilingSoon = new(1f, 0.6f, 0.35f, 1f);
+        private static readonly Color SpoilingSoon = HudTheme.Warning;
 
         [SerializeField] private UIDocument document;
         [SerializeField] private EquipmentInteraction interaction;
@@ -79,10 +83,25 @@ namespace FoodFactoryGame.Session.Equipment
         private Label _cash;
         // Balance the cash label shows, so the text is rebuilt only when it changes (never a real balance before the first).
         private long _shownCash = long.MinValue;
+        private VisualElement _cashBlock;
+        // Cash, clock and warnings, top right; hidden in build mode, whose panel stands there and shows the cash.
+        private VisualElement _statusColumn;
         private Label _clock;
-        private Label _wageWarning;
+        private VisualElement _wageWarning;
+        private Label _wageWarningText;
+        private VisualElement _alert;
+        private Label _alertText;
+        private Label _alertTime;
+        private VisualElement _prompt;
+        private Label _promptKey;
+        private Label _promptText;
+        // Darkens the world behind an open screen; never takes a click.
+        private VisualElement _dim;
+        // The space above the hotbar that an open screen is centred in.
+        private VisualElement _screenArea;
         private VisualElement _screen;
         private VisualElement _cursor;
+        private VisualElement _removeWheel;
         private VisualElement _progressFill;
         private Label _progressLabel;
         private Label _hoverLabel;
@@ -107,64 +126,132 @@ namespace FoodFactoryGame.Session.Equipment
             root.Clear();
             var layer = new VisualElement { name = "hud", pickingMode = PickingMode.Ignore };
             Fill(layer);
+            _dim = new VisualElement { name = "hud-dim", pickingMode = PickingMode.Ignore };
+            Fill(_dim);
+            _dim.style.backgroundColor = HudTheme.Dim;
             _crosshair = new VisualElement { name = "hud-crosshair", pickingMode = PickingMode.Ignore };
             _crosshair.style.position = Position.Absolute;
             _crosshair.style.left = new Length(50, LengthUnit.Percent);
             _crosshair.style.top = new Length(50, LengthUnit.Percent);
             _crosshair.style.width = _crosshair.style.height = 6;
             _crosshair.style.marginLeft = _crosshair.style.marginTop = -3;
-            _crosshair.style.backgroundColor = Color.white;
-            SetRadius(_crosshair, 3);
+            _crosshair.style.backgroundColor = HudTheme.Text;
+            HudTheme.Border(_crosshair, new Color(0f, 0f, 0f, 0.35f), 1);
+            HudTheme.Radius(_crosshair, 3);
+            _prompt = Prompt();
+            // The hotbar card is centred along the bottom edge; only its slots take clicks.
+            var hotbarRow = new VisualElement { pickingMode = PickingMode.Ignore };
+            hotbarRow.style.position = Position.Absolute;
+            hotbarRow.style.bottom = 24;
+            hotbarRow.style.left = 0;
+            hotbarRow.style.right = 0;
+            hotbarRow.style.flexDirection = FlexDirection.Row;
+            hotbarRow.style.justifyContent = Justify.Center;
             _hotbar = new VisualElement { name = "hud-hotbar", pickingMode = PickingMode.Ignore };
-            _hotbar.style.position = Position.Absolute;
-            _hotbar.style.bottom = 12;
-            _hotbar.style.left = 0;
-            _hotbar.style.right = 0;
             _hotbar.style.flexDirection = FlexDirection.Row;
-            _hotbar.style.justifyContent = Justify.Center;
+            HudTheme.StyleOverlay(_hotbar);
+            HudTheme.Radius(_hotbar, 14);
+            HudTheme.Pad(_hotbar, 8 - SlotGap / 2);
+            hotbarRow.Add(_hotbar);
+            // An open screen is centred in the space above the hotbar, which stays clickable as a drop target.
+            var screenArea = _screenArea = new VisualElement { name = "hud-screen-area", pickingMode = PickingMode.Ignore };
+            screenArea.style.position = Position.Absolute;
+            screenArea.style.left = screenArea.style.right = 0;
+            screenArea.style.top = 24;
+            screenArea.style.bottom = 24 + HotbarSlotSize + 16 + 16;
+            screenArea.style.justifyContent = Justify.Center;
+            screenArea.style.alignItems = Align.Center;
             _screen = new VisualElement { name = "hud-screen" };
-            _screen.style.position = Position.Absolute;
-            _screen.style.left = new Length(50, LengthUnit.Percent);
-            _screen.style.top = new Length(50, LengthUnit.Percent);
-            _screen.style.translate = new Translate(new Length(-50, LengthUnit.Percent), new Length(-50, LengthUnit.Percent));
             _screen.style.flexDirection = FlexDirection.Row;
             _screen.style.alignItems = Align.FlexStart;
+            screenArea.Add(_screen);
             // The cursor stack is drawn above everything and never takes a click, so the slot under it receives the click.
             _cursor = new VisualElement { name = "hud-cursor", pickingMode = PickingMode.Ignore };
             _cursor.style.position = Position.Absolute;
             _cursor.style.width = _cursor.style.height = IconSize;
-            // Company cash (decision 0012): display only, from the latest site baseline.
-            _cash = Caption("", 18, Heading);
+            // Top right: company cash (decision 0012) over the game clock, then the wage warning (decision 0039) and the
+            // spoilage alert, each its own card. Display only, from the latest site baseline.
+            var status = _statusColumn = new VisualElement { name = "hud-status", pickingMode = PickingMode.Ignore };
+            status.style.position = Position.Absolute;
+            status.style.top = 24;
+            status.style.right = 24;
+            status.style.width = 260;
+            status.style.alignItems = Align.FlexEnd;
+            // A compact card sized to its text, right-aligned over the wider warning cards.
+            var money = new VisualElement { name = "hud-money", pickingMode = PickingMode.Ignore };
+            HudTheme.StyleOverlay(money);
+            money.style.minWidth = 150;
+            money.style.paddingTop = money.style.paddingBottom = 8;
+            money.style.paddingLeft = money.style.paddingRight = 12;
+            _cashBlock = new VisualElement { pickingMode = PickingMode.Ignore };
+            _cashBlock.Add(HudTheme.Eyebrow("Cash"));
+            _cash = HudTheme.Label("", 20, HudTheme.Text, true);
             _cash.name = "hud-cash";
-            _cash.style.position = Position.Absolute;
-            _cash.style.top = 12;
-            _cash.style.right = 16;
-            _cash.style.unityFontStyleAndWeight = FontStyle.Bold;
-            _cash.style.textShadow = new TextShadow { offset = new Vector2(1f, 1f), color = Color.black };
-            // Game clock and wage warning (decision 0039), under the cash.
-            _clock = Caption("", 14, Color.white);
+            _cash.style.marginTop = 1;
+            _cashBlock.Add(_cash);
+            var divider = HudTheme.Divider();
+            divider.style.marginTop = 5;
+            divider.style.marginBottom = 5;
+            _cashBlock.Add(divider);
+            money.Add(_cashBlock);
+            _clock = HudTheme.Label("", 12, HudTheme.TextSoft);
             _clock.name = "hud-clock";
-            _clock.style.position = Position.Absolute;
-            _clock.style.top = 36;
-            _clock.style.right = 16;
-            _clock.style.textShadow = new TextShadow { offset = new Vector2(1f, 1f), color = Color.black };
-            _wageWarning = Caption("", 13, SpoilingSoon);
-            _wageWarning.name = "hud-wage-warning";
-            _wageWarning.style.position = Position.Absolute;
-            _wageWarning.style.top = 56;
-            _wageWarning.style.right = 16;
-            _wageWarning.style.maxWidth = 420;
-            _wageWarning.style.whiteSpace = WhiteSpace.Normal;
-            _wageWarning.style.unityTextAlign = TextAnchor.UpperRight;
-            _wageWarning.style.unityFontStyleAndWeight = FontStyle.Bold;
-            _wageWarning.style.textShadow = new TextShadow { offset = new Vector2(1f, 1f), color = Color.black };
+            money.Add(_clock);
+            status.Add(money);
+            _wageWarning = new VisualElement { name = "hud-wage-warning", pickingMode = PickingMode.Ignore };
+            HudTheme.StyleOverlay(_wageWarning);
+            HudTheme.Border(_wageWarning, HudTheme.Accent, 1);
+            _wageWarning.style.marginTop = 8;
+            _wageWarning.style.alignSelf = Align.Stretch;
+            _wageWarning.style.flexDirection = FlexDirection.Row;
+            _wageWarning.style.alignItems = Align.FlexStart;
+            var mark = HudTheme.Label("!", 14, HudTheme.Ink, true);
+            mark.style.width = mark.style.height = 18;
+            mark.style.flexShrink = 0;
+            mark.style.marginRight = 10;
+            mark.style.marginTop = 1;
+            mark.style.unityTextAlign = TextAnchor.MiddleCenter;
+            mark.style.backgroundColor = HudTheme.Accent;
+            HudTheme.Radius(mark, 9);
+            _wageWarning.Add(mark);
+            _wageWarningText = HudTheme.Label("", 13, HudTheme.Text);
+            _wageWarningText.name = "hud-wage-warning-text";
+            _wageWarningText.style.whiteSpace = WhiteSpace.Normal;
+            _wageWarningText.style.flexShrink = 1;
+            _wageWarning.Add(_wageWarningText);
+            status.Add(_wageWarning);
+            _alert = new VisualElement { name = "hud-alert", pickingMode = PickingMode.Ignore };
+            HudTheme.StyleOverlay(_alert);
+            _alert.style.marginTop = 8;
+            _alert.style.alignSelf = Align.Stretch;
+            _alert.style.flexDirection = FlexDirection.Row;
+            _alert.style.alignItems = Align.Center;
+            _alert.Add(HudTheme.Dot(HudTheme.Danger));
+            _alertText = HudTheme.Label("", 13, HudTheme.Text);
+            _alertText.name = "hud-alert-text";
+            _alertText.style.marginLeft = 10;
+            _alertText.style.flexShrink = 1;
+            _alertText.style.whiteSpace = WhiteSpace.Normal;
+            _alert.Add(_alertText);
+            _alert.Add(HudTheme.Spacer());
+            _alertTime = HudTheme.Label("", 12, HudTheme.Warning, true);
+            _alertTime.style.marginLeft = 8;
+            _alert.Add(_alertTime);
+            status.Add(_alert);
+            layer.Add(_dim);
             layer.Add(_crosshair);
-            layer.Add(_cash);
-            layer.Add(_clock);
-            layer.Add(_wageWarning);
-            layer.Add(_hotbar);
-            layer.Add(_screen);
+            layer.Add(_prompt);
+            layer.Add(status);
+            layer.Add(screenArea);
+            // Above the screen, so a window taller than its area never covers the hotbar's slots.
+            layer.Add(hotbarRow);
             layer.Add(_cursor);
+            _removeWheel = new VisualElement { name = "hud-remove-wheel", pickingMode = PickingMode.Ignore };
+            _removeWheel.style.position = Position.Absolute;
+            _removeWheel.style.width = _removeWheel.style.height = WheelSize;
+            _removeWheel.style.display = DisplayStyle.None;
+            _removeWheel.generateVisualContent += DrawRemoveWheel;
+            layer.Add(_removeWheel);
             root.Add(layer);
             interaction.HoveredEntry = HoveredEntry;
         }
@@ -184,14 +271,19 @@ namespace FoodFactoryGame.Session.Equipment
             _crosshair.style.display = active && interaction.PointerLocked ? DisplayStyle.Flex : DisplayStyle.None;
             _hotbar.style.display = active ? DisplayStyle.Flex : DisplayStyle.None;
             var hasCompany = active && site.Companies is { Count: > 0 };
-            _cash.style.display = hasCompany ? DisplayStyle.Flex : DisplayStyle.None;
+            _cashBlock.style.display = hasCompany ? DisplayStyle.Flex : DisplayStyle.None;
             if (hasCompany && site.Companies[0].Cash != _shownCash)
             {
                 _shownCash = site.Companies[0].Cash;
                 _cash.text = FormatCash(_shownCash);
             }
             UpdateClock(active ? site : null);
+            UpdateAlert(active ? site : null);
+            UpdatePrompt(active);
+            UpdateRemoveWheel(active);
+            _statusColumn.style.display = interaction.Screen == InteractionScreen.Build ? DisplayStyle.None : DisplayStyle.Flex;
             _screen.style.display = screenOpen ? DisplayStyle.Flex : DisplayStyle.None;
+            _dim.style.display = screenOpen ? DisplayStyle.Flex : DisplayStyle.None;
             if (!active)
             {
                 _cursor.style.display = DisplayStyle.None;
@@ -216,18 +308,148 @@ namespace FoodFactoryGame.Session.Equipment
         // fewer game hours of wages than this player's setting (0 turns the early warning off).
         private void UpdateClock(GoodsSnapshot site)
         {
+            var money = _clock.parent;
             if (site == null)
             {
-                _clock.style.display = _wageWarning.style.display = DisplayStyle.None;
+                money.style.display = _wageWarning.style.display = DisplayStyle.None;
                 return;
             }
             var (day, hour, minute) = GoodsWorld.GameTime(site.ClockSeconds);
-            _clock.style.display = DisplayStyle.Flex;
-            var clock = $"Day {day}, {hour:00}:{minute:00}";
+            money.style.display = DisplayStyle.Flex;
+            var clock = $"Day {day}  ·  {hour:00}:{minute:00}";
             if (_clock.text != clock) _clock.text = clock;
             var warning = WageWarning(site, interaction.WageWarningHours);
             _wageWarning.style.display = warning == null ? DisplayStyle.None : DisplayStyle.Flex;
-            if (warning != null && _wageWarning.text != warning) _wageWarning.text = warning;
+            if (warning != null && _wageWarningText.text != warning) _wageWarningText.text = warning;
+        }
+
+        // Centres the belt removal wheel on the crosshair (or the free pointer in the top-down view) while it fills.
+        private void UpdateRemoveWheel(bool active)
+        {
+            var progress = active ? interaction.BeltRemoveProgress : 0f;
+            _removeWheel.style.display = progress > 0f ? DisplayStyle.Flex : DisplayStyle.None;
+            if (progress <= 0f || _removeWheel.panel == null) return;
+            var pointer = interaction.PointerLocked
+                ? new Vector2(UnityEngine.Screen.width * 0.5f, UnityEngine.Screen.height * 0.5f)
+                : interaction.PointerPosition;
+            var position = RuntimePanelUtils.ScreenToPanel(_removeWheel.panel, new Vector2(pointer.x, UnityEngine.Screen.height - pointer.y));
+            _removeWheel.style.left = position.x - WheelSize * 0.5f;
+            _removeWheel.style.top = position.y - WheelSize * 0.5f;
+            _removeWheel.MarkDirtyRepaint();
+        }
+
+        // A dark ring filling clockwise from the top in the accent colour, like build mode's hold wheel.
+        private void DrawRemoveWheel(MeshGenerationContext context)
+        {
+            var painter = context.painter2D;
+            var center = new Vector2(WheelSize * 0.5f, WheelSize * 0.5f);
+            var radius = WheelSize * 0.5f - 4f;
+            painter.lineWidth = 6f;
+            painter.strokeColor = new Color(0f, 0f, 0f, 0.55f);
+            painter.BeginPath();
+            painter.Arc(center, radius, Angle.Degrees(0f), Angle.Degrees(360f));
+            painter.Stroke();
+            var progress = interaction.BeltRemoveProgress;
+            if (progress <= 0f) return;
+            painter.lineWidth = 4f;
+            painter.lineCap = LineCap.Round;
+            painter.strokeColor = HudTheme.Accent;
+            painter.BeginPath();
+            painter.Arc(center, radius, Angle.Degrees(-90f), Angle.Degrees(-90f + 360f * progress));
+            painter.Stroke();
+        }
+
+        // The edible stack nearest to spoiling outside the cold, once it is in the last tenth of its shelf life, in a place this
+        // player can name (their inventory, the storage, a machine, an employee's hands). Display only.
+        private void UpdateAlert(GoodsSnapshot site)
+        {
+            GoodsLot worst = null;
+            var left = long.MaxValue;
+            string place = null;
+            if (site != null)
+                foreach (var lot in site.Lots)
+                {
+                    if (lot.Spoiled || lot.SpoilAfterSeconds >= GoodsWorld.NonPerishableSeconds) continue;
+                    var remaining = Math.Max(0, lot.SpoilAfterSeconds - lot.ExposureSeconds);
+                    if (remaining * 10 > lot.SpoilAfterSeconds || remaining >= left) continue;
+                    if (site.Locations.FirstOrDefault(x => x.Id == lot.LocationId)?.Refrigerated ?? false) continue;
+                    var name = PlaceName(site, lot.LocationId);
+                    if (name == null) continue;
+                    worst = lot;
+                    left = remaining;
+                    place = name;
+                }
+            _alert.style.display = worst == null ? DisplayStyle.None : DisplayStyle.Flex;
+            if (worst == null) return;
+            var text = $"{ItemName(worst.ItemId)} spoils soon in {place}";
+            if (_alertText.text != text) _alertText.text = text;
+            var time = FormatDuration(left, false);
+            if (_alertTime.text != time) _alertTime.text = time;
+        }
+
+        // A goods location as a player reads it; null for places this HUD does not name (another player's inventory, trucks).
+        private string PlaceName(GoodsSnapshot site, string locationId)
+        {
+            if (locationId == interaction.InventoryId) return "your inventory";
+            if (locationId == DevWorld.StorageId) return "storage";
+            var machine = site.Equipment.FirstOrDefault(x => x.State == EquipmentState.Placed
+                && (x.InputLocationId == locationId || x.OutputLocationId == locationId));
+            if (machine != null) return MachineName(machine.Kind);
+            var employee = site.Employees.FirstOrDefault(x => GoodsWorld.InventoryLocationId(x.Id) == locationId);
+            return employee == null ? null : $"{employee.Name}'s hands";
+        }
+
+        // "[E]  Open Oven" under the crosshair while it is on something with a screen and nothing is open.
+        private VisualElement Prompt()
+        {
+            var prompt = new VisualElement { name = "hud-prompt", pickingMode = PickingMode.Ignore };
+            prompt.style.position = Position.Absolute;
+            prompt.style.left = new Length(50, LengthUnit.Percent);
+            prompt.style.top = new Length(50, LengthUnit.Percent);
+            prompt.style.translate = new Translate(new Length(-50, LengthUnit.Percent), 28);
+            prompt.style.flexDirection = FlexDirection.Row;
+            prompt.style.alignItems = Align.Center;
+            HudTheme.StyleOverlay(prompt);
+            HudTheme.Border(prompt, new Color(0f, 0f, 0f, 0f), 0);
+            HudTheme.Radius(prompt, 10);
+            prompt.style.paddingLeft = prompt.style.paddingTop = prompt.style.paddingBottom = 8;
+            _promptKey = HudTheme.Label("", 14, HudTheme.Ink, true);
+            _promptKey.name = "hud-prompt-key";
+            _promptKey.style.minWidth = _promptKey.style.height = 28;
+            _promptKey.style.paddingLeft = _promptKey.style.paddingRight = 6;
+            _promptKey.style.unityTextAlign = TextAnchor.MiddleCenter;
+            _promptKey.style.backgroundColor = HudTheme.Text;
+            HudTheme.Radius(_promptKey, 6);
+            prompt.Add(_promptKey);
+            _promptText = HudTheme.Label("", 14, HudTheme.Text);
+            _promptText.name = "hud-prompt-text";
+            _promptText.style.marginLeft = 10;
+            prompt.Add(_promptText);
+            return prompt;
+        }
+
+        private void UpdatePrompt(bool active)
+        {
+            var target = active && interaction.Screen == InteractionScreen.None && interaction.PointerLocked
+                ? HoverName(interaction.Hovered) : null;
+            _prompt.style.display = target == null ? DisplayStyle.None : DisplayStyle.Flex;
+            if (target == null) return;
+            var key = interaction.InteractKey;
+            if (_promptKey.text != key) _promptKey.text = key;
+            if (_promptText.text != target) _promptText.text = target;
+        }
+
+        private string HoverName(Component hovered)
+        {
+            if (hovered == null) return null;
+            return hovered switch
+            {
+                Employees.EmployeeWorker worker => $"Open {worker.DisplayName}",
+                EquipmentVisual visual => $"Open {MachineName(visual.Kind)}",
+                Employees.SiteLocationMarker => "Open storage",
+                WorldMap.PropertyMarker => "View property",
+                _ => null
+            };
         }
 
         // The warning text for a site baseline, or null when nothing needs saying. Public so tests check the rule directly.
@@ -500,7 +722,8 @@ namespace FoodFactoryGame.Session.Equipment
             {
                 var slotIndex = index;
                 var selected = index == interaction.SelectedSlot;
-                var slot = SlotFrame($"hud-slot-{index + 1}", selected);
+                var entry = entries[index];
+                var slot = SlotFrame($"hud-slot-{index + 1}", selected, entry != null, HotbarSlotSize);
                 // Hotbar slots take clicks only on a screen (assigning the cursor stack); in the world they are display only.
                 slot.RegisterCallback<PointerDownEvent>(evt =>
                 {
@@ -515,24 +738,19 @@ namespace FoodFactoryGame.Session.Equipment
                 }, TrickleDown.TrickleDown);
                 slot.RegisterCallback<PointerEnterEvent>(_ =>
                 {
-                    if (interaction.Screen != InteractionScreen.None) SetBorder(slot, Highlight, selected ? 2 : 1);
+                    if (interaction.Screen != InteractionScreen.None) HudTheme.Border(slot, Highlight, selected ? 2 : 1);
                 });
-                slot.RegisterCallback<PointerLeaveEvent>(_ =>
-                {
-                    if (selected) SetBorder(slot, Highlight, 2);
-                    else SlotEdges(slot);
-                });
-                var number = Caption($"{index + 1}", 10, Muted);
+                slot.RegisterCallback<PointerLeaveEvent>(_ => SlotRest(slot, selected));
+                var number = Caption($"{(index + 1) % 10}", 10, selected ? Highlight : HudTheme.Faint);
                 number.style.position = Position.Absolute;
-                number.style.left = 3;
-                number.style.top = 1;
-                var entry = entries[index];
+                number.style.left = 5;
+                number.style.top = 3;
                 if (entry != null)
                 {
                     var count = interaction.HotbarCount(entry);
                     var sprite = entry.MachineKind != null ? MachineIcon(entry.MachineKind) : ItemIcon(entry.ItemId);
                     var name = entry.MachineKind != null ? Title(entry.MachineKind) : ItemName(entry.ItemId);
-                    slot.Add(Icon(sprite, name, count > 0 ? 1f : 0.35f));
+                    slot.Add(Icon(sprite, name, count > 0 ? 1f : 0.35f, 38));
                     if (count > 0) slot.Add(Count(count));
                 }
                 slot.Add(number);
@@ -552,11 +770,11 @@ namespace FoodFactoryGame.Session.Equipment
             if (interaction.Screen is InteractionScreen.None or InteractionScreen.Employee or InteractionScreen.PickPosition or InteractionScreen.Logistics
                     or InteractionScreen.Build
                 || inventoryId == null) return;
-            var inventory = Window("hud-inventory", $"Inventory  {Units(site, inventoryId)}");
+            var inventory = Window("hud-inventory", "Inventory", SlotsUsed(site, inventoryId));
             inventory.Add(GridView(InventoryGrid));
             // One line at the grid's width: a longer hover line must never resize the centred screen under the pointer.
-            _hoverLabel = Caption(" ", 12, Muted, 6);
-            _hoverLabel.style.width = Math.Min(_grids.TryGetValue(InventoryGrid, out var slots) ? slots.Count : 0, GridColumns) * (SlotSize + 2);
+            _hoverLabel = Caption(" ", 12, Muted, 10);
+            _hoverLabel.style.width = Math.Min(_grids.TryGetValue(InventoryGrid, out var slots) ? slots.Count : 0, GridColumns) * (SlotSize + SlotGap);
             _hoverLabel.style.whiteSpace = WhiteSpace.NoWrap;
             _hoverLabel.style.overflow = Overflow.Hidden;
             _hoverLabel.style.textOverflow = TextOverflow.Ellipsis;
@@ -566,17 +784,21 @@ namespace FoodFactoryGame.Session.Equipment
             {
                 if (interaction.StorageOpen)
                 {
-                    var storage = Window("hud-storage", $"Storage  {Units(site, DevWorld.StorageId)}");
+                    var storage = Window("hud-storage", "Storage", SlotsUsed(site, DevWorld.StorageId));
                     storage.Add(GridView(StorageGrid));
                     _screen.Add(storage);
                 }
-                // Supplier and Staff share one column, so the screen is no wider than it was with the supplier alone.
-                var side = new VisualElement { name = "hud-side-column" };
+                // Supplier and Staff share one column, which scrolls when the two are taller than the space above the hotbar.
+                var side = new ScrollView(ScrollViewMode.Vertical) { name = "hud-side-column" };
+                side.style.width = SideColumnWidth;
+                var room = _screenArea.resolvedStyle.height;
+                if (room > 0f) side.style.maxHeight = room;
+                HudTheme.StyleScroller(side);
                 if (interaction.Session.Offers.Count > 0) side.Add(SupplierWindow());
                 if (site.Companies is { Count: > 0 })
                 {
                     var staff = StaffWindow(site);
-                    if (side.childCount > 0) staff.style.marginTop = 6;
+                    if (side.childCount > 0) staff.style.marginTop = 12;
                     side.Add(staff);
                 }
                 if (side.childCount > 0) _screen.Add(side);
@@ -596,23 +818,22 @@ namespace FoodFactoryGame.Session.Equipment
             // Truck offers are bought on the logistics screen (decision 0023); restaurant furnishings in build mode (decision 0034).
             foreach (var offer in interaction.Session.Offers.Where(x => x != null && x.Truck == null && (x.Equipment == null || string.IsNullOrEmpty(x.Equipment.Category))))
             {
-                var row = new VisualElement { name = $"hud-offer-row-{offer.Id}" };
-                row.style.flexDirection = FlexDirection.Row;
-                row.style.alignItems = Align.Center;
-                row.style.marginTop = 4;
+                var row = CardRow($"hud-offer-row-{offer.Id}");
                 // A machine offer (decision 0017) shows the machine; it arrives held, like a picked-up machine.
                 var machine = offer.Equipment != null ? offer.Equipment.Kind : null;
                 var offerName = machine != null ? Title(machine) : ItemName(offer.ItemId);
-                row.Add(Icon(machine != null ? MachineIcon(machine) : ItemIcon(offer.ItemId), offerName, 1f));
-                var label = Caption($"{offer.Quantity} {offerName}  {FormatCash(offer.PriceCents)}", 12, Color.white);
-                label.style.minWidth = 120;
-                label.style.marginLeft = 6;
-                row.Add(label);
+                row.Add(Icon(machine != null ? MachineIcon(machine) : ItemIcon(offer.ItemId), offerName, 1f, 32));
+                var text = new VisualElement { pickingMode = PickingMode.Ignore };
+                text.style.flexGrow = 1;
+                text.style.marginLeft = 10;
+                text.style.minWidth = 120;
+                text.Add(HudTheme.Label(offerName, 14, HudTheme.Text, true));
+                var detail = HudTheme.Label($"{offer.Quantity}  ·  {FormatCash(offer.PriceCents)}", 12, Muted);
+                detail.style.marginTop = 2;
+                text.Add(detail);
+                row.Add(text);
                 var id = offer.Id;
-                // Not focusable: a focused button would buy again on every keyboard Submit (Enter/Space) after the click.
-                var buy = new Button(() => ClickOffer(id)) { name = $"hud-offer-{id}", text = "Buy", focusable = false };
-                buy.style.minWidth = 48;
-                row.Add(buy);
+                row.Add(HudTheme.Button($"hud-offer-{id}", "Buy", () => ClickOffer(id)));
                 window.Add(row);
             }
             return window;
@@ -627,50 +848,99 @@ namespace FoodFactoryGame.Session.Equipment
             var cap = GoodsWorld.EmployeeCap(site, siteId);
             var count = site.Employees.Count;
             var pending = interaction.HasPendingRequests;
-            var summary = Caption($"Employees: {count} of {cap}  ·  {FormatCash(GoodsWorld.WageCentsPerHour)} per game hour each", 12, Color.white, 2);
+            var summary = Caption($"Employees: {count} of {cap}  ·  {FormatCash(GoodsWorld.WageCentsPerHour)} per game hour each", 12, Muted);
             summary.name = "hud-staff-count";
+            summary.style.whiteSpace = WhiteSpace.Normal;
+            summary.style.marginTop = -6;
+            summary.style.marginBottom = 12;
             window.Add(summary);
-            var hire = new Button(ClickHire) { name = "hud-hire", text = count >= cap ? "Hire (site is full)" : "Hire", focusable = false };
-            hire.style.alignSelf = Align.FlexStart;
-            hire.style.marginTop = 4;
-            hire.SetEnabled(!pending && count < cap);
-            window.Add(hire);
+            // Hired, the hourly wage bill and how many game hours of it the cash covers.
+            var wages = site.CompanyWageCentsPerHour;
+            var cash = site.Companies[0].Cash;
+            var tiles = HudTheme.Row();
+            tiles.style.alignItems = Align.Stretch;
+            tiles.Add(Tile("Hired", $"{count} / {cap}", HudTheme.Text));
+            tiles.Add(Tile("Wages", $"{FormatCash(wages)} / h", HudTheme.Text));
+            var covers = wages > 0 ? cash / wages : -1;
+            tiles.Add(Tile("Cash covers", covers < 0 ? "—" : $"{covers} h",
+                covers >= 0 && covers < Math.Max(1, interaction.WageWarningHours) ? SpoilingSoon : HudTheme.Text));
+            HudTheme.Gap(tiles, 8);
+            window.Add(tiles);
             foreach (var employee in site.Employees)
             {
-                var row = new VisualElement { name = $"hud-employee-{employee.Id}" };
-                row.style.flexDirection = FlexDirection.Row;
-                row.style.alignItems = Align.Center;
-                row.style.marginTop = 4;
+                var row = CardRow($"hud-employee-{employee.Id}");
                 var holding = Holding(site, employee.Id);
-                var state = employee.Unpaid ? "unpaid, waiting outside" : holding ? "holding goods" : "paid";
-                var label = Caption($"{employee.Name}  ({state})", 12, employee.Unpaid ? Spoiled : Color.white);
-                label.style.minWidth = 200;
-                row.Add(label);
+                row.Add(HudTheme.Avatar(employee.Name));
+                var text = new VisualElement { pickingMode = PickingMode.Ignore };
+                text.style.flexGrow = 1;
+                text.style.marginLeft = 12;
+                text.Add(HudTheme.Label(employee.Name, 14, HudTheme.Text, true));
+                var state = HudTheme.Row();
+                state.style.marginTop = 3;
+                state.Add(HudTheme.Dot(employee.Unpaid ? HudTheme.Danger : holding ? Highlight : HudTheme.Positive, 7));
+                var stateText = HudTheme.Label(employee.Unpaid ? "Unpaid, waiting outside" : holding ? "Holding goods" : "Paid", 12,
+                    employee.Unpaid ? Spoiled : HudTheme.TextSoft);
+                stateText.style.marginLeft = 6;
+                state.Add(stateText);
+                text.Add(state);
+                row.Add(text);
                 var id = employee.Id;
-                var fire = new Button(() => ClickFire(id)) { name = $"hud-fire-{id}", text = "Fire", focusable = false };
+                var fireColumn = new VisualElement { pickingMode = PickingMode.Ignore };
+                fireColumn.style.alignItems = Align.FlexEnd;
+                var fire = HudTheme.Button($"hud-fire-{id}", "Fire", () => ClickFire(id), HudButton.Danger);
                 fire.SetEnabled(!pending && !holding);
-                row.Add(fire);
+                fireColumn.Add(fire);
+                if (holding)
+                {
+                    var hint = HudTheme.Label("Empty their hands first", 10, HudTheme.Faint);
+                    hint.style.marginTop = 3;
+                    fireColumn.Add(hint);
+                }
+                row.Add(fireColumn);
                 window.Add(row);
-                if (holding) window.Add(Caption("Empty their hands on their screen to fire them.", 11, Muted));
             }
-            var setting = new VisualElement { name = "hud-wage-warning-setting" };
-            setting.style.flexDirection = FlexDirection.Row;
-            setting.style.alignItems = Align.Center;
-            setting.style.marginTop = 8;
+            var hireRow = HudTheme.Row();
+            hireRow.style.marginTop = 12;
+            var room = HudTheme.Label(count >= cap ? "No room left. More floor space allows more staff." : $"{cap - count} more can be hired here.", 12, Muted);
+            room.style.flexShrink = 1;
+            room.style.whiteSpace = WhiteSpace.Normal;
+            hireRow.Add(room);
+            hireRow.Add(HudTheme.Spacer());
+            var hire = HudTheme.Button("hud-hire", count >= cap ? "Site is full" : $"Hire  ·  {FormatCash(GoodsWorld.WageCentsPerHour)} / h", ClickHire,
+                HudButton.Primary, 44);
+            hire.style.marginLeft = 12;
+            hire.SetEnabled(!pending && count < cap);
+            hireRow.Add(hire);
+            window.Add(hireRow);
+            var divider = HudTheme.Divider();
+            divider.style.marginTop = 14;
+            divider.style.marginBottom = 14;
+            window.Add(divider);
+            var setting = HudTheme.Row();
+            setting.name = "hud-wage-warning-setting";
+            var settingText = new VisualElement { pickingMode = PickingMode.Ignore };
+            settingText.style.flexShrink = 1;
+            settingText.Add(HudTheme.Label("Wage warning", 14, HudTheme.Text, true));
+            var settingHint = HudTheme.Label("Warn when cash covers less than", 12, Muted);
+            settingHint.style.marginTop = 2;
+            settingText.Add(settingHint);
+            setting.Add(settingText);
+            setting.Add(HudTheme.Spacer());
             var hours = interaction.WageWarningHours;
-            var less = new Button(() => ClickWageWarning(-1)) { name = "hud-wage-warning-less", text = "-", focusable = false };
-            var more = new Button(() => ClickWageWarning(1)) { name = "hud-wage-warning-more", text = "+", focusable = false };
+            var stepper = HudTheme.Segmented();
+            stepper.style.alignItems = Align.Center;
+            var less = HudTheme.Segment("hud-wage-warning-less", "−", false, () => ClickWageWarning(-1));
+            var more = HudTheme.Segment("hud-wage-warning-more", "+", false, () => ClickWageWarning(1));
             less.SetEnabled(hours > 0);
             more.SetEnabled(hours < Goods.Network.GoodsNetworkBridge.MaxWageWarningHours);
-            setting.Add(Caption("Warn when cash covers under", 12, Muted));
-            setting.Add(less);
-            var value = Caption(hours == 0 ? "off" : $"{hours} h", 12, Color.white);
+            stepper.Add(less);
+            var value = HudTheme.Label(hours == 0 ? "off" : $"{hours} h", 13, HudTheme.Text, true);
             value.name = "hud-wage-warning-hours";
-            value.style.minWidth = 30;
+            value.style.minWidth = 44;
             value.style.unityTextAlign = TextAnchor.MiddleCenter;
-            setting.Add(value);
-            setting.Add(more);
-            setting.Add(Caption("of wages", 12, Muted));
+            stepper.Add(value);
+            stepper.Add(more);
+            setting.Add(stepper);
             window.Add(setting);
             return window;
         }
@@ -700,7 +970,7 @@ namespace FoodFactoryGame.Session.Equipment
         private VisualElement ConstructionWindow(GoodsBuilding building)
         {
             var window = Window("hud-construction", "Factory");
-            var floors = Caption($"Floors: {building.Floors} of {DevWorld.MaxFloors}", 12, Color.white, 4);
+            var floors = Caption($"Floors: {building.Floors} of {DevWorld.MaxFloors}", 12, HudTheme.Text, 4);
             floors.name = "hud-floors";
             window.Add(floors);
             if (building.Floors >= DevWorld.MaxFloors)
@@ -708,17 +978,12 @@ namespace FoodFactoryGame.Session.Equipment
                 window.Add(Caption("Top floor reached.", 12, Muted, 4));
                 return window;
             }
-            var row = new VisualElement();
-            row.style.flexDirection = FlexDirection.Row;
-            row.style.alignItems = Align.Center;
-            row.style.marginTop = 4;
-            var label = Caption($"Add a floor  {FormatCash(GoodsWorld.FloorPriceCents(building, DevWorld.FloorOffer))}", 12, Color.white);
-            label.style.minWidth = 120;
+            var row = CardRow("hud-floor-row");
+            var label = Caption($"Add a floor  ·  {FormatCash(GoodsWorld.FloorPriceCents(building, DevWorld.FloorOffer))}", 13, HudTheme.Text);
+            label.style.flexGrow = 1;
+            label.style.minWidth = 140;
             row.Add(label);
-            // Not focusable: a focused button would order again on every keyboard Submit (Enter/Space) after the click.
-            var build = new Button(ClickAddFloor) { name = "hud-add-floor", text = "Build", focusable = false };
-            build.style.minWidth = 48;
-            row.Add(build);
+            row.Add(HudTheme.Button("hud-add-floor", "Build", ClickAddFloor));
             window.Add(row);
             if (!building.HasElevator) window.Add(Caption("The elevator goes where you stand.", 12, Muted, 4));
             return window;
@@ -734,42 +999,41 @@ namespace FoodFactoryGame.Session.Equipment
             if (equipment.Kind == GoodsWorld.DockKind) return DockWindow(site, equipment);
             if (GoodsWorld.IsTable(equipment)) return TableWindow(site, equipment);
             if (!interaction.Session.Recipes.Any(x => x != null && x.StationKind == equipment.Kind)) return StorageMachineWindow(site, equipment);
-            var window = Window("hud-machine", MachineName(equipment.Kind));
-            window.style.minWidth = 300;
-            var body = new VisualElement();
-            body.style.flexDirection = FlexDirection.Row;
+            var makes = interaction.Session.Recipes.Where(x => x != null && !x.IsSale && x.StationKind == equipment.Kind).ToList();
+            var recipeLine = string.Join(",  ", makes.Select(x =>
+                $"{string.Join(" + ", x.Inputs.Select(y => ItemName(y.itemId)).Distinct())} → {ItemName(x.OutputItemId)}  ·  {x.DurationSeconds} s"));
+            var window = Window("hud-machine", MachineName(equipment.Kind), recipeLine);
+            window.style.minWidth = 380;
+            var body = Inset(FlexDirection.Row);
             body.style.alignItems = Align.Center;
             body.style.justifyContent = Justify.Center;
-            body.style.backgroundColor = Inset;
-            Pad(body, 12);
-            body.Add(Labelled(GridView(InputGrid), $"Input {Units(site, equipment.InputLocationId)}"));
-            var arrow = new VisualElement { name = "hud-progress" };
-            arrow.style.width = 90;
-            arrow.style.height = 12;
-            arrow.style.marginLeft = arrow.style.marginRight = 12;
-            arrow.style.marginBottom = 16;
-            arrow.style.backgroundColor = SlotEdgeDark;
-            SetBorder(arrow, SlotEdgeLight, 1);
-            _progressFill = new VisualElement { name = "hud-progress-fill", pickingMode = PickingMode.Ignore };
-            _progressFill.style.height = new Length(100, LengthUnit.Percent);
-            _progressFill.style.backgroundColor = Highlight;
-            arrow.Add(_progressFill);
-            body.Add(arrow);
+            body.Add(Labelled(GridView(InputGrid), $"In  {Units(site, equipment.InputLocationId)}"));
+            var middle = new VisualElement { pickingMode = PickingMode.Ignore };
+            middle.style.width = 120;
+            middle.style.marginLeft = middle.style.marginRight = 16;
+            middle.style.marginTop = 16;
+            var arrow = HudTheme.Label("→", 20, HudTheme.Faint);
+            arrow.style.unityTextAlign = TextAnchor.MiddleCenter;
+            arrow.style.marginBottom = 6;
+            middle.Add(arrow);
+            middle.Add(HudTheme.Progress("hud-progress", out _progressFill));
+            body.Add(middle);
             // A sale station (decision 0013) turns its input into company cash, so it shows prices instead of an output grid.
             var sales = SaleRecipes(equipment.Kind);
-            if (sales.Count == 0) body.Add(Labelled(GridView(OutputGrid), $"Output {Units(site, equipment.OutputLocationId)}"));
+            if (sales.Count == 0) body.Add(Labelled(GridView(OutputGrid), $"Out  {Units(site, equipment.OutputLocationId)}"));
             else
             {
                 var prices = new VisualElement { name = "hud-sale-prices" };
-                prices.style.minWidth = 96;
-                prices.Add(Caption("Sells", 12, Heading));
+                prices.style.minWidth = 120;
+                prices.Add(HudTheme.Eyebrow("Sells"));
                 foreach (var sale in sales)
-                    prices.Add(Caption($"{string.Join(" + ", sale.Inputs.Select(x => $"{x.quantity} {ItemName(x.itemId)}"))}  {FormatCash(sale.SaleCents)}", 12, Color.white, 4));
+                    prices.Add(Caption($"{string.Join(" + ", sale.Inputs.Select(x => $"{x.quantity} {ItemName(x.itemId)}"))}  {FormatCash(sale.SaleCents)}", 13, HudTheme.Text, 6));
                 body.Add(prices);
             }
             window.Add(body);
-            _progressLabel = Caption("", 12, Muted, 6);
+            _progressLabel = Caption("", 12, HudTheme.TextSoft, 10);
             _progressLabel.name = "hud-progress-label";
+            _progressLabel.style.whiteSpace = WhiteSpace.Normal;
             window.Add(_progressLabel);
             if (equipment.Kind == GoodsWorld.CounterKind) window.Add(StaffRow(site, equipment));
             if (HasPowerSwitch(equipment.Kind)) window.Add(PowerRow(equipment));
@@ -783,31 +1047,36 @@ namespace FoodFactoryGame.Session.Equipment
         // server to flip it. Rebuilt with the server's answer (Signature).
         private VisualElement PowerRow(GoodsEquipment equipment)
         {
-            var row = new VisualElement { name = "hud-power" };
-            row.style.flexDirection = FlexDirection.Row;
-            row.style.alignItems = Align.Center;
-            row.style.marginTop = 6;
+            var row = HudTheme.Row();
+            row.name = "hud-power";
+            row.style.marginTop = 16;
             var on = equipment.PoweredOn;
-            var label = Caption(interaction.HasPendingRequests ? "Switching..." : on ? "Power: on" : "Power: off",
-                12, on ? Color.white : Spoiled);
-            label.name = "hud-power-label";
-            label.style.flexGrow = 1;
-            row.Add(label);
+            var text = new VisualElement { pickingMode = PickingMode.Ignore };
+            text.style.flexGrow = 1;
+            text.Add(HudTheme.Label("Power", 14, HudTheme.Text, true));
+            if (interaction.HasPendingRequests)
+            {
+                var label = Caption("Switching...", 12, Muted, 2);
+                label.name = "hud-power-label";
+                text.Add(label);
+            }
+            row.Add(text);
             var track = new VisualElement { name = "hud-power-switch" };
-            track.style.width = 46;
-            track.style.height = 22;
-            track.style.backgroundColor = on ? PowerOn : SlotEdgeDark;
-            SetBorder(track, SlotEdgeLight, 1);
-            track.style.borderTopLeftRadius = track.style.borderTopRightRadius = 11;
-            track.style.borderBottomLeftRadius = track.style.borderBottomRightRadius = 11;
+            track.style.width = 88;
+            track.style.height = 44;
+            track.style.flexDirection = FlexDirection.Row;
+            track.style.alignItems = Align.Center;
+            track.style.justifyContent = on ? Justify.FlexEnd : Justify.FlexStart;
+            HudTheme.Pad(track, 4);
+            track.style.backgroundColor = on ? HudTheme.PowerOn : HudTheme.Edge;
+            HudTheme.Radius(track, 22);
             var knob = new VisualElement { pickingMode = PickingMode.Ignore };
-            knob.style.position = Position.Absolute;
-            knob.style.top = 2;
-            knob.style.left = on ? 26 : 2;
-            knob.style.width = knob.style.height = 16;
-            knob.style.backgroundColor = Color.white;
-            knob.style.borderTopLeftRadius = knob.style.borderTopRightRadius = 8;
-            knob.style.borderBottomLeftRadius = knob.style.borderBottomRightRadius = 8;
+            knob.style.width = knob.style.height = 36;
+            knob.style.backgroundColor = HudTheme.Hex(0xF4F1EA);
+            knob.style.alignItems = Align.Center;
+            knob.style.justifyContent = Justify.Center;
+            HudTheme.Radius(knob, 18);
+            knob.Add(HudTheme.Label(on ? "ON" : "OFF", 10, HudTheme.Ink, true));
             track.Add(knob);
             var equipmentId = equipment.Id;
             track.RegisterCallback<ClickEvent>(_ =>
@@ -825,29 +1094,32 @@ namespace FoodFactoryGame.Session.Equipment
         // A register (decision 0034) sells only while someone works it: who does, and a button to work it or leave it.
         private VisualElement StaffRow(GoodsSnapshot site, GoodsEquipment register)
         {
-            var row = new VisualElement { name = "hud-staff" };
-            row.style.flexDirection = FlexDirection.Row;
-            row.style.alignItems = Align.Center;
-            row.style.marginTop = 6;
+            var row = HudTheme.Row();
+            row.name = "hud-staff";
+            row.style.marginTop = 14;
+            row.style.flexWrap = Wrap.Wrap;
             var me = interaction.LocalPlayerId;
             var who = string.IsNullOrEmpty(register.StaffId) ? "nobody: customers are not served"
                 : register.StaffId == me ? "you" : site.Employees.FirstOrDefault(x => x.Id == register.StaffId)?.Name ?? "a teammate";
             // While a request is out the row says so, and it is rebuilt when the server's answer arrives (Signature).
             var label = Caption(interaction.HasPendingRequests ? "Updating..." : $"Staffed by {who}", 12,
-                string.IsNullOrEmpty(register.StaffId) ? Spoiled : Color.white);
+                string.IsNullOrEmpty(register.StaffId) ? Spoiled : HudTheme.Text);
             label.name = "hud-staff-label";
             label.style.flexGrow = 1;
             row.Add(label);
             var mine = register.StaffId == me;
             var registerId = register.Id;
-            // Not focusable: a focused button would click again on every keyboard Submit (Enter/Space).
-            var button = new Button(() => ClickStaff(registerId, !mine)) { name = "hud-staff-button", text = mine ? "Leave" : "Work this register", focusable = false };
+            var button = HudTheme.Button("hud-staff-button", mine ? "Leave" : "Work this register", () => ClickStaff(registerId, !mine),
+                mine ? HudButton.Secondary : HudButton.Primary);
+            button.style.marginLeft = 8;
             button.SetEnabled(!interaction.HasPendingRequests);
             row.Add(button);
             foreach (var employee in site.Employees.Where(x => x.Id != register.StaffId))
             {
                 var id = employee.Id;
-                row.Add(new Button(() => interaction.Staff(registerId, id)) { name = $"hud-staff-{id}", text = $"Assign {employee.Name}", focusable = false });
+                var assign = HudTheme.Button($"hud-staff-{id}", $"Assign {employee.Name}", () => interaction.Staff(registerId, id));
+                assign.style.marginLeft = 8;
+                row.Add(assign);
             }
             return row;
         }
@@ -860,11 +1132,8 @@ namespace FoodFactoryGame.Session.Equipment
         private VisualElement DockWindow(GoodsSnapshot site, GoodsEquipment equipment)
         {
             var window = Window("hud-machine", "Loading dock");
-            var body = new VisualElement();
-            body.style.flexDirection = FlexDirection.Row;
+            var body = Inset(FlexDirection.Row);
             body.style.alignItems = Align.FlexStart;
-            body.style.backgroundColor = Inset;
-            Pad(body, 12);
             var outgoing = Labelled(GridView(InputGrid), $"Outgoing: trucks load {Units(site, equipment.InputLocationId)}");
             outgoing.style.marginRight = 16;
             body.Add(outgoing);
@@ -893,11 +1162,9 @@ namespace FoodFactoryGame.Session.Equipment
         private VisualElement TableWindow(GoodsSnapshot site, GoodsEquipment equipment)
         {
             var window = Window("hud-machine", "Table");
-            var body = new VisualElement();
-            body.style.backgroundColor = Inset;
-            Pad(body, 12);
+            var body = Inset(FlexDirection.Column);
             var seated = site.Customers.Count(x => x.TableId == equipment.Id);
-            var seats = Caption($"Seats taken: {seated}/{equipment.Seats}", 14, Color.white);
+            var seats = Caption($"Seats taken: {seated}/{equipment.Seats}", 14, HudTheme.Text);
             seats.name = "hud-table-seats";
             body.Add(seats);
             var diner = site.Diners.FirstOrDefault();
@@ -911,13 +1178,11 @@ namespace FoodFactoryGame.Session.Equipment
 
         private VisualElement StorageMachineWindow(GoodsSnapshot site, GoodsEquipment equipment)
         {
-            var window = Window("hud-machine", Title(equipment.Kind));
-            var body = new VisualElement();
-            body.style.alignItems = Align.Center;
-            body.style.backgroundColor = Inset;
-            Pad(body, 12);
             var refrigerated = site.Locations.FirstOrDefault(x => x.Id == equipment.InputLocationId)?.Refrigerated ?? false;
-            body.Add(Labelled(GridView(InputGrid), $"{(refrigerated ? "Refrigerated" : "Storage")} {Units(site, equipment.InputLocationId)}"));
+            var window = Window("hud-machine", MachineName(equipment.Kind), SlotsUsed(site, equipment.InputLocationId));
+            var body = Inset(FlexDirection.Column);
+            body.style.alignItems = Align.Center;
+            body.Add(Labelled(GridView(InputGrid), refrigerated ? "Refrigerated" : "Storage"));
             window.Add(body);
             if (refrigerated)
             {
@@ -930,16 +1195,23 @@ namespace FoodFactoryGame.Session.Equipment
 
         private VisualElement GridView(string grid)
         {
+            // Explicit rows of GridColumns slots: a wrapping row of fixed width can lose its last column to device-pixel
+            // rounding on a scaled panel.
             var view = new VisualElement { name = $"hud-{grid}-grid" };
-            view.style.flexDirection = FlexDirection.Row;
-            view.style.flexWrap = Wrap.Wrap;
             var slots = _grids.TryGetValue(grid, out var list) ? list : new List<SlotContent>();
-            view.style.width = Math.Min(slots.Count, GridColumns) * (SlotSize + 2);
+            VisualElement row = null;
             for (var index = 0; index < slots.Count; index++)
             {
+                if (index % GridColumns == 0)
+                {
+                    row = new VisualElement();
+                    row.style.flexDirection = FlexDirection.Row;
+                    view.Add(row);
+                }
                 var slotIndex = index;
                 var content = slots[index];
-                var slot = SlotFrame($"hud-{grid}-slot-{index}", false);
+                var slot = SlotFrame($"hud-{grid}-slot-{index}", false, content != null, SlotSize);
+                if (content is { Spoiled: true }) slot.style.backgroundColor = HudTheme.SpoiledFill;
                 // Read by HoveredEntry to find the stack under the pointer when a hotbar key is pressed.
                 slot.userData = content;
                 // Presses are read here rather than through Button.clicked, whose activator ignores any press with a
@@ -966,11 +1238,11 @@ namespace FoodFactoryGame.Session.Equipment
                     // Edible goods show when they spoil; UpdateSpoilage fills the text in (empty for goods that do not spoil).
                     if (content.MachineKind == null && !content.Spoiled)
                     {
-                        var timer = Caption("", 10, Muted);
+                        var timer = Caption("", 9, Muted);
                         timer.name = "hud-spoil-timer";
                         timer.style.position = Position.Absolute;
-                        timer.style.left = 3;
-                        timer.style.top = 1;
+                        timer.style.left = 4;
+                        timer.style.top = 2;
                         timer.style.unityFontStyleAndWeight = FontStyle.Bold;
                         timer.style.textShadow = new TextShadow { offset = new Vector2(1f, 1f), color = Color.black };
                         slot.Add(timer);
@@ -978,14 +1250,14 @@ namespace FoodFactoryGame.Session.Equipment
                     }
                     slot.RegisterCallback<PointerEnterEvent>(_ => _hovered = (location, content));
                 }
-                slot.RegisterCallback<PointerEnterEvent>(_ => SetBorder(slot, Highlight, 1));
+                slot.RegisterCallback<PointerEnterEvent>(_ => HudTheme.Border(slot, Highlight, 1));
                 slot.RegisterCallback<PointerLeaveEvent>(_ =>
                 {
-                    SlotEdges(slot);
+                    SlotRest(slot, false);
                     _hovered = null;
                     if (_hoverLabel != null) _hoverLabel.text = " ";
                 });
-                view.Add(slot);
+                row.Add(slot);
             }
             return view;
         }
@@ -1115,7 +1387,7 @@ namespace FoodFactoryGame.Session.Equipment
             {
                 var time = SpoilTime(site, locationId, itemId);
                 label.text = time is { } known ? FormatDuration(known.Seconds, true) : "";
-                if (time is { } shown) label.style.color = shown.Soon ? SpoilingSoon : shown.Refrigerated ? Chilled : Color.white;
+                if (time is { } shown) label.style.color = shown.Soon ? SpoilingSoon : shown.Refrigerated ? Chilled : HudTheme.Text;
             }
             if (_hoverLabel == null || _hovered is not { } hovered) return;
             var content = hovered.Content;
@@ -1169,6 +1441,13 @@ namespace FoodFactoryGame.Session.Equipment
                 : $"{GoodsSlots.SlotsUsed(site.Lots.Where(x => x.LocationId == locationId), interaction.Session.MaxStack)}/{location.Capacity}";
         }
 
+        // "3/40 slots" for a window's subtitle; null when the location is unknown.
+        private string SlotsUsed(GoodsSnapshot site, string locationId)
+        {
+            var units = Units(site, locationId);
+            return units.Length == 0 ? null : $"{units} slots";
+        }
+
         private List<RecipeAsset> SaleRecipes(string kind) =>
             interaction.Session.Recipes.Where(x => x != null && x.IsSale && x.StationKind == kind).ToList();
 
@@ -1178,63 +1457,115 @@ namespace FoodFactoryGame.Session.Equipment
         private Sprite MachineIcon(string kind) =>
             interaction.Session.EquipmentDefinitions.FirstOrDefault(x => x != null && x.Kind == kind)?.Icon;
 
-        // Item and kind IDs are shown directly when no content names them: "dough" -> "Dough".
-        private string MachineName(string kind) =>
-            interaction.Session.EquipmentDefinitions.FirstOrDefault(x => x != null && x.Kind == kind)?.DisplayName ?? Title(kind);
+        // Item and kind IDs are shown directly when no content names them: "dough" -> "Dough". Content names start upper case
+        // on screen ("oven" -> "Oven").
+        private string MachineName(string kind)
+        {
+            var name = interaction.Session.EquipmentDefinitions.FirstOrDefault(x => x != null && x.Kind == kind)?.DisplayName;
+            return string.IsNullOrEmpty(name) ? Title(kind) : char.ToUpperInvariant(name[0]) + name.Substring(1);
+        }
 
         private static string Title(string id) =>
             string.IsNullOrEmpty(id) ? "" : CultureInfo.InvariantCulture.TextInfo.ToTitleCase(id.Replace('-', ' '));
 
-        private static VisualElement Window(string name, string title)
+        // A screen window: bold title with an optional muted subtitle beside it (slots used, the machine's recipe).
+        private static VisualElement Window(string name, string title, string subtitle = null)
         {
             var window = new VisualElement { name = name };
-            window.style.backgroundColor = Backdrop;
+            HudTheme.StylePanel(window, 16);
             window.style.marginLeft = window.style.marginRight = 6;
-            SetBorder(window, SlotEdgeDark, 2);
-            Pad(window, 8);
-            var heading = Caption(title, 15, Heading);
-            heading.style.unityFontStyleAndWeight = FontStyle.Bold;
-            heading.style.marginBottom = 6;
-            window.Add(heading);
+            var header = HudTheme.Row();
+            header.style.alignItems = Align.FlexEnd;
+            header.style.marginBottom = 12;
+            header.Add(HudTheme.Label(title, 17, Heading, true));
+            if (!string.IsNullOrEmpty(subtitle))
+            {
+                var detail = HudTheme.Label(subtitle, 12, Muted);
+                detail.style.marginLeft = 10;
+                detail.style.marginBottom = 2;
+                detail.style.flexShrink = 1;
+                header.Add(detail);
+            }
+            window.Add(header);
             return window;
+        }
+
+        // The darker well inside a window that holds a machine's grids.
+        private static VisualElement Inset(FlexDirection direction)
+        {
+            var body = new VisualElement();
+            body.style.flexDirection = direction;
+            body.style.backgroundColor = HudTheme.Inset;
+            HudTheme.Radius(body, 12);
+            HudTheme.Pad(body, 16);
+            return body;
+        }
+
+        // A list row on a card (supplier offers, employees, floors).
+        private static VisualElement CardRow(string name)
+        {
+            var row = HudTheme.Row();
+            row.name = name;
+            row.style.marginTop = 6;
+            row.style.backgroundColor = HudTheme.Card;
+            HudTheme.Border(row, HudTheme.CardEdge, 1);
+            HudTheme.Radius(row, 10);
+            row.style.paddingLeft = row.style.paddingRight = 12;
+            row.style.paddingTop = row.style.paddingBottom = 10;
+            return row;
+        }
+
+        // A small stat tile: caption over a value.
+        private static VisualElement Tile(string caption, string value, Color color)
+        {
+            var tile = new VisualElement { pickingMode = PickingMode.Ignore };
+            tile.style.flexGrow = 1;
+            tile.style.flexBasis = 0;
+            tile.style.backgroundColor = HudTheme.Inset;
+            HudTheme.Radius(tile, 10);
+            tile.style.paddingLeft = tile.style.paddingRight = 10;
+            tile.style.paddingTop = tile.style.paddingBottom = 10;
+            tile.Add(HudTheme.Eyebrow(caption));
+            var text = HudTheme.Label(value, 15, color, true);
+            text.style.marginTop = 4;
+            tile.Add(text);
+            return tile;
         }
 
         private static VisualElement Labelled(VisualElement content, string label)
         {
             var column = new VisualElement();
-            column.style.alignItems = Align.Center;
+            column.style.alignItems = Align.FlexStart;
+            var caption = HudTheme.Eyebrow(label);
+            caption.style.marginBottom = 6;
+            caption.style.marginLeft = SlotGap / 2;
+            column.Add(caption);
             column.Add(content);
-            column.Add(Caption(label, 11, Muted, 2));
             return column;
         }
 
-        private static VisualElement SlotFrame(string name, bool selected)
+        private static VisualElement SlotFrame(string name, bool selected, bool filled, int size)
         {
             var slot = new Button { name = name, text = "" };
-            slot.style.width = slot.style.height = SlotSize;
-            slot.style.marginLeft = slot.style.marginRight = slot.style.marginTop = slot.style.marginBottom = 1;
+            slot.style.width = slot.style.height = size;
+            slot.style.marginLeft = slot.style.marginRight = slot.style.marginTop = slot.style.marginBottom = SlotGap / 2;
             slot.style.paddingLeft = slot.style.paddingRight = slot.style.paddingTop = slot.style.paddingBottom = 0;
             slot.style.alignItems = Align.Center;
             slot.style.justifyContent = Justify.Center;
-            slot.style.backgroundColor = SlotFill;
-            SetRadius(slot, 2);
-            if (selected) SetBorder(slot, Highlight, 2);
-            else SlotEdges(slot);
+            slot.style.backgroundColor = filled ? HudTheme.Slot : HudTheme.SlotEmpty;
+            HudTheme.Radius(slot, size > SlotSize ? 9 : 8);
+            SlotRest(slot, selected);
             return slot;
         }
 
-        // Bevelled slot edge: light top/left, dark bottom/right.
-        private static void SlotEdges(VisualElement slot)
-        {
-            slot.style.borderTopWidth = slot.style.borderLeftWidth = slot.style.borderBottomWidth = slot.style.borderRightWidth = 1;
-            slot.style.borderTopColor = slot.style.borderLeftColor = SlotEdgeLight;
-            slot.style.borderBottomColor = slot.style.borderRightColor = SlotEdgeDark;
-        }
+        // A slot's edge at rest: amber when it is the selected hotbar slot, otherwise invisible.
+        private static void SlotRest(VisualElement slot, bool selected) =>
+            HudTheme.Border(slot, selected ? Highlight : new Color(0f, 0f, 0f, 0f), selected ? 2 : 1);
 
-        private static VisualElement Icon(Sprite sprite, string name, float opacity)
+        private static VisualElement Icon(Sprite sprite, string name, float opacity, int size = IconSize)
         {
             var icon = new VisualElement { name = "hud-icon", pickingMode = PickingMode.Ignore };
-            icon.style.width = icon.style.height = IconSize;
+            icon.style.width = icon.style.height = size;
             icon.style.flexShrink = 0;
             icon.style.opacity = opacity;
             if (sprite != null)
@@ -1246,7 +1577,7 @@ namespace FoodFactoryGame.Session.Equipment
             {
                 // No icon content: the item's name stands in.
                 icon.style.justifyContent = Justify.Center;
-                var label = Caption(name, 10, Color.white);
+                var label = Caption(name, 10, HudTheme.Text);
                 label.style.unityTextAlign = TextAnchor.MiddleCenter;
                 label.style.whiteSpace = WhiteSpace.Normal;
                 icon.Add(label);
@@ -1260,11 +1591,11 @@ namespace FoodFactoryGame.Session.Equipment
 
         private static Label Count(int count)
         {
-            var label = Caption(count.ToString(CultureInfo.InvariantCulture), 12, Color.white);
+            var label = Caption(count.ToString(CultureInfo.InvariantCulture), 12, HudTheme.Text);
             label.name = "hud-count";
             label.style.position = Position.Absolute;
-            label.style.right = 3;
-            label.style.bottom = 0;
+            label.style.right = 5;
+            label.style.bottom = 2;
             label.style.unityFontStyleAndWeight = FontStyle.Bold;
             label.style.textShadow = new TextShadow { offset = new Vector2(1f, 1f), color = Color.black };
             return label;
@@ -1286,17 +1617,5 @@ namespace FoodFactoryGame.Session.Equipment
             element.style.left = element.style.top = element.style.right = element.style.bottom = 0;
         }
 
-        private static void Pad(VisualElement element, int padding) =>
-            element.style.paddingLeft = element.style.paddingRight = element.style.paddingTop = element.style.paddingBottom = padding;
-
-        private static void SetBorder(VisualElement element, Color color, int width)
-        {
-            element.style.borderTopWidth = element.style.borderLeftWidth = element.style.borderBottomWidth = element.style.borderRightWidth = width;
-            element.style.borderTopColor = element.style.borderLeftColor = element.style.borderBottomColor = element.style.borderRightColor = color;
-        }
-
-        private static void SetRadius(VisualElement element, int radius) =>
-            element.style.borderTopLeftRadius = element.style.borderTopRightRadius =
-                element.style.borderBottomLeftRadius = element.style.borderBottomRightRadius = radius;
     }
 }

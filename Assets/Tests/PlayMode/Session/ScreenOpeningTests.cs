@@ -163,6 +163,10 @@ namespace FoodFactoryGame.Session.PlayModeTests
             var scroll = panel.SourceField.Q<ScrollView>();
             Assert.That(scroll, Is.Not.Null, "The text box scrolls.");
             Assert.That(scroll.scrollOffset.y, Is.Zero);
+            // The text is measured at its full height (the caret bar sits beside it, not inside it), so there is something to
+            // scroll and the scroll bar shows.
+            Assert.That(panel.SourceField.Q<TextElement>().layout.height, Is.GreaterThan(scroll.contentViewport.layout.height * 2f));
+            Assert.That(scroll.verticalScroller.resolvedStyle.display, Is.EqualTo(DisplayStyle.Flex), "The scroll bar shows.");
 
             panel.SourceField.Focus();
             panel.SourceField.SelectRange(0, 0);
@@ -174,6 +178,34 @@ namespace FoodFactoryGame.Session.PlayModeTests
             Assert.That(panel.SourceField.cursorIndex, Is.GreaterThan(panel.SourceField.value.Length / 2), "The caret moved down.");
             Assert.That(scroll.scrollOffset.y, Is.GreaterThan(0f), "The text scrolled to keep the caret in view.");
             panel.SourceField.Blur();
+            _interaction.CloseScreen();
+        }
+
+        // Owner feedback: focusing an item search box opens its drop-down at once, the item this player touched last first;
+        // typing narrows it by name.
+        [UnityTest]
+        public IEnumerator ItemSearchOpensWithRecentItemsFirst()
+        {
+            var panel = UnityEngine.Object.FindAnyObjectByType<EmployeeScriptPanel>();
+            yield return OpenEmployee(panel);
+            while (panel.Draft.Tasks.Count > 0) panel.RemoveTask(0);
+            panel.AddTask();
+            panel.SetAnyItem(0, false);
+            _interaction.NoteItem("bread");
+            yield return Frames(2);
+            var search = panel.TaskList.Q<TextField>("employee-task-0-search");
+            var suggestions = panel.TaskList.Q("employee-task-0-suggestions");
+            Assert.That(suggestions.resolvedStyle.display, Is.EqualTo(DisplayStyle.None));
+            search.Focus();
+            yield return Frames(2);
+            Assert.That(suggestions.resolvedStyle.display, Is.EqualTo(DisplayStyle.Flex), "The drop-down opens with focus.");
+            Assert.That(suggestions[0].name, Is.EqualTo("employee-task-0-suggest-bread"), "The most recent item comes first.");
+            search.value = "dou";
+            yield return Frames(2);
+            Assert.That(suggestions.Children().Select(x => x.name), Is.EqualTo(new[] { "employee-task-0-suggest-dough" }), "Typing matches by name.");
+            search.Blur();
+            yield return new WaitForSeconds(0.5f);
+            Assert.That(suggestions.resolvedStyle.display, Is.EqualTo(DisplayStyle.None), "It closes once focus leaves.");
             _interaction.CloseScreen();
         }
 
@@ -391,6 +423,45 @@ namespace FoodFactoryGame.Session.PlayModeTests
             yield return Until(() => _interaction.Hovered == storage, "storage highlighted");
             yield return LeftClick();
             Assert.That((_interaction.Screen, _interaction.StorageOpen), Is.EqualTo((InteractionScreen.Inventory, true)), "Storage screen open.");
+        }
+
+        // Running-game captures of the HUD and its screens in HudTheme's look (world, inventory with storage, the oven, the
+        // employee tasks and Lua tabs). Runs only when the file Temp/hud-captures.flag exists (the Pipeline test runner does
+        // not run [Explicit] tests); writes PNGs to docs/verification/hud-redesign-20261009/.
+        [UnityTest]
+        public IEnumerator HudAndScreenCaptures()
+        {
+            if (!File.Exists(Path.Combine(Application.dataPath, "..", "Temp", "hud-captures.flag")))
+                Assert.Ignore("Captures run on request: create Temp/hud-captures.flag.");
+            var output = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "docs", "verification", "hud-redesign-20261009"));
+            Directory.CreateDirectory(output);
+            IEnumerator Shot(string name)
+            {
+                yield return Frames(10);
+                yield return new WaitForEndOfFrame();
+                var screen = ScreenCapture.CaptureScreenshotAsTexture();
+                File.WriteAllBytes(Path.Combine(output, name), screen.EncodeToPNG());
+                UnityEngine.Object.Destroy(screen);
+            }
+            yield return new WaitForSeconds(2f);
+            yield return Shot("world-hud.png");
+            _interaction.OpenStorage();
+            yield return Shot("inventory-storage.png");
+            _interaction.CloseScreen();
+            _interaction.OpenMachine(DevWorld.OvenId);
+            yield return Shot("oven.png");
+            _interaction.CloseScreen();
+            var panel = UnityEngine.Object.FindAnyObjectByType<EmployeeScriptPanel>();
+            yield return OpenEmployee(panel);
+            panel.AddTask();
+            panel.SetAnyItem(0, false);
+            panel.AddItem(0, "dough");
+            panel.AddTask();
+            panel.SetTaskType(1, EmployeeTaskType.Power);
+            yield return Shot("employee-tasks.png");
+            panel.ShowLua(true);
+            yield return Shot("employee-lua.png");
+            _interaction.CloseScreen();
         }
     }
 }

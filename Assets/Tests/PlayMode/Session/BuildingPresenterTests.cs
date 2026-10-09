@@ -99,9 +99,9 @@ namespace FoodFactoryGame.Session.PlayModeTests
             // Collider bounds follow transforms only after a physics sync.
             Physics.SyncTransforms();
             var walls = shell.GetComponentsInChildren<BoxCollider>().Where(x => x.name.StartsWith("Wall")).ToList();
-            // A restaurant is drawn with the art kit (decision 0034): one solid, invisible collider per wall cell, doorways open.
+            // A restaurant is drawn with the art kit (decision 0034): one solid, invisible wall object per wall cell, doorways open.
             var building0 = _root.ClientSite.Buildings.Single(x => x.Id == DevWorld.RestaurantId);
-            Assert.That(walls.Count, Is.EqualTo(2 * building0.Width + 2 * (building0.Depth - 2) - building0.Doors.Count),
+            Assert.That(walls.Select(x => x.gameObject).Distinct().Count(), Is.EqualTo(2 * building0.Width + 2 * (building0.Depth - 2) - building0.Doors.Count),
                 "Every perimeter cell but the doorway is a solid wall.");
             Assert.That(shell.GetComponentsInChildren<Transform>().Any(x => x.name.StartsWith("RT_Wall_Plaster")), Is.True, "Plaster kit walls are drawn.");
             // Decision 0036: each door leaf is solid while shut, so a closed door bumps; nothing else but walls is.
@@ -114,6 +114,9 @@ namespace FoodFactoryGame.Session.PlayModeTests
             var gap = SiteGridSpace.FootprintCenter(layout, DevWorld.RestaurantDoorX, building.CellZ + building.Depth - 1, 2, 1) + Vector3.up;
             Assert.That(walls.Any(x => x.bounds.Contains(gap)), Is.False, "The doorway is open.");
             Assert.That(walls.Any(x => x.bounds.Contains(SiteGridSpace.FootprintCenter(layout, building.CellX, 4, 1, 1) + Vector3.up)), Is.True, "The west wall is solid.");
+            // The colliders hug the thin kit wall on the cell's centreline instead of filling the cell.
+            Assert.That(walls.Any(x => x.bounds.Contains(SiteGridSpace.FootprintCenter(layout, building.CellX, 4, 1, 1) + new Vector3(0.4f, 1f, 0f))), Is.False,
+                "Beside the west wall's centreline is open.");
 
             yield return Until(() => (_avatar = UnityEngine.Object.FindObjectsByType<PlayerAvatar>(FindObjectsSortMode.None).FirstOrDefault(x => x.IsOwner)) != null, "owned avatar");
             var rig = _avatar.CameraRig;

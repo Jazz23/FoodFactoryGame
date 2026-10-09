@@ -68,7 +68,7 @@ Decisions are in [decision 0005](decisions/0005-session-bootstrap-and-player-ide
 - `ClientIdentity` keeps the client secret in the SQLite database `persistentDataPath/Identity/identity.db` (`-identity <file>` override; decision 0011).
 - FishNet sends start scenes only after authentication, so `SessionRoot` spawns one `Player` per connection on `OnClientLoadedStartScenes`, owned by that connection and with a server-set display name. FishNet despawns it on disconnect; the world keeps running.
 - `Player.prefab`: `NetworkObject`, client-authoritative `NetworkTransform`, `CharacterController`, `PlayerAvatar` (camera-yaw-relative `Player/Move` at 4 m/s, `Player/Sprint` (Left Shift) at 7 m/s, `Player/Jump` (Space) to 1.2 m while grounded; a ceiling ends the rise), the animated character `Model` (implemented 2026-09-29: `Assets/Art/Models/Player/Player.fbx`, built by `ArtSource/Player/build_player_model.py` and installed by `AgentScripts/BuildPlayerVisual.cs`; a factory worker (hard hat with goggles, rolled-sleeve work shirt, denim bib apron with leather strap, pocket, pen and ID badge, gloves, cargo pants with reflective bands, laced boots) as one ~22k-triangle skinned mesh with two materials: `PL_Shirt`, tinted per display name, and `PL_Palette`, whose faces sample flat cells of `Textures/Player_Palette.png` and its metallic/smoothness map; the apron skirt is weighted to the thighs so strides do not cut through it; `Player.controller` blends Idle/Walk/Run on `Speed` and plays Jump, Fall and Land from `Grounded` and `VerticalSpeed`), `PlayerAnimation` (presentation only: sets those parameters from the avatar's observed motion and a ground ray, so remote copies animate from the replicated pose with no animator replication; a per-frame jump over 1.5 m counts as a teleport), and a disabled `CameraRig` (`OrbitCameraRig`, camera, audio listener) that only the owning client enables. It orbits with `Player/Look` (always on since 0007; formerly while `Player/Orbit` was held); `Player/Zoom` (scroll) steps distance. Pitch is limited to 10–80° and distance to 3–20 m. `Player/SwitchCamera` (C; the C binding moved off the unused `Crouch`) toggles a top-down view that looks straight down on the avatar with yaw snapped to the nearest 90°, so the world-aligned site grid reads horizontal/vertical. The two views blend over 0.4 s (smoothstep), each keeps its own zoom distance, and `Yaw` follows the blend so movement stays screen-relative. The top-down view does not orbit; `EquipmentInteraction` leaves the pointer free there (no crosshair) and aims at the mouse position. Implemented; verified by authoring and placement tests, not yet by a running-game capture.
-- `ClientSiteSubscription` subscribes an authenticated client to `dev-site` once the bridge is visible. `SessionPanel` (UI Toolkit, built in code, `Assets/UI/SessionPanelSettings.asset`) shows the name/address/Host/Join menu with status and rejection reasons, then a readout of mode, player ID, the replicated site clock and revision, and (on a server) the server clock, revision and player count.
+- `ClientSiteSubscription` subscribes an authenticated client to `dev-site` once the bridge is visible. `SessionPanel` (UI Toolkit, built in code, `Assets/UI/SessionPanelSettings.asset`) shows the name/address/Host/Join menu with status and rejection reasons, then a readout of mode, player ID, the replicated site clock and revision, and (on a server) the server clock, revision and player count. (Removed 2026-10-09: no in-session readout.)
 
 Prototype, labelled in code: the authenticator (no encryption or accounts), owner movement authority (presentation only; no gameplay rule trusts position), the all-players `dev-site` grant, the 8-player cap, and the dev seed.
 
@@ -157,7 +157,9 @@ Decision: [0012](decisions/0012-company-cash.md). Step 1 of the sell loop: cash 
 - Domain (`GoodsWorld.Company.cs`): `GoodsCompany { Id, Cash (whole cents, long), SiteIds }` in `GoodsSnapshot.Companies`. Server-only `Bootstrap(GoodsCompany)` rejects blank/duplicate IDs, negative cash, unknown sites, and a site already owned. `CompanyOfSite(siteId)`. Private `TryCredit`/`TryDebit` (positive amounts only; debit refuses overdraw; `checked`) are for later commands to call inside their own commit. `internal AdjustCashDurably(company, delta, savePath)` returns null or `unknown-company` / `invalid-amount` / `insufficient-funds` / `persistence-unavailable`, restoring the prior state on any failure (overflow rethrows after restoring). `Validate` checks unique non-blank IDs, cash ≥ 0, existing sites, one owner per site.
 - Persistence: payload schema **v5** (`world.db` `user_version` still 1); v4 upgrades in memory with no companies. `View` includes only the owning company of the viewed site, so cash reaches clients in the existing full site baseline with no new RPC.
 - Dev seed (`DevWorld`): PROTOTYPE `dev-company` owns `dev-site` with 50000 cents. `EnsureCompany` adds it once to an older save, committed before serving.
-- HUD: `PlayerHud` shows the site company's cash top right (`hud-cash`, `PlayerHud.FormatCash`), display only.
+- HUD: `PlayerHud` shows the site company's cash top right (`hud-cash`, `PlayerHud.FormatCash`), display only. Since
+  decision 0040 the HUD and every screen built in code are drawn through `HudTheme` (cards, slots, buttons, dim backdrop,
+  spoilage alert, interact prompt).
 - Measurement: `GoodsSnapshotStore.Stats` (`GoodsCommitStats`) records each save that writes a new revision: its time (live-state validation and one JSON conversion under the world lock, the SQLite transaction before `COMMIT`, and `COMMIT` including WAL sync) and payload bytes. `LastTimings` exposes the last successful write's phase split for the benchmark (the copy phase is now zero); phase time excludes waits for the save lock and another writer. Failed saves and saves of an already-stored revision are not counted. `GoodsNetworkBridge.InitializeServer` resets the counters and one-time warnings, so they describe the served world only. The bridge logs `[Goods] commits=… avg=…ms max=…ms payload=…KB` every 60 s and warns once per served world past 50 ms or 1 MB. The [final 1,000-customer record](verification/customer-scale-performance-20260925.md) supports deferring [decision 0025](decisions/0025-save-cost-at-customer-scale.md); no storage migration is implemented.
 - Every durable command, the clock tick, admission grants and `AdjustCashDurably` go through one private boundary, `GoodsWorld.Durably` (run, commit if the revision changed, restore the prior state on any failure).
 Open: debt, several companies per world, member permissions, player-set prices; purchases (step 3). Sales: step 2, below.
@@ -290,6 +292,47 @@ Open: hiring, wages, firing and more employees; which players may command an emp
 
 Not done or open: a running-game capture; a separate-process multiplayer check; employees on a dedicated `-server` in a
 generated world (no scene placement without a client); hiring in `DevSite`; the cap-shrink rule and the other open items of 0039.
+
+## Implemented: owner feedback round 3 (2026-10-09)
+
+Owner feedback on the HUD redesign ([decision 0040](decisions/0040-hud-visual-redesign.md)). Presentation only; no goods schema
+change.
+
+- `SessionPanel` no longer shows an in-session readout (player ID, clocks, revision, control hint, last rejection). The menu is
+  unchanged. `EquipmentInteraction.Status` and `LastRejection` are still computed but no longer drawn; build mode shows its own
+  refusals.
+- Employee screen: the hand slots have their own row under the name, so the close button cannot cover them. The machine "Give"
+  row is gone; `EquipmentInteraction.GiveMachine` and `RequestGive` remain, but no UI calls them. The Lua hint reads "Editing
+  it disables the Tasks tab". Checkboxes are only as wide as their box and label, so a click beside them does nothing. The Lua
+  text box scrolls again: the custom caret bar now sits beside the text element in the scroll view's content. As a child of
+  the text element it had stopped the text from being measured, so the box never grew past the viewport and arrow keys jumped
+  the view. Dark text boxes get the `hud-text-field` class (`Assets/UI/Hud.uss`, imported by `DevRuntimeTheme.tss`) for a light caret and
+  selection, replacing the deprecated `textSelection.cursorColor`.
+- Item search: focusing a task's item box opens its drop-down at once. With no text it lists items by
+  `EquipmentInteraction.RecentItemRank`: items this client recently picked up, moved, bought or put on or took off belts, then
+  items in the inventory, then the rest by name. Typing filters by name or ID. The recent list is client memory only (never
+  saved or sent).
+- HUD: the cash card is smaller (20 px figure, right-aligned 260 px column) and hides in build mode. The oven's power row no
+  longer says "Bakes only while switched on".
+- Belts: holding Remove on a belt fills a wheel at the crosshair (`EquipmentInteraction.BeltRemoveProgress`, drawn by `PlayerHud`)
+  for `BuildMode.HoldSeconds`. Once one belt is taken up, the rest of that press removes each belt the crosshair passes over
+  at once.
+- Build mode: the panel uses `HudTheme` (header with cash and ambience, tool and style chips, catalog cards, footer with
+  preview, refusal, Clear selection and Leave). Leaving remembers the camera's focus, distance, tilt and turn. Reopening on the
+  same site within `BuildMode.RememberedViewReach` (20 m, PROTOTYPE) of that focus restores it; otherwise the default lot
+  framing returns.
+- Restaurant walls: each kit wall cell's colliders now follow the thin wall on the cell's centreline (0.3 m thick): one box
+  for a straight cell, or a post with half-cell arms toward linked wall, door or window cells. The NavMesh obstacle still covers
+  the whole cell.
+- Evidence (2026-10-09, Pipeline runner, async): EditMode `SessionAuthoringTests` 27/27. PlayMode `ScreenOpeningTests` 9 passed
+  and 1 skipped (on-request captures), including the new `ItemSearchOpensWithRecentItemsFirst` and scroll checks in
+  `LongLuaScrollsAndFollowsTheCaret`. `BeltPlacementTests` 3/3, with wheel checks in the removal step.
+  `BuildingPresenterTests` 2/2, with a thin-collider check. `RestaurantBuildingSessionTests` 4 passed, 1 skipped (captures).
+  `HiringSessionTests` 4/4, `EquipmentPlacementTests` 11/11, `SessionBootstrapTests` 2/2. Live play-mode probes (isolated
+  temporary saves) captured the HUD, oven, employee tasks with the open drop-down, the Lua tab with its scroll bar and build
+  mode. They also checked camera memory: a panned, zoomed and tilted view was restored on reopening, and the default came back
+  after moving the avatar 40 m. Real mouse and keyboard input outside the test fixture was not exercised (the Editor drops
+  background input).
 
 ## Implemented: conveyor lifts (2026-09-24)
 

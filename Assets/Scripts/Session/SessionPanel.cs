@@ -1,8 +1,7 @@
-// Development host/join panel and in-session readout (player ID, server clock, site revision, equipment hint) built in UI Toolkit.
-// In a scene that generates worlds it also lists the saved worlds to pick from, takes the seed for a new world and shows the
-// stored layout's seed (decision 0026).
+// Development host/join panel built in UI Toolkit, hidden during a session (there is no in-session readout; the HUD shows what
+// players need). In a scene that generates worlds it also lists the saved worlds to pick from and takes the seed for a new world
+// (decision 0026).
 // Presentation only: it reads session state and calls SessionRoot; it never decides admission or simulation.
-using FoodFactoryGame.Session.Equipment;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -13,7 +12,6 @@ namespace FoodFactoryGame.Session
     {
         [SerializeField] private UIDocument document;
         [SerializeField] private SessionRoot session;
-        [SerializeField] private EquipmentInteraction equipment;
 
         private VisualElement _menu;
         private TextField _name;
@@ -22,7 +20,6 @@ namespace FoodFactoryGame.Session
         private TextField _world;
         private ScrollView _savedWorlds;
         private Label _menuStatus;
-        private Label _readout;
         private bool _wasRunning;
 
         // Start, not OnEnable: SessionRoot.Awake must have resolved command-line options first.
@@ -65,11 +62,7 @@ namespace FoodFactoryGame.Session
             }
             _menu.Add(buttons);
             _menu.Add(_menuStatus);
-            // Wraps within part of the width so long hints stay on screen and clear of the HUD's cash readout (top right).
-            _readout = new Label { name = "session-readout", style = { color = Color.white, whiteSpace = WhiteSpace.Normal, maxWidth = new Length(60, LengthUnit.Percent) } };
-            Style(_readout, 8);
             root.Add(_menu);
-            root.Add(_readout);
         }
 
         private void Update()
@@ -77,21 +70,10 @@ namespace FoodFactoryGame.Session
             if (_menu == null) return;
             var running = session.IsRunning;
             _menu.style.display = running ? DisplayStyle.None : DisplayStyle.Flex;
-            _readout.style.display = running ? DisplayStyle.Flex : DisplayStyle.None;
             _menuStatus.text = session.Status;
             // Back at the menu after a session: the world just played moved to the top, or a new one now exists.
             if (_wasRunning && !running) RefreshSavedWorlds();
             _wasRunning = running;
-            if (!running) return;
-            var site = session.ClientSite;
-            var server = session.ServerWorld?.Snapshot();
-            _readout.text = $"{session.Mode} | {session.Status}\n"
-                + $"Player: {session.Authenticator.LocalPlayerId ?? "(none)"}\n"
-                + (site == null ? "Site: waiting for dev-site baseline\n"
-                    : $"Site {session.ClientSiteId}: clock {site.ClockSeconds}s, revision {site.Revision}\n")
-                + (server == null ? "" : $"Server: clock {server.ClockSeconds}s, revision {server.Revision}, players {session.Authenticator.AuthenticatedCount}\n")
-                + WorldLine()
-                + equipment.Status;
         }
 
         private void Host()
@@ -147,16 +129,6 @@ namespace FoodFactoryGame.Session
                 button.style.backgroundColor = selected ? new StyleColor(new Color(0.35f, 0.55f, 0.9f)) : new StyleColor(StyleKeyword.Null);
                 button.style.unityFontStyleAndWeight = selected ? FontStyle.Bold : FontStyle.Normal;
             }
-        }
-
-        private string WorldLine()
-        {
-            if (!session.GeneratesWorld || session.ServerWorld == null) return "";
-            var stored = session.ServerLayout;
-            if (stored == null) return $"World '{session.WorldName}': no generated layout (made before world generation; use New world)\n";
-            var layout = stored.Layout;
-            return $"World '{session.WorldName}': seed '{layout.RequestedSeed}' ({layout.Seed}, attempt {layout.Attempt}), generator v{layout.GeneratorVersion}, "
-                + $"{layout.Buildings.Count} buildings, start {layout.StartRestaurantId}\n";
         }
 
         private static void Style(VisualElement element, int padding)

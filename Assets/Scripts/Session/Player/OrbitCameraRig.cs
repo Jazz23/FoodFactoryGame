@@ -82,20 +82,22 @@ namespace FoodFactoryGame.Session.Player
         public Vector3? BuildFocus { get; private set; }
         public float BuildDistance { get; private set; }
         public float BuildPitch => _buildPitch;
+        public float BuildYaw => _buildYaw;
         // Set by build mode: false while the pointer is over its panel, so scrolling the catalog does not zoom.
         public bool BuildControls { get; set; } = true;
         // How far the third-person camera currently stands from its pivot (shortened by walls and ceilings).
         public float CurrentArm { get; private set; }
         private bool _topDownBeforeBuild;
 
-        // Looks down on focus from distance metres (null focus returns to the view used before).
-        public void SetBuildView(Vector3? focus, float distance)
+        // Looks down on focus from distance metres (null focus returns to the view used before). Entering build mode starts
+        // straight down at the orbit yaw snapped to the grid, unless a yaw and pitch are given (a remembered build view).
+        public void SetBuildView(Vector3? focus, float distance, float? buildYaw = null, float? buildPitch = null)
         {
             if (focus.HasValue && !BuildFocus.HasValue)
             {
                 _topDownBeforeBuild = TopDown;
-                _buildYaw = Mathf.Round(yaw / 90f) * 90f;
-                _buildPitch = 90f;
+                _buildYaw = buildYaw ?? Mathf.Round(yaw / 90f) * 90f;
+                _buildPitch = Mathf.Clamp(buildPitch ?? 90f, MinBuildPitch, 90f);
             }
             if (!focus.HasValue && BuildFocus.HasValue) SetTopDown(_topDownBeforeBuild || _indoors);
             BuildFocus = focus;

@@ -1,7 +1,7 @@
 // Drives belts through the real DevSite host session with virtual mouse and keyboard input: a belt stack carried out of
 // the inventory, a Factorio-style drag with R making a corner mid-drag, synchronised tread scrolling, one item put on a
-// belt with Z, carried to the end of the line and taken back off with F, and right-click removal returning belt and
-// item, and a conveyor lift (decision 0021) carrying an item up to a factory's second floor. Saves and identities live in a
+// belt with Z, carried to the end of the line and taken back off with F, and removal by holding right click while a wheel
+// fills, returning belt and item, and a conveyor lift (decision 0021) carrying an item up to a factory's second floor. Saves and identities live in a
 // unique temporary directory.
 using System;
 using System.Collections;
@@ -255,9 +255,20 @@ namespace FoodFactoryGame.Session.PlayModeTests
             yield return Key(UnityEngine.InputSystem.Key.Z);
             yield return Until(() => Server.Lots.Any(x => x.LocationId == end.LocationId) && !_interaction.HasPendingRequests, "dough on the last belt");
             _interaction.ClearCursor();
+            // Holding Remove fills a wheel at the crosshair first, like removing in build mode.
+            var pressed = Time.unscaledTime;
             Mouse(false, true);
+            yield return Until(() => _interaction.BeltRemoveProgress > 0.2f, "the removal wheel fills");
+            yield return null;
+            var wheel = UnityEngine.UIElements.UQueryExtensions.Q(_hud.ScreenRoot.panel.visualTree, "hud-remove-wheel");
+            Assert.That(wheel.resolvedStyle.display, Is.EqualTo(UnityEngine.UIElements.DisplayStyle.Flex), "The wheel shows while holding.");
+            Assert.That(BeltAt(6, 5), Is.Not.Null, "Nothing is removed before the wheel fills.");
             yield return Until(() => BeltAt(6, 5) == null && !_interaction.HasPendingRequests, "last belt removed");
+            Assert.That(Time.unscaledTime - pressed, Is.GreaterThanOrEqualTo(Buildings.BuildMode.HoldSeconds - 0.05f));
             Mouse(false, false);
+            yield return null;
+            yield return null;
+            Assert.That(wheel.resolvedStyle.display, Is.EqualTo(UnityEngine.UIElements.DisplayStyle.None), "The wheel hides once released.");
             Assert.That(Carried(GoodsWorld.BeltItemId), Is.EqualTo(DevWorld.StarterBelts - 7));
             Assert.That(Carried(DevWorld.DoughItemId), Is.EqualTo(DevWorld.StarterDough), "The riding dough came back.");
             yield return Until(() => _belts.Belts.Count == 7 && _belts.ItemIds.Count == 0, "visuals follow");

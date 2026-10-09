@@ -23,6 +23,9 @@ namespace FoodFactoryGame.Session.Equipment
 
         public Component Hovered => _hovered;
 
+        // The interact key's first binding as the player sees it ("E"), for the HUD prompt.
+        public string InteractKey => UnityEngine.InputSystem.InputActionRebindingExtensions.GetBindingDisplayString(inventoryAction.action, 0);
+
         private void UpdateHover()
         {
             var hovered = _camera != null && Screen == InteractionScreen.None && !_released ? HoverUnderCrosshair() : null;

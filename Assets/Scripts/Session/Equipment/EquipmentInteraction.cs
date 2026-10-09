@@ -105,6 +105,10 @@ namespace FoodFactoryGame.Session.Equipment
         [SerializeField] private float interactReach = 2.5f;
 
         private readonly HashSet<string> _pending = new();
+        // Items this player touched (picked up, moved, bought, put on or taken off belts), most recent first; this client's
+        // presentation only (item pickers list them first), never saved or sent.
+        private readonly List<string> _recentItems = new();
+        private const int MaxRecentItems = 32;
         private readonly HotbarEntry[] _hotbar = new HotbarEntry[HotbarSize];
         private bool _hotbarSeeded;
         private ClientSiteSubscription _subscription;
@@ -369,6 +373,25 @@ namespace FoodFactoryGame.Session.Equipment
             _ghostRenderers = _ghostModel.GetComponentsInChildren<Renderer>().Where(x => x.enabled).ToArray();
         }
 
+        // Notes an item the player just touched, for RecentItemRank.
+        public void NoteItem(string itemId)
+        {
+            if (string.IsNullOrEmpty(itemId)) return;
+            _recentItems.Remove(itemId);
+            _recentItems.Insert(0, itemId);
+            if (_recentItems.Count > MaxRecentItems) _recentItems.RemoveAt(_recentItems.Count - 1);
+        }
+
+        // Sort key for item pickers: recently touched items by recency, then items in the player's inventory, then the rest.
+        public int RecentItemRank(string itemId)
+        {
+            var index = _recentItems.IndexOf(itemId);
+            if (index >= 0) return index;
+            var site = session.ClientSite;
+            return site != null && InventoryId != null && site.Lots.Any(x => x.LocationId == InventoryId && x.ItemId == itemId)
+                ? MaxRecentItems : int.MaxValue;
+        }
+
         public IEnumerable<GoodsLot> CursorLots(GoodsSnapshot site) => CursorGoods == null || site == null
             ? Enumerable.Empty<GoodsLot>()
             : site.Lots.Where(x => x.LocationId == CursorGoods.LocationId && x.ItemId == CursorGoods.ItemId && x.Spoiled == CursorGoods.Spoiled);
@@ -377,6 +400,7 @@ namespace FoodFactoryGame.Session.Equipment
         public void PickUpGoods(string locationId, string itemId, bool spoiled, int quantity, string slot = null)
         {
             ClearCursor();
+            NoteItem(itemId);
             CursorGoods = new CursorStack { LocationId = locationId, ItemId = itemId, Spoiled = spoiled, Quantity = quantity, Slot = slot };
             if (quantity < 1 || !CursorLots(session.ClientSite).Any()) CursorGoods = null;
         }
@@ -395,6 +419,7 @@ namespace FoodFactoryGame.Session.Equipment
         public void TransferStack(string sourceId, string itemId, bool spoiled, int quantity, string destinationId)
         {
             if (sourceId == destinationId || session.ClientSite == null) return;
+            NoteItem(itemId);
             MoveGoods(session.ClientSite.Lots.Where(x => x.LocationId == sourceId && x.ItemId == itemId && x.Spoiled == spoiled).ToList(),
                 destinationId, quantity);
         }
@@ -572,6 +597,7 @@ namespace FoodFactoryGame.Session.Equipment
             var bridge = _subscription?.Bridge;
             if (bridge == null || string.IsNullOrEmpty(offerId)) return;
             LastRejection = null;
+            NoteItem(session.Offers.FirstOrDefault(x => x != null && x.Id == offerId)?.ItemId);
             // The subscribed site: the one whose balance and inventory this client shows.
             bridge.RequestPurchase(Track(), _subscription.SiteId, offerId);
         }

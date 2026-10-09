@@ -5,7 +5,8 @@
 // never own state. The local avatar's cell and height on any drawn site decide "indoors" and its level: the rig switches to the top-down view,
 // and that building's roof and every storey above the avatar's level are hidden (colliders too), for this client only.
 // A restaurant's ground storey (decision 0034) is drawn with the restaurant art kit (RestaurantShellModel) when a style catalog
-// is set, with one invisible collider and NavMesh obstacle per wall cell; a shell is rebuilt whenever its data changes. A shell
+// is set, with one invisible wall object per wall cell: thin colliders on the kit wall's centreline and a whole-cell NavMesh
+// obstacle; a shell is rebuilt whenever its data changes. A shell
 // with free walls (decision 0036) gets its floor tint, roof and ceiling over the cells its walls enclose, not its bounding box.
 // Every ground storey has a ceiling under its roof, shown only to a local avatar inside who is not using the top-down view, so
 // the room keeps a ceiling in the third-person view while the top-down view still looks in from above.
@@ -25,6 +26,8 @@ namespace FoodFactoryGame.Session.Buildings
     {
         private static readonly int BaseColor = Shader.PropertyToID("_BaseColor");
         private const float SlabThickness = 0.2f;
+        // Thickness of a restaurant wall cell's colliders: a little over the kit wall, so what bumps is what is drawn.
+        private const float WallThickness = 0.3f;
 
         [SerializeField] private SessionRoot session;
         [SerializeField] private Material wallMaterial;
@@ -320,8 +323,8 @@ namespace FoodFactoryGame.Session.Buildings
             return boxes;
         }
 
-        // Art-kit visuals plus one invisible box collider (a solid wall for avatars and aim rays) and carving NavMesh obstacle per
-        // wall cell, interior walls and window cells included; doors stay open.
+        // Art-kit visuals plus one invisible wall object (thin box colliders, solid for avatars and aim rays) and carving NavMesh
+        // obstacle per wall cell, interior walls and window cells included; doors stay open.
         private void KitWalls(SiteLayout layout, GoodsBuilding building, Transform parent)
         {
             RestaurantShellModel.Build(parent, layout, building, restaurantStyles);
@@ -329,14 +332,38 @@ namespace FoodFactoryGame.Session.Buildings
             for (var x = building.CellX; x < building.CellX + building.Width; x++)
             for (var z = building.CellZ; z < building.CellZ + building.Depth; z++)
                 if (SiteGrid.OnPerimeter(building, x, z)) cells.Add((x, z));
+            var height = SiteGridSpace.LevelHeight;
             foreach (var (x, z) in cells.Where(c => SiteGrid.IsWall(building, c.X, c.Z)))
             {
-                var center = SiteGridSpace.FootprintCenter(layout, x, z, 1, 1);
-                var solid = Box(parent, $"Wall {x},{z}", wallMaterial, center + Vector3.up * SiteGridSpace.LevelHeight * 0.5f,
-                    new Vector3(SiteGrid.CellSize, SiteGridSpace.LevelHeight, SiteGrid.CellSize), true);
-                solid.enabled = false;
-                solid.gameObject.AddComponent<NavMeshObstacle>().carving = true;
+                var wall = new GameObject($"Wall {x},{z}");
+                wall.transform.SetParent(parent, false);
+                wall.transform.localPosition = SiteGridSpace.FootprintCenter(layout, x, z, 1, 1) + Vector3.up * height * 0.5f;
+                // The kit wall is thin on the cell's centreline, so the collider is too: a straight cell is one thin box along its
+                // line; a corner, junction or end is a post with a half-cell arm toward each linked wall, door or window cell.
+                var linked = new[] { (1, 0), (-1, 0), (0, 1), (0, -1) }.Where(d => cells.Contains((x + d.Item1, z + d.Item2))).ToList();
+                var straightX = linked.Count == 2 && linked.Contains((1, 0)) && linked.Contains((-1, 0)) || linked.Count == 0;
+                var straightZ = linked.Count == 2 && linked.Contains((0, 1)) && linked.Contains((0, -1));
+                if (straightX || straightZ)
+                    Solid(wall, Vector3.zero, straightX ? new Vector3(SiteGrid.CellSize, height, WallThickness) : new Vector3(WallThickness, height, SiteGrid.CellSize));
+                else
+                {
+                    Solid(wall, Vector3.zero, new Vector3(WallThickness, height, WallThickness));
+                    foreach (var (dx, dz) in linked)
+                        Solid(wall, new Vector3(dx, 0f, dz) * (SiteGrid.CellSize * 0.25f),
+                            dx != 0 ? new Vector3(SiteGrid.CellSize * 0.5f, height, WallThickness) : new Vector3(WallThickness, height, SiteGrid.CellSize * 0.5f));
+                }
+                // Employees still route around the whole cell (the unit cube's scale sizes the obstacle).
+                var obstacle = wall.AddComponent<NavMeshObstacle>();
+                obstacle.size = new Vector3(SiteGrid.CellSize, height, SiteGrid.CellSize);
+                obstacle.carving = true;
             }
+        }
+
+        private static void Solid(GameObject wall, Vector3 center, Vector3 size)
+        {
+            var box = wall.AddComponent<BoxCollider>();
+            box.center = center;
+            box.size = size;
         }
 
         // The south and north walls span the full width; the west and east walls fill in between the corners.
