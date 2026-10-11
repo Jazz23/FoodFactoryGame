@@ -348,10 +348,11 @@ namespace FoodFactoryGame.Session
                 _creatingWorld = _selectedWorld == null && session.GeneratesWorld;
             }
 
+            create.EnableInClassList("menu-world-row--selected", _creatingWorld);
             var list = _page.Part<ScrollView>("menu-world-list");
             if (worlds.Count == 0)
             {
-                var empty = new Label("No saved worlds yet. Press New world.");
+                var empty = new Label("No saved worlds yet.");
                 empty.AddToClassList("menu-worlds__empty");
                 list.Add(empty);
             }

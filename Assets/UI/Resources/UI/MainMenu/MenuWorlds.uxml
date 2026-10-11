@@ -1,5 +1,5 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
-    <!-- Select World: saved worlds (MenuWorldRow.uxml per world) and the chosen world's details with the Play as dropdown.
+    <!-- Select World: a New world option above the saved worlds (MenuWorldRow.uxml per world) and the chosen world's details with the Play as dropdown.
      The four hosting choices are fixed here; SessionPanel marks the chosen one and copies its text into the dropdown. -->
     <Style src="project://database/Assets/UI/Theme/Theme.uss" />
     <Style src="MainMenu.uss" />
@@ -10,10 +10,6 @@
                 <ui:Label text="Back" picking-mode="Ignore" />
             </ui:Button>
             <ui:Label text="Select world" class="ff-page-title menu-page__title" picking-mode="Ignore" />
-            <ui:Button name="menu-new-world" focusable="false" class="ff-button ff-button--lg ff-button--overlay ff-button--with-glyph">
-                <ui:VisualElement class="ff-glyph ff-glyph--plus" />
-                <ui:Label text="New world" picking-mode="Ignore" />
-            </ui:Button>
         </ui:VisualElement>
         <ui:VisualElement class="ff-row menu-page__body">
             <ui:VisualElement class="menu-card menu-worlds">
@@ -21,7 +17,14 @@
                     <ui:Label text="WORLD" class="ff-eyebrow ff-grow" picking-mode="Ignore" />
                     <ui:Label text="LAST PLAYED" class="ff-eyebrow" picking-mode="Ignore" />
                 </ui:VisualElement>
-                <ui:ScrollView name="menu-world-list" mode="Vertical" horizontal-scroller-visibility="Hidden" class="ff-scroll menu-worlds__list" />
+                <ui:ScrollView name="menu-world-list" mode="Vertical" horizontal-scroller-visibility="Hidden" class="ff-scroll menu-worlds__list">
+                    <ui:Button name="menu-new-world" focusable="false" class="menu-world-row">
+                        <ui:VisualElement class="menu-world-row__tile" picking-mode="Ignore">
+                            <ui:VisualElement class="ff-glyph ff-glyph--plus" picking-mode="Ignore" />
+                        </ui:VisualElement>
+                        <ui:Label text="New world" class="menu-world-row__name ff-grow" picking-mode="Ignore" />
+                    </ui:Button>
+                </ui:ScrollView>
             </ui:VisualElement>
             <ui:VisualElement name="menu-world-details" class="menu-card menu-details">
                 <ui:VisualElement name="menu-world-existing" class="menu-details__head">
