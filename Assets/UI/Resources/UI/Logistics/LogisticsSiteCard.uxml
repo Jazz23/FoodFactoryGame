@@ -1,0 +1,10 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <!-- Another site of the company: name, distance by road, and its storage and dock stock (LogisticsStockRow per stack). -->
+    <Style src="project://database/Assets/UI/Theme/Theme.uss" />
+    <Style src="Logistics.uss" />
+    <ui:VisualElement class="ff-card logi-card">
+        <ui:Label name="title" class="logi-card__name" picking-mode="Ignore" />
+        <ui:Label name="distance" class="ff-small" picking-mode="Ignore" />
+        <ui:VisualElement name="stock" />
+    </ui:VisualElement>
+</ui:UXML>

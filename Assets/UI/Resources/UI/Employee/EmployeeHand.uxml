@@ -1,0 +1,9 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <!-- One hand slot (decision 0039): what the employee holds; clicking a full one takes the stack. -->
+    <Style src="project://database/Assets/UI/Theme/Theme.uss" />
+    <Style src="Employee.uss" />
+    <ui:Button focusable="false" class="ff-slot emp-hand">
+        <ui:VisualElement name="icon" class="ff-icon emp-hand__icon" picking-mode="Ignore" />
+        <ui:Label name="count" class="ff-slot__count emp-hand__count" picking-mode="Ignore" />
+    </ui:Button>
+</ui:UXML>

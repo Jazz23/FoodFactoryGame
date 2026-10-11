@@ -1,0 +1,13 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <!-- One Supplier offer (decisions 0014, 0017): icon, name, pack size and price, and Buy. -->
+    <Style src="project://database/Assets/UI/Theme/Theme.uss" />
+    <Style src="Hud.uss" />
+    <ui:VisualElement class="ff-card ff-row hud-offer">
+        <ui:VisualElement name="icon" class="ff-icon hud-offer__icon" picking-mode="Ignore" />
+        <ui:VisualElement class="hud-offer__text" picking-mode="Ignore">
+            <ui:Label name="title" class="hud-offer__name" picking-mode="Ignore" />
+            <ui:Label name="detail" class="ff-small hud-offer__detail" picking-mode="Ignore" />
+        </ui:VisualElement>
+        <ui:Button name="buy" text="Buy" focusable="false" class="ff-button" />
+    </ui:VisualElement>
+</ui:UXML>

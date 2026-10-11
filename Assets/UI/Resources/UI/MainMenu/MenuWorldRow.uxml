@@ -1,0 +1,12 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <!-- One saved world in Select World. SessionPanel names it menu-world-<name>, fills the parts and adds menu-world-row selected. -->
+    <Style src="project://database/Assets/UI/Theme/Theme.uss" />
+    <Style src="MainMenu.uss" />
+    <ui:Button focusable="false" class="menu-world-row">
+        <ui:VisualElement class="menu-world-row__tile" picking-mode="Ignore">
+            <ui:Label name="initial" class="menu-world-row__initial" picking-mode="Ignore" />
+        </ui:VisualElement>
+        <ui:Label name="title" class="menu-world-row__name ff-grow" picking-mode="Ignore" />
+        <ui:Label name="played" class="menu-world-row__played" picking-mode="Ignore" />
+    </ui:Button>
+</ui:UXML>

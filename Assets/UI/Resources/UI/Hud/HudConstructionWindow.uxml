@@ -1,0 +1,17 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <!-- Factory construction (decision 0020): floors so far and one Build button for the next floor. -->
+    <Style src="project://database/Assets/UI/Theme/Theme.uss" />
+    <Style src="Hud.uss" />
+    <ui:VisualElement name="hud-construction" class="ff-panel hud-window">
+        <ui:VisualElement class="ff-row hud-window__header" picking-mode="Ignore">
+            <ui:Label text="Factory" class="ff-title" picking-mode="Ignore" />
+        </ui:VisualElement>
+        <ui:Label name="hud-floors" class="hud-note" picking-mode="Ignore" />
+        <ui:Label name="hud-top-floor" text="Top floor reached." class="hud-note ff-muted" picking-mode="Ignore" />
+        <ui:VisualElement name="hud-floor-row" class="ff-card ff-row">
+            <ui:Label name="hud-floor-price" class="hud-floor__price ff-grow" picking-mode="Ignore" />
+            <ui:Button name="hud-add-floor" text="Build" focusable="false" class="ff-button" />
+        </ui:VisualElement>
+        <ui:Label name="hud-elevator-note" text="The elevator goes where you stand." class="hud-note ff-muted" picking-mode="Ignore" />
+    </ui:VisualElement>
+</ui:UXML>

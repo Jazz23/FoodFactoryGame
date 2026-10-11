@@ -38,6 +38,8 @@ namespace FoodFactoryGame.Session
         private readonly HashSet<NetworkConnection> _rejecting = new();
         private SessionAdmission _admission;
         private int _maxPlayers = DefaultMaxPlayers;
+        // Singleplayer hosting (decision 0041): only the host's own client (its own secret) is admitted.
+        private bool _localOnly;
         private string _clientName;
         private string _clientSecret;
 
@@ -70,11 +72,12 @@ namespace FoodFactoryGame.Session
             NetworkManager.ClientManager.UnregisterBroadcast<JoinResponseBroadcast>(OnJoinResponse);
         }
 
-        public void ConfigureServer(SessionAdmission admission, int maxPlayers = DefaultMaxPlayers)
+        public void ConfigureServer(SessionAdmission admission, int maxPlayers = DefaultMaxPlayers, bool localOnly = false)
         {
             if (admission == null || maxPlayers < 1) throw new ArgumentException("Admission and a positive player cap are required.");
             _admission = admission;
             _maxPlayers = maxPlayers;
+            _localOnly = localOnly;
         }
 
         public void SetClientCredentials(string displayName, string secret)
@@ -125,6 +128,13 @@ namespace FoodFactoryGame.Session
             if (_admission == null)
             {
                 Reject(connection, "server-not-ready");
+                return;
+            }
+            // The host's client reaches its own server over the transport like anyone else, so it is recognised by the secret
+            // this same authenticator sent for it.
+            if (_localOnly && (string.IsNullOrEmpty(_clientSecret) || request.Secret != _clientSecret))
+            {
+                Reject(connection, "singleplayer");
                 return;
             }
             if (_players.Count >= _maxPlayers)

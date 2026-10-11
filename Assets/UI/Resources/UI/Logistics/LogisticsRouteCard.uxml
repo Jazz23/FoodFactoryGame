@@ -1,0 +1,16 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <!-- A route (decision 0023), or the draft for a new one: its name, the trucks on it, the pickup, dropoff and cargo choosers,
+         and Apply and Delete (or Create route for the draft). -->
+    <Style src="project://database/Assets/UI/Theme/Theme.uss" />
+    <Style src="Logistics.uss" />
+    <ui:VisualElement class="ff-card logi-card">
+        <ui:Label name="title" class="logi-card__name" picking-mode="Ignore" />
+        <ui:Label name="trucks" class="ff-small ff-wrap" picking-mode="Ignore" />
+        <ui:VisualElement name="choosers" class="logi-card__choosers" />
+        <ui:VisualElement class="ff-row logi-card__buttons">
+            <ui:Button name="apply" focusable="false" class="ff-button ff-button--sm" />
+            <ui:Button name="delete" text="Delete" focusable="false" class="ff-button ff-button--sm ff-button--danger logi-card__delete" />
+            <ui:Button name="create" text="Create route" focusable="false" class="ff-button ff-button--sm ff-button--primary" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

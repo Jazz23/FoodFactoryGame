@@ -216,7 +216,7 @@ namespace FoodFactoryGame.Session.Buildings
                 _wasActive = active;
                 OnActiveChanged(active);
             }
-            if (_window != null) _window.style.display = active ? DisplayStyle.Flex : DisplayStyle.None;
+            if (_window != null) _window.Show(active);
             if (!active)
             {
                 _removePress = null;
@@ -819,131 +819,41 @@ namespace FoodFactoryGame.Session.Buildings
             _pendingRequests.Clear();
         }
 
-        // ---- Panel (UI Toolkit, built in code) ----
+        // ---- Panel (Build UXML and USS under Assets/UI/Resources/UI, decision 0042) ----
 
         private void BuildPanel()
         {
             if (document == null) return;
             var root = document.rootVisualElement;
             root.Clear();
-            // A HudTheme window on the right, from the top (the HUD's cash card hides in build mode; this panel shows the cash)
-            // down to the bottom edge.
-            _window = new VisualElement { name = "build" };
-            _window.style.position = Position.Absolute;
-            _window.style.right = 24;
-            _window.style.top = 24;
-            _window.style.bottom = 24;
-            _window.style.width = 340;
-            HudTheme.StylePanel(_window, 0);
-
-            var head = new VisualElement();
-            head.style.flexShrink = 0;
-            head.style.paddingLeft = head.style.paddingRight = 18;
-            head.style.paddingTop = 16;
-            head.style.paddingBottom = 12;
-            head.style.borderBottomWidth = 1;
-            head.style.borderBottomColor = HudTheme.Edge;
-            var top = HudTheme.Row();
-            top.Add(HudTheme.Label("Build", 17, HudTheme.Text, true));
-            top.Add(HudTheme.Spacer());
-            top.Add(HudTheme.IconButton("build-close", "✕", Toggle));
-            head.Add(top);
-            var money = HudTheme.Row();
-            money.style.marginTop = 10;
-            money.style.alignItems = Align.FlexEnd;
-            var cash = new VisualElement { pickingMode = PickingMode.Ignore };
-            cash.Add(HudTheme.Eyebrow("Cash"));
-            _cash = HudTheme.Label("", 18, HudTheme.Text, true);
-            _cash.name = "build-cash";
-            _cash.style.marginTop = 1;
-            cash.Add(_cash);
-            money.Add(cash);
-            money.Add(HudTheme.Spacer());
-            var ambience = new VisualElement { pickingMode = PickingMode.Ignore };
-            ambience.style.alignItems = Align.FlexEnd;
-            ambience.Add(HudTheme.Eyebrow("Ambience"));
-            _ambience = HudTheme.Label("", 14, HudTheme.TextSoft, true);
-            _ambience.name = "build-ambience";
-            _ambience.style.marginTop = 3;
-            ambience.Add(_ambience);
-            money.Add(ambience);
-            head.Add(money);
-            _window.Add(head);
-
-            var body = new VisualElement();
-            body.style.flexGrow = 1;
-            body.style.flexShrink = 1;
-            body.style.minHeight = 0;
-            body.style.paddingLeft = body.style.paddingRight = 18;
-            body.style.paddingTop = 14;
-            body.Add(HudTheme.Eyebrow("Tools"));
-            _tools = new VisualElement { name = "build-tools" };
-            _tools.style.flexDirection = FlexDirection.Row;
-            _tools.style.flexWrap = Wrap.Wrap;
-            _tools.style.marginTop = 6;
-            _tools.style.marginLeft = _tools.style.marginRight = -3;
-            body.Add(_tools);
-            _stylesHeading = HudTheme.Eyebrow("Style");
-            _stylesHeading.style.marginTop = 10;
-            body.Add(_stylesHeading);
-            _styles = new VisualElement { name = "build-styles" };
-            _styles.style.flexDirection = FlexDirection.Row;
-            _styles.style.flexWrap = Wrap.Wrap;
-            _styles.style.marginTop = 6;
-            _styles.style.marginLeft = _styles.style.marginRight = -3;
-            body.Add(_styles);
-            var catalogHeading = HudTheme.Eyebrow("Catalog");
-            catalogHeading.style.marginTop = 14;
-            body.Add(catalogHeading);
-            var scroll = new ScrollView(ScrollViewMode.Vertical) { name = "build-catalog-scroll" };
-            scroll.style.flexGrow = 1;
-            scroll.style.minHeight = 0;
-            scroll.style.marginTop = 6;
-            scroll.style.marginBottom = 10;
-            HudTheme.StyleScroller(scroll);
-            _catalog = new VisualElement { name = "build-catalog" };
-            scroll.Add(_catalog);
-            body.Add(scroll);
-            // Rows keep their height in the fixed-height column; only the catalog scrolls.
-            foreach (var child in body.Children()) child.style.flexShrink = child is ScrollView ? 1 : 0;
-            _window.Add(body);
-
-            var footer = new VisualElement();
-            footer.style.flexShrink = 0;
-            footer.style.paddingLeft = footer.style.paddingRight = 18;
-            footer.style.paddingTop = 12;
-            footer.style.paddingBottom = 16;
-            footer.style.borderTopWidth = 1;
-            footer.style.borderTopColor = HudTheme.Edge;
-            _preview = HudTheme.Label(" ", 13, HudTheme.Text);
-            _preview.name = "build-preview";
-            _preview.style.whiteSpace = WhiteSpace.Normal;
-            footer.Add(_preview);
-            _status = HudTheme.Label(" ", 12, HudTheme.DangerText);
-            _status.name = "build-status";
-            _status.style.marginTop = 3;
-            _status.style.whiteSpace = WhiteSpace.Normal;
-            footer.Add(_status);
-            var buttons = HudTheme.Row();
-            buttons.style.marginTop = 10;
-            var clear = HudTheme.Button("build-cancel", "Clear selection", ClearSelection);
-            clear.style.flexGrow = 1;
-            buttons.Add(clear);
-            var leave = HudTheme.Button("build-leave", "Leave", Toggle, HudButton.Primary);
-            leave.style.marginLeft = 8;
-            buttons.Add(leave);
-            footer.Add(buttons);
-            _window.Add(footer);
-            root.Add(_window);
-            _window.style.display = DisplayStyle.None;
+            UiTemplates.Fill(root, "Build/Build");
+            _window = root.Part("build");
+            _window.Show(false);
+            root.Part<Button>("build-close").clicked += Toggle;
+            _cash = root.Part<Label>("build-cash");
+            _ambience = root.Part<Label>("build-ambience");
+            _tools = root.Part("build-tools");
+            _stylesHeading = root.Part<Label>("build-styles-heading");
+            _styles = root.Part("build-styles");
+            _catalog = root.Part("build-catalog");
+            _preview = root.Part<Label>("build-preview");
+            _status = root.Part<Label>("build-status");
+            root.Part<Button>("build-cancel").clicked += ClearSelection;
+            root.Part<Button>("build-leave").clicked += Toggle;
+            foreach (var tool in Tools)
+            {
+                var chosen = tool;
+                _tools.Part<Button>(ToolName(tool)).clicked += () => SelectTool(chosen);
+            }
             // The hold-to-remove wheel: a ring that fills clockwise from the top as Remove is held.
-            _holdWheel = new VisualElement { name = "build-hold-wheel", pickingMode = PickingMode.Ignore };
-            _holdWheel.style.position = Position.Absolute;
-            _holdWheel.style.width = _holdWheel.style.height = WheelSize;
-            _holdWheel.style.display = DisplayStyle.None;
+            _holdWheel = root.Part("build-hold-wheel");
             _holdWheel.generateVisualContent += DrawWheel;
-            root.Add(_holdWheel);
         }
+
+        // The tool chips in Build.uxml, named build-tool-<tool>.
+        private static readonly BuildTool[] Tools = { BuildTool.Sell, BuildTool.Wall, BuildTool.Door, BuildTool.Window, BuildTool.Finish };
+
+        private static string ToolName(BuildTool tool) => $"build-tool-{tool.ToString().ToLowerInvariant()}";
 
         private void DrawWheel(MeshGenerationContext context)
         {
@@ -970,7 +880,7 @@ namespace FoodFactoryGame.Session.Buildings
         {
             if (_holdWheel?.panel == null) return;
             var holding = _removePress.HasValue;
-            _holdWheel.style.display = holding ? DisplayStyle.Flex : DisplayStyle.None;
+            _holdWheel.Show(holding);
             if (!holding) return;
             var pointer = pointAction.action.ReadValue<Vector2>();
             var position = RuntimePanelUtils.ScreenToPanel(_holdWheel.panel, new Vector2(pointer.x, UnityEngine.Screen.height - pointer.y));
@@ -984,10 +894,8 @@ namespace FoodFactoryGame.Session.Buildings
             if (_window == null) return;
             var site = session.ClientSite;
             var company = site.Companies.FirstOrDefault(x => x.SiteIds.Contains(session.ClientSiteId));
-            var cash = PlayerHud.FormatCash(company?.Cash ?? 0);
-            if (_cash.text != cash) _cash.text = cash;
-            var ambience = $"{RestaurantRules.Ambience(site, session.ClientSiteId)} / {RestaurantRules.AmbienceCap}";
-            if (_ambience.text != ambience) _ambience.text = ambience;
+            _cash.SetText(PlayerHud.FormatCash(company?.Cash ?? 0));
+            _ambience.SetText($"{RestaurantRules.Ambience(site, session.ClientSiteId)} / {RestaurantRules.AmbienceCap}");
             var key = $"{Tool}|{Style}|{OfferId}";
             if (_shownTools != key)
             {
@@ -1003,10 +911,11 @@ namespace FoodFactoryGame.Session.Buildings
             var money = preview.ChargeCents == 0 && preview.RefundCents == 0 ? "free"
                 : $"charge {PlayerHud.FormatCash(preview.ChargeCents)}, refund {PlayerHud.FormatCash(preview.RefundCents)}, net {(preview.NetCents < 0 ? "+" : "-")}{PlayerHud.FormatCash(Math.Abs(preview.NetCents))}";
             var idle = string.IsNullOrEmpty(preview.Label) && preview.Problem == null;
-            _preview.text = idle ? Hint() : $"{preview.Label}: {money}" + (preview.Problem != null ? $"  [{preview.Problem}]" : "");
-            _preview.style.color = preview.Problem != null ? HudTheme.DangerText : idle ? HudTheme.Muted : HudTheme.Text;
-            _status.text = HasPendingRequests ? "Waiting for the server..." : string.IsNullOrEmpty(LastRejection) ? "" : $"Refused: {LastRejection}";
-            _status.style.display = _status.text.Length == 0 ? DisplayStyle.None : DisplayStyle.Flex;
+            _preview.SetText(idle ? Hint() : $"{preview.Label}: {money}" + (preview.Problem != null ? $"  [{preview.Problem}]" : ""));
+            _preview.EnableInClassList("build__preview--problem", preview.Problem != null);
+            _preview.EnableInClassList("build__preview--idle", idle);
+            _status.SetText(HasPendingRequests ? "Waiting for the server..." : string.IsNullOrEmpty(LastRejection) ? "" : $"Refused: {LastRejection}");
+            _status.Show(_status.text.Length > 0);
         }
 
         // What to do next, while nothing is previewed.
@@ -1014,16 +923,10 @@ namespace FoodFactoryGame.Session.Buildings
             ? "Pick a tool or an item. Hold right click on something to sell or remove it."
             : "Click to place, drag to draw. R rotates; X clears.";
 
+        // Lights the chosen tool, lists the chosen tool's styles (amber when chosen) and marks the chosen catalog card.
         private void FillTools()
         {
-            _tools.Clear();
-            void ToolButton(BuildTool tool, string text) =>
-                _tools.Add(Chip($"build-tool-{tool.ToString().ToLowerInvariant()}", text, Tool == tool, () => SelectTool(tool)));
-            ToolButton(BuildTool.Sell, "Sell / remove");
-            ToolButton(BuildTool.Wall, "Wall");
-            ToolButton(BuildTool.Door, "Door");
-            ToolButton(BuildTool.Window, "Window");
-            ToolButton(BuildTool.Finish, "Wall finish");
+            foreach (var tool in Tools) _tools.Part(ToolName(tool)).EnableInClassList("ff-chip--chosen", Tool == tool);
             _styles.Clear();
             var styles = Tool switch
             {
@@ -1032,24 +935,18 @@ namespace FoodFactoryGame.Session.Buildings
                 BuildTool.Window => GoodsWorld.WindowStyles,
                 _ => Array.Empty<string>()
             };
-            _stylesHeading.style.display = styles.Any() ? DisplayStyle.Flex : DisplayStyle.None;
+            _stylesHeading.Show(styles.Any());
             foreach (var style in styles)
             {
                 var chosen = style;
-                _styles.Add(Chip($"build-style-{style}", Name(style), Style == style, () => SelectTool(Tool, chosen)));
+                var chip = new Button(() => SelectTool(Tool, chosen)) { name = $"build-style-{style}", text = Name(style), focusable = false };
+                chip.AddToClassList("ff-button");
+                chip.AddToClassList("ff-chip");
+                chip.EnableInClassList("ff-chip--chosen", Style == style);
+                _styles.Add(chip);
             }
-            foreach (var row in _catalog.Query<VisualElement>(className: "build-item").ToList()) StyleItem(row, false);
-        }
-
-        // A tool or style choice: amber when chosen, a neutral chip otherwise.
-        private static Button Chip(string name, string text, bool chosen, Action clicked)
-        {
-            var button = HudTheme.Button(name, text, clicked, chosen ? HudButton.Primary : HudButton.Secondary, 32);
-            button.style.marginLeft = button.style.marginRight = 3;
-            button.style.marginTop = button.style.marginBottom = 3;
-            button.style.paddingLeft = button.style.paddingRight = 12;
-            button.style.fontSize = 13;
-            return button;
+            foreach (var row in _catalog.Query<VisualElement>(className: "build-item").ToList())
+                row.EnableInClassList("build-item--chosen", (string)row.userData == OfferId);
         }
 
         private void FillCatalog()
@@ -1060,63 +957,27 @@ namespace FoodFactoryGame.Session.Buildings
             {
                 var inSection = offers.Where(x => (string.IsNullOrEmpty(x.Equipment.Category) ? EquipmentSection : x.Equipment.Category) == section).ToList();
                 if (inSection.Count == 0) continue;
-                var heading = HudTheme.Label(section, 13, HudTheme.TextSoft, true);
-                heading.style.marginTop = _catalog.childCount == 0 ? 2 : 12;
-                heading.style.marginBottom = 6;
+                var heading = new Label(section) { pickingMode = PickingMode.Ignore };
+                heading.AddToClassList("build-section");
+                heading.EnableInClassList("build-section--first", _catalog.childCount == 0);
                 _catalog.Add(heading);
                 foreach (var offer in inSection)
                 {
                     var id = offer.Id;
                     // The whole card picks the item.
-                    var row = new VisualElement { name = $"build-item-{offer.Id}", userData = offer.Id };
-                    row.AddToClassList("build-item");
-                    row.style.flexDirection = FlexDirection.Row;
-                    row.style.alignItems = Align.Center;
-                    row.style.marginBottom = 6;
-                    row.style.paddingLeft = row.style.paddingRight = 10;
-                    row.style.paddingTop = row.style.paddingBottom = 7;
-                    HudTheme.Radius(row, 10);
-                    var icon = new VisualElement { pickingMode = PickingMode.Ignore };
-                    icon.style.width = icon.style.height = 34;
-                    icon.style.flexShrink = 0;
-                    if (offer.Equipment.Icon != null)
-                    {
-                        icon.style.backgroundImage = new StyleBackground(offer.Equipment.Icon);
-                        icon.style.backgroundSize = new BackgroundSize(BackgroundSizeType.Contain);
-                    }
-                    else
-                    {
-                        icon.style.backgroundColor = HudTheme.SlotEmpty;
-                        HudTheme.Radius(icon, 8);
-                    }
-                    row.Add(icon);
-                    var text = new VisualElement { pickingMode = PickingMode.Ignore };
-                    text.style.flexGrow = 1;
-                    text.style.flexShrink = 1;
-                    text.style.marginLeft = 10;
-                    var label = HudTheme.Label(offer.Equipment.DisplayName, 13, HudTheme.Text, true);
-                    label.style.whiteSpace = WhiteSpace.Normal;
-                    text.Add(label);
-                    var price = HudTheme.Label(PlayerHud.FormatCash(offer.PriceCents), 12, HudTheme.Muted);
-                    price.style.marginTop = 2;
-                    text.Add(price);
-                    row.Add(text);
-                    row.RegisterCallback<PointerEnterEvent>(_ => StyleItem(row, true));
-                    row.RegisterCallback<PointerLeaveEvent>(_ => StyleItem(row, false));
+                    var row = UiTemplates.Clone("Build/BuildCatalogItem");
+                    row.name = $"build-item-{offer.Id}";
+                    row.userData = offer.Id;
+                    var icon = row.Part("icon");
+                    icon.SetIcon(offer.Equipment.Icon, "");
+                    icon.EnableInClassList("ff-icon--empty", offer.Equipment.Icon == null);
+                    row.Part<Label>("title").text = offer.Equipment.DisplayName;
+                    row.Part<Label>("price").text = PlayerHud.FormatCash(offer.PriceCents);
                     row.RegisterCallback<ClickEvent>(_ => SelectOffer(id));
-                    StyleItem(row, false);
                     _catalog.Add(row);
                 }
             }
             _shownTools = null;
-        }
-
-        // A catalog card: an amber edge when it is the chosen item, a lighter fill under the pointer.
-        private void StyleItem(VisualElement row, bool hovered)
-        {
-            var chosen = (string)row.userData == OfferId;
-            row.style.backgroundColor = hovered ? HudTheme.Control : HudTheme.Card;
-            HudTheme.Border(row, chosen ? HudTheme.Accent : HudTheme.CardEdge, 1);
         }
     }
 }

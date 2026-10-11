@@ -1,0 +1,12 @@
+/* The buy panel for a map building (decision 0028) in the shared look. Shared pieces come from Theme.uss. */
+
+.prop { width: 360px; padding: 18px 20px 20px 20px; }
+.prop__header { align-items: flex-start; margin-bottom: 12px; }
+.prop__facts { padding: 14px; }
+.prop__price { font-size: 14px; }
+.prop__state { margin-top: 4px; font-size: 13px; color: var(--ff-text-soft); }
+.prop__state--yours { color: var(--ff-positive); }
+.prop__state--taken { color: var(--ff-danger-text); }
+.prop__cash { margin-top: 10px; }
+.prop__status { margin-top: 6px; font-size: 12px; color: var(--ff-danger-text); }
+.prop__buy { margin-top: 10px; }

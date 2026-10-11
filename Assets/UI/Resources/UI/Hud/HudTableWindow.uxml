@@ -1,0 +1,14 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <!-- A dining table (decision 0024): its seats and the restaurant's standing with customers. -->
+    <Style src="project://database/Assets/UI/Theme/Theme.uss" />
+    <Style src="Hud.uss" />
+    <ui:VisualElement name="hud-machine" class="ff-panel hud-window">
+        <ui:VisualElement class="ff-row hud-window__header" picking-mode="Ignore">
+            <ui:Label text="Table" class="ff-title" picking-mode="Ignore" />
+        </ui:VisualElement>
+        <ui:VisualElement class="ff-inset" picking-mode="Ignore">
+            <ui:Label name="hud-table-seats" picking-mode="Ignore" />
+            <ui:Label name="hud-table-standing" class="hud-note ff-muted" picking-mode="Ignore" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

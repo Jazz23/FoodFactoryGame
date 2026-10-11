@@ -1,0 +1,206 @@
+/* The employee screen (decision 0037), from the "Employee tasks + Lua" canvas: header with hands and tabs, task cards,
+   the Lua page and the Run footer. Shared pieces come from Theme.uss. */
+
+.emp { width: 760px; padding: 0; }
+
+.emp__head { padding: 18px 22px 0 22px; }
+.emp__who { flex-grow: 1; flex-shrink: 1; margin-left: 14px; }
+.emp__state { margin-top: 4px; }
+.emp__status { margin-left: 6px; flex-shrink: 1; font-size: 12px; color: var(--ff-text-soft); }
+.emp--failing .emp__status { color: var(--ff-danger-text); }
+.emp__close { margin-left: 14px; align-self: flex-start; }
+
+/* On a row of its own under the name, so however many hand slots there are, the close button never covers them. */
+.emp__hands { flex-wrap: wrap; margin-top: 12px; }
+.emp__hands-caption { margin-right: 8px; }
+
+.emp-hand {
+    width: 40px;
+    height: 40px;
+    margin: 0 2px;
+    border-color: var(--ff-edge);
+}
+
+.emp-hand__icon { width: 30px; height: 30px; }
+.emp-hand__count { right: 3px; bottom: 1px; font-size: 11px; }
+.ff-slot--spoiled .emp-hand__count { color: var(--ff-danger-text); }
+
+/* Tabs: light text over an amber underline on the showing one. */
+.emp__tabs {
+    margin-top: 14px;
+    border-bottom-width: 1px;
+    border-color: var(--ff-edge);
+}
+
+.emp__tab {
+    height: 40px;
+    margin: 0 0 -1px 0;
+    padding: 0 16px;
+    font-size: 14px;
+    color: var(--ff-muted);
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+    border-bottom-width: 2px;
+    border-color: rgba(0, 0, 0, 0);
+    border-radius: 0;
+}
+
+.emp__tab:hover { color: var(--ff-text); background-color: rgba(0, 0, 0, 0); }
+
+.emp__tab--showing {
+    color: var(--ff-text);
+    border-bottom-color: var(--ff-accent);
+    -unity-font-style: bold;
+}
+
+/* Both pages are this tall, so switching tabs never resizes the screen. */
+.emp__page { height: 420px; padding: 16px 22px; }
+
+.emp__banner {
+    background-color: #3A2E1C;
+    border-width: 1px;
+    border-color: var(--ff-accent);
+    border-radius: 10px;
+    padding: 8px 12px;
+    margin-bottom: 10px;
+}
+
+.emp__banner-text { flex-grow: 1; flex-shrink: 1; margin-right: 10px; font-size: 12px; }
+.emp__loop { margin-bottom: 10px; }
+.emp__list { flex-grow: 1; }
+.emp__empty { font-size: 12px; color: var(--ff-muted); white-space: normal; }
+
+.emp__add {
+    margin-top: 10px;
+    border-color: var(--ff-edge-strong);
+    color: var(--ff-text-soft);
+}
+
+.emp__lua-head { margin-bottom: 10px; }
+.emp__pick { margin-left: 12px; }
+
+/* The Lua text box keeps the page's height and scrolls its text instead of growing. */
+.emp__source { flex-grow: 1; flex-shrink: 1; min-height: 0; white-space: normal; }
+
+.emp__source > .unity-base-text-field__input {
+    background-color: var(--ff-code);
+    color: var(--ff-code-text);
+    border-color: var(--ff-card-edge);
+    border-radius: 10px;
+    padding: 14px;
+    font-size: 13px;
+    -unity-text-align: upper-left;
+}
+
+.emp__caret {
+    position: absolute;
+    width: 3px;
+    height: 16px;
+    background-color: var(--ff-accent);
+}
+
+.emp__reference { margin-top: 10px; font-size: 11px; color: var(--ff-faint); }
+
+.emp__footer {
+    padding: 14px 22px;
+    border-top-width: 1px;
+    border-color: var(--ff-edge);
+}
+
+.emp__run { margin-left: 10px; }
+
+/* ---------- Task cards ---------- */
+
+.emp-task { margin-top: 0; margin-bottom: 10px; padding: 14px 16px; border-radius: 12px; }
+
+.emp-task__number {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+    -unity-text-align: middle-center;
+    background-color: var(--ff-edge);
+    border-radius: 6px;
+    font-size: 12px;
+    -unity-font-style: bold;
+}
+
+.emp-task__type { flex-grow: 1; margin: 0 10px; }
+.emp-task__remove { width: 36px; height: 36px; }
+
+.emp-task__places { margin-top: 12px; }
+.emp-task__place { flex-grow: 1; flex-basis: 0; }
+.emp-task__arrow { width: 28px; height: 16px; margin: 0 8px; color: var(--ff-disabled); }
+.emp-task__any { margin-top: 12px; }
+.emp-task__machine { margin-top: 12px; }
+.emp-task__power { margin-top: 12px; }
+.emp-task__power-choice { margin-right: 16px; }
+
+/* The item chips and the search box share one field, like a tag input. */
+.emp-task__items {
+    flex-wrap: wrap;
+    margin-top: 8px;
+    padding: 4px;
+    background-color: var(--ff-panel);
+    border-width: 1px;
+    border-color: var(--ff-control-edge);
+    border-radius: 10px;
+}
+
+.emp-task__none { margin: 0 6px; }
+.emp-task__search { flex-grow: 1; min-width: 160px; }
+
+.emp-task__search > .unity-base-text-field__input {
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+}
+
+.emp-task__suggestions {
+    display: none;
+    margin-top: 4px;
+    padding: 4px;
+    background-color: var(--ff-panel);
+    border-width: 1px;
+    border-color: var(--ff-control-edge);
+    border-radius: 10px;
+}
+
+.emp-task__suggestions--open { display: flex; }
+
+.emp-place {
+    background-color: var(--ff-panel);
+    border-radius: 10px;
+    padding: 8px 10px;
+}
+
+.emp-place__icon { margin-right: 10px; }
+.emp-place__words { flex-grow: 1; flex-shrink: 1; min-width: 0; }
+.emp-place__value { margin-top: 1px; font-size: 14px; }
+.emp-place--unset .emp-place__value { color: var(--ff-muted); }
+.emp-place__pick { margin-left: 8px; }
+
+.emp-chip {
+    height: 32px;
+    margin: 2px;
+    padding-left: 6px;
+    background-color: var(--ff-control);
+    border-radius: 8px;
+}
+
+.emp-chip__icon { width: 22px; height: 22px; margin-right: 6px; }
+.emp-chip__name { font-size: 13px; }
+
+.emp-chip__remove {
+    width: 24px;
+    height: 24px;
+    margin-left: 4px;
+    padding: 0;
+    border-width: 0;
+    color: var(--ff-muted);
+    align-items: center;
+    justify-content: center;
+}
+
+.emp-suggestion { height: 32px; padding-left: 8px; border-radius: 6px; }
+.emp-suggestion:hover { background-color: var(--ff-control); }
+.emp-suggestion__icon { width: 20px; height: 20px; margin-right: 8px; }
+.emp-suggestion__name { font-size: 13px; }

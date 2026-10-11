@@ -1,0 +1,18 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <!-- A machine with no recipes is storage (the fridge, decision 0018): its grid, and a note when it is refrigerated. -->
+    <Style src="project://database/Assets/UI/Theme/Theme.uss" />
+    <Style src="Hud.uss" />
+    <ui:VisualElement name="hud-machine" class="ff-panel hud-window">
+        <ui:VisualElement class="ff-row hud-window__header" picking-mode="Ignore">
+            <ui:Label name="title" class="ff-title" picking-mode="Ignore" />
+            <ui:Label name="subtitle" class="hud-window__subtitle" picking-mode="Ignore" />
+        </ui:VisualElement>
+        <ui:VisualElement class="ff-inset hud-storage__body">
+            <ui:VisualElement class="hud-labelled">
+                <ui:Label name="input-caption" class="ff-eyebrow hud-labelled__caption" picking-mode="Ignore" />
+                <ui:VisualElement name="input-grid" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:Label name="hud-refrigerated-note" text="Goods in here do not spoil." class="hud-note ff-chilled-text" picking-mode="Ignore" />
+    </ui:VisualElement>
+</ui:UXML>

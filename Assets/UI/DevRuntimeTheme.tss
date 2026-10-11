@@ -1,2 +1,8 @@
 @import url("unity-theme://default");
-@import url("Hud.uss");
+@import url("Theme/Theme.uss");
+@import url("Resources/UI/MainMenu/MainMenu.uss");
+@import url("Resources/UI/Hud/Hud.uss");
+@import url("Resources/UI/Employee/Employee.uss");
+@import url("Resources/UI/Build/Build.uss");
+@import url("Resources/UI/Logistics/Logistics.uss");
+@import url("Resources/UI/Property/Property.uss");

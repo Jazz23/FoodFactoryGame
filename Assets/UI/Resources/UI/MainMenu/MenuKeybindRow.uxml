@@ -1,0 +1,13 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <!-- One action: its label and two key slots. A fixed row (scroll zoom, hotbar digits) shows "fixed" and no buttons;
+     SessionPanel adds menu-keycap listening, changed or unbound to a slot. -->
+    <Style src="project://database/Assets/UI/Theme/Theme.uss" />
+    <Style src="MainMenu.uss" />
+    <ui:VisualElement class="ff-row menu-keyrow">
+        <ui:Label name="action" class="menu-keyrow__label ff-grow" picking-mode="Ignore" />
+        <ui:Button name="primary" focusable="false" class="menu-keycap" />
+        <ui:Button name="alternate" focusable="false" class="menu-keycap" />
+        <ui:Label name="fixed-key" class="menu-keycap menu-keycap--fixed" picking-mode="Ignore" />
+        <ui:Label name="fixed-note" text="Fixed" class="menu-keycap--note" picking-mode="Ignore" />
+    </ui:VisualElement>
+</ui:UXML>

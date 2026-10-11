@@ -64,11 +64,11 @@ Decisions are in [decision 0005](decisions/0005-session-bootstrap-and-player-ide
 
 - `SessionRoot` (in `DevSite`) is the server composition root, with Host, Client and Server-only modes. Server start creates the save directory, loads `world.db` (importing a pre-SQLite `world.snapshot` once) or creates and commits the **development seed** (`DevWorld`: world `dev-world`, site `dev-site`, one storage location; placeholder content), opens the SQLite `players.db`, configures the authenticator, and only then starts FishNet. Once listening, it spawns `GoodsNetworkBridge` and calls `InitializeServer` with `DevAuthenticator.PlayerIdOf` as the only connection→player resolver. The bridge ticks the world whenever the server runs, including with no clients (`-server`).
 - `PlayerRegistry` (SQLite, server-only) maps SHA-256(client secret) to a stable `player-<guid>` ID; raw secrets are never stored. `SessionAdmission` resolves or creates the identity first, then commits the `dev-site` grant with `GoodsWorld.TryGrantDurably`; either failure rejects the join. Registry schema is `user_version` 1; newer is refused. The goods snapshot stayed at v2 in this step (v3 since equipment placement).
-- `DevAuthenticator` (FishNet `Authenticator`): clients send `{DisplayName, Secret}`; the server answers `{Accepted, Reason, PlayerId}` before passing or failing the connection. Rejection reasons: `invalid-name`, `invalid-secret`, `persistence-unavailable`, `already-connected`, `server-full` (cap 8), `server-not-ready`. `already-connected` is checked with a read-only lookup before any write. A rejected client disconnects itself after reading the reason; the server kicks it only after a 2 s grace, because FishNet's forced close raced the reply over real UDP. The connection→player map is server memory only and is cleared on disconnect.
+- `DevAuthenticator` (FishNet `Authenticator`): clients send `{DisplayName, Secret}`; the server answers `{Accepted, Reason, PlayerId}` before passing or failing the connection. Rejection reasons: `invalid-name`, `invalid-secret`, `persistence-unavailable`, `already-connected`, `server-full` (cap 8), `server-not-ready`, and `singleplayer` (a Singleplayer host turning away everyone but its own client; decision 0041). `already-connected` is checked with a read-only lookup before any write. A rejected client disconnects itself after reading the reason; the server kicks it only after a 2 s grace, because FishNet's forced close raced the reply over real UDP. The connection→player map is server memory only and is cleared on disconnect.
 - `ClientIdentity` keeps the client secret in the SQLite database `persistentDataPath/Identity/identity.db` (`-identity <file>` override; decision 0011).
 - FishNet sends start scenes only after authentication, so `SessionRoot` spawns one `Player` per connection on `OnClientLoadedStartScenes`, owned by that connection and with a server-set display name. FishNet despawns it on disconnect; the world keeps running.
 - `Player.prefab`: `NetworkObject`, client-authoritative `NetworkTransform`, `CharacterController`, `PlayerAvatar` (camera-yaw-relative `Player/Move` at 4 m/s, `Player/Sprint` (Left Shift) at 7 m/s, `Player/Jump` (Space) to 1.2 m while grounded; a ceiling ends the rise), the animated character `Model` (implemented 2026-09-29: `Assets/Art/Models/Player/Player.fbx`, built by `ArtSource/Player/build_player_model.py` and installed by `AgentScripts/BuildPlayerVisual.cs`; a factory worker (hard hat with goggles, rolled-sleeve work shirt, denim bib apron with leather strap, pocket, pen and ID badge, gloves, cargo pants with reflective bands, laced boots) as one ~22k-triangle skinned mesh with two materials: `PL_Shirt`, tinted per display name, and `PL_Palette`, whose faces sample flat cells of `Textures/Player_Palette.png` and its metallic/smoothness map; the apron skirt is weighted to the thighs so strides do not cut through it; `Player.controller` blends Idle/Walk/Run on `Speed` and plays Jump, Fall and Land from `Grounded` and `VerticalSpeed`), `PlayerAnimation` (presentation only: sets those parameters from the avatar's observed motion and a ground ray, so remote copies animate from the replicated pose with no animator replication; a per-frame jump over 1.5 m counts as a teleport), and a disabled `CameraRig` (`OrbitCameraRig`, camera, audio listener) that only the owning client enables. It orbits with `Player/Look` (always on since 0007; formerly while `Player/Orbit` was held); `Player/Zoom` (scroll) steps distance. Pitch is limited to 10–80° and distance to 3–20 m. `Player/SwitchCamera` (C; the C binding moved off the unused `Crouch`) toggles a top-down view that looks straight down on the avatar with yaw snapped to the nearest 90°, so the world-aligned site grid reads horizontal/vertical. The two views blend over 0.4 s (smoothstep), each keeps its own zoom distance, and `Yaw` follows the blend so movement stays screen-relative. The top-down view does not orbit; `EquipmentInteraction` leaves the pointer free there (no crosshair) and aims at the mouse position. Implemented; verified by authoring and placement tests, not yet by a running-game capture.
-- `ClientSiteSubscription` subscribes an authenticated client to `dev-site` once the bridge is visible. `SessionPanel` (UI Toolkit, built in code, `Assets/UI/SessionPanelSettings.asset`) shows the name/address/Host/Join menu with status and rejection reasons, then a readout of mode, player ID, the replicated site clock and revision, and (on a server) the server clock, revision and player count. (Removed 2026-10-09: no in-session readout.)
+- `ClientSiteSubscription` subscribes an authenticated client to `dev-site` once the bridge is visible. `SessionPanel` (UI Toolkit, `Assets/UI/SessionPanelSettings.asset`; UXML and USS since decision 0042) shows the name/address/Host/Join menu with status and rejection reasons, then a readout of mode, player ID, the replicated site clock and revision, and (on a server) the server clock, revision and player count. (Removed 2026-10-09: no in-session readout. Replaced 2026-10-10 by the main menu, decision 0041, below.)
 
 Prototype, labelled in code: the authenticator (no encryption or accounts), owner movement authority (presentation only; no gameplay rule trusts position), the all-players `dev-site` grant, the 8-player cap, and the dev seed.
 
@@ -96,7 +96,7 @@ Not yet: buying/selling equipment, other machines, and moving equipment between 
 Decisions are in [decision 0007](decisions/0007-player-controls-and-working-oven.md). No new server rule and no schema change.
 
 - Controls (`EquipmentInteraction`, `OrbitCameraRig`): the pointer is locked to a centre crosshair while no screen is open, so `Player/Look` always orbits; the rig pivots 1 m beside the avatar. `Player/Inventory` (E) toggles the inventory screen, `Player/Hotbar` (1–9, one action whose bindings scale to the slot number) puts a held machine kind on the cursor, `Player/ClearCursor` (Q) empties it, `Player/Place` (left mouse) places the cursor item or opens the machine under the crosshair, `Player/Remove` (right mouse) picks the machine up, `Player/Rotate` (R) turns the ghost, `Player/CloseScreen` (Esc) closes a screen or releases the pointer. Aim rays skip player avatars. `Player/Orbit` is gone.
-- HUD (`PlayerHud`, UI Toolkit built in code, its own `UIDocument` on the session panel settings): crosshair, 9-slot hotbar (kind and held count), the inventory screen (your machines and goods by item/spoiled beside `dev-site-storage`) and the machine screen (recipe picker, Start, progress, input, output). Every click is a request: stack moves use `GoodsNetworkBridge.RequestTransfer` (whole lots up to the destination's previewed free capacity), Start uses the new `RequestStartJob` → `StartJobDurably`, one batch per click.
+- HUD (`PlayerHud`, UI Toolkit, its own `UIDocument` on the session panel settings; UXML and USS since decision 0042): crosshair, 9-slot hotbar (kind and held count), the inventory screen (your machines and goods by item/spoiled beside `dev-site-storage`) and the machine screen (recipe picker, Start, progress, input, output). Every click is a request: stack moves use `GoodsNetworkBridge.RequestTransfer` (whole lots up to the destination's previewed free capacity), Start uses the new `RequestStartJob` → `StartJobDurably`, one batch per click.
 - Content: `RecipeAsset` (`Assets/Content/Recipes/Bread.asset`: `oven-bread`, 1 dough → 1 bread, 10 s, bread spoils after 3600 s). `SessionRoot.recipes` lists it; `StartServer` registers every recipe with the world, including a recovered save.
 - Dev ingredients: a new dev world's storage gets 20 dough; `TryGrantDurably(..., starterGoods)` adds 5 dough (`starter:<playerId>:0`) to a player's inventory only in the commit that creates it. Dough spoils after 7200 s. Existing saves and existing inventories get neither.
 - Display: `EquipmentPresenter` sets `EquipmentVisual.Running` from the baseline (a running, not blocked, job on the station), which drives every `IEquipmentRunningDisplay` in the model; `OvenToggle` implements it (glow, light, fans).
@@ -158,7 +158,7 @@ Decision: [0012](decisions/0012-company-cash.md). Step 1 of the sell loop: cash 
 - Persistence: payload schema **v5** (`world.db` `user_version` still 1); v4 upgrades in memory with no companies. `View` includes only the owning company of the viewed site, so cash reaches clients in the existing full site baseline with no new RPC.
 - Dev seed (`DevWorld`): PROTOTYPE `dev-company` owns `dev-site` with 50000 cents. `EnsureCompany` adds it once to an older save, committed before serving.
 - HUD: `PlayerHud` shows the site company's cash top right (`hud-cash`, `PlayerHud.FormatCash`), display only. Since
-  decision 0040 the HUD and every screen built in code are drawn through `HudTheme` (cards, slots, buttons, dim backdrop,
+  decision 0040 the HUD and every screen built in code are drawn through `HudTheme` (since decision 0042: UXML templates and USS classes) (cards, slots, buttons, dim backdrop,
   spoilage alert, interact prompt).
 - Measurement: `GoodsSnapshotStore.Stats` (`GoodsCommitStats`) records each save that writes a new revision: its time (live-state validation and one JSON conversion under the world lock, the SQLite transaction before `COMMIT`, and `COMMIT` including WAL sync) and payload bytes. `LastTimings` exposes the last successful write's phase split for the benchmark (the copy phase is now zero); phase time excludes waits for the save lock and another writer. Failed saves and saves of an already-stored revision are not counted. `GoodsNetworkBridge.InitializeServer` resets the counters and one-time warnings, so they describe the served world only. The bridge logs `[Goods] commits=… avg=…ms max=…ms payload=…KB` every 60 s and warns once per served world past 50 ms or 1 MB. The [final 1,000-customer record](verification/customer-scale-performance-20260925.md) supports deferring [decision 0025](decisions/0025-save-cost-at-customer-scale.md); no storage migration is implemented.
 - Every durable command, the clock tick, admission grants and `AdjustCashDurably` go through one private boundary, `GoodsWorld.Durably` (run, commit if the revision changed, restore the prior state on any failure).
@@ -306,7 +306,7 @@ change.
   it disables the Tasks tab". Checkboxes are only as wide as their box and label, so a click beside them does nothing. The Lua
   text box scrolls again: the custom caret bar now sits beside the text element in the scroll view's content. As a child of
   the text element it had stopped the text from being measured, so the box never grew past the viewport and arrow keys jumped
-  the view. Dark text boxes get the `hud-text-field` class (`Assets/UI/Hud.uss`, imported by `DevRuntimeTheme.tss`) for a light caret and
+  the view. Dark text boxes get the `hud-text-field` class (`Assets/UI/Hud.uss`, imported by `DevRuntimeTheme.tss`; since decision 0042 `ff-text-field` in `Assets/UI/Theme/Theme.uss`) for a light caret and
   selection, replacing the deprecated `textSelection.cursorColor`.
 - Item search: focusing a task's item box opens its drop-down at once. With no text it lists items by
   `EquipmentInteraction.RecentItemRank`: items this client recently picked up, moved, bought or put on or took off belts, then
@@ -317,7 +317,7 @@ change.
 - Belts: holding Remove on a belt fills a wheel at the crosshair (`EquipmentInteraction.BeltRemoveProgress`, drawn by `PlayerHud`)
   for `BuildMode.HoldSeconds`. Once one belt is taken up, the rest of that press removes each belt the crosshair passes over
   at once.
-- Build mode: the panel uses `HudTheme` (header with cash and ambience, tool and style chips, catalog cards, footer with
+- Build mode: the panel uses `HudTheme` (since decision 0042: `Build.uxml`/`Build.uss`) (header with cash and ambience, tool and style chips, catalog cards, footer with
   preview, refusal, Clear selection and Leave). Leaving remembers the camera's focus, distance, tilt and turn. Reopening on the
   same site within `BuildMode.RememberedViewReach` (20 m, PROTOTYPE) of that focus restores it; otherwise the default lot
   framing returns.
@@ -806,6 +806,45 @@ This supersedes the resize and build-mode parts of the section above.
 - Camera and input: third-person camera collision and ceiling clamp; build-mode pan (Move), zoom (Zoom) and tilt (new
   Player/CameraTilt, right mouse); Cancel and ClearCursor (X) clear the build selection; right click removes only without a drag.
 - Content: larger generated restaurants; the ceiling panel is withdrawn.
+
+## Implemented: main menu and client settings (2026-10-10)
+
+Decision: [0041](decisions/0041-main-menu-and-client-settings.md). Presentation and client-local preferences; no goods or
+registry schema change.
+
+- `SessionPanel` is the main menu (same component and scene wiring): Resume, Select World (saved worlds, New world with name
+  and seed, a Play as dropdown), Connect to Server (name and address), Settings and Quit, drawn from `Assets/UI/Resources/UI/MainMenu` (UXML and USS, decision 0042) on an opaque
+  backdrop and hidden during a session. It calls `SessionRoot` only (`SelectWorld`, `Visibility`, `Begin`).
+- `HostVisibility` (`SessionOptions.cs`): Singleplayer, FriendsOnly, InviteOnly, Public. `SessionRoot.Visibility` (default
+  Public, so command-line and test hosts are unchanged) is read at server start; Singleplayer makes `DevAuthenticator` admit only
+  the host client's own secret. **The other three are not enforced**: they admit anyone who can reach the address.
+- `ClientSettings` (SQLite `settings` key/value table, `user_version` 1) at `persistentDataPath/Settings/settings.db`
+  (`-settings <file>`; `SessionOptions.SettingsPath`, null in options a test builds): display name, look sensitivity, binding
+  override JSON, and the Resume target (world + visibility, or server address, and when). Load never creates the file. The menu
+  records a target only for sessions it started, once the local player is admitted. `SessionRoot.Configure` raises `Configured`
+  so the menu reloads (defaults for a null path, and binding overrides removed).
+- `KeyBindings` lists the rebindable Player actions in screen groups with a primary and an alternate Keyboard&Mouse binding each
+  (`InputSystem_Actions.inputactions` now authors empty alternates), runs `PerformInteractiveRebinding` (keyboard and mouse
+  buttons only; Esc cancels, Backspace unbinds) and finds conflicts. Overrides apply to the project-wide asset, which every
+  `InputActionReference` resolves to, so they take effect at once. `OrbitCameraRig.LookSensitivity` scales orbit and build-mode
+  turning.
+
+Open: enforcing friends-only/invite-only/public hosting (needs a platform service), an in-game way back to the menu, the hosting
+model and player count (GDD).
+
+## Implemented: UI in UXML and USS (2026-10-10)
+
+Decision: [0042](decisions/0042-ui-in-uxml-and-uss.md). Presentation only.
+
+- Every screen's structure is UXML and its look USS: `Assets/UI/Theme/Theme.uss` (tokens and `ff-*` components) and one folder
+  per screen under `Assets/UI/Resources/UI/` (`MainMenu`, `Hud`, `Employee`, `Build`, `Logistics`, `Property`), each a frame
+  template plus one-root item templates. `DevRuntimeTheme.tss` imports the theme and every screen sheet.
+- `UiTemplates` (`Assets/Scripts/Session/UI`) loads templates from Resources, fills panel roots, clones items and finds named
+  parts; `Glyphs` draws the line icons in the element's USS colour. Panels (`SessionPanel`, `PlayerHud`,
+  `EmployeeScriptPanel`, `BuildMode`, `LogisticsPanel`, `PropertyPanel`) keep their logic, public methods and element names;
+  state is shown with classes, and only visibility, progress width and pointer-following positions are inline.
+- `HudTheme` keeps only the colours the removal wheels paint with. `Assets/UI/Hud.uss` is gone (its text-field rule is
+  `ff-text-field` in the theme).
 
 ## Baseline Test Evolution
 

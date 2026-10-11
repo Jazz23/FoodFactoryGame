@@ -1,0 +1,12 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <!-- One catalog card in build mode: the whole card picks the item; build-item chosen marks the selected one. -->
+    <Style src="project://database/Assets/UI/Theme/Theme.uss" />
+    <Style src="Build.uss" />
+    <ui:VisualElement class="ff-row build-item">
+        <ui:VisualElement name="icon" class="ff-icon build-item__icon" picking-mode="Ignore" />
+        <ui:VisualElement class="build-item__text" picking-mode="Ignore">
+            <ui:Label name="title" class="build-item__name ff-wrap" picking-mode="Ignore" />
+            <ui:Label name="price" class="ff-small build-item__price" picking-mode="Ignore" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

@@ -1,0 +1,61 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <!-- The employee screen (decision 0037): header with the employee, their hands and the tabs; the Tasks page (task cards from
+         EmployeeTaskCard.uxml) and the Lua source page; Stop and Run. EmployeeScriptPanel fills and wires it. -->
+    <Style src="project://database/Assets/UI/Theme/Theme.uss" />
+    <Style src="Employee.uss" />
+    <ui:VisualElement name="employee-script-root" class="ff-root ff-fill" picking-mode="Ignore">
+        <ui:VisualElement name="employee-script-dim" class="ff-fill ff-dim" picking-mode="Ignore" />
+        <ui:VisualElement name="employee-script" class="ff-panel ff-centered emp">
+            <ui:VisualElement class="emp__head">
+                <ui:VisualElement class="ff-row emp__top">
+                    <ui:VisualElement class="ff-avatar ff-avatar--lg" picking-mode="Ignore">
+                        <ui:Label name="employee-script-initial" class="ff-avatar__initial" picking-mode="Ignore" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="emp__who" picking-mode="Ignore">
+                        <ui:Label name="employee-script-title" class="ff-title" picking-mode="Ignore" />
+                        <ui:VisualElement class="ff-row emp__state" picking-mode="Ignore">
+                            <ui:VisualElement name="employee-script-dot" class="ff-dot ff-dot--sm" picking-mode="Ignore" />
+                            <ui:Label name="employee-script-status" class="emp__status ff-wrap" picking-mode="Ignore" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                    <ui:Button name="employee-script-close" focusable="false" class="ff-button ff-button--icon emp__close">
+                        <ui:VisualElement class="ff-glyph ff-glyph--close ff-glyph--sm" />
+                    </ui:Button>
+                </ui:VisualElement>
+                <ui:VisualElement name="employee-hands" class="ff-row emp__hands" />
+                <ui:VisualElement class="ff-row emp__tabs">
+                    <ui:Button name="employee-script-tab-tasks" text="Tasks" focusable="false" class="emp__tab" />
+                    <ui:Button name="employee-script-tab-lua" text="Lua source" focusable="false" class="emp__tab" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+            <ui:VisualElement name="employee-script-tasks" class="emp__page">
+                <ui:VisualElement name="employee-script-detached" class="ff-row emp__banner">
+                    <ui:Label text="The Lua was edited by hand, so the Tasks tab is disabled. Reset to go back to the tasks (the hand edits are lost)." class="emp__banner-text ff-wrap" picking-mode="Ignore" />
+                    <ui:Button name="employee-script-reset" text="Reset to tasks" focusable="false" class="ff-button" />
+                </ui:VisualElement>
+                <ui:Label text="Repeats forever, top to bottom: one trip or one switch per task each pass." class="ff-small emp__loop" picking-mode="Ignore" />
+                <ui:ScrollView name="employee-script-task-list" mode="Vertical" horizontal-scroller-visibility="Hidden" class="ff-scroll emp__list" />
+                <ui:Button name="employee-script-add-task" focusable="false" class="ff-button ff-button--lg ff-button--ghost ff-button--with-glyph emp__add">
+                    <ui:VisualElement class="ff-glyph ff-glyph--plus" />
+                    <ui:Label text="Add task" picking-mode="Ignore" />
+                </ui:Button>
+            </ui:VisualElement>
+            <ui:VisualElement name="employee-script-lua" class="emp__page">
+                <ui:VisualElement class="ff-row emp__lua-head">
+                    <ui:Label text="Generated from the task list. Editing it disables the Tasks tab." class="ff-small ff-wrap ff-grow" picking-mode="Ignore" />
+                    <ui:Button name="employee-script-pick" text="Select world pos" focusable="false" class="ff-button emp__pick" />
+                </ui:VisualElement>
+                <ui:TextField name="employee-script-source" multiline="true" vertical-scroller-visibility="Auto" class="ff-text-field emp__source ff-scroll" />
+                <ui:Label name="employee-script-reference" class="emp__reference ff-wrap" picking-mode="Ignore" text="move_to(place)  ·  path(place, place, ...)  ·  take(place, items, amount)  ·  put(place, items, amount)  ·  wait(seconds)&#10;turn_on(machine)  ·  turn_off(machine)  ·  toggle(machine)  ·  is_on(machine)  ·  accepts(place, except)  ·  room(place, items)&#10;place(machine, cell, rotation)  ·  pick_up(machine)  ·  place_belt(cell, direction)  ·  holding(kind)  ·  position()&#10;count(place, items)  ·  find(kind)  ·  carrying()  ·  say(text) / print(text)&#10;place: &quot;storage&quot;, a machine kind (&quot;oven&quot;, &quot;fridge&quot;, &quot;counter&quot;), a machine ID, &quot;&lt;id&gt;:in&quot; / &quot;&lt;id&gt;:out&quot;, or a cell {x, z} to walk onto (Select world pos inserts one). items: an item, a list {&quot;dough&quot;}, {except = {...}} or nil for any. take() and put() walk there first; amount may be left out." />
+            </ui:VisualElement>
+            <ui:VisualElement class="ff-row emp__footer">
+                <ui:Label text="Changes apply when you press Run." class="ff-small ff-grow" picking-mode="Ignore" />
+                <ui:Button name="employee-script-stop" text="Stop" focusable="false" class="ff-button ff-button--lg" />
+                <ui:Button name="employee-script-run" focusable="false" class="ff-button ff-button--primary ff-button--lg ff-button--with-glyph emp__run">
+                    <ui:VisualElement class="ff-glyph ff-glyph--play ff-glyph--sm" />
+                    <ui:Label text="Run" picking-mode="Ignore" />
+                </ui:Button>
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

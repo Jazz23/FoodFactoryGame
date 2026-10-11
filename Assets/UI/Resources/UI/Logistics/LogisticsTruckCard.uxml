@@ -1,0 +1,14 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <!-- A truck (decision 0022): name, live status and cargo, its route chooser and Assign. -->
+    <Style src="project://database/Assets/UI/Theme/Theme.uss" />
+    <Style src="Logistics.uss" />
+    <ui:VisualElement class="ff-card logi-card">
+        <ui:Label name="title" class="logi-card__name" picking-mode="Ignore" />
+        <ui:Label name="status" class="ff-small ff-wrap" picking-mode="Ignore" />
+        <ui:Label name="cargo" class="ff-small ff-wrap" picking-mode="Ignore" />
+        <ui:VisualElement name="choosers" class="logi-card__choosers" />
+        <ui:VisualElement class="ff-row logi-card__buttons">
+            <ui:Button name="assign" focusable="false" class="ff-button ff-button--sm" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

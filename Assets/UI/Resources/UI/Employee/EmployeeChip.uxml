@@ -1,0 +1,12 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <!-- One item chip in a task's tag field: icon, name and a remove button. -->
+    <Style src="project://database/Assets/UI/Theme/Theme.uss" />
+    <Style src="Employee.uss" />
+    <ui:VisualElement class="ff-row emp-chip">
+        <ui:VisualElement name="icon" class="ff-icon emp-chip__icon" picking-mode="Ignore" />
+        <ui:Label name="title" class="emp-chip__name" picking-mode="Ignore" />
+        <ui:Button name="remove" focusable="false" class="ff-button ff-button--ghost emp-chip__remove">
+            <ui:VisualElement class="ff-glyph ff-glyph--close ff-glyph--sm" />
+        </ui:Button>
+    </ui:VisualElement>
+</ui:UXML>

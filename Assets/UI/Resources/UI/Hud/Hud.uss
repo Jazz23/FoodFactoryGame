@@ -1,0 +1,255 @@
+/* The HUD and its slot-grid screens (decision 0040), from the "Food Factory UI" canvas (HUD, Inventory + storage, Oven,
+   Staff). Slots, buttons and cards come from Theme.uss. */
+
+/* ---------- In the world ---------- */
+
+.hud-crosshair {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 6px;
+    height: 6px;
+    margin-left: -3px;
+    margin-top: -3px;
+    background-color: var(--ff-text);
+    border-width: 1px;
+    border-color: rgba(0, 0, 0, 0.35);
+    border-radius: 3px;
+}
+
+/* "[E]  Open Oven" under the crosshair. */
+.hud-prompt {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    translate: -50% 28px;
+    flex-direction: row;
+    align-items: center;
+    background-color: var(--ff-overlay);
+    border-radius: 10px;
+    padding: 8px 14px 8px 8px;
+}
+
+.hud-prompt__text { margin-left: 10px; font-size: 14px; }
+
+/* Top right: cash over the clock, then the wage warning and the spoilage alert, each its own card. */
+.hud-status {
+    position: absolute;
+    top: 24px;
+    right: 24px;
+    width: 260px;
+    align-items: flex-end;
+}
+
+.hud-money { min-width: 150px; padding: 8px 12px; }
+.hud-money__cash { font-size: 20px; -unity-font-style: bold; margin-top: 1px; }
+.hud-money__divider { margin-top: 5px; margin-bottom: 5px; }
+.hud-money__clock { font-size: 12px; color: var(--ff-text-soft); }
+
+.hud-warning {
+    margin-top: 8px;
+    align-self: stretch;
+    flex-direction: row;
+    align-items: flex-start;
+    border-color: var(--ff-accent);
+}
+
+.hud-warning__mark {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    margin: 1px 10px 0 0;
+    -unity-text-align: middle-center;
+    background-color: var(--ff-accent);
+    border-radius: 9px;
+    font-size: 14px;
+    -unity-font-style: bold;
+    color: var(--ff-ink);
+}
+
+.hud-warning__text { font-size: 13px; flex-shrink: 1; }
+
+.hud-alert {
+    margin-top: 8px;
+    align-self: stretch;
+    flex-direction: row;
+    align-items: center;
+}
+
+.hud-alert__text { margin-left: 10px; flex-shrink: 1; font-size: 13px; }
+.hud-alert__time { margin-left: 8px; font-size: 12px; -unity-font-style: bold; color: var(--ff-warning); }
+
+/* ---------- Hotbar, cursor stack, removal wheel ---------- */
+
+.hud-hotbar-row {
+    position: absolute;
+    bottom: 24px;
+    left: 0;
+    right: 0;
+    flex-direction: row;
+    justify-content: center;
+}
+
+.hud-hotbar {
+    flex-direction: row;
+    background-color: var(--ff-overlay);
+    border-width: 1px;
+    border-color: var(--ff-edge);
+    border-radius: 14px;
+    padding: 6px;
+}
+
+.hud-hotbar .ff-slot { width: 56px; height: 56px; border-radius: 9px; }
+.hud-hotbar .ff-icon { width: 38px; height: 38px; }
+
+.hud-slot__number {
+    position: absolute;
+    left: 5px;
+    top: 3px;
+    font-size: 10px;
+    color: var(--ff-faint);
+}
+
+.ff-slot--selected .hud-slot__number { color: var(--ff-accent); }
+
+/* Slots light up under the pointer on a screen; in the world the hotbar is display only. */
+.hud-grid .ff-slot:hover,
+.hud--screen-open .hud-hotbar .ff-slot:hover { border-color: var(--ff-accent); }
+
+.hud-cursor {
+    position: absolute;
+    width: 36px;
+    height: 36px;
+}
+
+.hud-wheel {
+    position: absolute;
+    width: 34px;
+    height: 34px;
+}
+
+/* ---------- Screens ---------- */
+
+/* An open screen is centred in the space above the hotbar, which stays clickable as a drop target. */
+.hud-screen-area {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 24px;
+    bottom: 112px;
+    justify-content: center;
+    align-items: center;
+}
+
+.hud-screen { flex-direction: row; align-items: flex-start; }
+
+.hud-window { margin: 0 6px; }
+.hud-window__header { align-items: flex-end; margin-bottom: 12px; }
+.hud-window__subtitle { margin: 0 0 2px 10px; flex-shrink: 1; font-size: 12px; color: var(--ff-muted); }
+
+/* One line at the grid's width (the code sets it): a longer hover line never resizes the centred screen. */
+.hud-hover {
+    margin-top: 10px;
+    font-size: 12px;
+    color: var(--ff-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.hud-grid__row { flex-direction: row; }
+
+/* Supplier and Staff share a scrolling column beside the grids. */
+.hud-side { width: 320px; }
+.hud-side__gap { margin-top: 12px; }
+
+.hud-note { margin-top: 6px; font-size: 12px; }
+
+/* A grid with its caption over it. */
+.hud-labelled { align-items: flex-start; }
+.hud-labelled__caption { margin: 0 0 6px 2px; }
+
+/* Supplier offers. */
+.hud-offer__icon { width: 32px; height: 32px; }
+.hud-offer__text { flex-grow: 1; margin-left: 10px; min-width: 120px; }
+.hud-offer__name { font-size: 14px; -unity-font-style: bold; }
+.hud-offer__detail { margin-top: 2px; }
+
+/* Staff. */
+.hud-staff__summary { margin: -6px 0 12px 0; }
+.hud-tiles { align-items: stretch; }
+.hud-tiles__gap { margin-left: 8px; }
+.hud-tile--short .ff-tile__value { color: var(--ff-warning); }
+
+.hud-employee__text { flex-grow: 1; margin-left: 12px; }
+.hud-employee__state { margin-top: 3px; }
+.hud-employee__state-text { margin-left: 6px; font-size: 12px; color: var(--ff-text-soft); }
+.hud-employee--unpaid .hud-employee__state-text { color: var(--ff-danger-text); }
+.hud-employee__fire { align-items: flex-end; }
+.hud-employee__hint { margin-top: 3px; font-size: 10px; color: var(--ff-faint); }
+
+.hud-staff__hire { margin-top: 12px; }
+.hud-staff__hire-button { margin-left: 12px; }
+.hud-staff__divider { margin: 14px 0; }
+.hud-staff__hint { margin-top: 2px; }
+.hud-staff__hours { min-width: 44px; font-size: 13px; -unity-font-style: bold; -unity-text-align: middle-center; }
+
+/* Factory construction. */
+.hud-floor__price { font-size: 13px; min-width: 140px; }
+
+/* A machine: input, progress, output. */
+.hud-machine { min-width: 380px; }
+.hud-machine__body { align-items: center; justify-content: center; }
+
+.hud-machine__middle {
+    width: 120px;
+    margin: 16px 16px 0 16px;
+}
+
+.hud-machine__arrow { width: 40px; height: 20px; align-self: center; margin-bottom: 6px; color: var(--ff-disabled); }
+.hud-machine__prices { min-width: 120px; }
+.hud-machine__price { margin-top: 6px; font-size: 13px; }
+.hud-machine__progress-label { margin-top: 10px; font-size: 12px; color: var(--ff-text-soft); }
+
+/* A register's staff (decision 0034). */
+.hud-register { margin-top: 14px; flex-wrap: wrap; }
+.hud-register__label { font-size: 12px; }
+.hud-register--empty .hud-register__label { color: var(--ff-danger-text); }
+.hud-register__button { margin-left: 8px; }
+
+/* The power switch (decision 0037). */
+.hud-power { margin-top: 16px; }
+.hud-power__label { margin-top: 2px; }
+
+.hud-power__switch {
+    width: 88px;
+    height: 44px;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 4px;
+    background-color: var(--ff-edge);
+    border-radius: 22px;
+}
+
+.hud-power__switch:hover { background-color: var(--ff-edge-strong); }
+.hud-power__switch--on { justify-content: flex-end; background-color: var(--ff-power-on); }
+.hud-power__switch--on:hover { background-color: #47AA62; }
+.hud-power__switch:disabled { opacity: 0.6; }
+
+.hud-power__knob {
+    width: 36px;
+    height: 36px;
+    border-radius: 18px;
+    background-color: var(--ff-knob);
+    align-items: center;
+    justify-content: center;
+}
+
+.hud-power__state { font-size: 10px; -unity-font-style: bold; color: var(--ff-ink); }
+
+/* Docks and storage machines. */
+.hud-dock__body { align-items: flex-start; }
+.hud-dock__outgoing { margin-right: 16px; }
+.hud-dock__warning { color: #FFBF4D; }
+.hud-storage__body { align-items: center; }

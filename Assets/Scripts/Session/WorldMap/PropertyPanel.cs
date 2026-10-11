@@ -1,5 +1,6 @@
-// Local player's buy panel for a map building (decision 0028) in UI Toolkit, built in code: opened by aiming at a purchasable
-// building and pressing Interact (EquipmentInteraction.OpenProperty). It shows the building's category, its lot's price,
+// Local player's buy panel for a map building (decision 0028), drawn from the Property UXML and USS under Assets/UI/Resources/UI
+// (decision 0042): opened by aiming at a purchasable building and pressing Interact (EquipmentInteraction.OpenProperty). It
+// shows the building's category, its lot's price,
 // whether it is for sale, owned by this company, owned by another or not sold, and the company's cash, with a Buy button.
 // The offer comes from the replicated layout through the same WorldLayoutShells call the server uses, so nothing extra is sent;
 // ownership comes from the primary baseline's public property records. Buy is a request the server checks; like
@@ -18,11 +19,6 @@ namespace FoodFactoryGame.Session.WorldMap
     [DisallowMultipleComponent]
     public sealed class PropertyPanel : MonoBehaviour
     {
-        private static readonly Color Backdrop = new(0.19f, 0.19f, 0.2f, 0.97f);
-        private static readonly Color Heading = new(1f, 0.9f, 0.74f, 1f);
-        private static readonly Color Muted = new(0.7f, 0.7f, 0.75f, 1f);
-        private static readonly Color Error = new(0.95f, 0.45f, 0.4f, 1f);
-
         [SerializeField] private UIDocument document;
         [SerializeField] private EquipmentInteraction interaction;
         [SerializeField] private WorldLayoutPresenter map;
@@ -31,6 +27,7 @@ namespace FoodFactoryGame.Session.WorldMap
         private readonly Dictionary<string, string> _pending = new();
         private ClientSiteSubscription _subscription;
         private VisualElement _window;
+        private VisualElement _dim;
         private Label _title;
         private Label _price;
         private Label _state;
@@ -51,46 +48,19 @@ namespace FoodFactoryGame.Session.WorldMap
         {
             var root = document.rootVisualElement;
             root.Clear();
-            _window = new VisualElement { name = "property" };
-            _window.style.position = Position.Absolute;
-            _window.style.left = new Length(50, LengthUnit.Percent);
-            _window.style.top = new Length(50, LengthUnit.Percent);
-            _window.style.translate = new Translate(new Length(-50, LengthUnit.Percent), new Length(-50, LengthUnit.Percent));
-            _window.style.width = 340;
-            _window.style.backgroundColor = Backdrop;
-            _window.style.paddingLeft = _window.style.paddingRight = _window.style.paddingTop = _window.style.paddingBottom = 10;
-            _window.style.borderTopLeftRadius = _window.style.borderTopRightRadius = 4;
-            _window.style.borderBottomLeftRadius = _window.style.borderBottomRightRadius = 4;
-            _title = Caption("", 16, Heading);
-            _title.name = "property-title";
-            _title.style.unityFontStyleAndWeight = FontStyle.Bold;
-            _window.Add(_title);
-            _price = Caption("", 13, Color.white, 6);
-            _price.name = "property-price";
-            _window.Add(_price);
-            _state = Caption("", 13, Color.white, 2);
-            _state.name = "property-state";
-            _window.Add(_state);
-            _cash = Caption("", 12, Muted, 2);
-            _cash.name = "property-cash";
-            _window.Add(_cash);
-            _status = Caption(" ", 12, Error, 6);
-            _status.name = "property-status";
-            _window.Add(_status);
-            var buttons = new VisualElement();
-            buttons.style.flexDirection = FlexDirection.Row;
-            buttons.style.justifyContent = Justify.FlexEnd;
-            buttons.style.marginTop = 6;
-            // Not focusable: a focused button would click again on every keyboard Submit (Enter/Space).
-            _buy = new Button(Buy) { name = "property-buy", text = "Buy", focusable = false };
-            _buy.style.minWidth = 70;
-            buttons.Add(_buy);
-            var close = new Button(interaction.CloseScreen) { name = "property-close", text = "Close", focusable = false };
-            close.style.minWidth = 70;
-            buttons.Add(close);
-            _window.Add(buttons);
-            root.Add(_window);
-            _window.style.display = DisplayStyle.None;
+            UiTemplates.Fill(root, "Property/Property");
+            _window = root.Part("property");
+            _dim = root.Part("property-dim");
+            _title = root.Part<Label>("property-title");
+            _price = root.Part<Label>("property-price");
+            _state = root.Part<Label>("property-state");
+            _cash = root.Part<Label>("property-cash");
+            _status = root.Part<Label>("property-status");
+            _buy = root.Part<Button>("property-buy");
+            _buy.clicked += Buy;
+            root.Part<Button>("property-close").clicked += interaction.CloseScreen;
+            _window.Show(false);
+            _dim.Show(false);
         }
 
         private void Update()
@@ -100,7 +70,8 @@ namespace FoodFactoryGame.Session.WorldMap
             var site = Session.ClientSite;
             var offer = Offer();
             var open = site != null && offer != null && Session.IsRunning && interaction.Screen == InteractionScreen.Property;
-            _window.style.display = open ? DisplayStyle.Flex : DisplayStyle.None;
+            _window.Show(open);
+            _dim.Show(open);
             if (!open) return;
             var company = site.Companies.FirstOrDefault(x => x.SiteIds.Contains(Session.ClientSiteId));
             var owner = site.Properties.FirstOrDefault(x => x.LotId == offer.LotId)?.CompanyId;
@@ -108,6 +79,8 @@ namespace FoodFactoryGame.Session.WorldMap
             _price.text = $"Price: {PlayerHud.FormatCash(offer.PriceCents)}  (lot {offer.Width} x {offer.Depth} m)";
             _state.text = owner != null ? (owner == company?.Id ? "Owned by your company" : "Owned by another company")
                 : offer.ForSale ? "For sale" : "Not for sale";
+            _state.EnableInClassList("prop__state--yours", owner != null && owner == company?.Id);
+            _state.EnableInClassList("prop__state--taken", owner != null && owner != company?.Id);
             _cash.text = company == null ? "Your company: none on this site" : $"Your company's cash: {PlayerHud.FormatCash(company.Cash)}";
             _buy.SetEnabled(owner == null && offer.ForSale && company != null && !HasPendingRequests);
             _status.text = HasPendingRequests ? "Waiting for the server..." : string.IsNullOrEmpty(LastRejection) ? " " : $"Rejected: {LastRejection}";
@@ -156,15 +129,5 @@ namespace FoodFactoryGame.Session.WorldMap
             GoodsWorld.StationCategory => "Station",
             _ => category
         };
-
-        private static Label Caption(string text, int size, Color color, int marginTop = 0)
-        {
-            var label = new Label(text) { pickingMode = PickingMode.Ignore };
-            label.style.fontSize = size;
-            label.style.color = color;
-            label.style.marginTop = marginTop;
-            label.style.whiteSpace = WhiteSpace.Normal;
-            return label;
-        }
     }
 }

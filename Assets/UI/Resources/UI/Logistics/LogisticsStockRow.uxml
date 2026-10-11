@@ -1,0 +1,9 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <!-- One stack on another site with its live count, and the button that moves one stack of it. -->
+    <Style src="project://database/Assets/UI/Theme/Theme.uss" />
+    <Style src="Logistics.uss" />
+    <ui:VisualElement class="ff-row logi-stock">
+        <ui:Label name="count" class="logi-stock__label ff-grow" picking-mode="Ignore" />
+        <ui:Button name="move" focusable="false" class="ff-button ff-button--sm logi-stock__move" />
+    </ui:VisualElement>
+</ui:UXML>

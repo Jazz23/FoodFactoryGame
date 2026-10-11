@@ -1,0 +1,12 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <!-- One grid or hotbar slot. PlayerHud names it, hides the parts it does not use and adds the state classes
+         (ff-slot filled, spoiled, selected). The number shows only on hotbar slots. -->
+    <Style src="project://database/Assets/UI/Theme/Theme.uss" />
+    <Style src="Hud.uss" />
+    <ui:Button focusable="false" class="ff-slot hud-slot">
+        <ui:VisualElement name="hud-icon" class="ff-icon" picking-mode="Ignore" />
+        <ui:Label name="hud-spoil-timer" class="ff-slot__timer" picking-mode="Ignore" />
+        <ui:Label name="hud-count" class="ff-slot__count" picking-mode="Ignore" />
+        <ui:Label name="number" class="hud-slot__number" picking-mode="Ignore" />
+    </ui:Button>
+</ui:UXML>

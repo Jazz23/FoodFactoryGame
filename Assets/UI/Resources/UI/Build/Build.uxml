@@ -1,0 +1,53 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <!-- Restaurant build mode's panel (decision 0034): a window on the right with cash and ambience, the tools, the styles for the
+         chosen tool, the catalog (BuildCatalogItem.uxml per offer), the preview line and Leave; and the hold-to-remove wheel. -->
+    <Style src="project://database/Assets/UI/Theme/Theme.uss" />
+    <Style src="Build.uss" />
+    <ui:VisualElement name="build-root" class="ff-root ff-fill" picking-mode="Ignore">
+        <ui:VisualElement name="build" class="ff-panel build">
+            <ui:VisualElement class="build__head">
+                <ui:VisualElement class="ff-row">
+                    <ui:Label text="Build" class="ff-title ff-grow" picking-mode="Ignore" />
+                    <ui:Button name="build-close" focusable="false" class="ff-button ff-button--icon">
+                        <ui:VisualElement class="ff-glyph ff-glyph--close ff-glyph--sm" />
+                    </ui:Button>
+                </ui:VisualElement>
+                <ui:VisualElement class="ff-row build__money" picking-mode="Ignore">
+                    <ui:VisualElement class="ff-grow" picking-mode="Ignore">
+                        <ui:Label text="CASH" class="ff-eyebrow" picking-mode="Ignore" />
+                        <ui:Label name="build-cash" class="build__cash" picking-mode="Ignore" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="build__ambience" picking-mode="Ignore">
+                        <ui:Label text="AMBIENCE" class="ff-eyebrow" picking-mode="Ignore" />
+                        <ui:Label name="build-ambience" class="build__ambience-value" picking-mode="Ignore" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+            </ui:VisualElement>
+            <ui:VisualElement class="build__body">
+                <ui:Label text="TOOLS" class="ff-eyebrow" picking-mode="Ignore" />
+                <ui:VisualElement name="build-tools" class="build__chips">
+                    <ui:Button name="build-tool-sell" text="Sell / remove" focusable="false" class="ff-button ff-chip" />
+                    <ui:Button name="build-tool-wall" text="Wall" focusable="false" class="ff-button ff-chip" />
+                    <ui:Button name="build-tool-door" text="Door" focusable="false" class="ff-button ff-chip" />
+                    <ui:Button name="build-tool-window" text="Window" focusable="false" class="ff-button ff-chip" />
+                    <ui:Button name="build-tool-finish" text="Wall finish" focusable="false" class="ff-button ff-chip" />
+                </ui:VisualElement>
+                <ui:Label name="build-styles-heading" text="STYLE" class="ff-eyebrow build__heading" picking-mode="Ignore" />
+                <ui:VisualElement name="build-styles" class="build__chips" />
+                <ui:Label text="CATALOG" class="ff-eyebrow build__heading build__heading--catalog" picking-mode="Ignore" />
+                <ui:ScrollView name="build-catalog-scroll" mode="Vertical" horizontal-scroller-visibility="Hidden" class="ff-scroll build__catalog">
+                    <ui:VisualElement name="build-catalog" />
+                </ui:ScrollView>
+            </ui:VisualElement>
+            <ui:VisualElement class="build__footer">
+                <ui:Label name="build-preview" text=" " class="build__preview ff-wrap" picking-mode="Ignore" />
+                <ui:Label name="build-status" class="build__status ff-wrap" picking-mode="Ignore" />
+                <ui:VisualElement class="ff-row build__buttons">
+                    <ui:Button name="build-cancel" text="Clear selection" focusable="false" class="ff-button ff-grow" />
+                    <ui:Button name="build-leave" text="Leave" focusable="false" class="ff-button ff-button--primary build__leave" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:VisualElement name="build-hold-wheel" class="build__wheel" picking-mode="Ignore" />
+    </ui:VisualElement>
+</ui:UXML>

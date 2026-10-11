@@ -1,5 +1,6 @@
-// Local player's logistics screen (decisions 0022, 0023) in UI Toolkit, built in code: the company's routes (pickup dock,
-// dropoff dock, cargo, Apply, Delete, and the trucks on each) with a draft for a new route; its trucks with their live status,
+// Local player's logistics screen (decisions 0022, 0023), drawn from the Logistics UXML and USS under Assets/UI/Resources/UI
+// (decision 0042): the company's routes (pickup dock, dropoff dock, cargo, Apply, Delete, and the trucks on each) with a
+// draft for a new route; its trucks with their live status,
 // cargo and a route chooser (a route or Parked) with Assign, and a Buy button per truck offer; and its remote sites with their
 // storage and dock stock and buttons that move one stack at a time between them. Opened with L (EquipmentInteraction). Every
 // button is a request the server checks; nothing changes here until the next baseline. Rows are rebuilt only when the set of
@@ -26,11 +27,7 @@ namespace FoodFactoryGame.Session.Logistics
         // Draft key of the route not created yet.
         public const string NewRouteKey = "new";
 
-        private static readonly Color Backdrop = new(0.19f, 0.19f, 0.2f, 0.97f);
-        private static readonly Color Inset = new(0.11f, 0.11f, 0.12f, 1f);
-        private static readonly Color Heading = new(1f, 0.9f, 0.74f, 1f);
-        private static readonly Color Muted = new(0.7f, 0.7f, 0.75f, 1f);
-        private static readonly Color Error = new(0.95f, 0.45f, 0.4f, 1f);
+        private const string Templates = "Logistics/";
 
         [SerializeField] private UIDocument document;
         [SerializeField] private EquipmentInteraction interaction;
@@ -50,6 +47,7 @@ namespace FoodFactoryGame.Session.Logistics
         private readonly HashSet<string> _pending = new();
         private ClientSiteSubscription _subscription;
         private VisualElement _window;
+        private VisualElement _dim;
         private VisualElement _routes;
         private VisualElement _trucks;
         private VisualElement _sites;
@@ -67,41 +65,16 @@ namespace FoodFactoryGame.Session.Logistics
         {
             var root = document.rootVisualElement;
             root.Clear();
-            _window = new VisualElement { name = "logistics" };
-            _window.style.position = Position.Absolute;
-            _window.style.left = new Length(50, LengthUnit.Percent);
-            _window.style.top = new Length(50, LengthUnit.Percent);
-            _window.style.translate = new Translate(new Length(-50, LengthUnit.Percent), new Length(-50, LengthUnit.Percent));
-            _window.style.backgroundColor = Backdrop;
-            Pad(_window, 10);
-            _window.style.borderTopLeftRadius = _window.style.borderTopRightRadius = 4;
-            _window.style.borderBottomLeftRadius = _window.style.borderBottomRightRadius = 4;
-            var title = Caption("Logistics", 16, Heading);
-            title.style.unityFontStyleAndWeight = FontStyle.Bold;
-            _window.Add(title);
-            var columns = new VisualElement();
-            columns.style.flexDirection = FlexDirection.Row;
-            columns.style.alignItems = Align.FlexStart;
-            columns.style.marginTop = 6;
-            _routes = Column("logistics-routes", 430);
-            _trucks = Column("logistics-trucks", 330);
-            _trucks.style.marginLeft = 10;
-            _sites = Column("logistics-sites", 330);
-            _sites.style.marginLeft = 10;
-            columns.Add(_routes);
-            columns.Add(_trucks);
-            columns.Add(_sites);
-            _window.Add(columns);
-            _status = Caption(" ", 12, Error);
-            _status.name = "logistics-status";
-            _status.style.marginTop = 6;
-            _window.Add(_status);
-            var close = new Button(interaction.CloseScreen) { name = "logistics-close", text = "Close", focusable = false };
-            close.style.alignSelf = Align.FlexEnd;
-            close.style.minWidth = 70;
-            _window.Add(close);
-            root.Add(_window);
-            _window.style.display = DisplayStyle.None;
+            UiTemplates.Fill(root, Templates + "Logistics");
+            _window = root.Part("logistics");
+            _dim = root.Part("logistics-dim");
+            _routes = root.Part("logistics-routes");
+            _trucks = root.Part("logistics-trucks");
+            _sites = root.Part("logistics-sites");
+            _status = root.Part<Label>("logistics-status");
+            root.Part<Button>("logistics-close").clicked += interaction.CloseScreen;
+            _window.Show(false);
+            _dim.Show(false);
         }
 
         private void Update()
@@ -113,7 +86,8 @@ namespace FoodFactoryGame.Session.Logistics
             if (site != null)
                 foreach (var remote in site.Sites.Where(x => x.Id != _subscription?.SiteId)) _subscription?.Watch(remote.Id);
             var open = site != null && Session.IsRunning && interaction.Screen == InteractionScreen.Logistics;
-            _window.style.display = open ? DisplayStyle.Flex : DisplayStyle.None;
+            _window.Show(open);
+            _dim.Show(open);
             if (!open) return;
             _drafts.TryAdd(NewRouteKey, new RouteDraft());
             foreach (var route in site.Routes.Where(x => !_drafts.ContainsKey(x.Id)))
@@ -289,13 +263,11 @@ namespace FoodFactoryGame.Session.Logistics
             _routes.Clear();
             _trucks.Clear();
             _sites.Clear();
-            _routes.Add(Heading2("Routes"));
             var routes = Routes();
-            if (routes.Count == 0) _routes.Add(Caption("The company has no routes.", 12, Muted));
+            if (routes.Count == 0) _routes.Add(Empty("The company has no routes."));
             foreach (var route in routes) _routes.Add(RouteCard(site, route));
             _routes.Add(NewRouteCard());
-            _trucks.Add(Heading2("Trucks"));
-            if (site.Trucks.Count == 0) _trucks.Add(Caption("The company has no trucks.", 12, Muted));
+            if (site.Trucks.Count == 0) _trucks.Add(Empty("The company has no trucks."));
             foreach (var truck in site.Trucks.OrderBy(x => x.Id, StringComparer.Ordinal)) _trucks.Add(TruckCard(truck));
             foreach (var offer in TruckOffers())
             {
@@ -304,89 +276,89 @@ namespace FoodFactoryGame.Session.Logistics
                 {
                     name = $"logistics-buy-{id}", text = $"Buy {offer.Truck.DisplayName}  {PlayerHud.FormatCash(offer.PriceCents)}", focusable = false
                 };
-                buy.style.alignSelf = Align.FlexStart;
-                buy.style.marginTop = 6;
+                buy.AddToClassList("ff-button");
+                buy.AddToClassList("ff-button--primary");
+                buy.AddToClassList("logi__buy");
                 _trucks.Add(buy);
             }
-            _sites.Add(Heading2("Other sites"));
             var remotes = RemoteSites(site).ToList();
-            if (remotes.Count == 0) _sites.Add(Caption("The company has no other sites.", 12, Muted));
+            if (remotes.Count == 0) _sites.Add(Empty("The company has no other sites."));
             foreach (var remote in remotes) _sites.Add(SiteCard(site, remote));
         }
 
         private VisualElement RouteCard(GoodsSnapshot site, GoodsRoute route)
         {
             var id = route.Id;
-            var card = Card($"logistics-route-{id}");
-            var name = Caption(RouteName(route), 13, Color.white);
-            name.style.unityFontStyleAndWeight = FontStyle.Bold;
-            card.Add(name);
+            var card = UiTemplates.Clone(Templates + "LogisticsRouteCard");
+            card.name = $"logistics-route-{id}";
+            card.Part<Label>("title").text = RouteName(route);
             var trucks = site.Trucks.Where(x => x.RouteId == id).OrderBy(x => x.Id, StringComparer.Ordinal).Select(x => x.Name).ToList();
-            var assigned = Caption(trucks.Count == 0 ? "No trucks: assign one on the right." : "Trucks: " + string.Join(", ", trucks), 12, Muted);
+            var assigned = card.Part<Label>("trucks");
             assigned.name = $"logistics-route-trucks-{id}";
-            card.Add(assigned);
-            AddChoosers(card, id);
+            assigned.text = trucks.Count == 0 ? "No trucks: assign one on the right." : "Trucks: " + string.Join(", ", trucks);
+            AddChoosers(card.Part("choosers"), id);
             var draft = _drafts[id];
             var applied = route.PickupDockId == draft.PickupDockId && route.DropoffDockId == draft.DropoffDockId
                 && route.AllowedItemIds.FirstOrDefault() == draft.ItemId && route.AllowedItemIds.Count <= 1;
-            var buttons = new VisualElement();
-            buttons.style.flexDirection = FlexDirection.Row;
-            buttons.style.marginTop = 4;
-            var apply = new Button(() => ApplyRoute(id)) { name = $"logistics-apply-{id}", text = applied ? "Route set" : "Apply route", focusable = false };
+            var apply = card.Part<Button>("apply");
+            apply.name = $"logistics-apply-{id}";
+            apply.text = applied ? "Route set" : "Apply route";
+            apply.EnableInClassList("ff-button--primary", !applied);
             apply.SetEnabled(!applied && draft.PickupDockId != null && draft.DropoffDockId != null);
-            buttons.Add(apply);
-            buttons.Add(new Button(() => DeleteRoute(id)) { name = $"logistics-delete-{id}", text = "Delete", focusable = false });
-            card.Add(buttons);
+            apply.clicked += () => ApplyRoute(id);
+            var delete = card.Part<Button>("delete");
+            delete.name = $"logistics-delete-{id}";
+            delete.clicked += () => DeleteRoute(id);
+            card.Part("create").RemoveFromHierarchy();
             return card;
         }
 
         private VisualElement NewRouteCard()
         {
-            var card = Card("logistics-route-new");
-            var name = Caption("New route", 13, Color.white);
-            name.style.unityFontStyleAndWeight = FontStyle.Bold;
-            card.Add(name);
-            AddChoosers(card, NewRouteKey);
+            var card = UiTemplates.Clone(Templates + "LogisticsRouteCard");
+            card.name = "logistics-route-new";
+            card.Part<Label>("title").text = "New route";
+            card.Part("trucks").RemoveFromHierarchy();
+            AddChoosers(card.Part("choosers"), NewRouteKey);
             var draft = _drafts[NewRouteKey];
-            var create = new Button(CreateRoute) { name = "logistics-create-route", text = "Create route", focusable = false };
+            card.Part("apply").RemoveFromHierarchy();
+            card.Part("delete").RemoveFromHierarchy();
+            var create = card.Part<Button>("create");
+            create.name = "logistics-create-route";
             create.SetEnabled(draft.PickupDockId != null && draft.DropoffDockId != null);
-            create.style.alignSelf = Align.FlexStart;
-            create.style.marginTop = 4;
-            card.Add(create);
+            create.clicked += CreateRoute;
             return card;
         }
 
-        private void AddChoosers(VisualElement card, string routeKey)
+        private void AddChoosers(VisualElement choosers, string routeKey)
         {
             var draft = _drafts[routeKey];
-            card.Add(Chooser(routeKey, PickupField, "Load at", DockName(draft.PickupDockId), step => CycleDraft(routeKey, PickupField, step)));
-            card.Add(Chooser(routeKey, DropoffField, "Deliver to", DockName(draft.DropoffDockId), step => CycleDraft(routeKey, DropoffField, step)));
-            card.Add(Chooser(routeKey, CargoField, "Cargo", draft.ItemId == null ? "Any" : ItemName(draft.ItemId),
+            choosers.Add(Chooser(routeKey, PickupField, "Load at", DockName(draft.PickupDockId), step => CycleDraft(routeKey, PickupField, step)));
+            choosers.Add(Chooser(routeKey, DropoffField, "Deliver to", DockName(draft.DropoffDockId), step => CycleDraft(routeKey, DropoffField, step)));
+            choosers.Add(Chooser(routeKey, CargoField, "Cargo", draft.ItemId == null ? "Any" : ItemName(draft.ItemId),
                 step => CycleDraft(routeKey, CargoField, step)));
         }
 
         private VisualElement TruckCard(GoodsTruck truck)
         {
             var id = truck.Id;
-            var card = Card($"logistics-truck-{id}");
-            var name = Caption(truck.Name, 13, Color.white);
-            name.style.unityFontStyleAndWeight = FontStyle.Bold;
-            card.Add(name);
-            Live(card, $"logistics-truck-status-{id}", () => TruckStatus(Current(id)), Muted);
-            Live(card, $"logistics-truck-cargo-{id}", () => CargoText(Current(id)), Muted);
+            var card = UiTemplates.Clone(Templates + "LogisticsTruckCard");
+            card.name = $"logistics-truck-{id}";
+            card.Part<Label>("title").text = truck.Name;
+            Live(card.Part<Label>("status"), $"logistics-truck-status-{id}", () => TruckStatus(Current(id)));
+            Live(card.Part<Label>("cargo"), $"logistics-truck-cargo-{id}", () => CargoText(Current(id)));
             var chosen = _truckDrafts[id];
             var route = Routes().FirstOrDefault(x => x.Id == chosen);
-            card.Add(Chooser(id, "route", "Route", route == null ? "Parked" : RouteName(route), step => CycleTruckRoute(id, step), 170));
+            var chooser = Chooser(id, "route", "Route", route == null ? "Parked" : RouteName(route), step => CycleTruckRoute(id, step));
+            chooser.AddToClassList("logi-chooser--narrow");
+            card.Part("choosers").Add(chooser);
             var applied = chosen == (truck.RouteId ?? "");
-            var assign = new Button(() => AssignTruck(id))
-            {
-                name = $"logistics-assign-{id}", text = applied ? (chosen == "" ? "Parked" : "Assigned") : chosen == "" ? "Park" : "Assign",
-                focusable = false
-            };
+            var assign = card.Part<Button>("assign");
+            assign.name = $"logistics-assign-{id}";
+            assign.text = applied ? (chosen == "" ? "Parked" : "Assigned") : chosen == "" ? "Park" : "Assign";
+            assign.EnableInClassList("ff-button--primary", !applied);
             assign.SetEnabled(!applied);
-            assign.style.alignSelf = Align.FlexStart;
-            assign.style.marginTop = 4;
-            card.Add(assign);
+            assign.clicked += () => AssignTruck(id);
             return card;
         }
 
@@ -394,22 +366,16 @@ namespace FoodFactoryGame.Session.Logistics
 
         private GoodsRoute RouteOf(GoodsTruck truck) => Primary == null ? null : GoodsWorld.RouteOf(Primary, truck);
 
-        private VisualElement Chooser(string key, string field, string label, string value, Action<int> cycle, int width = 200)
+        private VisualElement Chooser(string key, string field, string label, string value, Action<int> cycle)
         {
-            var row = new VisualElement { name = $"logistics-{field}-{key}" };
-            row.style.flexDirection = FlexDirection.Row;
-            row.style.alignItems = Align.Center;
-            row.style.marginTop = 3;
-            var caption = Caption(label, 12, Muted);
-            caption.style.width = 70;
-            row.Add(caption);
-            row.Add(SmallButton("<", () => cycle(-1)));
-            var shown = Caption(value, 12, Color.white);
+            var row = UiTemplates.Clone(Templates + "LogisticsChooser");
+            row.name = $"logistics-{field}-{key}";
+            row.Part<Label>("caption").text = label;
+            row.Part<Button>("previous").clicked += () => cycle(-1);
+            row.Part<Button>("next").clicked += () => cycle(1);
+            var shown = row.Part<Label>("value");
             shown.name = $"logistics-{field}-value-{key}";
-            shown.style.width = width;
-            shown.style.unityTextAlign = TextAnchor.MiddleCenter;
-            row.Add(shown);
-            row.Add(SmallButton(">", () => cycle(1)));
+            shown.text = value;
             return row;
         }
 
@@ -424,57 +390,58 @@ namespace FoodFactoryGame.Session.Logistics
 
         private VisualElement SiteCard(GoodsSnapshot primary, GoodsSite remote)
         {
-            var card = Card($"logistics-site-{remote.Id}");
-            var name = Caption(remote.Name, 13, Color.white);
-            name.style.unityFontStyleAndWeight = FontStyle.Bold;
-            card.Add(name);
+            var card = UiTemplates.Clone(Templates + "LogisticsSiteCard");
+            card.name = $"logistics-site-{remote.Id}";
+            card.Part<Label>("title").text = remote.Name;
             var metres = GoodsWorld.RoadMetres(primary, GoodsWorld.ViewSiteId(primary), remote.Id);
-            if (metres is { } road) card.Add(Caption($"{road.ToString("N0", CultureInfo.InvariantCulture)} m by road", 12, Muted));
+            var distance = card.Part<Label>("distance");
+            if (metres is { } road) distance.text = $"{road.ToString("N0", CultureInfo.InvariantCulture)} m by road";
+            else distance.RemoveFromHierarchy();
+            var stock = card.Part("stock");
             var view = SiteView(remote.Id);
             if (view == null)
             {
-                card.Add(Caption("Loading...", 12, Muted));
+                stock.Add(Note("Loading...", "logi-stock__none"));
                 return card;
             }
             var storage = view.Locations.FirstOrDefault(x => x.SiteId == remote.Id && x.Kind == "storage");
             var dock = view.Equipment.Where(x => x.Kind == GoodsWorld.DockKind && x.State == EquipmentState.Placed)
                 .OrderBy(x => x.Id, StringComparer.Ordinal).FirstOrDefault();
-            if (storage != null) Stock(card, view, storage.Id, "Storage", dock == null ? null : ("Ship", dock.InputLocationId));
+            if (storage != null) Stock(stock, view, storage.Id, "Storage", dock == null ? null : ("Ship", dock.InputLocationId));
             if (dock != null)
             {
-                Stock(card, view, dock.InputLocationId, "Dock outgoing", storage == null ? null : ("Unstage", storage.Id));
-                Stock(card, view, dock.OutputLocationId, "Dock incoming", storage == null ? null : ("Store", storage.Id));
+                Stock(stock, view, dock.InputLocationId, "Dock outgoing", storage == null ? null : ("Unstage", storage.Id));
+                Stock(stock, view, dock.OutputLocationId, "Dock incoming", storage == null ? null : ("Store", storage.Id));
             }
-            else card.Add(Caption("No dock here: trucks cannot serve this site.", 12, Muted, 4));
+            else stock.Add(Note("No dock here: trucks cannot serve this site.", "logi-stock__heading"));
             return card;
         }
 
         // One location's stacks, each with its live count and a button that moves one stack to target.
-        private void Stock(VisualElement card, GoodsSnapshot view, string locationId, string title, (string Label, string LocationId)? target)
+        private void Stock(VisualElement parent, GoodsSnapshot view, string locationId, string title, (string Label, string LocationId)? target)
         {
             var siteId = GoodsWorld.ViewSiteId(view);
             var location = view.Locations.First(x => x.Id == locationId);
-            Live(card, null, () => $"{title}  {Slots(SiteView(siteId), locationId)}/{location.Capacity}", Heading, 4);
+            var heading = Note("", "logi-stock__heading");
+            parent.Add(heading);
+            Live(heading, null, () => $"{title}  {Slots(SiteView(siteId), locationId)}/{location.Capacity}");
             var groups = view.Lots.Where(x => x.LocationId == locationId).Select(x => (x.ItemId, x.Spoiled)).Distinct()
                 .OrderBy(x => x.ItemId, StringComparer.Ordinal).ThenBy(x => x.Spoiled).ToList();
-            if (groups.Count == 0) card.Add(Caption("empty", 12, Muted));
+            if (groups.Count == 0) parent.Add(Note("empty", "logi-stock__none"));
             foreach (var (itemId, spoiled) in groups)
             {
-                var row = new VisualElement { name = $"logistics-stock-{locationId}-{itemId}{(spoiled ? "-spoiled" : "")}" };
-                row.style.flexDirection = FlexDirection.Row;
-                row.style.alignItems = Align.Center;
-                var label = Caption("", 12, Color.white);
-                label.style.width = 170;
-                row.Add(label);
-                _live.Add((label, () => $"{ItemName(itemId)}{(spoiled ? " (spoiled)" : "")} ×{Units(SiteView(siteId), locationId, itemId, spoiled)}"));
+                var row = UiTemplates.Clone(Templates + "LogisticsStockRow");
+                row.name = $"logistics-stock-{locationId}-{itemId}{(spoiled ? "-spoiled" : "")}";
+                Live(row.Part<Label>("count"), null, () => $"{ItemName(itemId)}{(spoiled ? " (spoiled)" : "")} ×{Units(SiteView(siteId), locationId, itemId, spoiled)}");
+                var button = row.Part<Button>("move");
                 if (target is { } move)
                 {
-                    var button = SmallButton(move.Label, () => MoveStack(siteId, locationId, itemId, spoiled, move.LocationId));
                     button.name = $"logistics-move-{locationId}-{itemId}{(spoiled ? "-spoiled" : "")}";
-                    button.style.minWidth = 64;
-                    row.Add(button);
+                    button.text = move.Label;
+                    button.clicked += () => MoveStack(siteId, locationId, itemId, spoiled, move.LocationId);
                 }
-                card.Add(row);
+                else button.RemoveFromHierarchy();
+                parent.Add(row);
             }
         }
 
@@ -565,58 +532,23 @@ namespace FoodFactoryGame.Session.Logistics
 
         private void OnDestroy() => Subscribe(null);
 
-        private void Live(VisualElement parent, string name, Func<string> text, Color color, int marginTop = 0)
+        // A label whose text is refreshed every frame from text.
+        private void Live(Label label, string name, Func<string> text)
         {
-            var label = Caption("", 12, color, marginTop);
             if (name != null) label.name = name;
-            parent.Add(label);
             _live.Add((label, text));
         }
 
         private static int Wrap(int index, int count) => count == 0 ? 0 : ((index % count) + count) % count;
 
-        private static VisualElement Column(string name, int width)
-        {
-            var column = new VisualElement { name = name };
-            column.style.width = width;
-            return column;
-        }
+        // A muted line in an empty column.
+        private static Label Empty(string text) => Note(text, "logi__empty");
 
-        private static VisualElement Card(string name)
-        {
-            var card = new VisualElement { name = name };
-            card.style.backgroundColor = Inset;
-            card.style.marginTop = 6;
-            Pad(card, 8);
-            return card;
-        }
-
-        private static Label Heading2(string text)
-        {
-            var label = Caption(text, 14, Heading);
-            label.style.unityFontStyleAndWeight = FontStyle.Bold;
-            return label;
-        }
-
-        private static Button SmallButton(string text, Action clicked)
-        {
-            // Not focusable: a focused button would click again on every keyboard Submit (Enter/Space).
-            var button = new Button(clicked) { text = text, focusable = false };
-            button.style.minWidth = 24;
-            return button;
-        }
-
-        private static Label Caption(string text, int size, Color color, int marginTop = 0)
+        private static Label Note(string text, string className)
         {
             var label = new Label(text) { pickingMode = PickingMode.Ignore };
-            label.style.fontSize = size;
-            label.style.color = color;
-            label.style.marginTop = marginTop;
-            label.style.whiteSpace = WhiteSpace.Normal;
+            label.AddToClassList(className);
             return label;
         }
-
-        private static void Pad(VisualElement element, int padding) =>
-            element.style.paddingLeft = element.style.paddingRight = element.style.paddingTop = element.style.paddingBottom = padding;
     }
 }

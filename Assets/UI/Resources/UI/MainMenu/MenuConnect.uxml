@@ -1,0 +1,25 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <!-- Connect to Server: name and address, then Connect. -->
+    <Style src="project://database/Assets/UI/Theme/Theme.uss" />
+    <Style src="MainMenu.uss" />
+    <ui:VisualElement name="main-menu-page" class="menu-page">
+        <ui:VisualElement class="ff-row menu-page__header">
+            <ui:Button name="menu-back" focusable="false" class="ff-button ff-button--lg ff-button--overlay ff-button--with-glyph menu-back">
+                <ui:VisualElement class="ff-glyph ff-glyph--chevron-left" />
+                <ui:Label text="Back" picking-mode="Ignore" />
+            </ui:Button>
+            <ui:Label text="Connect to server" class="ff-page-title menu-page__title" picking-mode="Ignore" />
+        </ui:VisualElement>
+        <ui:VisualElement class="menu-card menu-connect">
+            <ui:VisualElement class="ff-field">
+                <ui:Label text="YOUR NAME" class="ff-eyebrow ff-field__caption" picking-mode="Ignore" />
+                <ui:TextField name="menu-connect-name" class="ff-text-field" />
+            </ui:VisualElement>
+            <ui:VisualElement class="ff-field">
+                <ui:Label text="SERVER ADDRESS" class="ff-eyebrow ff-field__caption" picking-mode="Ignore" />
+                <ui:TextField name="menu-connect-address" class="ff-text-field" />
+            </ui:VisualElement>
+            <ui:Button name="menu-connect-go" text="Connect" focusable="false" class="ff-button ff-button--primary ff-button--xl menu-connect__go" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

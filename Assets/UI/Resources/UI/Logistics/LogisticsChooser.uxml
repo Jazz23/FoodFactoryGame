@@ -1,0 +1,15 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <!-- A cycling choice in a card: caption, previous, the value, next. -->
+    <Style src="project://database/Assets/UI/Theme/Theme.uss" />
+    <Style src="Logistics.uss" />
+    <ui:VisualElement class="ff-row logi-chooser">
+        <ui:Label name="caption" class="ff-small logi-chooser__caption" picking-mode="Ignore" />
+        <ui:Button name="previous" focusable="false" class="ff-button ff-button--icon ff-button--sm logi-chooser__step">
+            <ui:VisualElement class="ff-glyph ff-glyph--chevron-left ff-glyph--sm" />
+        </ui:Button>
+        <ui:Label name="value" class="logi-chooser__value ff-nowrap" picking-mode="Ignore" />
+        <ui:Button name="next" focusable="false" class="ff-button ff-button--icon ff-button--sm logi-chooser__step">
+            <ui:VisualElement class="ff-glyph ff-glyph--chevron-right ff-glyph--sm" />
+        </ui:Button>
+    </ui:VisualElement>
+</ui:UXML>

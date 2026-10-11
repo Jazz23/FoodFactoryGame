@@ -15,6 +15,17 @@ namespace FoodFactoryGame.Session
         Server
     }
 
+    // Who may join a hosted world, chosen on the world screen (decision 0041). Only Singleplayer is enforced: it admits the
+    // host's own client alone. The other three admit anyone who can reach the address until a friends/invite/listing service
+    // exists; they are recorded so Resume restarts the world the same way.
+    public enum HostVisibility
+    {
+        Singleplayer,
+        FriendsOnly,
+        InviteOnly,
+        Public
+    }
+
     public sealed class SessionOptions
     {
         public const string DefaultAddress = "127.0.0.1";
@@ -31,6 +42,9 @@ namespace FoodFactoryGame.Session
         public string IdentityPath;
         // Set only for the default identity location; an explicit -identity path is never paired with a legacy file.
         public string LegacyIdentityPath;
+        // Client preferences (name, sensitivity, key bindings, last session) in SQLite; null keeps defaults and writes nothing,
+        // which is what tests get from options they build themselves.
+        public string SettingsPath;
         // Seed for a world created by this server in a scene that generates worlds (decision 0026); blank means random.
         // Ignored for a world that already exists.
         public string WorldSeed = "";
@@ -64,9 +78,11 @@ namespace FoodFactoryGame.Session
         }
 
         public static string DefaultIdentityPath => Path.Combine(Application.persistentDataPath, "Identity", "identity.db");
+        public static string DefaultSettingsPath => Path.Combine(Application.persistentDataPath, "Settings", "settings.db");
         public static string DefaultLegacyIdentityPath => Path.Combine(Application.persistentDataPath, "Identity", LegacyIdentityFileName);
 
-        // Switches: -host | -server | -connect <address>, -name <display>, -save <directory>, -identity <file>, -seed <text>.
+        // Switches: -host | -server | -connect <address>, -name <display>, -save <directory>, -identity <file>, -seed <text>,
+        // -settings <file>.
         public static SessionOptions FromCommandLine(string[] args)
         {
             var options = new SessionOptions
@@ -74,6 +90,7 @@ namespace FoodFactoryGame.Session
                 SaveDirectory = DefaultSaveDirectory,
                 IdentityPath = DefaultIdentityPath,
                 LegacyIdentityPath = DefaultLegacyIdentityPath,
+                SettingsPath = DefaultSettingsPath,
                 DisplayName = Environment.UserName
             };
             for (var index = 0; index < args.Length; index++)
@@ -88,6 +105,7 @@ namespace FoodFactoryGame.Session
                     case "-save" when value != null: options.SaveDirectory = Path.GetFullPath(value); options.SaveDirectoryExplicit = true; index++; break;
                     case "-identity" when value != null: options.IdentityPath = Path.GetFullPath(value); options.LegacyIdentityPath = null; index++; break;
                     case "-seed" when value != null: options.WorldSeed = value; index++; break;
+                    case "-settings" when value != null: options.SettingsPath = Path.GetFullPath(value); index++; break;
                 }
             }
             return options;

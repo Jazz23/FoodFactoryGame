@@ -1,0 +1,94 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <!-- Select World: saved worlds (MenuWorldRow.uxml per world) and the chosen world's details with the Play as dropdown.
+     The four hosting choices are fixed here; SessionPanel marks the chosen one and copies its text into the dropdown. -->
+    <Style src="project://database/Assets/UI/Theme/Theme.uss" />
+    <Style src="MainMenu.uss" />
+    <ui:VisualElement name="main-menu-page" class="menu-page">
+        <ui:VisualElement class="ff-row menu-page__header">
+            <ui:Button name="menu-back" focusable="false" class="ff-button ff-button--lg ff-button--overlay ff-button--with-glyph menu-back">
+                <ui:VisualElement class="ff-glyph ff-glyph--chevron-left" />
+                <ui:Label text="Back" picking-mode="Ignore" />
+            </ui:Button>
+            <ui:Label text="Select world" class="ff-page-title menu-page__title" picking-mode="Ignore" />
+            <ui:Button name="menu-new-world" focusable="false" class="ff-button ff-button--lg ff-button--overlay ff-button--with-glyph">
+                <ui:VisualElement class="ff-glyph ff-glyph--plus" />
+                <ui:Label text="New world" picking-mode="Ignore" />
+            </ui:Button>
+        </ui:VisualElement>
+        <ui:VisualElement class="ff-row menu-page__body">
+            <ui:VisualElement class="menu-card menu-worlds">
+                <ui:VisualElement class="ff-row menu-worlds__columns" picking-mode="Ignore">
+                    <ui:Label text="WORLD" class="ff-eyebrow ff-grow" picking-mode="Ignore" />
+                    <ui:Label text="LAST PLAYED" class="ff-eyebrow" picking-mode="Ignore" />
+                </ui:VisualElement>
+                <ui:ScrollView name="menu-world-list" mode="Vertical" horizontal-scroller-visibility="Hidden" class="ff-scroll menu-worlds__list" />
+            </ui:VisualElement>
+            <ui:VisualElement name="menu-world-details" class="menu-card menu-details">
+                <ui:VisualElement name="menu-world-existing" class="menu-details__head">
+                    <ui:Label name="menu-world-name" class="menu-details__name" picking-mode="Ignore" />
+                    <ui:Label name="menu-world-played" class="ff-small menu-details__sub" picking-mode="Ignore" />
+                </ui:VisualElement>
+                <ui:VisualElement name="menu-world-new" class="menu-details__head">
+                    <ui:Label text="New world" class="menu-details__name" picking-mode="Ignore" />
+                    <ui:Label text="Generated from the seed; leave it blank for a random one." class="ff-small ff-wrap menu-details__sub" picking-mode="Ignore" />
+                    <ui:VisualElement class="ff-field">
+                        <ui:Label text="NAME" class="ff-eyebrow ff-field__caption" picking-mode="Ignore" />
+                        <ui:TextField name="menu-new-world-name" class="ff-text-field" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="ff-field">
+                        <ui:Label text="SEED" class="ff-eyebrow ff-field__caption" picking-mode="Ignore" />
+                        <ui:TextField name="menu-new-world-seed" class="ff-text-field" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+                <ui:VisualElement class="ff-divider menu-details__divider" picking-mode="Ignore" />
+                <ui:VisualElement name="menu-visibility" class="menu-visibility">
+                    <ui:Label text="PLAY AS" class="ff-eyebrow menu-visibility__caption" picking-mode="Ignore" />
+                    <ui:Button name="menu-visibility-toggle" focusable="false" class="menu-choice menu-choice--current">
+                        <ui:VisualElement class="menu-choice__text" picking-mode="Ignore">
+                            <ui:Label name="menu-visibility-label" class="menu-choice__title" picking-mode="Ignore" />
+                            <ui:Label name="menu-visibility-description" class="menu-choice__description ff-wrap" picking-mode="Ignore" />
+                        </ui:VisualElement>
+                        <ui:VisualElement name="menu-visibility-chevron" class="ff-glyph ff-glyph--chevron-down menu-choice__chevron" />
+                    </ui:Button>
+                    <ui:VisualElement name="menu-visibility-options" class="menu-visibility__options">
+                        <ui:Button name="menu-visibility-Singleplayer" focusable="false" class="menu-choice menu-option">
+                            <ui:VisualElement class="menu-choice__text" picking-mode="Ignore">
+                                <ui:Label text="Singleplayer" class="menu-choice__title" picking-mode="Ignore" />
+                                <ui:Label text="Only you. Nobody can join." class="menu-choice__description ff-wrap" picking-mode="Ignore" />
+                            </ui:VisualElement>
+                            <ui:VisualElement class="ff-glyph ff-glyph--check menu-option__check" />
+                        </ui:Button>
+                        <ui:VisualElement class="ff-divider menu-visibility__divider" picking-mode="Ignore" />
+                        <ui:Label text="HOST FOR OTHERS" class="ff-eyebrow menu-visibility__group" picking-mode="Ignore" />
+                        <ui:Button name="menu-visibility-FriendsOnly" focusable="false" class="menu-choice menu-option">
+                            <ui:VisualElement class="menu-choice__text" picking-mode="Ignore">
+                                <ui:Label text="Host · Friends only" class="menu-choice__title" picking-mode="Ignore" />
+                                <ui:Label text="Friends can join from their friends list." class="menu-choice__description ff-wrap" picking-mode="Ignore" />
+                            </ui:VisualElement>
+                            <ui:VisualElement class="ff-glyph ff-glyph--check menu-option__check" />
+                        </ui:Button>
+                        <ui:Button name="menu-visibility-InviteOnly" focusable="false" class="menu-choice menu-option">
+                            <ui:VisualElement class="menu-choice__text" picking-mode="Ignore">
+                                <ui:Label text="Host · Invite only" class="menu-choice__title" picking-mode="Ignore" />
+                                <ui:Label text="Only players you invite can join." class="menu-choice__description ff-wrap" picking-mode="Ignore" />
+                            </ui:VisualElement>
+                            <ui:VisualElement class="ff-glyph ff-glyph--check menu-option__check" />
+                        </ui:Button>
+                        <ui:Button name="menu-visibility-Public" focusable="false" class="menu-choice menu-option">
+                            <ui:VisualElement class="menu-choice__text" picking-mode="Ignore">
+                                <ui:Label text="Host · Public" class="menu-choice__title" picking-mode="Ignore" />
+                                <ui:Label text="Anyone can find and join from the server list." class="menu-choice__description ff-wrap" picking-mode="Ignore" />
+                            </ui:VisualElement>
+                            <ui:VisualElement class="ff-glyph ff-glyph--check menu-option__check" />
+                        </ui:Button>
+                    </ui:VisualElement>
+                </ui:VisualElement>
+                <ui:VisualElement class="ff-spacer" picking-mode="Ignore" />
+                <ui:Button name="menu-play" focusable="false" class="ff-button ff-button--primary ff-button--xl ff-button--with-glyph menu-play">
+                    <ui:VisualElement class="ff-glyph ff-glyph--play" />
+                    <ui:Label name="menu-play-label" text="Play" picking-mode="Ignore" />
+                </ui:Button>
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

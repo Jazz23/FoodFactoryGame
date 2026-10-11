@@ -183,6 +183,23 @@ namespace FoodFactoryGame.Session.PlayModeTests
             yield return Until(() => _root.NetworkManager.ServerManager.Clients.Count == 1, "server dropped the rejected connection", 4f);
         }
 
+        // Singleplayer hosting (decision 0041) admits the host's own client and turns every other connection away.
+        [UnityTest]
+        public IEnumerator SingleplayerHostRejectsRemotePlayers()
+        {
+            _root.Visibility = HostVisibility.Singleplayer;
+            Assert.That(_root.Begin(SessionMode.Host), Is.True);
+            yield return Until(() => _root.Authenticator.LocalPlayerId != null, "host local client authenticated");
+            CreateRemote(RemoteSecretPath, "Remote");
+            Assert.That(_remote.ClientManager.StartConnection(), Is.True);
+            yield return Until(() => _remoteAuth.LastRejection != null, "remote rejected");
+            Assert.That(_remoteAuth.LastRejection, Is.EqualTo("singleplayer"));
+            Assert.That(_remoteAuth.LocalPlayerId, Is.Null);
+            yield return Until(() => !_remote.IsClientStarted, "rejected client disconnected itself", 1f);
+            Assert.That(ServerAvatars.Count, Is.EqualTo(1));
+            Assert.That(_root.ServerRegistry.Count, Is.EqualTo(1), "A rejected player is never registered.");
+        }
+
         [UnityTest]
         public IEnumerator ServerOnlyStartAdvancesWorldWithoutAnyClient()
         {

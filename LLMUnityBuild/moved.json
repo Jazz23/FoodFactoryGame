@@ -1,0 +1,124 @@
+{
+    "pairs": [
+        {
+            "source": "G:/Unity/FoodFactoryGame/Assets/StreamingAssets/LlamaLib-v2.0.5\\android-arm64",
+            "target": "G:\\Unity\\FoodFactoryGame\\LLMUnityBuild\\android-arm64"
+        },
+        {
+            "source": "G:/Unity/FoodFactoryGame/Assets/StreamingAssets/LlamaLib-v2.0.5\\android-arm64.meta",
+            "target": "G:\\Unity\\FoodFactoryGame\\LLMUnityBuild\\android-arm64.meta"
+        },
+        {
+            "source": "G:/Unity/FoodFactoryGame/Assets/StreamingAssets/LlamaLib-v2.0.5\\android-x64",
+            "target": "G:\\Unity\\FoodFactoryGame\\LLMUnityBuild\\android-x64"
+        },
+        {
+            "source": "G:/Unity/FoodFactoryGame/Assets/StreamingAssets/LlamaLib-v2.0.5\\android-x64.meta",
+            "target": "G:\\Unity\\FoodFactoryGame\\LLMUnityBuild\\android-x64.meta"
+        },
+        {
+            "source": "G:/Unity/FoodFactoryGame/Assets/StreamingAssets/LlamaLib-v2.0.5\\ios-arm64",
+            "target": "G:\\Unity\\FoodFactoryGame\\LLMUnityBuild\\ios-arm64"
+        },
+        {
+            "source": "G:/Unity/FoodFactoryGame/Assets/StreamingAssets/LlamaLib-v2.0.5\\ios-arm64.meta",
+            "target": "G:\\Unity\\FoodFactoryGame\\LLMUnityBuild\\ios-arm64.meta"
+        },
+        {
+            "source": "G:/Unity/FoodFactoryGame/Assets/StreamingAssets/LlamaLib-v2.0.5\\linux-x64",
+            "target": "G:\\Unity\\FoodFactoryGame\\LLMUnityBuild\\linux-x64"
+        },
+        {
+            "source": "G:/Unity/FoodFactoryGame/Assets/StreamingAssets/LlamaLib-v2.0.5\\linux-x64.meta",
+            "target": "G:\\Unity\\FoodFactoryGame\\LLMUnityBuild\\linux-x64.meta"
+        },
+        {
+            "source": "G:/Unity/FoodFactoryGame/Assets/StreamingAssets/LlamaLib-v2.0.5\\osx-arm64",
+            "target": "G:\\Unity\\FoodFactoryGame\\LLMUnityBuild\\osx-arm64"
+        },
+        {
+            "source": "G:/Unity/FoodFactoryGame/Assets/StreamingAssets/LlamaLib-v2.0.5\\osx-arm64.meta",
+            "target": "G:\\Unity\\FoodFactoryGame\\LLMUnityBuild\\osx-arm64.meta"
+        },
+        {
+            "source": "G:/Unity/FoodFactoryGame/Assets/StreamingAssets/LlamaLib-v2.0.5\\osx-universal",
+            "target": "G:\\Unity\\FoodFactoryGame\\LLMUnityBuild\\osx-universal"
+        },
+        {
+            "source": "G:/Unity/FoodFactoryGame/Assets/StreamingAssets/LlamaLib-v2.0.5\\osx-universal.meta",
+            "target": "G:\\Unity\\FoodFactoryGame\\LLMUnityBuild\\osx-universal.meta"
+        },
+        {
+            "source": "G:/Unity/FoodFactoryGame/Assets/StreamingAssets/LlamaLib-v2.0.5\\osx-x64",
+            "target": "G:\\Unity\\FoodFactoryGame\\LLMUnityBuild\\osx-x64"
+        },
+        {
+            "source": "G:/Unity/FoodFactoryGame/Assets/StreamingAssets/LlamaLib-v2.0.5\\osx-x64.meta",
+            "target": "G:\\Unity\\FoodFactoryGame\\LLMUnityBuild\\osx-x64.meta"
+        },
+        {
+            "source": "G:/Unity/FoodFactoryGame/Assets/StreamingAssets/LlamaLib-v2.0.5\\setup",
+            "target": "G:\\Unity\\FoodFactoryGame\\LLMUnityBuild\\setup"
+        },
+        {
+            "source": "G:/Unity/FoodFactoryGame/Assets/StreamingAssets/LlamaLib-v2.0.5\\setup.meta",
+            "target": "G:\\Unity\\FoodFactoryGame\\LLMUnityBuild\\setup.meta"
+        },
+        {
+            "source": "G:/Unity/FoodFactoryGame/Assets/StreamingAssets/LlamaLib-v2.0.5\\visionos-arm64",
+            "target": "G:\\Unity\\FoodFactoryGame\\LLMUnityBuild\\visionos-arm64"
+        },
+        {
+            "source": "G:/Unity/FoodFactoryGame/Assets/StreamingAssets/LlamaLib-v2.0.5\\visionos-arm64.meta",
+            "target": "G:\\Unity\\FoodFactoryGame\\LLMUnityBuild\\visionos-arm64.meta"
+        },
+        {
+            "source": "G:/Unity/FoodFactoryGame/Assets/StreamingAssets/LlamaLib-v2.0.5\\win-x64\\native\\cublas64_12.dll",
+            "target": "G:\\Unity\\FoodFactoryGame\\LLMUnityBuild\\win-x64\\native\\cublas64_12.dll"
+        },
+        {
+            "source": "G:/Unity/FoodFactoryGame/Assets/StreamingAssets/LlamaLib-v2.0.5\\win-x64\\native\\cublas64_12.dll.meta",
+            "target": "G:\\Unity\\FoodFactoryGame\\LLMUnityBuild\\win-x64\\native\\cublas64_12.dll.meta"
+        },
+        {
+            "source": "G:/Unity/FoodFactoryGame/Assets/StreamingAssets/LlamaLib-v2.0.5\\win-x64\\native\\cublasLt64_12.dll",
+            "target": "G:\\Unity\\FoodFactoryGame\\LLMUnityBuild\\win-x64\\native\\cublasLt64_12.dll"
+        },
+        {
+            "source": "G:/Unity/FoodFactoryGame/Assets/StreamingAssets/LlamaLib-v2.0.5\\win-x64\\native\\cublasLt64_12.dll.meta",
+            "target": "G:\\Unity\\FoodFactoryGame\\LLMUnityBuild\\win-x64\\native\\cublasLt64_12.dll.meta"
+        },
+        {
+            "source": "G:/Unity/FoodFactoryGame/Assets/StreamingAssets/LlamaLib-v2.0.5\\win-x64\\native\\cudart64_12.dll",
+            "target": "G:\\Unity\\FoodFactoryGame\\LLMUnityBuild\\win-x64\\native\\cudart64_12.dll"
+        },
+        {
+            "source": "G:/Unity/FoodFactoryGame/Assets/StreamingAssets/LlamaLib-v2.0.5\\win-x64\\native\\cudart64_12.dll.meta",
+            "target": "G:\\Unity\\FoodFactoryGame\\LLMUnityBuild\\win-x64\\native\\cudart64_12.dll.meta"
+        },
+        {
+            "source": "G:/Unity/FoodFactoryGame/Assets/StreamingAssets/LlamaLib-v2.0.5\\win-x64\\native\\llamalib_win-x64_cublas.dll",
+            "target": "G:\\Unity\\FoodFactoryGame\\LLMUnityBuild\\win-x64\\native\\llamalib_win-x64_cublas.dll"
+        },
+        {
+            "source": "G:/Unity/FoodFactoryGame/Assets/StreamingAssets/LlamaLib-v2.0.5\\win-x64\\native\\llamalib_win-x64_cublas.dll.meta",
+            "target": "G:\\Unity\\FoodFactoryGame\\LLMUnityBuild\\win-x64\\native\\llamalib_win-x64_cublas.dll.meta"
+        },
+        {
+            "source": "G:/Unity/FoodFactoryGame/Assets/StreamingAssets/LlamaLib-v2.0.5\\win-x64\\native\\llamalib_win-x64_cublas.lib",
+            "target": "G:\\Unity\\FoodFactoryGame\\LLMUnityBuild\\win-x64\\native\\llamalib_win-x64_cublas.lib"
+        },
+        {
+            "source": "G:/Unity/FoodFactoryGame/Assets/StreamingAssets/LlamaLib-v2.0.5\\win-x64\\native\\llamalib_win-x64_cublas.lib.meta",
+            "target": "G:\\Unity\\FoodFactoryGame\\LLMUnityBuild\\win-x64\\native\\llamalib_win-x64_cublas.lib.meta"
+        },
+        {
+            "source": "",
+            "target": "G:/Unity/FoodFactoryGame/Assets/StreamingAssets/LLMManager.json"
+        },
+        {
+            "source": "",
+            "target": "G:/Unity/FoodFactoryGame/Assets/StreamingAssets/LLMManager.json.meta"
+        }
+    ]
+}

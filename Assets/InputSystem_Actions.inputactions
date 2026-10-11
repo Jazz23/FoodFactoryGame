@@ -281,6 +281,17 @@
                 },
                 {
                     "name": "",
+                    "id": "4abac7a8-450f-4683-a97a-de35c827baf0",
+                    "path": "",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
+                    "action": "Place",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "f71e13e6-6ee5-4f95-905f-40b30a60782e",
                     "path": "<Gamepad>/rightTrigger",
                     "interactions": "",
@@ -297,6 +308,17 @@
                     "interactions": "",
                     "processors": "",
                     "groups": ";Keyboard&Mouse",
+                    "action": "Rotate",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "265a2fb8-25fd-4384-8f9d-5452cb4f5405",
+                    "path": "",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
                     "action": "Rotate",
                     "isComposite": false,
                     "isPartOfComposite": false
@@ -589,6 +611,17 @@
                 },
                 {
                     "name": "",
+                    "id": "22470ed3-c6c9-4922-a35e-cd4847613ce6",
+                    "path": "",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
+                    "action": "Sprint",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "8cbb2f4b-a784-49cc-8d5e-c010b8c7f4e6",
                     "path": "<Gamepad>/leftStickPress",
                     "interactions": "",
@@ -613,6 +646,17 @@
                     "name": "",
                     "id": "eb40bb66-4559-4dfa-9a2f-820438abb426",
                     "path": "<Keyboard>/space",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
+                    "action": "Jump",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "dce42afc-8571-40d6-9205-65940768f1cb",
+                    "path": "",
                     "interactions": "",
                     "processors": "",
                     "groups": "Keyboard&Mouse",
@@ -677,6 +721,17 @@
                 },
                 {
                     "name": "",
+                    "id": "a8b2f7ba-600d-42ec-a4f9-3d72551031df",
+                    "path": "",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
+                    "action": "Interact",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "b3f66d0b-7751-423f-908b-a11c5bd95930",
                     "path": "<Gamepad>/buttonNorth",
                     "interactions": "",
@@ -710,6 +765,17 @@
                 },
                 {
                     "name": "",
+                    "id": "76321807-b3aa-4837-8d00-5f399dbec470",
+                    "path": "",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
+                    "action": "SwitchCamera",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "a42f4cfa-f37a-4a34-862f-2637057cc9a5",
                     "path": "<Mouse>/scroll",
                     "interactions": "",
@@ -726,6 +792,17 @@
                     "interactions": "",
                     "processors": "",
                     "groups": ";Keyboard&Mouse",
+                    "action": "Inventory",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "ba048532-ea50-4bf0-8157-3fab9ef10e85",
+                    "path": "",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
                     "action": "Inventory",
                     "isComposite": false,
                     "isPartOfComposite": false
@@ -754,6 +831,17 @@
                 },
                 {
                     "name": "",
+                    "id": "5c6cc6d1-3902-4682-9906-c2cdff088bd3",
+                    "path": "",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
+                    "action": "Remove",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "023c674f-0b46-4321-b79b-74f49e6f0263",
                     "path": "<Gamepad>/leftShoulder",
                     "interactions": "",
@@ -776,6 +864,17 @@
                 },
                 {
                     "name": "",
+                    "id": "7654f42f-e1d8-43dc-89ba-17364f108c28",
+                    "path": "",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
+                    "action": "ClearCursor",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "e4c1bf50-b84d-4626-bc52-455ce08f944e",
                     "path": "<Gamepad>/buttonEast",
                     "interactions": "",
@@ -792,6 +891,17 @@
                     "interactions": "",
                     "processors": "",
                     "groups": ";Keyboard&Mouse",
+                    "action": "CloseScreen",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "a23e1b34-141c-4c5a-9450-944acea1d898",
+                    "path": "",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
                     "action": "CloseScreen",
                     "isComposite": false,
                     "isPartOfComposite": false
@@ -919,6 +1029,17 @@
                 },
                 {
                     "name": "",
+                    "id": "e1fc7cec-21cd-4989-ad77-0d0fd17c1f0a",
+                    "path": "",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
+                    "action": "QuickTransfer",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "e41b8d27-6c9f-4a35-b2d0-9f7e1a3c5b68",
                     "path": "<Keyboard>/z",
                     "interactions": "",
@@ -930,11 +1051,33 @@
                 },
                 {
                     "name": "",
+                    "id": "b49941e4-2f90-4888-b7c5-b4f164b90c88",
+                    "path": "",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
+                    "action": "PlaceItem",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "5d9e2b74-1f3a-4c68-b0d7-8a4e6f1c3b92",
                     "path": "<Keyboard>/f",
                     "interactions": "",
                     "processors": "",
                     "groups": ";Keyboard&Mouse",
+                    "action": "TakeItem",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "51b04618-033f-4034-95af-03a1e18874f7",
+                    "path": "",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
                     "action": "TakeItem",
                     "isComposite": false,
                     "isPartOfComposite": false
@@ -974,11 +1117,33 @@
                 },
                 {
                     "name": "",
+                    "id": "0db90242-85f5-45f8-b241-78ccda4a1411",
+                    "path": "",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
+                    "action": "FloorUp",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "b95d2e71-4c0a-4f38-9e6b-8a3c1d7f5e24",
                     "path": "<Keyboard>/pageDown",
                     "interactions": "",
                     "processors": "",
                     "groups": ";Keyboard&Mouse",
+                    "action": "FloorDown",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "8d1a1080-cf4c-432d-a0c6-510ddadaa68f",
+                    "path": "",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
                     "action": "FloorDown",
                     "isComposite": false,
                     "isPartOfComposite": false
@@ -996,6 +1161,17 @@
                 },
                 {
                     "name": "",
+                    "id": "23dfe1d5-b79c-4163-8027-441d6edf97f1",
+                    "path": "",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
+                    "action": "FlipLift",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "8c4f2a7e-1b63-4d95-b0e8-5a7d3c9f1e24",
                     "path": "<Keyboard>/l",
                     "interactions": "",
@@ -1007,11 +1183,33 @@
                 },
                 {
                     "name": "",
+                    "id": "5bcfb7e4-8490-4859-89e1-5d8f651a33ef",
+                    "path": "",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
+                    "action": "Logistics",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "5649bd93-32dd-4730-8b16-2c0e366ec8d7",
                     "path": "<Keyboard>/b",
                     "interactions": "",
                     "processors": "",
                     "groups": ";Keyboard&Mouse",
+                    "action": "Build",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "0895f9f6-6e7e-4772-88d9-142c8e1c9582",
+                    "path": "",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
                     "action": "Build",
                     "isComposite": false,
                     "isPartOfComposite": false
@@ -1045,6 +1243,17 @@
                     "interactions": "",
                     "processors": "",
                     "groups": ";Keyboard&Mouse",
+                    "action": "CameraTilt",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "d1183331-7723-49a3-ab3c-c5da0d1fa479",
+                    "path": "",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
                     "action": "CameraTilt",
                     "isComposite": false,
                     "isPartOfComposite": false

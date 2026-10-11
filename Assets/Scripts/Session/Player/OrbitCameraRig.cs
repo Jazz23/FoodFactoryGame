@@ -71,7 +71,10 @@ namespace FoodFactoryGame.Session.Player
         private float _buildPitch = 90f;
         private readonly RaycastHit[] _hits = new RaycastHit[16];
 
-        public float Yaw => BuildFocus.HasValue ? _buildYaw : Mathf.LerpAngle(yaw, _topDownYaw, Eased);
+        // The player's mouse sensitivity from Settings (a multiplier on orbitDegreesPerUnit), shared by every local rig.
+        public static float LookSensitivity { get; set; } = 1f;
+
+        public float Yaw =>BuildFocus.HasValue ? _buildYaw : Mathf.LerpAngle(yaw, _topDownYaw, Eased);
         public float Pitch => pitch;
         public float Distance => distance;
         // The view the rig is showing or blending towards.
@@ -155,8 +158,8 @@ namespace FoodFactoryGame.Session.Player
             else if (OrbitEnabled && !TopDown)
             {
                 var delta = lookAction.action.ReadValue<Vector2>();
-                yaw = Mathf.Repeat(yaw + delta.x * orbitDegreesPerUnit, 360f);
-                pitch -= delta.y * orbitDegreesPerUnit;
+                yaw = Mathf.Repeat(yaw + delta.x * orbitDegreesPerUnit * LookSensitivity, 360f);
+                pitch -= delta.y * orbitDegreesPerUnit * LookSensitivity;
             }
             // Scroll magnitude differs by platform/device, so each nonzero frame is one step.
             var scroll = BuildFocus.HasValue ? 0f : zoomAction.action.ReadValue<Vector2>().y;
@@ -208,8 +211,8 @@ namespace FoodFactoryGame.Session.Player
             if (tiltAction.action.IsPressed())
             {
                 var delta = lookAction.action.ReadValue<Vector2>();
-                _buildYaw = Mathf.Repeat(_buildYaw + delta.x * orbitDegreesPerUnit, 360f);
-                _buildPitch = Mathf.Clamp(_buildPitch - delta.y * orbitDegreesPerUnit, MinBuildPitch, 90f);
+                _buildYaw = Mathf.Repeat(_buildYaw + delta.x * orbitDegreesPerUnit * LookSensitivity, 360f);
+                _buildPitch = Mathf.Clamp(_buildPitch - delta.y * orbitDegreesPerUnit * LookSensitivity, MinBuildPitch, 90f);
             }
         }
 

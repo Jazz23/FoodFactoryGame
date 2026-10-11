@@ -1,0 +1,34 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <!-- The logistics screen (decisions 0022, 0023): routes, trucks and the company's other sites in three columns, filled by
+         LogisticsPanel with the Logistics*.uxml cards. -->
+    <Style src="project://database/Assets/UI/Theme/Theme.uss" />
+    <Style src="Logistics.uss" />
+    <ui:VisualElement name="logistics-root" class="ff-root ff-fill" picking-mode="Ignore">
+        <ui:VisualElement name="logistics-dim" class="ff-fill ff-dim" picking-mode="Ignore" />
+        <ui:VisualElement name="logistics" class="ff-panel ff-centered logi">
+            <ui:VisualElement class="ff-row logi__header">
+                <ui:Label text="Logistics" class="ff-title ff-grow" picking-mode="Ignore" />
+                <ui:Button name="logistics-close" focusable="false" class="ff-button ff-button--icon">
+                    <ui:VisualElement class="ff-glyph ff-glyph--close ff-glyph--sm" />
+                </ui:Button>
+            </ui:VisualElement>
+            <ui:ScrollView mode="Vertical" horizontal-scroller-visibility="Hidden" class="ff-scroll logi__scroll">
+                <ui:VisualElement class="ff-row logi__columns">
+                    <ui:VisualElement class="logi__column logi__column--routes">
+                        <ui:Label text="ROUTES" class="ff-eyebrow logi__heading" picking-mode="Ignore" />
+                        <ui:VisualElement name="logistics-routes" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="logi__column logi__column--gap">
+                        <ui:Label text="TRUCKS" class="ff-eyebrow logi__heading" picking-mode="Ignore" />
+                        <ui:VisualElement name="logistics-trucks" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="logi__column logi__column--gap">
+                        <ui:Label text="OTHER SITES" class="ff-eyebrow logi__heading" picking-mode="Ignore" />
+                        <ui:VisualElement name="logistics-sites" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+            </ui:ScrollView>
+            <ui:Label name="logistics-status" text=" " class="logi__status ff-wrap" picking-mode="Ignore" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

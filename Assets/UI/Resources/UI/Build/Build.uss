@@ -1,0 +1,86 @@
+/* Restaurant build mode's panel (decision 0034): a window on the right from the top to the bottom edge (the HUD's cash card
+   hides in build mode; this panel shows the cash). Shared pieces come from Theme.uss. */
+
+.build {
+    position: absolute;
+    right: 24px;
+    top: 24px;
+    bottom: 24px;
+    width: 340px;
+    padding: 0;
+}
+
+.build__head {
+    flex-shrink: 0;
+    padding: 16px 18px 12px 18px;
+    border-bottom-width: 1px;
+    border-color: var(--ff-edge);
+}
+
+.build__money { margin-top: 10px; align-items: flex-end; }
+.build__cash { font-size: 18px; -unity-font-style: bold; margin-top: 1px; }
+.build__ambience { align-items: flex-end; }
+.build__ambience-value { font-size: 14px; -unity-font-style: bold; margin-top: 3px; color: var(--ff-text-soft); }
+
+/* Rows keep their height in the fixed-height column; only the catalog scrolls. */
+.build__body {
+    flex-grow: 1;
+    flex-shrink: 1;
+    min-height: 0;
+    padding: 14px 18px 0 18px;
+}
+
+.build__body > * { flex-shrink: 0; }
+.build__body > .build__catalog { flex-shrink: 1; }
+
+.build__chips {
+    flex-direction: row;
+    flex-wrap: wrap;
+    margin: 6px -3px 0 -3px;
+}
+
+.build__heading { margin-top: 10px; }
+.build__heading--catalog { margin-top: 14px; }
+.build__catalog { flex-grow: 1; min-height: 0; margin: 6px 0 10px 0; }
+
+.build-section { margin: 12px 0 6px 0; font-size: 13px; -unity-font-style: bold; color: var(--ff-text-soft); }
+.build-section--first { margin-top: 2px; }
+
+/* A catalog card: an amber edge when it is the chosen item, a lighter fill under the pointer. */
+.build-item {
+    margin-bottom: 6px;
+    padding: 7px 10px;
+    background-color: var(--ff-card);
+    border-width: 1px;
+    border-color: var(--ff-card-edge);
+    border-radius: 10px;
+}
+
+.build-item:hover { background-color: var(--ff-control); }
+.build-item--chosen { border-color: var(--ff-accent); }
+
+.build-item__icon { width: 34px; height: 34px; }
+.build-item__text { flex-grow: 1; flex-shrink: 1; margin-left: 10px; }
+.build-item__name { font-size: 13px; -unity-font-style: bold; }
+.build-item__price { margin-top: 2px; }
+
+.build__footer {
+    flex-shrink: 0;
+    padding: 12px 18px 16px 18px;
+    border-top-width: 1px;
+    border-color: var(--ff-edge);
+}
+
+.build__preview { font-size: 13px; }
+.build__preview--idle { color: var(--ff-muted); }
+.build__preview--problem { color: var(--ff-danger-text); }
+.build__status { margin-top: 3px; font-size: 12px; color: var(--ff-danger-text); }
+.build__buttons { margin-top: 10px; }
+.build__leave { margin-left: 8px; }
+
+.build__wheel {
+    position: absolute;
+    width: 34px;
+    height: 34px;
+    display: none;
+}

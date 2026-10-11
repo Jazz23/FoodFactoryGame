@@ -1,0 +1,46 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <!-- The menu's first screen: brand, Resume (filled in by SessionPanel), the screens and Quit. -->
+    <Style src="project://database/Assets/UI/Theme/Theme.uss" />
+    <Style src="MainMenu.uss" />
+    <ui:VisualElement name="main-menu-column" class="menu-main">
+        <ui:VisualElement class="menu-main__brand" picking-mode="Ignore">
+            <ui:VisualElement class="ff-row menu-main__brand-row" picking-mode="Ignore">
+                <ui:VisualElement class="menu-main__logo" picking-mode="Ignore">
+                    <ui:VisualElement class="ff-glyph ff-glyph--factory menu-main__logo-glyph" />
+                </ui:VisualElement>
+                <ui:Label text="FACTORY · RESTAURANT" class="menu-main__eyebrow" picking-mode="Ignore" />
+            </ui:VisualElement>
+            <ui:Label text="Food Factory" class="menu-main__title" picking-mode="Ignore" />
+        </ui:VisualElement>
+        <ui:Button name="menu-resume" focusable="false" class="menu-resume">
+            <ui:VisualElement class="menu-resume__circle" picking-mode="Ignore">
+                <ui:VisualElement class="ff-glyph ff-glyph--play menu-resume__play" />
+            </ui:VisualElement>
+            <ui:VisualElement class="menu-resume__text" picking-mode="Ignore">
+                <ui:Label text="Resume" class="menu-resume__title" picking-mode="Ignore" />
+                <ui:Label name="menu-resume-detail" text="Nothing to resume yet" class="menu-resume__detail ff-wrap" picking-mode="Ignore" />
+            </ui:VisualElement>
+            <ui:Label name="menu-resume-ago" class="menu-resume__ago" picking-mode="Ignore" />
+        </ui:Button>
+        <ui:Button name="menu-select-world" focusable="false" class="menu-button">
+            <ui:VisualElement class="ff-glyph ff-glyph--home menu-button__icon" />
+            <ui:Label text="Select World" class="menu-button__label" picking-mode="Ignore" />
+            <ui:VisualElement class="ff-glyph ff-glyph--chevron-right menu-button__chevron" />
+        </ui:Button>
+        <ui:Button name="menu-connect" focusable="false" class="menu-button">
+            <ui:VisualElement class="ff-glyph ff-glyph--server menu-button__icon" />
+            <ui:Label text="Connect to Server" class="menu-button__label" picking-mode="Ignore" />
+            <ui:VisualElement class="ff-glyph ff-glyph--chevron-right menu-button__chevron" />
+        </ui:Button>
+        <ui:Button name="menu-settings" focusable="false" class="menu-button">
+            <ui:VisualElement class="ff-glyph ff-glyph--sliders menu-button__icon" />
+            <ui:Label text="Settings" class="menu-button__label" picking-mode="Ignore" />
+            <ui:VisualElement class="ff-glyph ff-glyph--chevron-right menu-button__chevron" />
+        </ui:Button>
+        <ui:VisualElement class="ff-divider menu-main__divider" picking-mode="Ignore" />
+        <ui:Button name="menu-quit" focusable="false" class="menu-button menu-button--quiet">
+            <ui:VisualElement class="ff-glyph ff-glyph--exit menu-button__icon" />
+            <ui:Label text="Quit" class="menu-button__label" picking-mode="Ignore" />
+        </ui:Button>
+    </ui:VisualElement>
+</ui:UXML>

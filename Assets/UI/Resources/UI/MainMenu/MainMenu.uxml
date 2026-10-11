@@ -1,0 +1,10 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <!-- The main menu's frame (decision 0041): an opaque backdrop, the current screen (one of the Menu*.uxml templates) and a
+     status line. SessionPanel fills main-menu-content. -->
+    <Style src="project://database/Assets/UI/Theme/Theme.uss" />
+    <Style src="MainMenu.uss" />
+    <ui:VisualElement name="main-menu" class="ff-root ff-fill menu">
+        <ui:VisualElement name="main-menu-content" class="menu__content" />
+        <ui:Label name="main-menu-status" class="menu__status ff-wrap" picking-mode="Ignore" />
+    </ui:VisualElement>
+</ui:UXML>

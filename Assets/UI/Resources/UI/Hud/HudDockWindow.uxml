@@ -1,0 +1,23 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <!-- A loading dock (decision 0022): Outgoing (trucks load) beside Incoming (trucks unload), the trucks serving it, and a
+         warning when its lot's street cannot reach it (decision 0032). -->
+    <Style src="project://database/Assets/UI/Theme/Theme.uss" />
+    <Style src="Hud.uss" />
+    <ui:VisualElement name="hud-machine" class="ff-panel hud-window">
+        <ui:VisualElement class="ff-row hud-window__header" picking-mode="Ignore">
+            <ui:Label text="Loading dock" class="ff-title" picking-mode="Ignore" />
+        </ui:VisualElement>
+        <ui:VisualElement class="ff-inset ff-row hud-dock__body">
+            <ui:VisualElement class="hud-labelled hud-dock__outgoing">
+                <ui:Label name="input-caption" class="ff-eyebrow hud-labelled__caption" picking-mode="Ignore" />
+                <ui:VisualElement name="input-grid" />
+            </ui:VisualElement>
+            <ui:VisualElement class="hud-labelled">
+                <ui:Label name="output-caption" class="ff-eyebrow hud-labelled__caption" picking-mode="Ignore" />
+                <ui:VisualElement name="output-grid" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:Label name="hud-dock-trucks" class="hud-note ff-muted ff-wrap" picking-mode="Ignore" />
+        <ui:Label name="hud-dock-street-warning" text="Warning: no clear path from the street to this dock. Trucks still use it." class="hud-note hud-dock__warning ff-wrap" picking-mode="Ignore" />
+    </ui:VisualElement>
+</ui:UXML>

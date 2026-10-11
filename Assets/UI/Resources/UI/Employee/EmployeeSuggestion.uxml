@@ -1,0 +1,9 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <!-- One item in an item search box's drop-down. -->
+    <Style src="project://database/Assets/UI/Theme/Theme.uss" />
+    <Style src="Employee.uss" />
+    <ui:VisualElement class="ff-row emp-suggestion">
+        <ui:VisualElement name="icon" class="ff-icon emp-suggestion__icon" picking-mode="Ignore" />
+        <ui:Label name="title" class="emp-suggestion__name" picking-mode="Ignore" />
+    </ui:VisualElement>
+</ui:UXML>

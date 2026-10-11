@@ -1,0 +1,46 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <!-- The local player's HUD frame (decision 0040): crosshair, interact prompt, the status cards top right, the screen area
+         above the hotbar, the hotbar, the cursor stack and the belt removal wheel. PlayerHud fills hud-screen with the windows
+         (HudWindow and the Hud*Window templates) and hud-hotbar with HudSlot items. -->
+    <Style src="project://database/Assets/UI/Theme/Theme.uss" />
+    <Style src="Hud.uss" />
+    <ui:VisualElement name="hud" class="ff-root ff-fill hud" picking-mode="Ignore">
+        <ui:VisualElement name="hud-dim" class="ff-fill ff-dim" picking-mode="Ignore" />
+        <ui:VisualElement name="hud-crosshair" class="hud-crosshair" picking-mode="Ignore" />
+        <ui:VisualElement name="hud-prompt" class="hud-prompt" picking-mode="Ignore">
+            <ui:Label name="hud-prompt-key" class="ff-keycap" picking-mode="Ignore" />
+            <ui:Label name="hud-prompt-text" class="hud-prompt__text" picking-mode="Ignore" />
+        </ui:VisualElement>
+        <ui:VisualElement name="hud-status" class="hud-status" picking-mode="Ignore">
+            <ui:VisualElement name="hud-money" class="ff-overlay-card hud-money" picking-mode="Ignore">
+                <ui:VisualElement name="hud-cash-block" picking-mode="Ignore">
+                    <ui:Label text="CASH" class="ff-eyebrow" picking-mode="Ignore" />
+                    <ui:Label name="hud-cash" class="hud-money__cash" picking-mode="Ignore" />
+                    <ui:VisualElement class="ff-divider hud-money__divider" picking-mode="Ignore" />
+                </ui:VisualElement>
+                <ui:Label name="hud-clock" class="hud-money__clock" picking-mode="Ignore" />
+            </ui:VisualElement>
+            <ui:VisualElement name="hud-wage-warning" class="ff-overlay-card hud-warning" picking-mode="Ignore">
+                <ui:Label text="!" class="hud-warning__mark" picking-mode="Ignore" />
+                <ui:Label name="hud-wage-warning-text" class="hud-warning__text ff-wrap" picking-mode="Ignore" />
+            </ui:VisualElement>
+            <ui:VisualElement name="hud-alert" class="ff-overlay-card hud-alert" picking-mode="Ignore">
+                <ui:VisualElement class="ff-dot ff-dot--danger" picking-mode="Ignore" />
+                <ui:Label name="hud-alert-text" class="hud-alert__text ff-wrap" picking-mode="Ignore" />
+                <ui:VisualElement class="ff-spacer" picking-mode="Ignore" />
+                <ui:Label name="hud-alert-time" class="hud-alert__time" picking-mode="Ignore" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:VisualElement name="hud-screen-area" class="hud-screen-area" picking-mode="Ignore">
+            <ui:VisualElement name="hud-screen" class="hud-screen" />
+        </ui:VisualElement>
+        <ui:VisualElement class="hud-hotbar-row" picking-mode="Ignore">
+            <ui:VisualElement name="hud-hotbar" class="hud-hotbar" picking-mode="Ignore" />
+        </ui:VisualElement>
+        <ui:VisualElement name="hud-cursor" class="hud-cursor" picking-mode="Ignore">
+            <ui:VisualElement name="hud-icon" class="ff-icon" picking-mode="Ignore" />
+            <ui:Label name="hud-count" class="ff-slot__count" picking-mode="Ignore" />
+        </ui:VisualElement>
+        <ui:VisualElement name="hud-remove-wheel" class="hud-wheel" picking-mode="Ignore" />
+    </ui:VisualElement>
+</ui:UXML>

@@ -1,0 +1,43 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <!-- Staff (decision 0039): the site's employees against its cap, the wage bill, Hire, one HudEmployeeRow per employee and
+         this player's wage warning setting. -->
+    <Style src="project://database/Assets/UI/Theme/Theme.uss" />
+    <Style src="Hud.uss" />
+    <ui:VisualElement name="hud-staff-window" class="ff-panel hud-window">
+        <ui:VisualElement class="ff-row hud-window__header" picking-mode="Ignore">
+            <ui:Label text="Staff" class="ff-title" picking-mode="Ignore" />
+        </ui:VisualElement>
+        <ui:Label name="hud-staff-count" class="ff-small ff-wrap hud-staff__summary" picking-mode="Ignore" />
+        <ui:VisualElement class="ff-row hud-tiles" picking-mode="Ignore">
+            <ui:VisualElement class="ff-tile" picking-mode="Ignore">
+                <ui:Label text="HIRED" class="ff-eyebrow" picking-mode="Ignore" />
+                <ui:Label name="hud-staff-hired" class="ff-tile__value" picking-mode="Ignore" />
+            </ui:VisualElement>
+            <ui:VisualElement class="ff-tile hud-tiles__gap" picking-mode="Ignore">
+                <ui:Label text="WAGES" class="ff-eyebrow" picking-mode="Ignore" />
+                <ui:Label name="hud-staff-wages" class="ff-tile__value" picking-mode="Ignore" />
+            </ui:VisualElement>
+            <ui:VisualElement class="ff-tile hud-tiles__gap" picking-mode="Ignore">
+                <ui:Label text="CASH COVERS" class="ff-eyebrow" picking-mode="Ignore" />
+                <ui:Label name="hud-staff-covers" class="ff-tile__value" picking-mode="Ignore" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:VisualElement name="hud-staff-employees" />
+        <ui:VisualElement class="ff-row hud-staff__hire">
+            <ui:Label name="hud-staff-room" class="ff-small ff-wrap ff-grow" picking-mode="Ignore" />
+            <ui:Button name="hud-hire" focusable="false" class="ff-button ff-button--primary ff-button--lg hud-staff__hire-button" />
+        </ui:VisualElement>
+        <ui:VisualElement class="ff-divider hud-staff__divider" picking-mode="Ignore" />
+        <ui:VisualElement name="hud-wage-warning-setting" class="ff-row">
+            <ui:VisualElement class="ff-grow" picking-mode="Ignore">
+                <ui:Label text="Wage warning" class="ff-strong" picking-mode="Ignore" />
+                <ui:Label text="Warn when cash covers less than" class="ff-small hud-staff__hint" picking-mode="Ignore" />
+            </ui:VisualElement>
+            <ui:VisualElement class="ff-segmented">
+                <ui:Button name="hud-wage-warning-less" text="−" focusable="false" class="ff-segment" />
+                <ui:Label name="hud-wage-warning-hours" class="hud-staff__hours" picking-mode="Ignore" />
+                <ui:Button name="hud-wage-warning-more" text="+" focusable="false" class="ff-segment" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

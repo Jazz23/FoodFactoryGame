@@ -1,0 +1,21 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <!-- One employee in the Staff window: initial, name, pay state, and Fire (disabled while their hands hold anything). -->
+    <Style src="project://database/Assets/UI/Theme/Theme.uss" />
+    <Style src="Hud.uss" />
+    <ui:VisualElement class="ff-card ff-row hud-employee">
+        <ui:VisualElement class="ff-avatar" picking-mode="Ignore">
+            <ui:Label name="initial" class="ff-avatar__initial" picking-mode="Ignore" />
+        </ui:VisualElement>
+        <ui:VisualElement class="hud-employee__text" picking-mode="Ignore">
+            <ui:Label name="title" class="ff-strong" picking-mode="Ignore" />
+            <ui:VisualElement class="ff-row hud-employee__state" picking-mode="Ignore">
+                <ui:VisualElement name="dot" class="ff-dot ff-dot--sm" picking-mode="Ignore" />
+                <ui:Label name="state" class="hud-employee__state-text" picking-mode="Ignore" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:VisualElement class="hud-employee__fire" picking-mode="Ignore">
+            <ui:Button name="fire" text="Fire" focusable="false" class="ff-button ff-button--danger" />
+            <ui:Label name="hint" text="Empty their hands first" class="hud-employee__hint" picking-mode="Ignore" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

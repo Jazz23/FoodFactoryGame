@@ -1,0 +1,13 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <!-- A picked place in a task: its machine's icon, a caption (From, To, Machine), the place's name and the pick button. -->
+    <Style src="project://database/Assets/UI/Theme/Theme.uss" />
+    <Style src="Employee.uss" />
+    <ui:VisualElement class="ff-row emp-place">
+        <ui:VisualElement name="icon" class="ff-icon emp-place__icon" picking-mode="Ignore" />
+        <ui:VisualElement class="emp-place__words" picking-mode="Ignore">
+            <ui:Label name="caption" class="ff-tiny" picking-mode="Ignore" />
+            <ui:Label name="value" class="emp-place__value ff-nowrap" picking-mode="Ignore" />
+        </ui:VisualElement>
+        <ui:Button name="pick" focusable="false" class="ff-button ff-button--sm emp-place__pick" />
+    </ui:VisualElement>
+</ui:UXML>

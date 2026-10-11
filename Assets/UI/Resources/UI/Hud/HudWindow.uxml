@@ -1,0 +1,12 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <!-- A plain screen window: bold title with a muted subtitle beside it (slots used, a recipe); PlayerHud adds the content
+         (a slot grid, the hover line) after the header. Inventory, Storage and Supplier use it. -->
+    <Style src="project://database/Assets/UI/Theme/Theme.uss" />
+    <Style src="Hud.uss" />
+    <ui:VisualElement class="ff-panel hud-window">
+        <ui:VisualElement class="ff-row hud-window__header" picking-mode="Ignore">
+            <ui:Label name="title" class="ff-title" picking-mode="Ignore" />
+            <ui:Label name="subtitle" class="hud-window__subtitle" picking-mode="Ignore" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

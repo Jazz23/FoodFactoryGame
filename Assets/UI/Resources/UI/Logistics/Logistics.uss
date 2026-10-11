@@ -1,0 +1,31 @@
+/* The logistics screen (decisions 0022, 0023) in the shared look: routes, trucks and other sites in three columns of cards.
+   Shared pieces come from Theme.uss. */
+
+.logi { padding: 18px 20px 14px 20px; max-height: 90%; }
+.logi__header { margin-bottom: 8px; }
+.logi__scroll { flex-shrink: 1; }
+.logi__columns { align-items: flex-start; }
+.logi__column { width: 330px; }
+.logi__column--routes { width: 430px; }
+.logi__column--gap { margin-left: 14px; }
+.logi__heading { margin-bottom: 2px; }
+.logi__empty { margin-top: 6px; font-size: 12px; color: var(--ff-muted); white-space: normal; }
+.logi__buy { align-self: flex-start; margin-top: 8px; }
+.logi__status { margin-top: 8px; font-size: 12px; color: var(--ff-danger-text); }
+
+.logi-card__name { font-size: 13px; -unity-font-style: bold; margin-bottom: 2px; }
+.logi-card__choosers { margin-top: 4px; }
+.logi-card__buttons { margin-top: 6px; }
+.logi-card__delete { margin-left: 6px; }
+
+.logi-chooser { margin-top: 3px; }
+.logi-chooser__caption { width: 70px; }
+.logi-chooser__step { width: 26px; height: 26px; }
+.logi-chooser__value { width: 200px; font-size: 12px; -unity-text-align: middle-center; }
+.logi-chooser--narrow .logi-chooser__value { width: 170px; }
+
+.logi-stock__heading { margin-top: 6px; font-size: 12px; -unity-font-style: bold; color: var(--ff-text-soft); }
+.logi-stock { margin-top: 2px; }
+.logi-stock__label { font-size: 12px; }
+.logi-stock__move { min-width: 64px; height: 26px; }
+.logi-stock__none { font-size: 12px; color: var(--ff-muted); }

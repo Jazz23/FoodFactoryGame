@@ -1,0 +1,41 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <!-- One task in the visual task list (decision 0037). A Move task uses the "move" body (From, To, which items); a power
+         task the "power" body (a machine and on, off or toggle, which stay checkboxes as decision 0037 requires).
+         EmployeeScriptPanel removes the body the task does not use and names the parts employee-task-N-... -->
+    <ui:Template name="Place" src="EmployeePlace.uxml" />
+    <Style src="project://database/Assets/UI/Theme/Theme.uss" />
+    <Style src="Employee.uss" />
+    <ui:VisualElement class="ff-card emp-task">
+        <ui:VisualElement class="ff-row">
+            <ui:Label name="number" class="emp-task__number" picking-mode="Ignore" />
+            <ui:DropdownField name="type" class="ff-dropdown emp-task__type" />
+            <ui:Button name="remove" focusable="false" class="ff-button ff-button--icon emp-task__remove">
+                <ui:VisualElement class="ff-glyph ff-glyph--close ff-glyph--sm" />
+            </ui:Button>
+        </ui:VisualElement>
+        <ui:VisualElement name="move" class="emp-task__body">
+            <ui:VisualElement class="ff-row emp-task__places">
+                <ui:Instance template="Place" name="source" class="emp-task__place" />
+                <ui:VisualElement class="ff-glyph ff-glyph--arrow-right emp-task__arrow" />
+                <ui:Instance template="Place" name="destination" class="emp-task__place" />
+            </ui:VisualElement>
+            <ui:Toggle name="any" label="Move any valid item (what the destination takes)" focusable="false" class="ff-toggle emp-task__any" />
+            <ui:VisualElement name="filter">
+                <ui:Toggle name="whitelist" label="Whitelist (unchecked: blacklist)" focusable="false" class="ff-toggle" />
+                <ui:VisualElement name="items" class="ff-row emp-task__items">
+                    <ui:Label name="none" class="ff-small emp-task__none" picking-mode="Ignore" />
+                    <ui:TextField name="search" class="ff-text-field ff-text-field--compact emp-task__search" />
+                </ui:VisualElement>
+                <ui:VisualElement name="suggestions" class="emp-task__suggestions" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:VisualElement name="power" class="emp-task__body">
+            <ui:Instance template="Place" name="machine" class="emp-task__place emp-task__machine" />
+            <ui:VisualElement class="ff-row emp-task__power">
+                <ui:Toggle name="on" label="Turn machine on" focusable="false" class="ff-toggle emp-task__power-choice" />
+                <ui:Toggle name="off" label="Turn machine off" focusable="false" class="ff-toggle emp-task__power-choice" />
+                <ui:Toggle name="toggle" label="Toggle" focusable="false" class="ff-toggle" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

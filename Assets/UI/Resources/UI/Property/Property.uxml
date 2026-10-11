@@ -1,0 +1,23 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <!-- The buy panel for a map building (decision 0028): category, price, who owns it, the company's cash, and Buy. -->
+    <Style src="project://database/Assets/UI/Theme/Theme.uss" />
+    <Style src="Property.uss" />
+    <ui:VisualElement name="property-root" class="ff-root ff-fill" picking-mode="Ignore">
+        <ui:VisualElement name="property-dim" class="ff-fill ff-dim" picking-mode="Ignore" />
+        <ui:VisualElement name="property" class="ff-panel ff-centered prop">
+            <ui:VisualElement class="ff-row prop__header">
+                <ui:Label name="property-title" class="ff-title ff-grow ff-wrap" picking-mode="Ignore" />
+                <ui:Button name="property-close" focusable="false" class="ff-button ff-button--icon">
+                    <ui:VisualElement class="ff-glyph ff-glyph--close ff-glyph--sm" />
+                </ui:Button>
+            </ui:VisualElement>
+            <ui:VisualElement class="ff-inset prop__facts" picking-mode="Ignore">
+                <ui:Label name="property-price" class="prop__price ff-wrap" picking-mode="Ignore" />
+                <ui:Label name="property-state" class="prop__state ff-wrap" picking-mode="Ignore" />
+            </ui:VisualElement>
+            <ui:Label name="property-cash" class="ff-small prop__cash ff-wrap" picking-mode="Ignore" />
+            <ui:Label name="property-status" text=" " class="prop__status ff-wrap" picking-mode="Ignore" />
+            <ui:Button name="property-buy" text="Buy" focusable="false" class="ff-button ff-button--primary ff-button--lg prop__buy" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

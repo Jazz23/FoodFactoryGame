@@ -91,6 +91,10 @@ namespace FoodFactoryGame.Session
         // Client previews count slots with the same content the server registers; an item without a definition stacks to 1.
         public int MaxStack(string itemId) => items.FirstOrDefault(x => x != null && x.Id == itemId)?.MaxStack ?? 1;
         public bool IsRunning => Mode != SessionMode.None;
+        // Who may join the next hosted world (decision 0041); command-line and test hosts stay open, as before.
+        public HostVisibility Visibility { get; set; } = HostVisibility.Public;
+        // Raised when Configure replaces the options, so the menu reloads client settings from the new (possibly null) path.
+        public event Action Configured;
         // The transport finishes stopping on a later iteration. Starting before then lets the old server's late Stopped event
         // release the new world, so Begin waits for both local connections to be fully stopped.
         public bool CanBegin => !IsRunning && networkManager.TransportManager.Transport.GetConnectionState(true) == LocalConnectionState.Stopped
@@ -154,6 +158,7 @@ namespace FoodFactoryGame.Session
         {
             if (IsRunning) throw new InvalidOperationException("Stop the session before reconfiguring it.");
             _options = options ?? throw new ArgumentNullException(nameof(options));
+            Configured?.Invoke();
         }
 
         // The world a host or server will open: the name of its save folder beside the current one.
@@ -269,7 +274,8 @@ namespace FoodFactoryGame.Session
             _registry = new PlayerRegistry(_options.RegistryPath);
             // PROTOTYPE: players start with the dev inventory and starter goods on the primary site in either kind of world.
             authenticator.ConfigureServer(new SessionAdmission(_registry, ServerWorld, primarySite, _options.WorldPath,
-                DevWorld.InventoryCapacity, DevWorld.StarterGoods, StartOffer == null ? DevWorld.RemoteSiteIds : null));
+                DevWorld.InventoryCapacity, DevWorld.StarterGoods, StartOffer == null ? DevWorld.RemoteSiteIds : null),
+                DevAuthenticator.DefaultMaxPlayers, Mode == SessionMode.Host && Visibility == HostVisibility.Singleplayer);
             SetStatus("Starting server...");
             if (!networkManager.ServerManager.StartConnection()) throw new InvalidOperationException("Transport refused to start the server.");
         }

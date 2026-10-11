@@ -1,0 +1,13 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <!-- One keybind group (Movement, Building, ...): its heading over its rows. -->
+    <Style src="project://database/Assets/UI/Theme/Theme.uss" />
+    <Style src="MainMenu.uss" />
+    <ui:VisualElement class="menu-keygroup">
+        <ui:VisualElement class="ff-row menu-keygroup__head" picking-mode="Ignore">
+            <ui:Label name="title" class="menu-keygroup__name ff-grow" picking-mode="Ignore" />
+            <ui:Label text="Primary" class="menu-keygroup__slot" picking-mode="Ignore" />
+            <ui:Label text="Alternate" class="menu-keygroup__slot" picking-mode="Ignore" />
+        </ui:VisualElement>
+        <ui:VisualElement name="rows" />
+    </ui:VisualElement>
+</ui:UXML>
