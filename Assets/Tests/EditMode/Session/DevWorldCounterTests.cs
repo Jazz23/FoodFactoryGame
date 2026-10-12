@@ -20,7 +20,9 @@ namespace FoodFactoryGame.Session.Tests
         private static EquipmentDefinition Counter() =>
             AssetDatabase.LoadAssetAtPath<EquipmentDefinition>("Assets/Content/Equipment/Counter.asset");
 
-        private static RecipeAsset SellBread() => AssetDatabase.LoadAssetAtPath<RecipeAsset>("Assets/Content/Recipes/SellBread.asset");
+        // The bread menu item is a FoodBalance row since decision 0043.
+        private static RecipeAsset SellBread() => AssetDatabase.LoadAssetAtPath<FoodBalance>("Assets/Content/FoodBalance.asset").Menu()
+            .Single(x => x.Id == "counter-sell-bread");
 
         [SetUp]
         public void SetUp()

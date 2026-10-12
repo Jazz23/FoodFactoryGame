@@ -498,6 +498,12 @@ namespace FoodFactoryGame.Goods
                 foreach (var employee in state.Employees ?? new()) if (employee != null) employee.Unpaid = false;
                 state.SchemaVersion = 19;
             }
+            // v19 had no machine recipe settings (decision 0043): every machine loads set to automatic, the old behaviour.
+            if (state != null && state.SchemaVersion == 19)
+            {
+                foreach (var equipment in state.Equipment ?? new()) if (equipment != null) equipment.RecipeId ??= "";
+                state.SchemaVersion = 20;
+            }
             GoodsWorld.Validate(state);
             return state;
         }

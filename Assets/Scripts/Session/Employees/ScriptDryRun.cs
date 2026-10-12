@@ -1,6 +1,6 @@
 // Checks a program the script assistant wrote: first that it parses, then that it survives a short run against stand-ins for
 // the employee API (EmployeeWorker's Lua calls). Stand-ins finish at once and return typical values: true for walking and
-// placing, 1 for take/put/count/room, one ID from find/holding, {"dough"} from accepts(), false from is_on() and {0, 0} from
+// placing, 1 for take/put/count/room/work, one ID from find/holding, {"dough"} from accepts(), false from is_on() and {0, 0} from
 // position(). No goods, machines or world state are touched, so the run can happen on the client. It catches what parsing cannot, such as arithmetic on the table position()
 // returns or a call to a function the API does not have. Branches the stand-in values do not take go unchecked.
 using System;
@@ -53,7 +53,9 @@ namespace FoodFactoryGame.Session.Employees
             ["place_belt"] = Returns(DynValue.True),
             ["turn_on"] = Returns(DynValue.True),
             ["turn_off"] = Returns(DynValue.True),
-            ["toggle"] = Returns(DynValue.True)
+            ["toggle"] = Returns(DynValue.True),
+            ["set_recipe"] = Returns(DynValue.True),
+            ["work"] = Returns(DynValue.NewNumber(1))
         };
 
         private static Dictionary<string, Func<Script, CallbackArguments, DynValue>> Queries() => new()

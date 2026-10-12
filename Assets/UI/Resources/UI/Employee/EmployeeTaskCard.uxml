@@ -1,6 +1,7 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
     <!-- One task in the visual task list (decision 0037). A Move task uses the "move" body (From, To, which items); a power
-         task the "power" body (a machine and on, off or toggle, which stay checkboxes as decision 0037 requires).
+         task the "power" body (a machine and on, off or toggle, which stay checkboxes as decision 0037 requires); a Work or Recipe
+         task (decision 0043) the "recipe" body (a station or machine and a recipe).
          EmployeeScriptPanel removes the body the task does not use and names the parts employee-task-N-... -->
     <ui:Template name="Place" src="EmployeePlace.uxml" />
     <Style src="project://database/Assets/UI/Theme/Theme.uss" />
@@ -27,6 +28,13 @@
                     <ui:TextField name="search" class="ff-text-field ff-text-field--compact emp-task__search" />
                 </ui:VisualElement>
                 <ui:VisualElement name="suggestions" class="emp-task__suggestions" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:VisualElement name="recipe" class="emp-task__body">
+            <ui:Instance template="Place" name="station" class="emp-task__machine" />
+            <ui:VisualElement class="ff-row emp-task__recipe">
+                <ui:Label name="recipe-caption" class="ff-small emp-task__recipe-caption" picking-mode="Ignore" />
+                <ui:DropdownField name="recipe-choice" focusable="false" class="ff-dropdown ff-grow" />
             </ui:VisualElement>
         </ui:VisualElement>
         <ui:VisualElement name="power" class="emp-task__body">

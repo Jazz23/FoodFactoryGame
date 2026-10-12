@@ -217,6 +217,11 @@
 .hud-register--empty .hud-register__label { color: var(--ff-danger-text); }
 .hud-register__button { margin-left: 8px; }
 
+/* The recipe chooser (decision 0043). */
+.hud-recipe { margin-top: 14px; align-items: center; }
+.hud-recipe__label { margin-right: 12px; }
+.hud-recipe__choice { max-width: 520px; }
+
 /* The power switch (decision 0037). */
 .hud-power { margin-top: 16px; }
 .hud-power__label { margin-top: 2px; }

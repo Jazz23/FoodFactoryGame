@@ -1,0 +1,332 @@
+{
+ "summary": {
+  "total": 64,
+  "passed": 36,
+  "failed": 24,
+  "skipped": 4,
+  "inconclusive": 0
+ },
+ "duration": 254.54,
+ "results": [
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.BeltPlacementTests.ALiftCarriesAnItemUpToTheNextFloor",
+   "status": "Failed",
+   "message": "SetUp :   DevSite must contain a BeltPresenter.\r\n  Expected: not null\r\n  But was:  null\r\n"
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.BeltPlacementTests.DragWithRotateLaysACornerAndItemsRideToTheEnd",
+   "status": "Failed",
+   "message": "SetUp :   DevSite must contain a BeltPresenter.\r\n  Expected: not null\r\n  But was:  null\r\n"
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.BeltPlacementTests.HoldingRotateWhileDraggingFollowsTheCrosshairRoundCorners",
+   "status": "Failed",
+   "message": "SetUp :   DevSite must contain a BeltPresenter.\r\n  Expected: not null\r\n  But was:  null\r\n"
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.BuildingPresenterTests.AFactoryFloorIsBoughtRiddenAndBuiltOn",
+   "status": "Failed",
+   "message": "SetUp :   DevSite must contain a BuildingPresenter.\r\n  Expected: not null\r\n  But was:  null\r\n"
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.BuildingPresenterTests.WalkingInSwitchesToTopDownAndHidesTheRoofUntilWalkingOut",
+   "status": "Failed",
+   "message": "SetUp :   DevSite must contain a BuildingPresenter.\r\n  Expected: not null\r\n  But was:  null\r\n"
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.CompetitorCustomerTests.AtTheCapTheCurrentSiteKeepsItsFiguresAndTheCapHolds",
+   "status": "Passed",
+   "message": ""
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.CompetitorCustomerTests.CrowdsReachEachClientOnlyNearItsAvatar",
+   "status": "Passed",
+   "message": ""
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.CompetitorCustomerTests.FiguresAppearOffScreenQueueOutsideAndGoInWhenServed",
+   "status": "Passed",
+   "message": ""
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.CustomerPresenterTests.RemoteClientDrawsTheCustomerFromItsOwnReplicatedSite",
+   "status": "Failed",
+   "message": "SetUp : Unhandled log message: '[Error] Scene 'Assets/Scenes/DevSite.unity' couldn't be loaded because it has not been added to the active build profile or shared scene list or the AssetBundle has not been loaded.\nTo add a scene to the active build profile or shared scene list use the menu File->Bui"
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.CustomerPresenterTests.ReplicatedCustomerWalksFromOffscreenTowardTheCounter",
+   "status": "Failed",
+   "message": "SetUp : Unhandled log message: '[Error] Scene 'Assets/Scenes/DevSite.unity' couldn't be loaded because it has not been added to the active build profile or shared scene list or the AssetBundle has not been loaded.\nTo add a scene to the active build profile or shared scene list use the menu File->Bui"
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.EquipmentPlacementTests.HostAndRemoteBuyFromTheSupplierWithCompanyCash",
+   "status": "Failed",
+   "message": "SetUp : Unhandled log message: '[Error] Scene 'Assets/Scenes/DevSite.unity' couldn't be loaded because it has not been added to the active build profile or shared scene list or the AssetBundle has not been loaded.\nTo add a scene to the active build profile or shared scene list use the menu File->Bui"
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.EquipmentPlacementTests.HostBakesBreadThroughOvenSlotsAndRemoteSeesItRun",
+   "status": "Failed",
+   "message": "SetUp : Unhandled log message: '[Error] Scene 'Assets/Scenes/DevSite.unity' couldn't be loaded because it has not been added to the active build profile or shared scene list or the AssetBundle has not been loaded.\nTo add a scene to the active build profile or shared scene list use the menu File->Bui"
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.EquipmentPlacementTests.HostBuysAnOvenFromTheSupplierAndPlacesIt",
+   "status": "Failed",
+   "message": "SetUp : Unhandled log message: '[Error] Scene 'Assets/Scenes/DevSite.unity' couldn't be loaded because it has not been added to the active build profile or shared scene list or the AssetBundle has not been loaded.\nTo add a scene to the active build profile or shared scene list use the menu File->Bui"
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.EquipmentPlacementTests.HostMovesSeededOvenAndRemoteSeesEveryStep",
+   "status": "Failed",
+   "message": "SetUp : Unhandled log message: '[Error] Scene 'Assets/Scenes/DevSite.unity' couldn't be loaded because it has not been added to the active build profile or shared scene list or the AssetBundle has not been loaded.\nTo add a scene to the active build profile or shared scene list use the menu File->Bui"
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.EquipmentPlacementTests.HostSellsBreadAtTheCounterAndRemoteSeesTheCash",
+   "status": "Failed",
+   "message": "SetUp : Unhandled log message: '[Error] Scene 'Assets/Scenes/DevSite.unity' couldn't be loaded because it has not been added to the active build profile or shared scene list or the AssetBundle has not been loaded.\nTo add a scene to the active build profile or shared scene list use the menu File->Bui"
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.EquipmentPlacementTests.HotbarKeysOverAStackAndDropsOnTheHotbarAssignSlots",
+   "status": "Failed",
+   "message": "SetUp : Unhandled log message: '[Error] Scene 'Assets/Scenes/DevSite.unity' couldn't be loaded because it has not been added to the active build profile or shared scene list or the AssetBundle has not been loaded.\nTo add a scene to the active build profile or shared scene list use the menu File->Bui"
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.EquipmentPlacementTests.PowerSwitchClickPausesAndResumesABatch",
+   "status": "Failed",
+   "message": "SetUp : Unhandled log message: '[Error] Scene 'Assets/Scenes/DevSite.unity' couldn't be loaded because it has not been added to the active build profile or shared scene list or the AssetBundle has not been loaded.\nTo add a scene to the active build profile or shared scene list use the menu File->Bui"
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.EquipmentPlacementTests.ServerRestartShowsOvenWhereLastCommitted",
+   "status": "Failed",
+   "message": "SetUp : Unhandled log message: '[Error] Scene 'Assets/Scenes/DevSite.unity' couldn't be loaded because it has not been added to the active build profile or shared scene list or the AssetBundle has not been loaded.\nTo add a scene to the active build profile or shared scene list use the menu File->Bui"
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.EquipmentPlacementTests.ShiftClickSendsAStackAcrossOrFillsTheOtherContainer",
+   "status": "Failed",
+   "message": "SetUp : Unhandled log message: '[Error] Scene 'Assets/Scenes/DevSite.unity' couldn't be loaded because it has not been added to the active build profile or shared scene list or the AssetBundle has not been loaded.\nTo add a scene to the active build profile or shared scene list use the menu File->Bui"
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.EquipmentPlacementTests.SlotButtonsTakeShiftClicksAndPlainClicks",
+   "status": "Failed",
+   "message": "SetUp : Unhandled log message: '[Error] Scene 'Assets/Scenes/DevSite.unity' couldn't be loaded because it has not been added to the active build profile or shared scene list or the AssetBundle has not been loaded.\nTo add a scene to the active build profile or shared scene list use the menu File->Bui"
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.EquipmentPlacementTests.ThePressThatOpensAScreenNeverClicksASlot",
+   "status": "Failed",
+   "message": "SetUp : Unhandled log message: '[Error] Scene 'Assets/Scenes/DevSite.unity' couldn't be loaded because it has not been added to the active build profile or shared scene list or the AssetBundle has not been loaded.\nTo add a scene to the active build profile or shared scene list use the menu File->Bui"
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.HiringSessionTests.AnUnpaidEmployeeStopsWalksOutsideAndRestartsOncePaid",
+   "status": "Passed",
+   "message": ""
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.HiringSessionTests.HireFromTheStaffWindowSpawnsAWorkerBesideThePlayerAndFireRemovesIt",
+   "status": "Passed",
+   "message": ""
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.HiringSessionTests.TakingFromTheHandsSquareMovesTheStackToTheInventory",
+   "status": "Passed",
+   "message": ""
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.HiringSessionTests.TheWageWarningSettingIsSavedForThePlayer",
+   "status": "Passed",
+   "message": ""
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.KeyRebindingTests.ARebindOntoAnotherActionsKeyIsReportedAsAConflict",
+   "status": "Passed",
+   "message": ""
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.KeyRebindingTests.BackspaceUnbindsAndEscapeCancels",
+   "status": "Passed",
+   "message": ""
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.KeyRebindingTests.PressingAKeyRebindsThatSlotAndLeavesTheOtherAlone",
+   "status": "Passed",
+   "message": ""
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.KitchenSessionTests.AnEmployeeWorksTheCounterForABatchAndLeaves",
+   "status": "Passed",
+   "message": ""
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.KitchenSessionTests.KitchenCaptures",
+   "status": "Skipped",
+   "message": "Captures run on request: create Temp/kitchen-captures.flag."
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.KitchenSessionTests.RecipeChooserAndKitchenCounterWorkThroughTheirScreens",
+   "status": "Passed",
+   "message": ""
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.LogisticsPanelTests.PanelShipsStockEditsRoutesAndManagesTheFleet",
+   "status": "Failed",
+   "message": "SetUp : Unhandled log message: '[Error] Scene 'Assets/Scenes/DevSite.unity' couldn't be loaded because it has not been added to the active build profile or shared scene list or the AssetBundle has not been loaded.\nTo add a scene to the active build profile or shared scene list use the menu File->Bui"
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.MainMenuTests.HostingFromTheMenuBecomesTheResumeTarget",
+   "status": "Failed",
+   "message": "SetUp : Unhandled log message: '[Error] Scene 'Assets/Scenes/DevSite.unity' couldn't be loaded because it has not been added to the active build profile or shared scene list or the AssetBundle has not been loaded.\nTo add a scene to the active build profile or shared scene list use the menu File->Bui"
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.RestaurantBuildingSessionTests.BuildModeAndDecoratedRestaurantCaptures",
+   "status": "Skipped",
+   "message": "Captures run on request: create Temp/restaurant-captures.flag."
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.RestaurantBuildingSessionTests.BuildModeOrdersReachTheServerAndATeammate",
+   "status": "Passed",
+   "message": ""
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.RestaurantBuildingSessionTests.HoldingRemoveOnAWallClockSellsItOnceTheWheelFills",
+   "status": "Passed",
+   "message": ""
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.RestaurantBuildingSessionTests.RegisterStaffingReplicatesAndEndsWhenThePlayerLeaves",
+   "status": "Passed",
+   "message": ""
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.RestaurantBuildingSessionTests.RestaurantDocksInTheYardServeOneTruckAtATime",
+   "status": "Passed",
+   "message": ""
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.ScreenOpeningTests.EClosesEmployeeScriptUnlessTypingInIt",
+   "status": "Passed",
+   "message": ""
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.ScreenOpeningTests.EmployeeRunsItsTasksAndTheOvenBakes",
+   "status": "Passed",
+   "message": ""
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.ScreenOpeningTests.EmployeeScreenOpensOnTasksAndTasksGenerateTheLua",
+   "status": "Passed",
+   "message": ""
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.ScreenOpeningTests.EmployeeScriptOpenedByLeftClickIsNotFocusedByThatClick",
+   "status": "Passed",
+   "message": ""
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.ScreenOpeningTests.EmployeeScriptOpensUnfocusedAndLosesFocusWhenClosed",
+   "status": "Passed",
+   "message": ""
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.ScreenOpeningTests.HudAndScreenCaptures",
+   "status": "Skipped",
+   "message": "Captures run on request: create Temp/hud-captures.flag."
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.ScreenOpeningTests.ItemSearchOpensWithRecentItemsFirst",
+   "status": "Passed",
+   "message": ""
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.ScreenOpeningTests.LeftClickOpensTheStorageOnlyWhenHighlighted",
+   "status": "Passed",
+   "message": ""
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.ScreenOpeningTests.LongLuaScrollsAndFollowsTheCaret",
+   "status": "Passed",
+   "message": ""
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.ScreenOpeningTests.SettingASourcePulsesValidTargetsAndSetsThePickedOne",
+   "status": "Passed",
+   "message": ""
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.SessionBootstrapTests.HostAndRemoteJoinWithStableIdsOwnedAvatarsAndSiteState",
+   "status": "Failed",
+   "message": "SetUp : Unhandled log message: '[Error] Scene 'Assets/Scenes/DevSite.unity' couldn't be loaded because it has not been added to the active build profile or shared scene list or the AssetBundle has not been loaded.\nTo add a scene to the active build profile or shared scene list use the menu File->Bui"
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.SessionBootstrapTests.ServerOnlyStartAdvancesWorldWithoutAnyClient",
+   "status": "Failed",
+   "message": "SetUp : Unhandled log message: '[Error] Scene 'Assets/Scenes/DevSite.unity' couldn't be loaded because it has not been added to the active build profile or shared scene list or the AssetBundle has not been loaded.\nTo add a scene to the active build profile or shared scene list use the menu File->Bui"
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.SessionBootstrapTests.SingleplayerHostRejectsRemotePlayers",
+   "status": "Failed",
+   "message": "SetUp : Unhandled log message: '[Error] Scene 'Assets/Scenes/DevSite.unity' couldn't be loaded because it has not been added to the active build profile or shared scene list or the AssetBundle has not been loaded.\nTo add a scene to the active build profile or shared scene list use the menu File->Bui"
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.WorldGenHiringTests.AFarLotWithAnEmployeeGetsItsNavMeshWithoutBeingDrawn",
+   "status": "Passed",
+   "message": ""
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.WorldGenHiringTests.AHireWalksFromTheApronIntoTheRestaurant",
+   "status": "Passed",
+   "message": ""
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.WorldGenSessionTests.ABoughtRestaurantIsDrawnWhereItStands",
+   "status": "Passed",
+   "message": ""
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.WorldGenSessionTests.ABuildingBoughtThroughThePanelReachesBothClients",
+   "status": "Passed",
+   "message": ""
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.WorldGenSessionTests.ADockPlacesOnTheApron",
+   "status": "Passed",
+   "message": ""
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.WorldGenSessionTests.ANewWorldStartsThePlayerOnItsOwnRestaurant",
+   "status": "Passed",
+   "message": ""
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.WorldGenSessionTests.ATeammateSeesTheHostEnterAndBuildInTheSecondSite",
+   "status": "Passed",
+   "message": ""
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.WorldGenSessionTests.ATruckDrivesTheGeneratedRoadsWhereItIsDrawn",
+   "status": "Failed",
+   "message": "  The truck was drawn while driving.\r\n  Expected: greater than or equal to 8\r\n  But was:  7\r\n"
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.WorldGenSessionTests.AWholeSaleInTheStartingRestaurantReachesBothClients",
+   "status": "Passed",
+   "message": ""
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.WorldGenSessionTests.RejoiningStartsWhereThePlayerLeftWithTheGoods",
+   "status": "Passed",
+   "message": ""
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.WorldGenSessionTests.TheMapsStartingLotLinesUpWithTheSiteGrid",
+   "status": "Passed",
+   "message": ""
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.WorldGenSessionTests.TrucksAndCityTrafficCaptures",
+   "status": "Skipped",
+   "message": "Captures run on request: create Temp/truck-captures.flag."
+  },
+  {
+   "name": "FoodFactoryGame.Session.PlayModeTests.WorldGenSessionTests.WalkingIntoABoughtRestaurantCarriesTheGoodsThere",
+   "status": "Passed",
+   "message": ""
+  }
+ ]
+}

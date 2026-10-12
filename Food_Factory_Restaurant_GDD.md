@@ -186,6 +186,11 @@ Owner decisions recorded 2026-09-27:
 
 - A HUD warning tells the player employees will stop soon; each player chooses when it appears.
 
+### Employee Tasks (owner decisions 2026-10-06 and 2026-10-12, decisions 0037 and 0043)
+
+- An employee repeats a visual task list: move goods from A to B, turn a machine on or off, **work at a kitchen counter** for one
+  batch of a recipe, and **set a machine's recipe**. The list generates the Lua the employee runs.
+
 ### Game Clock (owner decision 2026-10-08)
 
 - The world has a game clock: 1 game hour is 1 real minute, so a game day is 24 real minutes. The HUD shows the day and time.
@@ -295,6 +300,26 @@ Food can be sold at different levels of processing. Central factories favor scal
 - All machines are available from the start but must be purchased and
   supported economically.
 
+## Recipe Catalog (owner decision 2026-10-12, decision 0043)
+
+Recipe list and stations are confirmed; every price, time and shelf life is a PROTOTYPE value kept in one editable asset
+(`Assets/Content/FoodBalance.asset` for prices; recipe assets for times). Full tables: `docs/decisions/0043-recipes-kitchen-stations-and-food-prices.md`.
+
+- **Raw ingredients** (supplier only for now; farms later, section 10): flour, potato, tomato, lettuce, milk, egg, cheese, beef,
+  chicken, fish, and dough.
+- **Stations:** oven, **mixer**, **stove**, **fryer**, **grill** and **kitchen counter**. There is no mill, churn, dairy vat,
+  butcher or pasta press: flour and cheese are bought, the mixer makes pasta, and the kitchen counter cuts meat and vegetables.
+  Every machine has a power switch; the kitchen counter instead needs a worker (below).
+- **Intermediates:** dough, pasta, breading, batter (mixer); tomato sauce, tomato soup, bolognese (stove); fries, fried chicken,
+  fried fish (fryer); cooked patty (grill); bun (oven); cut potatoes, patty, ground beef, chopped lettuce, pizza base (kitchen
+  counter). Dough, tomato sauce, bolognese, batter and fries feed several dishes, which favours central production.
+- **Dishes** (tier): Bread, Fries, Pancakes, Grilled Cheese, Tomato Soup & Bread (1); Margherita Pizza, Fried Chicken & Fries,
+  Cheeseburger, Spaghetti Bolognese, Fish & Chips (2); Lasagna (3). More upscale dishes will be added later.
+- **Kitchen counter:** where ingredients are cut and dishes assembled. Assembly takes time and advances only while a player or
+  employee stands at the counter working it.
+- **Recipe chooser:** a machine with several recipes can be set to one of them (or automatic, the first whose ingredients are
+  in); players set it on the machine's screen and employees with a task.
+
 ## Item Condition
 
 - Food condition is binary: **edible** or **spoiled**.
@@ -331,6 +356,11 @@ seating if applicable, pay, and leave.
 ## Menu
 
 - Player chooses which recipes each restaurant sells. Prices are fixed per recipe; the player does not set them (owner decision 2026-09-25, revising "and sets prices").
+
+- Owner decision 2026-10-12 (decision 0043): a restaurant sells every dish it has stocked at a staffed register, each at its own
+  fixed price, and customers choose only among dishes in stock. Districts differ in how picky they are: wealthier districts buy
+  only higher-tier food (PROTOTYPE: districts at 70% wealth and above buy tier 2 and up). Whether players also pick a menu per
+  restaurant on top of this is **open**; until decided, the stock is the menu.
 
 - Menus should match local tastes and the supply network behind the
   restaurant.
@@ -436,6 +466,8 @@ Owner decisions, 2026-10-01; numbers and formulas are PROTOTYPE and open (`docs/
 
 - Draft assumption: farms have location-specific output and production
   rates rather than detailed farming simulation.
+
+- Until farms exist, every raw ingredient (section 6, Recipe Catalog) is bought from the supplier (owner decision 2026-10-12).
 
 # 11. Competition & Acquisitions
 
@@ -554,7 +586,8 @@ support them.
 
 - Player character + general-purpose employees.
 
-- One farm type, several ingredients, several recipes.
+- One farm type, several ingredients, several recipes. (Ingredients and recipes: section 6, Recipe Catalog, implemented
+  2026-10-12 with supplier-only ingredients; the farm type is not built yet.)
 
 - One restaurant type with editable kitchen/dining layout: free outer and interior walls within the lot, doors, windows, tables, registers, decor with an ambience score, and docks.
 
@@ -587,6 +620,10 @@ support them.
 
 - External sales: LOCKED - non-player restaurants and distributors can
   buy player-produced food; contract/pricing details TBD.
+
+- Recipe catalog and kitchen stations: LOCKED - ten new dishes from intermediates on a mixer, stove, fryer, grill, oven and a
+  worker-bound kitchen counter, recipe choosers on multi-recipe machines, stock-based selling with district tier demand
+  (section 6, 2026-10-12). Prices and timings are PROTOTYPE values; per-restaurant menu selection is open.
 
 - Customer choice: LOCKED - each customer individually evaluates nearby restaurants using price, cuisine fit, distance, reputation, and wait time.
 

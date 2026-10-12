@@ -180,7 +180,8 @@ namespace FoodFactoryGame.Session.Tests
         {
             var world = Open(Layout());
             var state = world.Snapshot();
-            world.RegisterRecipe(AssetDatabase.LoadAssetAtPath<RecipeAsset>("Assets/Content/Recipes/SellBread.asset").ToDefinition());
+            world.RegisterRecipe(AssetDatabase.LoadAssetAtPath<FoodBalance>("Assets/Content/FoodBalance.asset").Menu()
+                .Single(x => x.Id == "counter-sell-bread").ToDefinition());
             // TEST-ONLY stock: 20 bread that never spoils during the test, placed straight into the counter's input.
             world.Bootstrap(new GoodsLot
             {

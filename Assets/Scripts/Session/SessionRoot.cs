@@ -39,6 +39,9 @@ namespace FoodFactoryGame.Session
         [SerializeField] private OfferAsset[] offers = Array.Empty<OfferAsset>();
         // Item content: names and icons for the HUD, and each item's max stack, which the server registers with the world.
         [SerializeField] private ItemDefinition[] items = Array.Empty<ItemDefinition>();
+        // Food prices (decision 0043): its supply rows become supplier offers and its dish rows menu items, listed with the
+        // authored offers and recipes above (food first, so the Supplier window starts with ingredients).
+        [SerializeField] private FoodBalance foodBalance;
         // PROTOTYPE: when set, the server seeds the dev employee and spawns one of these per saved employee record once the
         // goods bridge serves. Scenes without a NavMesh leave it empty; their saves keep any employee records untouched.
         [SerializeField] private EmployeeWorker employeePrefab;
@@ -61,6 +64,8 @@ namespace FoodFactoryGame.Session
         private readonly Dictionary<NetworkConnection, (string PlayerId, PlayerAvatar Avatar)> _avatars = new();
         private readonly Dictionary<string, (Vector3 Position, float Yaw)> _poses = new();
         private PlayerAvatar _localAvatar;
+        private RecipeAsset[] _allRecipes;
+        private OfferAsset[] _allOffers;
 
         public SessionMode Mode { get; private set; }
         public string Status { get; private set; } = "Not connected";
@@ -85,8 +90,13 @@ namespace FoodFactoryGame.Session
         // The site this client presents (named by the server's join answer); null before joining.
         public string ClientSiteId => _site?.SiteId;
         public IReadOnlyList<EquipmentDefinition> EquipmentDefinitions => equipmentDefinitions;
-        public IReadOnlyList<RecipeAsset> Recipes => recipes;
-        public IReadOnlyList<OfferAsset> Offers => offers;
+        // Authored recipes, then the menu items made from the food balance.
+        public IReadOnlyList<RecipeAsset> Recipes =>
+            _allRecipes ??= recipes.Concat(foodBalance != null ? foodBalance.Menu() : Array.Empty<RecipeAsset>()).ToArray();
+        // The food balance's ingredient packs, then the authored offers (belts, machines, trucks).
+        public IReadOnlyList<OfferAsset> Offers =>
+            _allOffers ??= (foodBalance != null ? foodBalance.Offers() : Array.Empty<OfferAsset>()).Concat(offers).ToArray();
+        public FoodBalance FoodBalance => foodBalance;
         public IReadOnlyList<ItemDefinition> Items => items;
         // Client previews count slots with the same content the server registers; an item without a definition stacks to 1.
         public int MaxStack(string itemId) => items.FirstOrDefault(x => x != null && x.Id == itemId)?.MaxStack ?? 1;
@@ -260,10 +270,12 @@ namespace FoodFactoryGame.Session
             // Nobody is connected yet, so no player works a register (decision 0034); employees keep theirs.
             ServerWorld.ReleaseStaffDurably(null, _options.WorldPath);
             // Recipes are content, not saved state, so they are registered on every start, including a recovered save.
-            foreach (var recipe in recipes) ServerWorld.RegisterRecipe(recipe.ToDefinition());
+            foreach (var recipe in Recipes) ServerWorld.RegisterRecipe(recipe.ToDefinition());
             // Kinds that run only while switched on (decision 0037), content like recipes.
             foreach (var definition in equipmentDefinitions.Where(x => x != null && x.ManualPower)) ServerWorld.RegisterManualPower(definition.Kind);
-            foreach (var offer in offers) offer.RegisterWith(ServerWorld);
+            // Kinds that run only while someone works them (decision 0043), content like recipes.
+            foreach (var definition in equipmentDefinitions.Where(x => x != null && x.WorkerBound)) ServerWorld.RegisterWorkerBound(definition.Kind);
+            foreach (var offer in Offers) offer.RegisterWith(ServerWorld);
             ServerWorld.RegisterFloorOffer(DevWorld.FloorOffer);
             // Like floors, the property catalog is content: the stored layout's lots (decision 0028), none without a layout. A
             // generated world registered its own while loading.

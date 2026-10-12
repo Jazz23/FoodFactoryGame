@@ -2,7 +2,8 @@
 // the server, through the ordinary employee API (EmployeeWorker); the list is only how the player edits it, saved beside the
 // script (GoodsEmployee.Tasks). Generation is deterministic, so a client can tell whether a script still matches its list:
 // one that does not was edited by hand and is "detached" until the player resets it. The program loops forever, doing one
-// step per task each pass (one carrying trip, or one flip of a switch), then waits briefly.
+// step per task each pass (one carrying trip, or one flip of a switch), then waits briefly. Decision 0043 adds working a
+// station for one batch (work) and setting a machine's recipe (set_recipe).
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -16,7 +17,11 @@ namespace FoodFactoryGame.Session.Employees
         // Move stuff from A to B.
         Move,
         // Turn a machine on, off, or toggle it.
-        Power
+        Power,
+        // Work a worker-bound station (the kitchen counter) for one batch of a recipe (decision 0043).
+        Work,
+        // Set what a machine makes (decision 0043).
+        Recipe
     }
 
     public enum EmployeeTaskPower
@@ -41,12 +46,17 @@ namespace FoodFactoryGame.Session.Employees
         // A machine ID picked in the world, and what to do with its switch.
         public string Machine = "";
         public EmployeeTaskPower Power;
+        // Work and Recipe tasks (decision 0043): a recipe ID of the picked machine's kind; empty means whatever the station is set
+        // to (Work) or automatic (Recipe).
+        public string Recipe = "";
     }
 
     [Serializable] public sealed class EmployeeTaskList
     {
         public const string MoveLabel = "Move stuff from A to B";
         public const string PowerLabel = "Turn machine on";
+        public const string WorkLabel = "Work at counter";
+        public const string RecipeLabel = "Set machine recipe";
         public const string Header = "-- Generated from this employee's Tasks tab. Editing it here detaches the employee from its tasks.\n";
 
         public List<EmployeeTask> Tasks = new();
@@ -67,6 +77,7 @@ namespace FoodFactoryGame.Session.Employees
                     task.Source ??= "";
                     task.Destination ??= "";
                     task.Machine ??= "";
+                    task.Recipe ??= "";
                     task.Items ??= new List<string>();
                 }
                 return list;
@@ -114,6 +125,12 @@ namespace FoodFactoryGame.Session.Employees
 
         public static string Describe(EmployeeTask task)
         {
+            if (task.Type == EmployeeTaskType.Work)
+                return $"Work at {Named(task.Machine, "a counter")} for one batch"
+                    + (string.IsNullOrEmpty(task.Recipe) ? "" : $" of {OneLine(task.Recipe)}");
+            if (task.Type == EmployeeTaskType.Recipe)
+                return $"Set {Named(task.Machine, "a machine")} to make "
+                    + (string.IsNullOrEmpty(task.Recipe) ? "automatically" : OneLine(task.Recipe));
             if (task.Type == EmployeeTaskType.Power)
             {
                 var machine = Named(task.Machine, "a machine");
@@ -138,6 +155,11 @@ namespace FoodFactoryGame.Session.Employees
         // One task's Lua line, or null while it is unfinished.
         private static string Statement(EmployeeTask task)
         {
+            if (task.Type == EmployeeTaskType.Work)
+                return string.IsNullOrEmpty(task.Machine) ? null
+                    : string.IsNullOrEmpty(task.Recipe) ? $"work({Quote(task.Machine)})" : $"work({Quote(task.Machine)}, {Quote(task.Recipe)})";
+            if (task.Type == EmployeeTaskType.Recipe)
+                return string.IsNullOrEmpty(task.Machine) ? null : $"set_recipe({Quote(task.Machine)}, {Quote(task.Recipe)})";
             if (task.Type == EmployeeTaskType.Power)
             {
                 if (string.IsNullOrEmpty(task.Machine)) return null;

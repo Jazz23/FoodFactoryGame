@@ -214,7 +214,8 @@ namespace FoodFactoryGame.Session.Equipment
         }
 
         // Valid targets on the current site: for a source or destination, every placed piece a player can open for goods (not
-        // tables or decor) and the storage; for a machine, every placed piece whose kind has a power switch.
+        // tables or decor) and the storage; for a machine, every placed piece whose kind has a power switch; for a station, every
+        // worker-bound piece; for a recipe machine, every piece whose kind has more than one recipe (decision 0043).
         private List<Component> ValidTargets(GoodsSnapshot site)
         {
             var placed = site.Equipment.Where(x => x.State == EquipmentState.Placed && x.SiteId == session.ClientSiteId)
@@ -224,12 +225,16 @@ namespace FoodFactoryGame.Session.Equipment
             {
                 if (visual == null || !placed.TryGetValue(visual.EquipmentId, out var equipment)) continue;
                 var definition = session.EquipmentDefinitions.FirstOrDefault(x => x != null && x.Kind == equipment.Kind);
-                var valid = PickMode == PickTarget.Machine
-                    ? definition != null && definition.ManualPower
-                    : definition?.OpensScreen != false && !GoodsWorld.IsTable(equipment);
+                var valid = PickMode switch
+                {
+                    PickTarget.Machine => definition != null && definition.ManualPower,
+                    PickTarget.Station => definition != null && definition.WorkerBound,
+                    PickTarget.RecipeMachine => session.Recipes.Count(x => x != null && !x.IsSale && x.StationKind == equipment.Kind) > 1,
+                    _ => definition?.OpensScreen != false && !GoodsWorld.IsTable(equipment)
+                };
                 if (valid) targets.Add(visual);
             }
-            if (PickMode != PickTarget.Machine)
+            if (PickMode is not (PickTarget.Machine or PickTarget.Station or PickTarget.RecipeMachine))
                 targets.AddRange(FindObjectsByType<SiteLocationMarker>()
                     .Where(x => x != null && site.Locations.Any(y => y.Id == x.LocationId && y.SiteId == session.ClientSiteId)));
             return targets;

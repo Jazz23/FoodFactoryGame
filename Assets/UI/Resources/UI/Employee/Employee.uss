@@ -204,3 +204,7 @@
 .emp-suggestion:hover { background-color: var(--ff-control); }
 .emp-suggestion__icon { width: 20px; height: 20px; margin-right: 8px; }
 .emp-suggestion__name { font-size: 13px; }
+
+/* Work and Recipe tasks (decision 0043): the station or machine, then a recipe chooser. */
+.emp-task__recipe { margin-top: 10px; align-items: center; }
+.emp-task__recipe-caption { margin-right: 10px; }

@@ -246,7 +246,8 @@ namespace FoodFactoryGame.Session.PlayModeTests
                 return rivals.Count(Shown) >= 2;
             }, "competitor figures filling the cap", 30f);
 
-            var recipe = _root.Recipes.Single(x => x != null && x.IsSale && x.StationKind == GoodsWorld.CounterKind);
+            // The menu has many dishes since decision 0043; these customers want bread.
+            var recipe = _root.Recipes.Single(x => x != null && x.IsSale && x.StationKind == GoodsWorld.CounterKind && x.Id == "counter-sell-bread");
             var mine = Enumerable.Range(1, Cap).Select(i => "mine-" + i).ToList();
             SeedQueued(Start.SiteId, mine, recipe.Id);
             yield return Until(() =>
@@ -285,7 +286,8 @@ namespace FoodFactoryGame.Session.PlayModeTests
             var quiet = competitors.Last();
             foreach (var competitor in busy)
                 SeedQueued(competitor.Id, Enumerable.Range(1, competitor.Seats + competitor.Servers + CompetitorFrontage.QueueSpots).Select(i => $"{competitor.Id}-test-{i}"));
-            var recipe = _root.Recipes.Single(x => x != null && x.IsSale && x.StationKind == GoodsWorld.CounterKind);
+            // The menu has many dishes since decision 0043; these customers want bread.
+            var recipe = _root.Recipes.Single(x => x != null && x.IsSale && x.StationKind == GoodsWorld.CounterKind && x.Id == "counter-sell-bread");
             SeedQueued(Start.SiteId, Enumerable.Range(1, 50).Select(i => "mine-test-" + i), recipe.Id);
             // Wait until the figures settle (a competitor whose whole street is on screen gets none: figures only appear out of view).
             var end = Time.realtimeSinceStartup + 60f;

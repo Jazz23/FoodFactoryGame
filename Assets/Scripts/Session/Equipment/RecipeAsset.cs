@@ -44,6 +44,25 @@ namespace FoodFactoryGame.Session.Equipment
         public string OutputItemId => outputItemId;
         public int OutputQuantity => outputQuantity;
 
+        // A menu item made at runtime from a FoodBalance dish row (decision 0043): sold at the register, never saved as an asset.
+        public static RecipeAsset CreateSale(string id, string displayName, string itemId, int saleCents, int tier, string cuisine,
+            int serveSeconds)
+        {
+            var recipe = CreateInstance<RecipeAsset>();
+            recipe.hideFlags = HideFlags.DontSave;
+            recipe.name = id;
+            recipe.id = id;
+            recipe.displayName = displayName;
+            recipe.stationKind = GoodsWorld.CounterKind;
+            recipe.durationSeconds = Math.Max(1, serveSeconds);
+            recipe.inputs = new List<Ingredient> { new() { itemId = itemId, quantity = 1 } };
+            recipe.outputItemId = "";
+            recipe.saleCents = Math.Max(1, saleCents);
+            recipe.tier = Math.Max(1, tier);
+            recipe.cuisine = cuisine ?? "";
+            return recipe;
+        }
+
         public RecipeDefinition ToDefinition() => new()
         {
             Id = id, StationKind = stationKind, DurationSeconds = durationSeconds,

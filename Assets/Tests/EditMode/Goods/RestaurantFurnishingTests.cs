@@ -240,6 +240,9 @@ namespace FoodFactoryGame.Goods.Tests
                     Id = "sell", StationKind = GoodsWorld.CounterKind, DurationSeconds = 4, Tier = 1, Cuisine = "bakery",
                     Inputs = { new RecipeInput { ItemId = "bread", Quantity = 1 } }, OutputItemId = "", SaleCents = 250
                 });
+                // Customers choose only dishes in stock (decision 0043): enough bread that the register never runs out.
+                world.RegisterItem("bread", 500);
+                world.Bootstrap(new GoodsLot { Id = "bread", ItemId = "bread", OwnerId = "resto", LocationId = "reg:in", Quantity = 500, SpoilAfterSeconds = 100_000 });
                 world.Bootstrap(new GoodsCompetitor { Id = "rival", Name = "Rival", Cuisine = "bakery", Tier = 1, PriceCents = 250, Servers = 1, ServiceSeconds = 4, Seats = 4 });
                 world.Bootstrap(new GoodsDistrict
                 {

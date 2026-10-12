@@ -204,7 +204,19 @@ namespace FoodFactoryGame.Session.Employees
         public void SetTaskType(int index, EmployeeTaskType type)
         {
             if (Detached || index < 0 || index >= _draft.Tasks.Count || _draft.Tasks[index].Type == type) return;
-            _draft.Tasks[index].Type = type;
+            var task = _draft.Tasks[index];
+            task.Type = type;
+            // A machine picked for one kind of task may not suit another (decision 0043), so it is picked again.
+            task.Machine = "";
+            task.Recipe = "";
+            Changed();
+        }
+
+        // The recipe a Work or Recipe task uses (decision 0043): a recipe ID, or empty for the station's setting / automatic.
+        public void SetTaskRecipe(int index, string recipeId)
+        {
+            if (Detached || index < 0 || index >= _draft.Tasks.Count) return;
+            _draft.Tasks[index].Recipe = recipeId ?? "";
             Changed();
         }
 
@@ -270,6 +282,12 @@ namespace FoodFactoryGame.Session.Employees
                 case PickTarget.Machine:
                     task.Machine = place ?? "";
                     break;
+                case PickTarget.Station:
+                case PickTarget.RecipeMachine:
+                    // Another machine kind has other recipes.
+                    if (MachineKind(place) != MachineKind(task.Machine)) task.Recipe = "";
+                    task.Machine = place ?? "";
+                    break;
             }
             Changed();
         }
@@ -323,22 +341,32 @@ namespace FoodFactoryGame.Session.Employees
             card.Part<Label>("number").text = $"{index + 1}";
             var type = card.Part<DropdownField>("type");
             type.name = $"employee-task-{index}-type";
-            type.choices = new List<string> { EmployeeTaskList.MoveLabel, EmployeeTaskList.PowerLabel };
-            type.SetValueWithoutNotify(task.Type == EmployeeTaskType.Power ? EmployeeTaskList.PowerLabel : EmployeeTaskList.MoveLabel);
-            type.RegisterValueChangedCallback(evt =>
-                SetTaskType(index, evt.newValue == EmployeeTaskList.PowerLabel ? EmployeeTaskType.Power : EmployeeTaskType.Move));
+            var labels = new Dictionary<EmployeeTaskType, string>
+            {
+                [EmployeeTaskType.Move] = EmployeeTaskList.MoveLabel, [EmployeeTaskType.Power] = EmployeeTaskList.PowerLabel,
+                [EmployeeTaskType.Work] = EmployeeTaskList.WorkLabel, [EmployeeTaskType.Recipe] = EmployeeTaskList.RecipeLabel
+            };
+            type.choices = labels.Values.ToList();
+            type.SetValueWithoutNotify(labels[task.Type]);
+            type.RegisterValueChangedCallback(evt => SetTaskType(index, labels.First(x => x.Value == evt.newValue).Key));
             var remove = card.Part<Button>("remove");
             remove.name = $"employee-task-{index}-remove";
             remove.clicked += () => RemoveTask(index);
-            if (task.Type == EmployeeTaskType.Power)
+            if (task.Type != EmployeeTaskType.Move) card.Part("move").RemoveFromHierarchy();
+            if (task.Type != EmployeeTaskType.Power) card.Part("power").RemoveFromHierarchy();
+            if (task.Type is not (EmployeeTaskType.Work or EmployeeTaskType.Recipe)) card.Part("recipe").RemoveFromHierarchy();
+            switch (task.Type)
             {
-                card.Part("move").RemoveFromHierarchy();
-                PowerBody(card, index, task);
-            }
-            else
-            {
-                card.Part("power").RemoveFromHierarchy();
-                MoveBody(card, index, task);
+                case EmployeeTaskType.Power:
+                    PowerBody(card, index, task);
+                    break;
+                case EmployeeTaskType.Work:
+                case EmployeeTaskType.Recipe:
+                    RecipeBody(card, index, task);
+                    break;
+                default:
+                    MoveBody(card, index, task);
+                    break;
             }
             return card;
         }
@@ -453,6 +481,31 @@ namespace FoodFactoryGame.Session.Employees
             on.SetEnabled(!toggling);
             off.SetEnabled(!toggling);
         }
+
+        // A Work task (a worker-bound station and the recipe to make there) or a Recipe task (a machine and what to set it to),
+        // decision 0043. The chooser lists the picked machine's recipes; empty means the station's own setting or automatic.
+        private void RecipeBody(VisualElement card, int index, EmployeeTask task)
+        {
+            var work = task.Type == EmployeeTaskType.Work;
+            FillPlace(card.Part("station"), index, work ? "Counter" : "Machine", work ? "Select counter" : "Select machine",
+                work ? PickTarget.Station : PickTarget.RecipeMachine, task.Machine);
+            var kind = MachineKind(task.Machine);
+            var recipes = kind == null ? new List<RecipeAsset>()
+                : interaction.Session.Recipes.Where(x => x != null && !x.IsSale && x.StationKind == kind).ToList();
+            var none = work ? "Whatever it is set to" : "Automatic (first ready recipe)";
+            var names = recipes.ToDictionary(x => x.Id, x => ItemName(x.OutputItemId) + (x.OutputQuantity > 1 ? $" ×{x.OutputQuantity}" : ""));
+            card.Part<Label>("recipe-caption").text = work ? "Make" : "Set to";
+            var choice = card.Part<DropdownField>("recipe-choice");
+            choice.name = $"employee-task-{index}-recipe";
+            choice.choices = new List<string> { none }.Concat(recipes.Select(x => names[x.Id])).ToList();
+            choice.SetValueWithoutNotify(names.TryGetValue(task.Recipe ?? "", out var current) ? current : none);
+            choice.RegisterValueChangedCallback(evt => SetTaskRecipe(index, names.FirstOrDefault(x => x.Value == evt.newValue).Key ?? ""));
+            choice.SetEnabled(kind != null);
+        }
+
+        // The kind of the placed machine a task names, or null.
+        private string MachineKind(string machineId) => string.IsNullOrEmpty(machineId) ? null
+            : interaction.Session.ClientSite?.Equipment.FirstOrDefault(x => x.Id == machineId)?.Kind;
 
         // A picked place in a box (EmployeePlace.uxml): its machine's icon, a caption, the place's name and the pick button.
         private void FillPlace(VisualElement box, int index, string caption, string text, PickTarget target, string place)

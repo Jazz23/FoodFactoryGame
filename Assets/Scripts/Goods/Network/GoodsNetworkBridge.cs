@@ -269,6 +269,21 @@ namespace FoodFactoryGame.Goods.Network
             if (result.Accepted) Broadcast();
         }
 
+        // Sets the recipe a machine makes, or empty for automatic (SelectRecipeDurably, decision 0043).
+        public void RequestSelectRecipe(string requestId, string equipmentId, string recipeId)
+        {
+            if (IsClientStarted) ServerSelectRecipe(requestId, equipmentId, recipeId ?? "");
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        private void ServerSelectRecipe(string requestId, string equipmentId, string recipeId, NetworkConnection sender = null)
+        {
+            if (!TryIdentify(sender, requestId, out var player)) return;
+            var result = _world.SelectRecipeDurably(player, requestId, equipmentId, recipeId, _savePath);
+            Reply(sender, result);
+            if (result.Accepted) Broadcast();
+        }
+
         // Hires an employee for the site the player stands on; it appears beside them (HireDurably, decision 0039).
         public void RequestHire(string requestId)
         {
@@ -708,10 +723,30 @@ namespace FoodFactoryGame.Goods.Network
         public GoodsOutcome WorkerSetPower(string workerId, string equipmentId, bool on) =>
             Worker(workerId, requestId => _world.SetPowerDurably(workerId, requestId, equipmentId, on, _savePath));
 
+        // Decision 0043: a worker sets a machine's recipe, or starts or stops working a station (its own ID, or empty to leave).
+        public GoodsOutcome WorkerSelectRecipe(string workerId, string equipmentId, string recipeId) =>
+            Worker(workerId, requestId => _world.SelectRecipeDurably(workerId, requestId, equipmentId, recipeId, _savePath));
+
+        public GoodsOutcome WorkerStaff(string workerId, string equipmentId, bool work) =>
+            Worker(workerId, requestId => _world.StaffDurably(workerId, requestId, equipmentId, work ? workerId : "", _savePath));
+
+        // Server-only: a worker stops working a station even while unpaid (its script stopped); accepted changes are broadcast.
+        public void WorkerLeave(string workerId, string equipmentId)
+        {
+            if (!IsServing) return;
+            var result = _world.StaffDurably(workerId, Guid.NewGuid().ToString("N"), equipmentId, "", _savePath);
+            if (result.Accepted) Broadcast();
+        }
+
         // Server-only content queries for workers: whether a kind needs switching on, and what its recipes consume.
         public bool RequiresPower(string kind) => IsServing && _world.RequiresPower(kind);
 
         public IReadOnlyList<string> RecipeInputs(string kind) => IsServing ? _world.RecipeInputs(kind) : Array.Empty<string>();
+
+        // Decision 0043: whether a kind runs only while worked, and the recipes it can be set to.
+        public bool RequiresWorker(string kind) => IsServing && _world.RequiresWorker(kind);
+
+        public IReadOnlyList<string> SelectableRecipes(string kind) => IsServing ? _world.SelectableRecipes(kind) : Array.Empty<string>();
 
         // Server-only: whether an employee is waiting to be paid (decision 0039); it does no work meanwhile.
         public bool IsUnpaid(string workerId) => IsServing && _world.IsUnpaid(workerId);

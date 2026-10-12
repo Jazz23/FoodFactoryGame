@@ -1,6 +1,6 @@
 // Verifies the visual task list's Lua (decision 0037): the program parses and survives a dry run against the employee API
 // stand-ins, is the same text for the same list (so a client can tell a hand-edited script), quotes place and item text,
-// leaves unfinished tasks as comments, and the list survives its JSON round trip.
+// leaves unfinished tasks as comments, and the list survives its JSON round trip. Decision 0043 adds work and set_recipe tasks.
 using FoodFactoryGame.Session.Employees;
 using NUnit.Framework;
 
@@ -17,7 +17,12 @@ namespace FoodFactoryGame.Session.Tests
                 new EmployeeTask { Source = "storage", Destination = "storage-2", AnyItem = false, Whitelist = false, Items = { "cheese" } },
                 new EmployeeTask { Type = EmployeeTaskType.Power, Machine = "oven-1", Power = EmployeeTaskPower.On },
                 new EmployeeTask { Type = EmployeeTaskType.Power, Machine = "oven-1", Power = EmployeeTaskPower.Off },
-                new EmployeeTask { Type = EmployeeTaskType.Power, Machine = "oven-1", Power = EmployeeTaskPower.Toggle }
+                new EmployeeTask { Type = EmployeeTaskType.Power, Machine = "oven-1", Power = EmployeeTaskPower.Toggle },
+                // Decision 0043: work a counter for one batch, and set a machine's recipe (empty: the station's setting / automatic).
+                new EmployeeTask { Type = EmployeeTaskType.Work, Machine = "kitchen-counter-2", Recipe = "kitchen-cheeseburger" },
+                new EmployeeTask { Type = EmployeeTaskType.Work, Machine = "kitchen-counter-2" },
+                new EmployeeTask { Type = EmployeeTaskType.Recipe, Machine = "mixer-3", Recipe = "mixer-pasta" },
+                new EmployeeTask { Type = EmployeeTaskType.Recipe, Machine = "mixer-3" }
             }
         };
 
@@ -33,6 +38,10 @@ namespace FoodFactoryGame.Session.Tests
             Assert.That(lua, Does.Contain("if not is_on(\"oven-1\") then turn_on(\"oven-1\") end"));
             Assert.That(lua, Does.Contain("if is_on(\"oven-1\") then turn_off(\"oven-1\") end"));
             Assert.That(lua, Does.Contain("toggle(\"oven-1\")"));
+            Assert.That(lua, Does.Contain("work(\"kitchen-counter-2\", \"kitchen-cheeseburger\")"));
+            Assert.That(lua, Does.Contain("work(\"kitchen-counter-2\")\n"));
+            Assert.That(lua, Does.Contain("set_recipe(\"mixer-3\", \"mixer-pasta\")"));
+            Assert.That(lua, Does.Contain("set_recipe(\"mixer-3\", \"\")"));
             Assert.That(lua, Does.Contain("while true do"));
         }
 
@@ -42,7 +51,8 @@ namespace FoodFactoryGame.Session.Tests
             var list = Full();
             var copy = EmployeeTaskList.FromJson(list.ToJson());
             Assert.That(copy.ToLua(), Is.EqualTo(list.ToLua()));
-            Assert.That(copy.Tasks.Count, Is.EqualTo(6));
+            Assert.That(copy.Tasks.Count, Is.EqualTo(10));
+            Assert.That((copy.Tasks[6].Type, copy.Tasks[6].Recipe), Is.EqualTo((EmployeeTaskType.Work, "kitchen-cheeseburger")));
             Assert.That(copy.Tasks[1].Items, Is.EqualTo(new[] { "bread", "pizza" }));
             Assert.That(copy.Tasks[5].Power, Is.EqualTo(EmployeeTaskPower.Toggle));
             Assert.That(EmployeeTaskList.FromJson("").Tasks, Is.Empty);

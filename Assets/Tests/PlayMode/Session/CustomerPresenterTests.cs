@@ -120,7 +120,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
 
         private void SeedCustomer(string id)
         {
-            var recipe = _root.Recipes.Single(x => x != null && x.IsSale && x.StationKind == GoodsWorld.CounterKind);
+            var recipe = _root.Recipes.Single(x => x != null && x.IsSale && x.StationKind == GoodsWorld.CounterKind && x.Id == "counter-sell-bread");
             _root.ServerWorld.Bootstrap(new GoodsCustomer
             {
                 Id = id, DistrictId = DevWorld.DistrictId, Appearance = 2, DineIn = true, PatienceSeconds = 600,

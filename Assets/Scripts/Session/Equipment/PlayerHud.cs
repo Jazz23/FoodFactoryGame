@@ -560,7 +560,8 @@ namespace FoodFactoryGame.Session.Equipment
             var open = _site.Equipment.FirstOrDefault(x => x.Id == interaction.OpenMachineId);
             // The power switch (decision 0037) shows the server's state, and waits while a request is out.
             if (open != null && HasPowerSwitch(open.Kind)) text.Append("|power:").Append(open.PoweredOn).Append(interaction.HasPendingRequests);
-            if (open?.Kind == GoodsWorld.CounterKind)
+            if (open != null) text.Append("|recipe:").Append(open.RecipeId).Append(interaction.HasPendingRequests);
+            if (open?.Kind == GoodsWorld.CounterKind || (open != null && interaction.IsWorkerBound(open.Kind)))
             {
                 text.Append("|staff:").Append(open.StaffId).Append('|').Append(interaction.HasPendingRequests);
                 foreach (var employee in _site.Employees) text.Append('|').Append(employee.Id);
@@ -810,8 +811,11 @@ namespace FoodFactoryGame.Session.Equipment
             if (GoodsWorld.IsTable(equipment)) return TableWindow(site, equipment);
             if (!interaction.Session.Recipes.Any(x => x != null && x.StationKind == equipment.Kind)) return StorageMachineWindow(site, equipment);
             var makes = interaction.Session.Recipes.Where(x => x != null && !x.IsSale && x.StationKind == equipment.Kind).ToList();
-            var recipeLine = string.Join(",  ", makes.Select(x =>
-                $"{string.Join(" + ", x.Inputs.Select(y => ItemName(y.itemId)).Distinct())} → {ItemName(x.OutputItemId)}  ·  {x.DurationSeconds} s"));
+            // Decision 0043: a machine set to one recipe shows only that one; on automatic, one recipe or a count.
+            var chosen = makes.FirstOrDefault(x => x.Id == equipment.RecipeId);
+            var recipeLine = chosen != null ? RecipeLine(chosen)
+                : makes.Count == 1 ? RecipeLine(makes[0])
+                : makes.Count > 1 ? $"Automatic: makes the first of {makes.Count} recipes whose inputs are in" : "";
             var window = UiTemplates.Clone(Templates + "HudMachineWindow");
             Header(window, MachineName(equipment.Kind), recipeLine);
             window.Part<Label>("input-caption").text = $"IN  {Units(site, equipment.InputLocationId)}";
@@ -838,12 +842,39 @@ namespace FoodFactoryGame.Session.Equipment
                 }
             }
             _progressLabel = window.Part<Label>("hud-progress-label");
-            if (equipment.Kind == GoodsWorld.CounterKind) FillRegister(window.Part("hud-staff"), site, equipment);
+            if (makes.Count > 1) FillRecipe(window.Part("hud-recipe"), equipment, makes);
+            else window.Part("hud-recipe").RemoveFromHierarchy();
+            if (equipment.Kind == GoodsWorld.CounterKind || interaction.IsWorkerBound(equipment.Kind)) FillRegister(window.Part("hud-staff"), site, equipment);
             else window.Part("hud-staff").RemoveFromHierarchy();
             if (HasPowerSwitch(equipment.Kind)) FillPower(window.Part("hud-power"), equipment);
             else window.Part("hud-power").RemoveFromHierarchy();
             return window;
         }
+
+        private string RecipeLine(RecipeAsset recipe) =>
+            $"{string.Join(" + ", recipe.Inputs.Select(x => (x.quantity > 1 ? $"{x.quantity} " : "") + ItemName(x.itemId)))} → "
+            + $"{(recipe.OutputQuantity > 1 ? $"{recipe.OutputQuantity} " : "")}{ItemName(recipe.OutputItemId)}  ·  {recipe.DurationSeconds} s";
+
+        // Decision 0043: what a machine with several recipes makes. Automatic starts the first recipe (by ID) whose inputs are in;
+        // choosing one makes only that. Rebuilt with the server's answer (Signature).
+        private void FillRecipe(VisualElement row, GoodsEquipment equipment, List<RecipeAsset> makes)
+        {
+            const string automatic = "Automatic (first ready recipe)";
+            var labels = makes.ToDictionary(x => x.Id, RecipeLine);
+            var choice = row.Part<DropdownField>("hud-recipe-choice");
+            choice.choices = new List<string> { automatic }.Concat(makes.Select(x => labels[x.Id])).ToList();
+            choice.SetValueWithoutNotify(labels.TryGetValue(equipment.RecipeId ?? "", out var current) ? current : automatic);
+            var equipmentId = equipment.Id;
+            choice.RegisterValueChangedCallback(evt =>
+            {
+                var picked = makes.FirstOrDefault(x => labels[x.Id] == evt.newValue);
+                ClickRecipe(equipmentId, picked?.Id ?? "");
+            });
+            choice.SetEnabled(!interaction.HasPendingRequests);
+        }
+
+        // Sets what a machine makes ("" for automatic), like the chooser. Public so tests drive the same path.
+        public void ClickRecipe(string equipmentId, string recipeId) => interaction.SelectRecipe(equipmentId, recipeId);
 
         private bool HasPowerSwitch(string kind) =>
             interaction.Session.EquipmentDefinitions.Any(x => x != null && x.Kind == kind && x.ManualPower);
@@ -868,22 +899,26 @@ namespace FoodFactoryGame.Session.Equipment
         // Flips a machine's power switch, like the switch. Public so tests drive the same path.
         public void ClickPower(string equipmentId, bool on) => interaction.SetPower(equipmentId, on);
 
-        // A register (decision 0034) sells only while someone works it: who does, and a button to work it or leave it.
+        // A register (decision 0034) sells only while someone works it: who does, and a button to work it or leave it. A
+        // worker-bound station (decision 0043, the kitchen counter) works the same way, except that it is worked by whoever stands
+        // at it: the player leaves by walking away, and employees work it from their task list, so it has no Assign buttons.
         private void FillRegister(VisualElement row, GoodsSnapshot site, GoodsEquipment register)
         {
             var me = interaction.LocalPlayerId;
-            var who = string.IsNullOrEmpty(register.StaffId) ? "nobody: customers are not served"
+            var station = interaction.IsWorkerBound(register.Kind);
+            var who = string.IsNullOrEmpty(register.StaffId) ? (station ? "nobody: nothing is made" : "nobody: customers are not served")
                 : register.StaffId == me ? "you" : site.Employees.FirstOrDefault(x => x.Id == register.StaffId)?.Name ?? "a teammate";
             // While a request is out the row says so, and it is rebuilt when the server's answer arrives (Signature).
-            row.Part<Label>("hud-staff-label").text = interaction.HasPendingRequests ? "Updating..." : $"Staffed by {who}";
+            row.Part<Label>("hud-staff-label").text = interaction.HasPendingRequests ? "Updating..." : $"{(station ? "Worked" : "Staffed")} by {who}";
             row.EnableInClassList("hud-register--empty", string.IsNullOrEmpty(register.StaffId));
             var mine = register.StaffId == me;
             var registerId = register.Id;
             var button = row.Part<Button>("hud-staff-button");
-            button.text = mine ? "Leave" : "Work this register";
+            button.text = mine ? "Leave" : station ? "Work this counter" : "Work this register";
             button.EnableInClassList("ff-button--primary", !mine);
             button.clicked += () => ClickStaff(registerId, !mine);
             button.SetEnabled(!interaction.HasPendingRequests);
+            if (station) return;
             foreach (var employee in site.Employees.Where(x => x.Id != register.StaffId))
             {
                 var id = employee.Id;
@@ -1068,10 +1103,14 @@ namespace FoodFactoryGame.Session.Equipment
                     + (waiting > 0 ? $"; {waiting} waiting" : "");
             }
             else if (job == null && equipment != null && HasPowerSwitch(equipment.Kind) && !equipment.PoweredOn)
-                _progressLabel.text = "Off: switch it on to bake";
+                _progressLabel.text = "Off: switch it on to start";
+            else if (job == null && equipment != null && interaction.IsWorkerBound(equipment.Kind) && string.IsNullOrEmpty(equipment.StaffId))
+                _progressLabel.text = "Idle: nothing is made until someone works this counter";
             else if (job == null)
             {
-                var recipes = interaction.Session.Recipes.Where(x => x != null && x.StationKind == equipment?.Kind).ToList();
+                // Decision 0043: a machine set to one recipe waits only for that recipe's ingredients.
+                var recipes = interaction.Session.Recipes.Where(x => x != null && x.StationKind == equipment?.Kind
+                    && (string.IsNullOrEmpty(equipment.RecipeId) || x.IsSale || x.Id == equipment.RecipeId)).ToList();
                 var ingredients = recipes.SelectMany(x => x.Inputs).Select(x => ItemName(x.itemId)).Distinct().ToList();
                 var output = site.Locations.FirstOrDefault(x => x.Id == equipment?.OutputLocationId);
                 var makes = recipes.Where(x => !x.IsSale).ToList();
@@ -1090,6 +1129,12 @@ namespace FoodFactoryGame.Session.Equipment
             {
                 fraction = 1f;
                 _progressLabel.text = $"Done, waiting: output full ({ItemName(job.OutputItemId)})";
+            }
+            else if (equipment != null && interaction.IsWorkerBound(equipment.Kind) && string.IsNullOrEmpty(equipment.StaffId))
+            {
+                // Nobody works the station (decision 0043): the batch waits where it is.
+                fraction = Mathf.Clamp01((float)(job.DurationSeconds - job.RemainingSeconds) / job.DurationSeconds);
+                _progressLabel.text = $"Paused (nobody working): {ItemName(job.OutputItemId)} {job.DurationSeconds - job.RemainingSeconds}/{job.DurationSeconds} s";
             }
             else if (equipment != null && HasPowerSwitch(equipment.Kind) && !equipment.PoweredOn)
             {

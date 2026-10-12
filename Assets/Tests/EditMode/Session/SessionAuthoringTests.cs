@@ -31,7 +31,7 @@ namespace FoodFactoryGame.Session.Tests
         private const string BreadRecipePath = "Assets/Content/Recipes/Bread.asset";
         private const string CounterPrefabPath = "Assets/Prefabs/Equipment/Counter.prefab";
         private const string CounterDefinitionPath = "Assets/Content/Equipment/Counter.asset";
-        private const string SellBreadRecipePath = "Assets/Content/Recipes/SellBread.asset";
+        private const string FoodBalancePath = "Assets/Content/FoodBalance.asset";
         private const string FridgePrefabPath = "Assets/Prefabs/Equipment/Fridge.prefab";
         private const string FridgeDefinitionPath = "Assets/Content/Equipment/Fridge.asset";
         private const string DockDefinitionPath = "Assets/Content/Equipment/Dock.asset";
@@ -76,9 +76,10 @@ namespace FoodFactoryGame.Session.Tests
                 var roots = objects.SelectMany(x => x.GetComponents<SessionRoot>()).ToArray();
                 Assert.That(roots.Length, Is.EqualTo(1));
                 AssertAssigned(roots[0], "networkManager", "authenticator", "bridgePrefab", "playerPrefab", "spawnPoints", "equipmentDefinitions", "recipes", "items");
-                Assert.That(roots[0].Items.Select(x => x.Id), Is.EquivalentTo(new[] { DevWorld.DoughItemId, "bread", GoodsWorld.BeltItemId, GoodsWorld.LiftItemId }));
-                Assert.That(roots[0].Items.All(x => x.Icon != null), Is.True, "Every dev item has an inventory icon.");
-                Assert.That(roots[0].Items.Select(x => (x.Id, x.MaxStack)),
+                // The dev items, then the kitchen items of decision 0043 (KitchenContentTests checks those).
+                Assert.That(roots[0].Items.Take(4).Select(x => x.Id), Is.EquivalentTo(new[] { DevWorld.DoughItemId, "bread", GoodsWorld.BeltItemId, GoodsWorld.LiftItemId }));
+                Assert.That(roots[0].Items.All(x => x.Icon != null), Is.True, "Every item has an inventory icon.");
+                Assert.That(roots[0].Items.Take(4).Select(x => (x.Id, x.MaxStack)),
                     Is.EquivalentTo(new[] { (DevWorld.DoughItemId, 20), ("bread", 20), (GoodsWorld.BeltItemId, 100), (GoodsWorld.LiftItemId, 50) }), "Dev dough and bread stack to 20, belts to 100, lifts to 50.");
                 using (var serialized = new SerializedObject(roots[0]))
                 {
@@ -88,11 +89,18 @@ namespace FoodFactoryGame.Session.Tests
                     // The machines first, then the restaurant furnishings (decision 0034, RestaurantContentTests checks those).
                     Assert.That(roots[0].EquipmentDefinitions.Take(5).Select(AssetDatabase.GetAssetPath),
                         Is.EqualTo(new[] { OvenDefinitionPath, CounterDefinitionPath, FridgeDefinitionPath, DockDefinitionPath, TableDefinitionPath }));
-                    Assert.That(roots[0].EquipmentDefinitions.Skip(5).Select(AssetDatabase.GetAssetPath), Is.All.StartsWith("Assets/Content/Restaurant/"));
-                    Assert.That(roots[0].Recipes.Select(AssetDatabase.GetAssetPath), Is.EqualTo(new[] { BreadRecipePath, SellBreadRecipePath }));
-                    Assert.That(roots[0].Offers.Take(8).Select(AssetDatabase.GetAssetPath),
-                        Is.EqualTo(new[] { "Assets/Content/Offers/Dough5.asset", "Assets/Content/Offers/Belt10.asset", "Assets/Content/Offers/Oven1.asset", "Assets/Content/Offers/Fridge1.asset", "Assets/Content/Offers/Dock1.asset", "Assets/Content/Offers/Table1.asset", "Assets/Content/Offers/Counter1.asset", "Assets/Content/Offers/Truck1.asset" }));
-                    Assert.That(roots[0].Offers.Skip(8).Select(AssetDatabase.GetAssetPath), Is.All.StartsWith("Assets/Content/Offers/Restaurant/"));
+                    // Then the restaurant furnishings and the kitchen stations (decision 0043).
+                    Assert.That(roots[0].EquipmentDefinitions.Skip(5).Select(AssetDatabase.GetAssetPath).Where(x => !x.StartsWith("Assets/Content/Restaurant/")),
+                        Is.EqualTo(new[] { "Mixer", "Stove", "Fryer", "Grill", "KitchenCounter" }.Select(x => $"Assets/Content/Equipment/{x}.asset")));
+                    // Authored recipes first; the menu items come from the food balance (decision 0043) and have no asset of their own.
+                    Assert.That(AssetDatabase.GetAssetPath(roots[0].Recipes[0]), Is.EqualTo(BreadRecipePath));
+                    Assert.That(AssetDatabase.GetAssetPath(serialized.FindProperty("foodBalance").objectReferenceValue), Is.EqualTo(FoodBalancePath));
+                    Assert.That(roots[0].Recipes.Where(x => x.IsSale).Select(x => x.Id), Does.Contain("counter-sell-bread"));
+                    Assert.That(roots[0].Offers.Select(x => x.Id), Does.Contain("supplier-dough-5"));
+                    Assert.That(roots[0].Offers.Select(AssetDatabase.GetAssetPath).Where(x => x != "").Take(7),
+                        Is.EqualTo(new[] { "Assets/Content/Offers/Belt10.asset", "Assets/Content/Offers/Oven1.asset", "Assets/Content/Offers/Fridge1.asset", "Assets/Content/Offers/Dock1.asset", "Assets/Content/Offers/Table1.asset", "Assets/Content/Offers/Counter1.asset", "Assets/Content/Offers/Truck1.asset" }));
+                    Assert.That(roots[0].Offers.Select(AssetDatabase.GetAssetPath).Where(x => x != "").Skip(7).Where(x => !x.StartsWith("Assets/Content/Offers/Restaurant/")),
+                        Is.EqualTo(new[] { "Mixer1", "Stove1", "Fryer1", "Grill1", "KitchenCounter1" }.Select(x => $"Assets/Content/Offers/{x}.asset")));
                 }
                 var panels = objects.SelectMany(x => x.GetComponents<SessionPanel>()).ToArray();
                 Assert.That(panels.Length, Is.EqualTo(1));
@@ -236,10 +244,11 @@ namespace FoodFactoryGame.Session.Tests
             finally { Object.DestroyImmediate(instance); }
         }
 
+        // Since decision 0043 the bread menu item is a FoodBalance row with the same ID and price.
         [Test]
         public void SellBreadRecipeSellsOneBreadAtTheCounter()
         {
-            var recipe = AssetDatabase.LoadAssetAtPath<RecipeAsset>(SellBreadRecipePath);
+            var recipe = AssetDatabase.LoadAssetAtPath<FoodBalance>(FoodBalancePath).Menu().SingleOrDefault(x => x.Id == "counter-sell-bread");
             Assert.That(recipe, Is.Not.Null);
             Assert.That(recipe.IsSale, Is.True);
             var definition = recipe.ToDefinition();
@@ -254,10 +263,12 @@ namespace FoodFactoryGame.Session.Tests
         [Test]
         public void SupplierOffersAreValidContentForKnownItems()
         {
-            var offers = new[] { "Dough5", "Belt10" }.Select(x => AssetDatabase.LoadAssetAtPath<OfferAsset>($"Assets/Content/Offers/{x}.asset")).ToArray();
+            // Food packs are FoodBalance rows since decision 0043; belts stay an offer asset.
+            var offers = AssetDatabase.LoadAssetAtPath<FoodBalance>(FoodBalancePath).Offers()
+                .Append(AssetDatabase.LoadAssetAtPath<OfferAsset>("Assets/Content/Offers/Belt10.asset")).ToArray();
             Assert.That(offers.All(x => x != null), Is.True);
-            Assert.That(offers.Select(x => (x.ItemId, x.Quantity, x.PriceCents)),
-                Is.EqualTo(new[] { (DevWorld.DoughItemId, 5, 250L), (FoodFactoryGame.Goods.GoodsWorld.BeltItemId, 10, 500L) }));
+            Assert.That(offers.Where(x => x.ItemId is DevWorld.DoughItemId or FoodFactoryGame.Goods.GoodsWorld.BeltItemId).Select(x => (x.Id, x.ItemId, x.Quantity, x.PriceCents)),
+                Is.EqualTo(new[] { ("supplier-dough-5", DevWorld.DoughItemId, 5, 250L), ("supplier-belt-10", FoodFactoryGame.Goods.GoodsWorld.BeltItemId, 10, 500L) }));
             var items = SessionTestFiles.ContentItems().Select(x => x.Id).ToList();
             Assert.That(offers.All(x => items.Contains(x.ItemId)), Is.True, "Every offer has an item definition (icon, stack size).");
             var world = new FoodFactoryGame.Goods.GoodsWorld("authoring-check");

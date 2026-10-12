@@ -5,6 +5,8 @@
 // customer's state commit at one revision and a restart never repeats a sale. Competitors are fixed AI restaurant records
 // with infinite stock and no cash. Customers are server records only; nothing here depends on a client, camera or scene.
 // Customers advance in one-second sub-steps after the rest of a clock step, so a long step matches many one-second steps.
+// Decision 0043: a customer considers only the menu items a player restaurant has in stock at one of its staffed registers, and
+// only items (and competitors) of at least its district's minimum tier: wealthy districts are picky (MinTier).
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -117,6 +119,11 @@ namespace FoodFactoryGame.Goods
         private const int WalkOutReputation = -40;
         private const long MinPatienceSeconds = 90, MaxPatienceSeconds = 240;
         private const long MinEatSeconds = 120, MaxEatSeconds = 300;
+        // PROTOTYPE (decision 0043): districts at least this wealthy accept only tier 2 food and up.
+        public const int PickyWealthPercent = 70;
+
+        // The lowest tier a district's customers will buy (decision 0043, PROTOTYPE rule from wealth).
+        public static int MinTier(GoodsDistrict district) => district.WealthPercent >= PickyWealthPercent ? 2 : 1;
 
         // A restaurant as customers see it during one sub-step.
         private sealed class Diner
@@ -150,6 +157,9 @@ namespace FoodFactoryGame.Goods
         private readonly Dictionary<string, List<(Diner Diner, int Distance)>> _candidates = new(StringComparer.Ordinal);
         // GoodsDiner records by restaurant ID, rebuilt with the customer index; DinerRecord adds to it.
         private readonly Dictionary<string, GoodsDiner> _dinerRecords = new(StringComparer.Ordinal);
+        // Per player restaurant, the menu items in stock at one of its registers (decision 0043). Derived from the goods, so it is
+        // dropped at the start of every customer second and rebuilt on first use.
+        private readonly Dictionary<string, List<RecipeDefinition>> _stockedMenus = new(StringComparer.Ordinal);
 
         private void InvalidateDiners()
         {
@@ -224,6 +234,7 @@ namespace FoodFactoryGame.Goods
         private void CustomerSecond(long now)
         {
             var diners = Diners();
+            _stockedMenus.Clear();
             foreach (var customer in _state.Customers.ToList())
             {
                 switch (customer.State)
@@ -418,6 +429,7 @@ namespace FoodFactoryGame.Goods
             var district = _state.Districts.First(x => x.Id == customer.DistrictId);
             var options = new List<(Diner Diner, string RecipeId, double Weight)>();
             var total = 1.0;
+            var minTier = MinTier(district);
             foreach (var (diner, distance) in Candidates(district, diners))
             {
                 if (diner.Id == customer.LeftRestaurantId) continue;
@@ -426,12 +438,19 @@ namespace FoodFactoryGame.Goods
                 double food;
                 if (diner.Player)
                 {
-                    var best = diner.Menu.Select(x => (x.Id, Score: FoodScore(district, x.Tier, x.Cuisine, x.SaleCents)))
+                    // Only what is in stock and good enough for this district (decision 0043); nothing suitable, not considered.
+                    var choices = StockedMenu(diner).Where(x => x.Tier >= minTier).ToList();
+                    if (choices.Count == 0) continue;
+                    var best = choices.Select(x => (x.Id, Score: FoodScore(district, x.Tier, x.Cuisine, x.SaleCents)))
                         .OrderByDescending(x => x.Score).ThenBy(x => x.Id, StringComparer.Ordinal).First();
                     recipeId = best.Id;
                     food = best.Score;
                 }
-                else food = FoodScore(district, diner.Competitor.Tier, diner.Competitor.Cuisine, diner.Competitor.PriceCents);
+                else
+                {
+                    if (diner.Competitor.Tier < minTier) continue;
+                    food = FoodScore(district, diner.Competitor.Tier, diner.Competitor.Cuisine, diner.Competitor.PriceCents);
+                }
                 var freeSeats = record?.PublishedFreeSeats ?? diner.Seats;
                 var score = 1.0 + food
                     - 0.5 * distance / 100.0
@@ -475,6 +494,27 @@ namespace FoodFactoryGame.Goods
             }
             _candidates.Add(district.Id, nearby);
             return nearby;
+        }
+
+        // A player restaurant's menu items with edible, unreserved goods for one whole purchase at one of its registers
+        // (the same test Serve uses), in menu (ID) order. Cached for the current customer second.
+        private List<RecipeDefinition> StockedMenu(Diner diner)
+        {
+            if (_stockedMenus.TryGetValue(diner.Id, out var stocked)) return stocked;
+            var inputs = new HashSet<string>(diner.Counters.Select(x => x.InputLocationId), StringComparer.Ordinal);
+            var stock = new Dictionary<(string Location, string Item), int>();
+            foreach (var lot in _state.Lots)
+            {
+                if (!inputs.Contains(lot.LocationId) || lot.Spoiled || lot.OwnerId != diner.Id) continue;
+                var available = Available(lot);
+                if (available <= 0) continue;
+                stock.TryGetValue((lot.LocationId, lot.ItemId), out var units);
+                stock[(lot.LocationId, lot.ItemId)] = units + available;
+            }
+            stocked = diner.Menu.Where(recipe => diner.Counters.Any(counter => recipe.Inputs.All(input =>
+                stock.TryGetValue((counter.InputLocationId, input.ItemId), out var units) && units >= input.Quantity))).ToList();
+            _stockedMenus[diner.Id] = stocked;
+            return stocked;
         }
 
         // PROTOTYPE weights: cuisine fit, tier valued by wealth, price minded less by wealth.

@@ -38,6 +38,9 @@ namespace FoodFactoryGame.Session.Employees
         [SerializeField] private Renderer[] carriedBox = Array.Empty<Renderer>();
         // How close (metres, horizontally) a cell waypoint counts as reached.
         private const float StandTolerance = 0.2f;
+        // work() (decision 0043): how long to wait for a batch to start at a station, and the most it stays for one batch.
+        private const float WorkStartSeconds = 2f;
+        private const float WorkLimitSeconds = 300f;
 
         // How close (metres, horizontally) to a place's footprint the employee must stand to use it.
         [SerializeField] private float reach = 1.3f;
@@ -192,6 +195,7 @@ namespace FoodFactoryGame.Session.Employees
                 return;
             }
             _lastMessage = null;
+            if (restarted) LeaveStations();
             _script = script;
             _source.Value = source;
             if (tasks != null) _tasks.Value = tasks;
@@ -229,6 +233,18 @@ namespace FoodFactoryGame.Session.Employees
         {
             _script = null;
             if (agent.enabled && agent.isOnNavMesh) agent.ResetPath();
+            LeaveStations();
+        }
+
+        // Decision 0043: an employee works a worker-bound station only while its work() call stands there, so stopping, going
+        // unpaid or restarting leaves any such station it still works (a register it was assigned to stays assigned).
+        private void LeaveStations()
+        {
+            var bridge = Bridge;
+            var view = bridge?.WorkerView(_employeeId, _siteId);
+            if (view == null) return;
+            foreach (var station in view.Equipment.Where(x => x.StaffId == _employeeId && bridge.RequiresWorker(x.Kind)).ToList())
+                bridge.WorkerLeave(_employeeId, station.Id);
         }
 
         private Goods.Network.GoodsNetworkBridge Bridge
@@ -427,7 +443,9 @@ namespace FoodFactoryGame.Session.Employees
             ["place_belt"] = PlaceBelt,
             ["turn_on"] = (args, result) => SwitchPower(args, result, true),
             ["turn_off"] = (args, result) => SwitchPower(args, result, false),
-            ["toggle"] = (args, result) => SwitchPower(args, result, null)
+            ["toggle"] = (args, result) => SwitchPower(args, result, null),
+            ["set_recipe"] = SetRecipe,
+            ["work"] = Work
         };
 
         private Dictionary<string, Func<Script, CallbackArguments, DynValue>> Queries() => new()
@@ -649,6 +667,113 @@ namespace FoodFactoryGame.Session.Employees
             var outcome = Bridge?.WorkerSetPower(_employeeId, place.EquipmentId, target);
             Debug.Log($"[Employee] {_employeeId} switching {place.EquipmentId} {(target ? "on" : "off")}: {outcome?.Reason ?? "unavailable"}.");
             result.Set(outcome?.Accepted == true ? DynValue.True : DynValue.False, Reason(outcome));
+        }
+
+        // set_recipe(machine, recipe): walks to a machine (an ID, or the nearest of a kind) and sets what it makes (decision 0043):
+        // a recipe ID ("mixer-pasta") or the item it makes ("pasta"); "" or nil sets it to automatic. Returns true, or false and a
+        // reason.
+        private IEnumerator SetRecipe(CallbackArguments args, EmployeeScript.Result result)
+        {
+            var view = View();
+            var place = Resolve(args[0], view);
+            var kind = place.EquipmentId == null ? null : view?.Equipment.FirstOrDefault(x => x.Id == place.EquipmentId)?.Kind;
+            if (place.Problem == null && place.EquipmentId == null) place.Problem = $"{place.Name} is not a machine";
+            var recipeId = place.Problem == null ? RecipeFor(kind, OptionalString(args, 1), out place.Problem, place.Name) : null;
+            if (place.Problem != null)
+            {
+                result.Set(DynValue.False, DynValue.NewString(place.Problem));
+                yield break;
+            }
+            _status.Value = $"Running: setting {place.Name} to {(recipeId == "" ? "automatic" : recipeId)}";
+            var walk = Walk(place, result);
+            while (walk.MoveNext()) yield return null;
+            if (!result.Value.IsNil()) yield break;
+            var outcome = Bridge?.WorkerSelectRecipe(_employeeId, place.EquipmentId, recipeId);
+            result.Set(outcome?.Accepted == true ? DynValue.True : DynValue.False, Reason(outcome));
+        }
+
+        // work(station, recipe): walks to a station that runs only while worked (decision 0043, the kitchen counter), sets its
+        // recipe when one is given (as set_recipe), and works it for one batch: it stays until the batch is done, or leaves
+        // after a moment if no batch starts (the ingredients are not in). Returns the number of batches made (1 or 0) and, for
+        // 0, a reason.
+        private IEnumerator Work(CallbackArguments args, EmployeeScript.Result result)
+        {
+            var view = View();
+            var place = Resolve(args[0], view);
+            var kind = place.EquipmentId == null ? null : view?.Equipment.FirstOrDefault(x => x.Id == place.EquipmentId)?.Kind;
+            if (place.Problem == null && place.EquipmentId == null) place.Problem = $"{place.Name} is not a machine";
+            if (place.Problem == null && Bridge?.RequiresWorker(kind) != true) place.Problem = $"{place.Name} does not need a worker";
+            var given = OptionalString(args, 1);
+            var recipeId = place.Problem == null && given != null ? RecipeFor(kind, given, out place.Problem, place.Name) : null;
+            if (place.Problem != null)
+            {
+                result.Set(DynValue.NewNumber(0), DynValue.NewString(place.Problem));
+                yield break;
+            }
+            _status.Value = $"Running: walking to work at {place.Name}";
+            var walk = Walk(place, result);
+            while (walk.MoveNext()) yield return null;
+            if (!result.Value.IsNil())
+            {
+                // Walk set (false, reason); work() answers (0, reason).
+                var reason = result.Value.Type == DataType.Tuple ? result.Value.Tuple.Last() : result.Value;
+                result.Set(DynValue.NewNumber(0), reason);
+                yield break;
+            }
+            var stationId = place.EquipmentId;
+            if (recipeId != null && View()?.Equipment.FirstOrDefault(x => x.Id == stationId)?.RecipeId != recipeId)
+            {
+                var set = Bridge?.WorkerSelectRecipe(_employeeId, stationId, recipeId);
+                if (set?.Accepted != true)
+                {
+                    result.Set(DynValue.NewNumber(0), Reason(set));
+                    yield break;
+                }
+            }
+            var staffed = Bridge?.WorkerStaff(_employeeId, stationId, true);
+            if (staffed?.Accepted != true && staffed?.Reason != "unchanged")
+            {
+                result.Set(DynValue.NewNumber(0), Reason(staffed));
+                yield break;
+            }
+            _status.Value = $"Running: working at {place.Name}";
+            // Wait for a batch to start (it starts at once when the ingredients are in), then for it to finish.
+            var startBy = Time.time + WorkStartSeconds;
+            var giveUp = Time.time + WorkLimitSeconds;
+            string jobId = null;
+            var made = 0;
+            while (Time.time < giveUp)
+            {
+                var job = View()?.Jobs.FirstOrDefault(x => x.StationId == stationId);
+                if (jobId == null)
+                {
+                    if (job != null) jobId = job.Id;
+                    else if (Time.time > startBy) break;
+                }
+                else if (job == null || job.Id != jobId || job.State == StationJobState.Blocked)
+                {
+                    made = 1;
+                    break;
+                }
+                yield return null;
+            }
+            Bridge?.WorkerStaff(_employeeId, stationId, false);
+            result.Set(DynValue.NewNumber(made), made > 0 ? DynValue.Nil
+                : DynValue.NewString(jobId == null ? $"nothing to make at {place.Name} (are the ingredients in?)" : $"gave up waiting at {place.Name}"));
+        }
+
+        // A recipe for a kind from a script's text: "" or nil for automatic, a recipe ID, or the item a recipe makes. Null with a
+        // problem when the kind cannot make it.
+        private string RecipeFor(string kind, string text, out string problem, string machine)
+        {
+            problem = null;
+            if (string.IsNullOrEmpty(text)) return "";
+            var selectable = Bridge?.SelectableRecipes(kind) ?? Array.Empty<string>();
+            if (selectable.Contains(text)) return text;
+            var made = _session.Recipes.FirstOrDefault(x => x != null && !x.IsSale && x.StationKind == kind && x.OutputItemId == text);
+            if (made != null && selectable.Contains(made.Id)) return made.Id;
+            problem = $"{machine} cannot make '{text}'";
+            return null;
         }
 
         private static DynValue Reason(GoodsOutcome outcome) => outcome == null ? DynValue.NewString("the world is not available")

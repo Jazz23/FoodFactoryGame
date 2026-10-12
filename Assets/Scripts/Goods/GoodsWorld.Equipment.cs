@@ -48,8 +48,12 @@ namespace FoodFactoryGame.Goods
         // bought before v16, when the price was not recorded).
         public long ChargedCents;
         // A register (kind counter) is the restaurant's sale point and sells only while staffed (decision 0034): the player or
-        // employee working it, empty when unstaffed. Empty on every other piece.
+        // employee working it, empty when unstaffed. A worker-bound station (decision 0043, the kitchen counter) uses it the same
+        // way: its batches start and advance only while someone works it. Empty on every other piece.
         public string StaffId = "";
+        // Decision 0043 (schema v20): the recipe the machine is set to make, or empty for automatic (the first ready recipe of its
+        // kind, by recipe ID). Kept through pickup, so a moved machine keeps its setting.
+        public string RecipeId = "";
         // Decision 0037 (schema v18): whether the machine's power switch is on. Only kinds registered as manually powered
         // (GoodsWorld.RegisterManualPower, the oven) read it: such a station starts and advances batches only while it is on.
         // Picking the piece up or selling it switches it off.
@@ -115,6 +119,7 @@ namespace FoodFactoryGame.Goods
                     throw new ArgumentException("Invalid, duplicate or unplaceable equipment.");
                 copy.Layer ??= "";
                 copy.StaffId = "";
+                copy.RecipeId ??= "";
                 _state.Equipment.Add(copy);
                 AddPlacedParts(copy);
                 InvalidateDinersFor(copy);
@@ -306,9 +311,10 @@ namespace FoodFactoryGame.Goods
             });
         }
 
-        // A staffed register (decision 0034): a placed counter worked by an actor granted its site; an employee must belong to it.
+        // A staffed register (decision 0034) or worker-bound station (decision 0043): a placed piece worked by an actor granted its
+        // site; an employee must belong to it. Which kinds may be worked is content, checked when staff is set (Staff).
         private static bool StaffValid(GoodsSnapshot state, GoodsEquipment register) =>
-            register.Kind == CounterKind && register.State == EquipmentState.Placed
+            register.State == EquipmentState.Placed
             && state.Grants.Any(x => x.PlayerId == register.StaffId && x.SiteId == register.SiteId)
             && (!register.StaffId.StartsWith(EmployeePrefix, StringComparison.Ordinal)
                 || state.Employees.Any(x => x.Id == register.StaffId && x.SiteId == register.SiteId));
@@ -329,7 +335,7 @@ namespace FoodFactoryGame.Goods
                     || x.Width < 1 || x.Depth < 1 || x.InputCapacity < 1 || x.OutputCapacity < 1
                     || x.Seats < 0 || (x.Kind == TableKind && x.Seats < 1)
                     || !SiteGrid.IsLayer(x.Layer) || (x.Layer != null && x.Layer != "" && x.Level != 0) || x.Ambience < 0 || x.ChargedCents < 0
-                    || x.StaffId == null || (x.StaffId != "" && !StaffValid(state, x))
+                    || x.StaffId == null || (x.StaffId != "" && !StaffValid(state, x)) || x.RecipeId == null
                     || (x.State != EquipmentState.Placed && x.State != EquipmentState.Held))
                 || state.Equipment.GroupBy(x => x.Id).Any(x => x.Count() != 1)
                 || state.Equipment.Where(x => x.StaffId != "").GroupBy(x => x.StaffId).Any(x => x.Count() != 1))

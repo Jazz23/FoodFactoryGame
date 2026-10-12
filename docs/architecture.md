@@ -679,7 +679,7 @@ the goods schema (v15) are unchanged. Evidence: [verification record](verificati
 - Player and employee operational rules should be shared; input and AI choose actions through those rules.
 - Visual objects must not become the sole owners of authoritative simulation state.
 
-These remain accepted contracts; only the bounded goods slice, its station jobs, equipment placement, the working oven, conveyor belts, company cash, the sell counter, supplier purchases, equipment purchases, spoilage timing/refrigeration, building shells, factory floors, conveyor lifts, trucks with loading docks, truck routes and fleet, customers, the procedural world layout, restaurant building, trucks on generated roads with city traffic, and hiring and wages above have a runtime interface. Customer purchases credit cash inside the clock tick; supplier purchases, floor orders, shell orders, buy-and-place orders and sales are the player payment commands. Trucks move goods between sites only inside the clock tick, through their own cargo locations.
+These remain accepted contracts; only the bounded goods slice, its station jobs, equipment placement, the working oven, conveyor belts, company cash, the sell counter, supplier purchases, equipment purchases, spoilage timing/refrigeration, building shells, factory floors, conveyor lifts, trucks with loading docks, truck routes and fleet, customers, the procedural world layout, restaurant building, trucks on generated roads with city traffic, hiring and wages, and kitchen stations with recipe settings (decision 0043) above have a runtime interface. Customer purchases credit cash inside the clock tick; supplier purchases, floor orders, shell orders, buy-and-place orders and sales are the player payment commands. Trucks move goods between sites only inside the clock tick, through their own cargo locations.
 
 ## Planned / Undecided
 
@@ -845,6 +845,31 @@ Decision: [0042](decisions/0042-ui-in-uxml-and-uss.md). Presentation only.
   state is shown with classes, and only visibility, progress width and pointer-following positions are inline.
 - `HudTheme` keeps only the colours the removal wheels paint with. `Assets/UI/Hud.uss` is gone (its text-field rule is
   `ff-text-field` in the theme).
+
+## Implemented: recipes, kitchen stations and food prices (2026-10-12)
+
+Decision: [0043](decisions/0043-recipes-kitchen-stations-and-food-prices.md). Goods snapshot schema **v20**.
+
+- **Recipe setting.** `GoodsEquipment.RecipeId` ("" is automatic). `GoodsWorld.SelectRecipe[Durably]` (player request
+  `GoodsNetworkBridge.RequestSelectRecipe`, employee `WorkerSelectRecipe`) sets it to one of the kind's goods recipes
+  (`SelectableRecipes`); an automatic station then starts only that recipe. A running batch keeps its recipe.
+- **Worker-bound stations.** Content kinds registered with `RegisterWorkerBound` (the kitchen counter, from
+  `EquipmentDefinition.workerBound`) start and advance batches only while `StaffId` names a paid worker. `Staff` (decision 0034)
+  accepts registers and worker-bound kinds; employees call `WorkerStaff`, and `WorkerLeave` releases one even while unpaid. The
+  client leaves a counter its player walks away from (`EquipmentInteraction.LeaveDistantStation`).
+- **Customer choice.** Only menu items in stock at a staffed, reachable register (`StockedMenu`, per customer second) and only
+  items and competitors of at least `GoodsWorld.MinTier(district)` (tier 2 at 70% wealth and above) are considered.
+- **Food prices.** `FoodBalance` (`Assets/Content/FoodBalance.asset`) turns supply rows into supplier offers and dish rows into
+  menu items at runtime; `SessionRoot.Offers` lists them first and `SessionRoot.Recipes` after the authored recipes. Offer and
+  menu IDs are derived from the item (`supplier-<item>-<pack>`, `counter-sell-<item>`), so the retired `Dough5` and `SellBread`
+  assets' IDs are unchanged.
+- **Content.** Mixer, stove, fryer, grill (power switches) and kitchen counter (worker-bound) definitions, offers and prefabs; 35
+  items; 26 recipes (the oven gains bun, pizza and lasagna and 3 input slots). Authored by `AgentScripts/BuildKitchenContent.cs`
+  from `ArtSource/Kitchen` (Blender) and `AgentScripts/DrawFoodIcons.ps1`.
+- **Screens and employees.** The machine screen has a Recipe chooser for multi-recipe machines and a Work this counter row for
+  worker-bound stations. Employee Lua gains `work(station, recipe)` and `set_recipe(machine, recipe)`; the visual task list gains
+  Work at counter and Set machine recipe (`EmployeeTaskType.Work`, `Recipe`; `EmployeeTask.Recipe`).
+- Open: per-restaurant menu selection, farms as ingredient sources, more tier 3 dishes, and every PROTOTYPE number.
 
 ## Baseline Test Evolution
 

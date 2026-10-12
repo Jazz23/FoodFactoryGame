@@ -210,7 +210,7 @@ namespace FoodFactoryGame.Goods
         }
 
         // Volatile primitive for tests. Live request handlers must call StaffDurably.
-        // Sets who works a register: staffId is the requester (who must be on the register's site), an employee of that site, or
+        // Sets who works a register or a worker-bound station (decision 0043): staffId is the requester (who must be on the register's site), an employee of that site, or
         // empty to leave it unstaffed. Checks, in order: identity and replay; the register and a grant on its site (forbidden); a
         // counter (not-a-register) that is placed (not-placed); the staff (not-on-site, unknown-employee, forbidden); a change
         // (unchanged). The staff stops working any other register.
@@ -229,7 +229,8 @@ namespace FoodFactoryGame.Goods
                 staffId ??= "";
                 var register = _state.Equipment.FirstOrDefault(x => x.Id == registerId);
                 if (register is null || !_state.Grants.Any(x => x.PlayerId == playerId && x.SiteId == register.SiteId)) return Reject("forbidden");
-                if (register.Kind != CounterKind) return Reject("not-a-register");
+                // A register, or a worker-bound station such as the kitchen counter (decision 0043).
+                if (register.Kind != CounterKind && !_workerKinds.Contains(register.Kind)) return Reject("not-a-register");
                 if (register.State != EquipmentState.Placed) return Reject("not-placed");
                 if (staffId == playerId)
                 {
@@ -245,6 +246,12 @@ namespace FoodFactoryGame.Goods
                 if (staffId != "") ReleaseStaffLocked(staffId);
                 register.StaffId = staffId;
                 InvalidateDiners();
+                // A worker-bound station may start a batch as soon as someone works it.
+                if (staffId != "" && _automaticJobs && _workerKinds.Contains(register.Kind))
+                {
+                    var station = _state.Stations.FirstOrDefault(x => x.Id == register.Id);
+                    if (station != null) StartReadyJob(station);
+                }
                 return Record(requestId, playerId, true, staffId == "" ? "unstaffed" : "staffed", null);
             }
         }

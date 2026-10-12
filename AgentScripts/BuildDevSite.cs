@@ -50,7 +50,6 @@ public static class BuildDevSite
     private const string CounterPrefabPath = "Assets/Prefabs/Equipment/Counter.prefab";
     private const string CounterDefinitionPath = "Assets/Content/Equipment/Counter.asset";
     private const string CounterMaterialFolder = "Assets/Materials/Counter";
-    private const string SellBreadRecipePath = "Assets/Content/Recipes/SellBread.asset";
     private const string TablePrefabPath = "Assets/Prefabs/Equipment/Table.prefab";
     private const string TableDefinitionPath = "Assets/Content/Equipment/Table.asset";
     private const string TableMaterialFolder = "Assets/Materials/Table";
@@ -78,7 +77,8 @@ public static class BuildDevSite
         var oven = BuildOvenDefinition(ImportIcon("Oven"));
         var bread = BuildBreadRecipe();
         var counter = BuildEquipmentDefinition(CounterDefinitionPath, DevWorld.CounterKind, 2, 1, 2, 1, BuildCounterPrefab(), ImportIcon("Counter"));
-        var sellBread = BuildSellBreadRecipe();
+        // The bread menu item and the dough pack are rows of Assets/Content/FoodBalance.asset (decision 0043), authored with
+        // every other food price by AgentScripts/BuildKitchenContent.cs; run that after this script.
         // PROTOTYPE fridge (decision 0018): 1x1 m, 8 refrigerated storage slots where goods do not spoil, no recipes; the output
         // slot is unused (equipment always has both buffers).
         var fridge = BuildEquipmentDefinition(FridgeDefinitionPath, "fridge", 1, 1, 8, 1, BuildFridgePrefab(), ImportIcon("Fridge"), true);
@@ -92,7 +92,6 @@ public static class BuildDevSite
         // counter (decision 0030) $50.00.
         var offers = new[]
         {
-            BuildOffer("Dough5", "supplier-dough-5", DevWorld.DoughItemId, 5, 250, DevWorld.DoughSpoilAfterSeconds),
             BuildOffer("Belt10", "supplier-belt-10", GoodsWorld.BeltItemId, 10, 500, GoodsWorld.NonPerishableSeconds),
             BuildOffer("Oven1", "supplier-oven", "", 1, 15000, 1, oven),
             BuildOffer("Fridge1", "supplier-fridge", "", 1, 8000, 1, fridge),
@@ -119,7 +118,7 @@ public static class BuildDevSite
             LitMaterial(BuildingMaterialFolder, "BuildingFloor", new Color(0.7f, 0.72f, 0.74f), 0f, 0.55f),
             LitMaterial(BuildingMaterialFolder, "BuildingRoof", new Color(0.32f, 0.2f, 0.17f), 0f, 0.2f)
         };
-        BuildScene(catalog, bridge, player, panelSettings, new[] { oven, counter, fridge, dock, table }, new[] { bread, sellBread }, offers, items, ghostMaterial,
+        BuildScene(catalog, bridge, player, panelSettings, new[] { oven, counter, fridge, dock, table }, new[] { bread }, offers, items, ghostMaterial,
             ghostModelMaterial, beltPrefabs, tread, itemSprite, buildingMaterials, BuildTruckPrefab());
         EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
         AssetDatabase.SaveAssets();
@@ -347,35 +346,6 @@ public static class BuildDevSite
     }
 
     // DEVELOPMENT content (decision 0013): the counter serves one customer every 5 s, each buying one edible bread for $2.50.
-    private static RecipeAsset BuildSellBreadRecipe()
-    {
-        var recipe = AssetDatabase.LoadAssetAtPath<RecipeAsset>(SellBreadRecipePath);
-        if (recipe == null)
-        {
-            recipe = ScriptableObject.CreateInstance<RecipeAsset>();
-            AssetDatabase.CreateAsset(recipe, SellBreadRecipePath);
-        }
-        using (var serialized = new SerializedObject(recipe))
-        {
-            serialized.FindProperty("id").stringValue = "counter-sell-bread";
-            serialized.FindProperty("displayName").stringValue = "Sell bread";
-            serialized.FindProperty("stationKind").stringValue = DevWorld.CounterKind;
-            serialized.FindProperty("durationSeconds").intValue = 5;
-            var inputs = serialized.FindProperty("inputs");
-            inputs.arraySize = 1;
-            inputs.GetArrayElementAtIndex(0).FindPropertyRelative("itemId").stringValue = "bread";
-            inputs.GetArrayElementAtIndex(0).FindPropertyRelative("quantity").intValue = 1;
-            serialized.FindProperty("outputItemId").stringValue = "";
-            serialized.FindProperty("saleCents").intValue = 250;
-            // PROTOTYPE menu attributes (decision 0024): basic tier, bakery cuisine.
-            serialized.FindProperty("tier").intValue = 1;
-            serialized.FindProperty("cuisine").stringValue = "bakery";
-            serialized.ApplyModifiedPropertiesWithoutUndo();
-        }
-        EditorUtility.SetDirty(recipe);
-        return recipe;
-    }
-
     // DEVELOPMENT content: the owner's first oven recipe, one dough to one bread in 10 s. Bread spoils after an hour ambient.
     private static RecipeAsset BuildBreadRecipe()
     {

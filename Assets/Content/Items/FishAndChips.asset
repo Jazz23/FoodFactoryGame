@@ -1,0 +1,18 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fea6b5b47dc3dc94395568ee53ff617c, type: 3}
+  m_Name: FishAndChips
+  m_EditorClassIdentifier: FoodFactoryGame.Session::FoodFactoryGame.Session.Equipment.ItemDefinition
+  id: fish-and-chips
+  displayName: Fish & Chips
+  icon: {fileID: 21300000, guid: 3693f7d217351664f983b4de5edd9dc3, type: 3}
+  maxStack: 20

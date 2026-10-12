@@ -282,7 +282,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
             yield return Until(() => Count(_root.ClientSite, input, "dough") == DevWorld.StarterDough && !interaction.HasPendingRequests, "dough in the input");
             yield return null;
             Assert.That(_root.ClientSite.Jobs.Any(x => x.StationId == DevWorld.OvenId), Is.False, "An oven that is off does not bake.");
-            Assert.That(hud.ScreenRoot.Q<Label>("hud-progress-label").text, Is.EqualTo("Off: switch it on to bake"));
+            Assert.That(hud.ScreenRoot.Q<Label>("hud-progress-label").text, Is.EqualTo("Off: switch it on to start"));
             Assert.That(hud.ScreenRoot.Q("hud-power-switch"), Is.Not.Null);
             Assert.That(_presenter.Visuals[DevWorld.OvenId].Running, Is.False);
 

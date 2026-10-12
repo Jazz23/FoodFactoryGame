@@ -27,6 +27,20 @@ namespace FoodFactoryGame.Session.Equipment
         public int Quantity => equipment != null || truck != null ? 1 : quantity;
         public long PriceCents => priceCents;
 
+        // A pack of an ingredient made at runtime from a FoodBalance supply row (decision 0043), never saved as an asset.
+        public static OfferAsset CreateSupply(string id, string itemId, int quantity, int priceCents, long spoilAfterSeconds)
+        {
+            var offer = CreateInstance<OfferAsset>();
+            offer.hideFlags = HideFlags.DontSave;
+            offer.name = id;
+            offer.id = id;
+            offer.itemId = itemId;
+            offer.quantity = System.Math.Max(1, quantity);
+            offer.priceCents = System.Math.Max(1, priceCents);
+            offer.spoilAfterSeconds = System.Math.Max(1, spoilAfterSeconds);
+            return offer;
+        }
+
         public PurchaseOffer ToDefinition() => new()
         {
             Id = id, ItemId = itemId, Quantity = quantity, PriceCents = priceCents, SpoilAfterSeconds = spoilAfterSeconds

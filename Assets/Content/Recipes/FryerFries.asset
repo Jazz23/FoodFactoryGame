@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d4e37b4a452b766479bd60f792bb872a, type: 3}
+  m_Name: FryerFries
+  m_EditorClassIdentifier: FoodFactoryGame.Session::FoodFactoryGame.Session.Equipment.RecipeAsset
+  id: fryer-fries
+  displayName: Fries
+  stationKind: fryer
+  durationSeconds: 6
+  inputs:
+  - itemId: cut-potatoes
+    quantity: 1
+  outputItemId: fries
+  outputQuantity: 1
+  outputSpoilAfterSeconds: 900
+  saleCents: 0
+  tier: 1
+  cuisine: 

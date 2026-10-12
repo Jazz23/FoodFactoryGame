@@ -47,7 +47,12 @@ namespace FoodFactoryGame.Session.Equipment
         Position,
         Source,
         Destination,
-        Machine
+        // A machine with a power switch.
+        Machine,
+        // A worker-bound station, for a "Work at counter" task (decision 0043).
+        Station,
+        // A machine with several recipes, for a "Set machine recipe" task (decision 0043).
+        RecipeMachine
     }
 
     // One slot's goods stack (item and spoiled state, up to the item's max stack) in one container, carried on the cursor.
@@ -291,6 +296,7 @@ namespace FoodFactoryGame.Session.Equipment
             if (Screen is InteractionScreen.Employee or InteractionScreen.PickPosition && OpenEmployee == null) CloseScreen();
             UpdateHover();
             UpdatePick(site);
+            LeaveDistantStation(site);
 
             var layout = site?.SiteLayouts.FirstOrDefault(x => x.SiteId == session.ClientSiteId);
             var suffix = HasPendingRequests ? " (waiting for server)" : !string.IsNullOrEmpty(LastRejection) ? $" (rejected: {LastRejection})" : "";
@@ -321,7 +327,7 @@ namespace FoodFactoryGame.Session.Equipment
                     InteractionScreen.Property => "Property: Buy spends company cash on this building and its lot; E or Esc closes",
                     InteractionScreen.Employee => "Employee: add tasks (or edit the Lua) and press Run; Stop halts it; Esc closes" + suffix,
                     InteractionScreen.PickPosition when PickMode != PickTarget.Position =>
-                        $"{PickMode switch { PickTarget.Source => "Set source", PickTarget.Destination => "Set destination", _ => "Select machine" }}: "
+                        $"{PickMode switch { PickTarget.Source => "Set source", PickTarget.Destination => "Set destination", PickTarget.Station => "Select counter", _ => "Select machine" }}: "
                         + "look at a pulsing red one and click or press E; Esc returns" + (PickText != null ? $" [{PickText}]" : ""),
                     InteractionScreen.PickPosition => "Select world pos: look at a cell or a machine (red) and click to insert it into the script; Esc returns"
                         + (PickText != null ? $" [{PickText}]" : ""),
@@ -610,6 +616,37 @@ namespace FoodFactoryGame.Session.Equipment
             if (bridge == null || string.IsNullOrEmpty(registerId)) return;
             LastRejection = null;
             bridge.RequestStaff(Track(), registerId, staffId ?? "");
+        }
+
+        // Sets the recipe a machine makes, or empty for automatic (decision 0043); the server checks the grant and the recipe.
+        public void SelectRecipe(string equipmentId, string recipeId)
+        {
+            var bridge = _subscription?.Bridge;
+            if (bridge == null || string.IsNullOrEmpty(equipmentId)) return;
+            LastRejection = null;
+            Debug.Log($"[Equipment] Requesting that {equipmentId} make {(string.IsNullOrEmpty(recipeId) ? "automatic" : recipeId)}.");
+            bridge.RequestSelectRecipe(Track(), equipmentId, recipeId ?? "");
+        }
+
+        // Whether a kind runs only while someone works it (decision 0043, the kitchen counter).
+        public bool IsWorkerBound(string kind) => session.EquipmentDefinitions.Any(x => x != null && x.Kind == kind && x.WorkerBound);
+
+        // Decision 0043: the local player works a worker-bound station only while standing at it. Walking out of reach (on its
+        // floor) leaves it, as the Leave button does; the server then pauses its batch.
+        private void LeaveDistantStation(GoodsSnapshot site)
+        {
+            if (site == null || _avatar == null || HasPendingRequests) return;
+            var me = LocalPlayerId;
+            var station = site.Equipment.FirstOrDefault(x => x.StaffId == me && x.State == EquipmentState.Placed && IsWorkerBound(x.Kind));
+            var layout = station == null ? null : site.SiteLayouts.FirstOrDefault(x => x.SiteId == station.SiteId);
+            if (layout == null) return;
+            var (width, depth) = SiteGrid.Footprint(station.Width, station.Depth, station.Rotation);
+            var center = SiteGridSpace.Center(layout, station);
+            var size = new Vector3(width * SiteGrid.CellSize, SiteGridSpace.LevelHeight, depth * SiteGrid.CellSize);
+            var bounds = new Bounds(center + Vector3.up * size.y * 0.5f, size);
+            if (InReach(bounds)) return;
+            Debug.Log($"[Equipment] Walked away from {station.Id}: leaving it.");
+            Staff(station.Id, "");
         }
 
         // Switches a manually powered machine (decision 0037, the oven) on or off; the server checks the grant and the kind.

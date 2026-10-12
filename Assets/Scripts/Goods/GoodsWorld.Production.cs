@@ -6,6 +6,9 @@
 // stations never start one, and a sale job loaded from an older save still completes and pays exactly once.
 // Decision 0037: a manually powered kind (the oven) starts and advances batches only while its piece's power switch is on;
 // switching it off pauses a running batch where it is, and switching it back on resumes it.
+// Decision 0043: a machine may be set to one of its kind's recipes (GoodsEquipment.RecipeId); it then starts only that recipe,
+// and when set to automatic (empty) it starts the first ready one by recipe ID, as before. A worker-bound kind (the kitchen
+// counter) starts and advances batches only while an actor works it (GoodsEquipment.StaffId) and that actor is not unpaid.
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -85,6 +88,7 @@ namespace FoodFactoryGame.Goods
 
         private readonly Dictionary<string, RecipeDefinition> _recipes = new();
         private readonly HashSet<string> _manualPowerKinds = new(StringComparer.Ordinal);
+        private readonly HashSet<string> _workerKinds = new(StringComparer.Ordinal);
         private bool _automaticJobs;
 
         // Server configuration, like recipes: never saved, set by the server owner on every start. When on, stations start
@@ -107,6 +111,27 @@ namespace FoodFactoryGame.Goods
             lock (_gate) return kind != null && _manualPowerKinds.Contains(kind);
         }
 
+        // Server configuration, like recipes: equipment kinds whose batches run only while someone works them (decision 0043, the
+        // kitchen counter). Never saved.
+        public void RegisterWorkerBound(string kind)
+        {
+            if (string.IsNullOrWhiteSpace(kind) || kind == CounterKind) throw new ArgumentException("Invalid equipment kind.");
+            lock (_gate) _workerKinds.Add(kind);
+        }
+
+        public bool RequiresWorker(string kind)
+        {
+            lock (_gate) return kind != null && _workerKinds.Contains(kind);
+        }
+
+        // Recipes a station kind can be set to (decision 0043): its goods recipes, by ID; never menu items.
+        public List<string> SelectableRecipes(string kind)
+        {
+            lock (_gate)
+                return _recipes.Values.Where(x => x.StationKind == kind && !x.IsSale).Select(x => x.Id)
+                    .OrderBy(x => x, StringComparer.Ordinal).ToList();
+        }
+
         // Item IDs a station kind's recipes consume (menu items included, since customers buy them from its input), in ID
         // order; empty for a kind with no recipes, which takes any goods.
         public List<string> RecipeInputs(string kind)
@@ -119,6 +144,50 @@ namespace FoodFactoryGame.Goods
         // False only for a manually powered station whose piece is switched off.
         private bool Powered(GoodsStation station) =>
             !_manualPowerKinds.Contains(station.Kind) || _state.Equipment.Any(x => x.Id == station.Id && x.PoweredOn);
+
+        // False only for a worker-bound station nobody works, or whose worker is an unpaid employee (decision 0039).
+        private bool Worked(GoodsStation station)
+        {
+            if (!_workerKinds.Contains(station.Kind)) return true;
+            var staff = _state.Equipment.FirstOrDefault(x => x.Id == station.Id)?.StaffId;
+            return !string.IsNullOrEmpty(staff) && !UnpaidLocked(staff);
+        }
+
+        // Volatile primitive for tests. Live request handlers must call SelectRecipeDurably. Sets the recipe a placed machine makes
+        // (decision 0043): one of its kind's goods recipes, or empty for automatic. Checks, in order: identity and replay; the
+        // machine and a grant on its site (forbidden); placed (not-placed); the recipe (invalid-recipe). Setting the recipe it
+        // already has is accepted and changes nothing. A running batch is never changed; the setting applies from the next one.
+        public GoodsOutcome SelectRecipe(string playerId, string requestId, string equipmentId, string recipeId)
+        {
+            lock (_gate)
+            {
+                if (string.IsNullOrWhiteSpace(playerId) || string.IsNullOrWhiteSpace(requestId))
+                    return new GoodsOutcome { Accepted = false, Reason = "invalid-identity" };
+                var replay = Replay(playerId, requestId);
+                if (replay != null) return replay;
+                recipeId ??= "";
+                var equipment = _state.Equipment.FirstOrDefault(x => x.Id == equipmentId);
+                if (equipment == null || !_state.Grants.Any(x => x.PlayerId == playerId && x.SiteId == equipment.SiteId))
+                    return Record(requestId, playerId, false, "forbidden", null);
+                if (equipment.State != EquipmentState.Placed) return Record(requestId, playerId, false, "not-placed", null);
+                if (recipeId != "" && (!_recipes.TryGetValue(recipeId, out var recipe) || recipe.IsSale || recipe.StationKind != equipment.Kind))
+                    return Record(requestId, playerId, false, "invalid-recipe", null);
+
+                // All checks precede this single locked mutation. A machine may start the newly chosen recipe at once.
+                equipment.RecipeId = recipeId;
+                if (_automaticJobs)
+                {
+                    var station = _state.Stations.FirstOrDefault(x => x.Id == equipment.Id);
+                    if (station != null) StartReadyJob(station);
+                }
+                return Record(requestId, playerId, true, "recipe-set", null);
+            }
+        }
+
+        public GoodsOutcome SelectRecipeDurably(string playerId, string requestId, string equipmentId, string recipeId, string savePath)
+        {
+            return Commit(playerId, requestId, savePath, () => SelectRecipe(playerId, requestId, equipmentId, recipeId));
+        }
 
         // Volatile primitive for tests. Live request handlers must call SetPowerDurably. Switches a placed, manually powered
         // machine on or off for an actor granted its site (a player or employee); switching it to the state it is already in
@@ -199,6 +268,7 @@ namespace FoodFactoryGame.Goods
                 var plan = InputPlan(station, recipe);
                 if (plan == null) return Record(requestId, playerId, false, "missing-inputs", null);
                 if (!Powered(station)) return Record(requestId, playerId, false, "powered-off", null);
+                if (!Worked(station)) return Record(requestId, playerId, false, "unstaffed", null);
 
                 // All checks precede this single locked mutation.
                 var job = AddJob(station, recipe, plan, playerId);
@@ -270,12 +340,14 @@ namespace FoodFactoryGame.Goods
             foreach (var station in _state.Stations) StartReadyJob(station);
         }
 
-        // Starts the first ready recipe on an idle station, or returns null.
+        // Starts the first ready recipe on an idle station (only its chosen recipe when it has one, decision 0043), or returns null.
         private StationJob StartReadyJob(GoodsStation station)
         {
-            if (_state.Jobs.Any(x => x.StationId == station.Id) || !Powered(station)) return null;
+            if (_state.Jobs.Any(x => x.StationId == station.Id) || !Powered(station) || !Worked(station)) return null;
+            var chosen = _state.Equipment.FirstOrDefault(x => x.Id == station.Id)?.RecipeId;
             // Menu items (sale recipes) are bought by customers, never started by a station (decision 0024).
-            foreach (var recipe in _recipes.Values.Where(x => x.StationKind == station.Kind && !x.IsSale).OrderBy(x => x.Id, StringComparer.Ordinal))
+            foreach (var recipe in _recipes.Values.Where(x => x.StationKind == station.Kind && !x.IsSale
+                         && (string.IsNullOrEmpty(chosen) || x.Id == chosen)).OrderBy(x => x.Id, StringComparer.Ordinal))
             {
                 if (!Fits(station.OutputLocationId, recipe.OutputItemId, false, recipe.OutputQuantity)) continue;
                 var plan = InputPlan(station, recipe);
@@ -313,7 +385,7 @@ namespace FoodFactoryGame.Goods
         // so one large step matches many small ones.
         private void ProgressJobs(long seconds)
         {
-            var unpowered = new HashSet<string>(_state.Stations.Where(x => !Powered(x)).Select(x => x.Id));
+            var unpowered = new HashSet<string>(_state.Stations.Where(x => !Powered(x) || !Worked(x)).Select(x => x.Id));
             foreach (var job in _state.Jobs.Where(x => x.State == StationJobState.Running && !unpowered.Contains(x.StationId)).ToList())
             {
                 // A waiting legacy sale (no headroom) is retried here with zero remaining.

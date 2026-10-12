@@ -1,0 +1,126 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2ef28cd7cc5a5a9488a58ec6e6913f84, type: 3}
+  m_Name: FoodBalance
+  m_EditorClassIdentifier: FoodFactoryGame.Session::FoodFactoryGame.Session.Equipment.FoodBalance
+  supplies:
+  - itemId: dough
+    packQuantity: 5
+    packPriceCents: 250
+    spoilAfterSeconds: 7200
+  - itemId: flour
+    packQuantity: 5
+    packPriceCents: 200
+    spoilAfterSeconds: 10080
+  - itemId: potato
+    packQuantity: 5
+    packPriceCents: 150
+    spoilAfterSeconds: 4320
+  - itemId: tomato
+    packQuantity: 5
+    packPriceCents: 200
+    spoilAfterSeconds: 1440
+  - itemId: lettuce
+    packQuantity: 5
+    packPriceCents: 200
+    spoilAfterSeconds: 1440
+  - itemId: milk
+    packQuantity: 5
+    packPriceCents: 250
+    spoilAfterSeconds: 720
+  - itemId: egg
+    packQuantity: 5
+    packPriceCents: 150
+    spoilAfterSeconds: 720
+  - itemId: cheese
+    packQuantity: 5
+    packPriceCents: 500
+    spoilAfterSeconds: 720
+  - itemId: beef
+    packQuantity: 5
+    packPriceCents: 750
+    spoilAfterSeconds: 240
+  - itemId: chicken
+    packQuantity: 5
+    packPriceCents: 600
+    spoilAfterSeconds: 240
+  - itemId: fish
+    packQuantity: 5
+    packPriceCents: 750
+    spoilAfterSeconds: 240
+  dishes:
+  - itemId: bread
+    displayName: Bread
+    saleCents: 250
+    tier: 1
+    cuisine: bakery
+    serveSeconds: 5
+  - itemId: fries
+    displayName: Fries
+    saleCents: 200
+    tier: 1
+    cuisine: fast-food
+    serveSeconds: 5
+  - itemId: pancakes
+    displayName: Pancakes
+    saleCents: 300
+    tier: 1
+    cuisine: bakery
+    serveSeconds: 5
+  - itemId: grilled-cheese
+    displayName: Grilled Cheese
+    saleCents: 350
+    tier: 1
+    cuisine: grill
+    serveSeconds: 5
+  - itemId: soup-and-bread
+    displayName: Soup & Bread
+    saleCents: 400
+    tier: 1
+    cuisine: bakery
+    serveSeconds: 5
+  - itemId: pizza
+    displayName: Margherita Pizza
+    saleCents: 700
+    tier: 2
+    cuisine: fast-food
+    serveSeconds: 5
+  - itemId: chicken-and-fries
+    displayName: Chicken & Fries
+    saleCents: 750
+    tier: 2
+    cuisine: fast-food
+    serveSeconds: 5
+  - itemId: cheeseburger
+    displayName: Cheeseburger
+    saleCents: 800
+    tier: 2
+    cuisine: grill
+    serveSeconds: 5
+  - itemId: spaghetti
+    displayName: Spaghetti Bolognese
+    saleCents: 850
+    tier: 2
+    cuisine: noodles
+    serveSeconds: 5
+  - itemId: fish-and-chips
+    displayName: Fish & Chips
+    saleCents: 900
+    tier: 2
+    cuisine: fast-food
+    serveSeconds: 5
+  - itemId: lasagna
+    displayName: Lasagna
+    saleCents: 1300
+    tier: 3
+    cuisine: fine-dining
+    serveSeconds: 5
