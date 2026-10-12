@@ -246,8 +246,50 @@ namespace FoodFactoryGame.World
                 byBuilding.TryGetValue(building.Id ?? "", out var lot);
                 if (layout.FormatVersion >= 3 && building.HasLot && lot == null) problems.Add($"building {building.Id}: property without a lot");
                 if ((building.SiteId ?? "") != (lot?.SiteId ?? "")) problems.Add($"building {building.Id}: site ID must be its lot's, and empty without one");
+                ServiceYard(layout, building, lot, problems);
             }
         }
+
+        // Decision 0037 (format 4): every restaurant property has a service yard inside its lot and outside its shell that reaches
+        // the lot's street edge; its back door is a non-corner wall cell on the yard side; the doorstep outside it and the 2 x 1
+        // starter dock lie in the yard, the dock touching the doorstep edge to edge without covering it. Nothing else has a yard,
+        // and formats before 4 have none.
+        private static void ServiceYard(WorldLayout layout, WorldBuilding building, WorldLot lot, List<string> problems)
+        {
+            var name = $"building {building.Id}";
+            var wanted = layout.FormatVersion >= 4 && building.Category == BuildingCategory.Restaurant && building.HasLot;
+            var has = building.ServiceYard != null || building.BackDoor != null || building.ServiceDock != null;
+            if (!wanted)
+            {
+                if (has) problems.Add($"{name}: only a format 4 restaurant property has a service yard");
+                return;
+            }
+            if (building.ServiceYard == null || building.BackDoor == null || building.ServiceDock == null || lot == null)
+            {
+                problems.Add($"{name}: restaurant without a service yard, back door and dock");
+                return;
+            }
+            var yard = building.ServiceYard;
+            var dock = building.ServiceDock;
+            var footprint = building.Footprint;
+            var doorstep = WorldGeometry.Doorstep(footprint, building.BackDoor);
+            if (!WorldGeometry.Contains(lot.Rect, yard) || Overlaps(yard, footprint)) problems.Add($"{name}: service yard not in its lot beside the shell");
+            if (doorstep == null || building.Doors.Any(x => x.X == building.BackDoor.X && x.Z == building.BackDoor.Z))
+                problems.Add($"{name}: back door is not a free non-corner wall cell");
+            else if (!yard.Contains(doorstep.X, doorstep.Z)) problems.Add($"{name}: back door does not open into the service yard");
+            if (!(dock.Width == 2 && dock.Depth == 1 || dock.Width == 1 && dock.Depth == 2) || !WorldGeometry.Contains(yard, dock))
+                problems.Add($"{name}: starter dock is not a 2 x 1 piece in the yard");
+            else if (doorstep != null && (dock.Contains(doorstep.X, doorstep.Z) || !Borders(dock, doorstep)))
+                problems.Add($"{name}: starter dock does not touch the back door's doorstep");
+            // The yard runs to the lot's street edge, so trucks and players reach the dock from the street along it.
+            var street = WorldGeometry.Step(building.Facing);
+            var reaches = street.X > 0 ? yard.X + yard.Width == lot.X + lot.Width : street.X < 0 ? yard.X == lot.X
+                : street.Z > 0 ? yard.Z + yard.Depth == lot.Z + lot.Depth : yard.Z == lot.Z;
+            if (!reaches) problems.Add($"{name}: service yard does not reach the street edge");
+        }
+
+        private static bool Overlaps(WorldRect a, WorldRect b) =>
+            a.X < b.X + b.Width && b.X < a.X + a.Width && a.Z < b.Z + b.Depth && b.Z < a.Z + a.Depth;
 
         // A cell just outside the rectangle, sharing an edge with it (not a corner).
         private static bool Borders(WorldRect rect, WorldCell cell)

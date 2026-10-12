@@ -1,5 +1,5 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
-    <!-- The local player's HUD frame (decision 0040): crosshair, interact prompt, the status cards top right, the screen area
+    <!-- The local player's HUD frame (decision 0040): crosshair, interact prompt, the status cards top right (cash and clock, wage warning, restaurant readiness, spoilage alert), the screen area
          above the hotbar, the hotbar, the cursor stack and the belt removal wheel. PlayerHud fills hud-screen with the windows
          (HudWindow and the Hud*Window templates) and hud-hotbar with HudSlot items. -->
     <Style src="project://database/Assets/UI/Theme/Theme.uss" />
@@ -24,6 +24,7 @@
                 <ui:Label text="!" class="hud-warning__mark" picking-mode="Ignore" />
                 <ui:Label name="hud-wage-warning-text" class="hud-warning__text ff-wrap" picking-mode="Ignore" />
             </ui:VisualElement>
+            <ui:Label name="hud-readiness" class="ff-overlay-card hud-readiness ff-wrap" picking-mode="Ignore" />
             <ui:VisualElement name="hud-alert" class="ff-overlay-card hud-alert" picking-mode="Ignore">
                 <ui:VisualElement class="ff-dot ff-dot--danger" picking-mode="Ignore" />
                 <ui:Label name="hud-alert-text" class="hud-alert__text ff-wrap" picking-mode="Ignore" />

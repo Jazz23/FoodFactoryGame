@@ -53,6 +53,11 @@ namespace FoodFactoryGame.World
             if (v3)
                 foreach (var l in layout.Lots)
                     Line("lot", l.Id, l.BuildingId, l.SiteId, l.X, l.Z, l.Width, l.Depth, Cells(new[] { l.Access }));
+            // Format 4: each restaurant's service yard, back door and starter dock, in building order.
+            var v4 = layout.FormatVersion >= 4;
+            var services = v4 ? layout.Buildings.Where(x => x.ServiceYard != null).ToList() : new List<WorldBuilding>();
+            foreach (var b in services)
+                Line("service", b.Id, Rect(b.ServiceYard), Cells(new[] { b.BackDoor }), Rect(b.ServiceDock));
             var terrain = layout.Terrain ?? WorldTerrain.Flat();
             Line("terrain", terrain.Spacing, terrain.Samples);
             for (var row = 0; row < terrain.Samples; row++)
@@ -63,7 +68,10 @@ namespace FoodFactoryGame.World
             for (var first = 0; first < layout.Trees.Count; first += TreesPerLine)
                 Line("trees", JoinList(layout.Trees.Skip(first).Take(TreesPerLine)
                     .Select(t => string.Join(",", Number(t.X), Number(t.Z), Number((int)t.Kind), Number(t.Scale)))));
-            if (v3)
+            if (v4)
+                Line("end", layout.Districts.Count, layout.Nodes.Count, layout.Roads.Count, layout.Rails.Count, layout.Buildings.Count,
+                    layout.Rivers.Count, layout.Bridges.Count, layout.Crossings.Count, layout.Trees.Count, layout.Lots.Count, services.Count);
+            else if (v3)
                 Line("end", layout.Districts.Count, layout.Nodes.Count, layout.Roads.Count, layout.Rails.Count, layout.Buildings.Count,
                     layout.Rivers.Count, layout.Bridges.Count, layout.Crossings.Count, layout.Trees.Count, layout.Lots.Count);
             else
@@ -172,6 +180,19 @@ namespace FoodFactoryGame.World
                     Id = p[1], BuildingId = p[2], SiteId = p[3], X = Int(p[4]), Z = Int(p[5]), Width = Int(p[6]), Depth = Int(p[7]), Access = access[0]
                 });
             }
+            var v4 = layout.FormatVersion >= 4;
+            var services = 0;
+            while (v4 && Peek() == "service")
+            {
+                var p = Next("service", 4);
+                var building = layout.Buildings.FirstOrDefault(x => x.Id == p[1]);
+                var door = ReadCells(p[3]);
+                if (building == null || building.ServiceYard != null || door.Count != 1) throw new FormatException("Bad service yard.");
+                building.ServiceYard = ReadRect(p[2]);
+                building.BackDoor = door[0];
+                building.ServiceDock = ReadRect(p[4]);
+                services++;
+            }
             var terrainLine = Next("terrain", 2);
             var terrain = new WorldTerrain { Spacing = Int(terrainLine[1]), Samples = Int(terrainLine[2]) };
             if (terrain.Spacing < 0 || terrain.Samples < 0 || (long)terrain.Samples * terrain.Samples > 4_000_000) throw new FormatException("Bad terrain size.");
@@ -212,11 +233,11 @@ namespace FoodFactoryGame.World
                     layout.Trees.Add(new WorldTree { X = v[0], Z = v[1], Kind = (TreeKind)v[2], Scale = v[3] });
                 }
             }
-            var end = Next("end", v3 ? 10 : 9);
+            var end = Next("end", v4 ? 11 : v3 ? 10 : 9);
             if (Int(end[1]) != layout.Districts.Count || Int(end[2]) != layout.Nodes.Count || Int(end[3]) != layout.Roads.Count
                 || Int(end[4]) != layout.Rails.Count || Int(end[5]) != layout.Buildings.Count || Int(end[6]) != layout.Rivers.Count
                 || Int(end[7]) != layout.Bridges.Count || Int(end[8]) != layout.Crossings.Count || Int(end[9]) != layout.Trees.Count
-                || (v3 && Int(end[10]) != layout.Lots.Count))
+                || (v3 && Int(end[10]) != layout.Lots.Count) || (v4 && Int(end[11]) != services))
                 throw new FormatException("World layout counts do not match.");
             if (row != lines.Length - 1 || lines[row] != "") throw new FormatException("Unexpected text after the world layout.");
             return layout;
@@ -263,6 +284,14 @@ namespace FoodFactoryGame.World
             var v = Ints(x, 2);
             return new WorldCell(v[0], v[1]);
         }).ToList();
+
+        private static string Rect(WorldRect rect) => string.Join(",", Number(rect.X), Number(rect.Z), Number(rect.Width), Number(rect.Depth));
+
+        private static WorldRect ReadRect(string token)
+        {
+            var v = Ints(token, 4);
+            return new WorldRect(v[0], v[1], v[2], v[3]);
+        }
 
         private static int[] Ints(string token, int count)
         {

@@ -1,6 +1,6 @@
 // Restaurant build mode (decision 0034, slice 2), local player only. Build (B) opens it as a screen of its own: the camera looks
-// down on the current site, a grid covers the lot and a panel on the right offers tools (sell or remove, walls, doors, windows,
-// wall finish) and a catalog of furnishings by category. Walls are free (decision 0036): outer and inner walls are drawn and
+// down on the current site, a grid covers the lot and a panel on the right offers tools (sell or remove, walls, doors, back doors
+// (decision 0037), windows, wall finish) and a catalog of furnishings by category. Walls are free (decision 0036): outer and inner walls are drawn and
 // removed alike, anywhere in the lot. The pointer's cell shows a ghost tinted by validity: the same pure rules the server applies
 // (GoodsWorld.PlanShell, FurnishProblem, SiteGrid) plus the company's cash, with the price, refund and net amount, or the reason it
 // would be refused. A click places a single piece, door or window; dragging draws a line of wall, restyles a line of walls or
@@ -34,6 +34,8 @@ namespace FoodFactoryGame.Session.Buildings
         Sell,
         Wall,
         Door,
+        // A back door (decision 0037): a door on an outer wall for staff and goods only.
+        BackDoor,
         Window,
         Finish,
         Item
@@ -203,6 +205,7 @@ namespace FoodFactoryGame.Session.Buildings
         {
             BuildTool.Wall or BuildTool.Finish => GoodsWorld.WallStyles[0],
             BuildTool.Door => GoodsWorld.DoorStyles[0],
+            BuildTool.BackDoor => GoodsWorld.BackDoorStyle,
             BuildTool.Window => GoodsWorld.WindowStyles[0],
             _ => ""
         };
@@ -422,10 +425,11 @@ namespace FoodFactoryGame.Session.Buildings
                     break;
                 }
                 case BuildTool.Door:
-                    shell.Kind = ShellOrder.Door;
+                case BuildTool.BackDoor:
+                    shell.Kind = Tool == BuildTool.BackDoor ? ShellOrder.BackDoor : ShellOrder.Door;
                     shell.X = to.X;
                     shell.Z = to.Z;
-                    preview.Label = $"{Name(Style)} door";
+                    preview.Label = Tool == BuildTool.BackDoor ? $"{Name(Style)} back door" : $"{Name(Style)} door";
                     break;
                 case BuildTool.Window:
                     shell.Kind = ShellOrder.Window;
@@ -467,7 +471,8 @@ namespace FoodFactoryGame.Session.Buildings
         private static bool IsWallCell(GoodsBuilding restaurant, int x, int z) => SiteGrid.IsPartition(restaurant, x, z) || SiteGrid.OnPerimeter(restaurant, x, z);
 
         // The rotation a piece is placed with at a cell: wall decor faces away from its wall (into a room if it can, else to any open
-        // cell), and a backed piece is turned round when that puts more wall behind it. Anything else keeps the chosen rotation.
+        // cell), a backed piece is turned round when that puts more wall behind it, and a dock when that puts more wall in front
+        // (its door frame). Anything else keeps the chosen rotation.
         public int FacingRotation(EquipmentDefinition definition, int cellX, int cellZ)
         {
             var site = session.ClientSite;
@@ -489,6 +494,17 @@ namespace FoodFactoryGame.Session.Buildings
                     bestScore = score;
                 }
                 return best;
+            }
+            if (definition.Kind == GoodsWorld.DockKind)
+            {
+                // A dock's upright door frame is its front: it turns round when that puts more wall in front of it.
+                int WallsAhead(int rotation)
+                {
+                    var (width, depth) = SiteGrid.Footprint(definition.Width, definition.Depth, rotation);
+                    return SiteGrid.BehindCells(cellX, cellZ, width, depth, (rotation + 2) % 4).Count(c => SiteGrid.WallAt(site, siteId, c.X, c.Z));
+                }
+                var turned = (Rotation + 2) % 4;
+                return WallsAhead(turned) > WallsAhead(Rotation) ? turned : Rotation;
             }
             if (definition.Mount != EquipmentMount.Backed) return Rotation;
             int WallsBehind(int rotation)
@@ -851,7 +867,7 @@ namespace FoodFactoryGame.Session.Buildings
         }
 
         // The tool chips in Build.uxml, named build-tool-<tool>.
-        private static readonly BuildTool[] Tools = { BuildTool.Sell, BuildTool.Wall, BuildTool.Door, BuildTool.Window, BuildTool.Finish };
+        private static readonly BuildTool[] Tools = { BuildTool.Sell, BuildTool.Wall, BuildTool.Door, BuildTool.BackDoor, BuildTool.Window, BuildTool.Finish };
 
         private static string ToolName(BuildTool tool) => $"build-tool-{tool.ToString().ToLowerInvariant()}";
 
@@ -931,7 +947,7 @@ namespace FoodFactoryGame.Session.Buildings
             var styles = Tool switch
             {
                 BuildTool.Wall or BuildTool.Finish => GoodsWorld.WallStyles,
-                BuildTool.Door => GoodsWorld.DoorStyles,
+                BuildTool.Door or BuildTool.BackDoor => GoodsWorld.DoorStyles,
                 BuildTool.Window => GoodsWorld.WindowStyles,
                 _ => Array.Empty<string>()
             };

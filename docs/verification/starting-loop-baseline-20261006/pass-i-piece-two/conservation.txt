@@ -1,0 +1,14 @@
+S1: cash $1,000,000.00 -> $1,000,000.00, charges $0.00 -> $0.00, sales 0 ($0.00), spend $0.00 (0 packs), bakes 0, units belt:50 dough:5 lift:10 | conserved
+S2: cash $1,000,000.00 -> $1,000,000.00, charges $0.00 -> $0.00, sales 0 ($0.00), spend $0.00 (0 packs), bakes 0, units belt:50 dough:5 lift:10 | conserved
+S3: cash $1,000,000.00 -> $999,847.50, charges $0.00 -> $150.00, sales 0 ($0.00), spend $2.50 (1 packs), bakes 0, units belt:50 dough:10 lift:10 | conserved
+S4: cash $999,847.50 -> $999,847.50, charges $150.00 -> $150.00, sales 0 ($0.00), spend $0.00 (0 packs), bakes 0, units belt:50 dough:10 lift:10 | conserved
+S5: cash $999,847.50 -> $999,847.50, charges $150.00 -> $150.00, sales 0 ($0.00), spend $0.00 (0 packs), bakes 10, units belt:50 bread:10 lift:10 | conserved
+S6: cash $999,847.50 -> $999,847.50, charges $150.00 -> $150.00, sales 0 ($0.00), spend $0.00 (0 packs), bakes 0, units belt:50 bread:10 lift:10 | conserved
+S7: cash $999,847.50 -> $999,852.50, charges $150.00 -> $150.00, sales 2 ($5.00), spend $0.00 (0 packs), bakes 0, units belt:50 bread:8 lift:10 | conserved
+S8: cash $999,852.50 -> $999,852.50, charges $150.00 -> $150.00, sales 0 ($0.00), spend $0.00 (0 packs), bakes 0, units belt:50 bread:8 lift:10 | conserved
+S9: cash $999,852.50 -> $999,852.50, charges $150.00 -> $150.00, sales 0 ($0.00), spend $0.00 (0 packs), bakes 0, units belt:50 bread:8 lift:10 | conserved
+S10: cash $999,852.50 -> $999,546.50, charges $150.00 -> $456.00, sales 0 ($0.00), spend $0.00 (0 packs), bakes 0, units belt:50 bread:8 lift:10 | conserved
+S11: cash $999,546.50 -> $999,486.50, charges $456.00 -> $516.00, sales 0 ($0.00), spend $0.00 (0 packs), bakes 0, units belt:50 bread:8 lift:10 | conserved
+S12: cash $999,486.50 -> $974,824.00, charges $516.00 -> $626.00, sales 0 ($0.00), spend $24,552.50 (1 packs), bakes 0, units belt:50 bread:8 dough:5 lift:10 | conserved
+S13 before restart: cash $974,824.00 -> $974,824.00, charges $626.00 -> $626.00, sales 0 ($0.00), spend $0.00 (0 packs), bakes 0, units belt:50 bread:8 dough:5 lift:10 | conserved
+S13: cash $974,824.00 -> $974,824.00, charges $626.00 -> $626.00, sales 0 ($0.00), spend $0.00 (0 packs), bakes 0, units belt:50 bread:8 dough:5 lift:10 | conserved

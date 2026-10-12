@@ -60,7 +60,7 @@ namespace FoodFactoryGame.Goods.Tests
             Inputs = { new RecipeInput { ItemId = "bread", Quantity = 1 } }, OutputItemId = "", SaleCents = 250
         };
 
-        private static GoodsDistrict District(int customersPerHour = 3600, int mapZ = 20, int range = 100) => new()
+        private static GoodsDistrict District(int customersPerHour = 60, int mapZ = 20, int range = 100) => new()
         {
             Id = "district", Name = "Test", MapZ = mapZ, CustomersPerHour = customersPerHour, WealthPercent = 50,
             AppearanceVariants = 3, LikedCuisines = { "bakery" }, DineInPercent = 50, RangeMetres = range
@@ -93,6 +93,8 @@ namespace FoodFactoryGame.Goods.Tests
         {
             var state = world.Snapshot();
             state.Revision = 0;
+            // Ledger entries carry the revision of their commit, which counts steps like the world's own (decision 0038).
+            foreach (var entry in state.Ledger) entry.Revision = 0;
             return JsonUtility.ToJson(state);
         }
 
@@ -108,7 +110,7 @@ namespace FoodFactoryGame.Goods.Tests
             Assert.That(state.Customers, Is.Not.Empty);
             Assert.That(state.Customers.Select(x => x.RestaurantId).Distinct(), Is.SubsetOf(new[] { "restaurant", "near" }));
             Assert.That(state.Customers.Select(x => x.Appearance), Is.All.InRange(0, 2));
-            Assert.That(state.Districts.Single().SpawnProgress, Is.Zero, "120 s at 3600 an hour leaves nothing over.");
+            Assert.That(state.Districts.Single().SpawnProgress, Is.Zero, "120 s at 60 a game hour leaves nothing over.");
             Assert.DoesNotThrow(() => GoodsWorld.Validate(state));
         }
 
@@ -123,6 +125,9 @@ namespace FoodFactoryGame.Goods.Tests
             Assert.That((customer.State, customer.CounterId, customer.TableId, customer.PaidCents),
                 Is.EqualTo((CustomerState.Ordering, "counter-1", "table-1", 250L)));
             Assert.That((Bread(), Cash()), Is.EqualTo((1, 1250L)), "The bread leaves the world and the company is paid at once.");
+            var sale = _world.Snapshot().Ledger.Single();
+            Assert.That((sale.Kind, sale.Cents, sale.SiteId, sale.EquipmentId, sale.CustomerId, sale.ClockSeconds, sale.RequestId),
+                Is.EqualTo((GoodsWorld.LedgerSale, 250L, "restaurant", "counter-1", "c1", 1L, "")), "The sale's ledger entry (decision 0038).");
             var diner = _world.Snapshot().Diners.Single(x => x.RestaurantId == "restaurant");
             Assert.That((diner.Served, diner.Reputation > 0), Is.EqualTo((1L, true)), "A prompt sale raises reputation.");
             _world.Advance(4);
@@ -130,6 +135,7 @@ namespace FoodFactoryGame.Goods.Tests
             _world.Advance(400);
             Assert.That(Customer("c1"), Is.Null, "Done eating, the customer leaves and frees the seat.");
             Assert.That((Bread(), Cash()), Is.EqualTo((1, 1250L)), "Paid exactly once.");
+            Assert.That(_world.Snapshot().Ledger.Count, Is.EqualTo(1), "One entry: leaving writes nothing.");
         }
 
         [Test]

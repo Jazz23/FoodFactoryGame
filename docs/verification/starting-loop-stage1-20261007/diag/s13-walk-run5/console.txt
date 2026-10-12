@@ -1,0 +1,5 @@
+S5 Log: [Goods] commits=11 avg=6.5ms max=14.9ms payload=69.8KB
+S10 Log: [Goods] commits=50 avg=4.9ms max=14.9ms payload=89.8KB
+S12 Log: [Goods] commits=63 avg=5.5ms max=15.5ms payload=108.5KB
+S12 Log: [Goods] commits=74 avg=5.7ms max=15.5ms payload=119.7KB
+S12 Log: [Goods] commits=86 avg=6.0ms max=15.6ms payload=128.3KB

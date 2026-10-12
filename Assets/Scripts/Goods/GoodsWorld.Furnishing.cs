@@ -33,9 +33,10 @@ namespace FoodFactoryGame.Goods
         // Pieces one buy-and-place order may place (a floor finish dragged over a room); bounds the work of one request.
         public const int MaxFurnishPlacements = 200;
 
-        // The dock street rule with the site's listed lot (decision 0034).
-        private string DockProblem(GoodsSnapshot state, GoodsEquipment piece, int cellX, int cellZ, int rotation) =>
-            RestaurantRules.DockProblem(state, piece, cellX, cellZ, rotation, _propertyOffers?.Values.FirstOrDefault(x => x.SiteId == piece.SiteId));
+        // The restaurant placement rules (the dock street rule of decision 0034, the back-door rules of 0037) with the site's listed
+        // lot.
+        private string RestaurantProblem(GoodsSnapshot state, GoodsEquipment piece, int cellX, int cellZ, int rotation) =>
+            RestaurantRules.PlacementProblem(state, piece, cellX, cellZ, rotation, _propertyOffers?.Values.FirstOrDefault(x => x.SiteId == piece.SiteId));
 
         // The listed lot of a site, for client previews of the dock rule; null for sites without one.
         public PropertyOffer OfferOfSite(string siteId)
@@ -69,7 +70,7 @@ namespace FoodFactoryGame.Goods
                 piece.Rotation = placement.Rotation;
                 piece.Level = level;
                 var problem = SiteGrid.PlacementProblem(probe, piece, placement.X, placement.Z, placement.Rotation, level)
-                    ?? RestaurantRules.DockProblem(probe, piece, placement.X, placement.Z, placement.Rotation, offer);
+                    ?? RestaurantRules.PlacementProblem(probe, piece, placement.X, placement.Z, placement.Rotation, offer);
                 if (problem != null) return problem;
                 probe.Equipment.Add(piece);
             }
@@ -105,7 +106,6 @@ namespace FoodFactoryGame.Goods
                 if (_state.Companies.First(x => x.Id == company).Cash < price) return Reject("insufficient-funds");
 
                 // All checks precede this single locked mutation.
-                TryDebit(company, price);
                 string first = null;
                 for (var index = 0; index < order.Placements.Count; index++)
                 {
@@ -126,6 +126,8 @@ namespace FoodFactoryGame.Goods
                     AddPlacedParts(piece);
                     first ??= piece.Id;
                 }
+                // One ledger entry for the order, naming its first piece.
+                TryDebit(company, price, new CashNote(LedgerFurnish, siteId, requestId, first, offerId: order.OfferId));
                 InvalidateDiners();
                 return RecordCents(requestId, playerId, "bought", price, first);
             }
@@ -195,7 +197,7 @@ namespace FoodFactoryGame.Goods
                 if (station != null) _state.Stations.Remove(station);
                 _state.Locations.RemoveAll(x => x.Id == piece.InputLocationId || x.Id == piece.OutputLocationId);
                 _state.Equipment.Remove(piece);
-                if (piece.ChargedCents > 0) TryCredit(company, piece.ChargedCents);
+                if (piece.ChargedCents > 0) TryCredit(company, piece.ChargedCents, new CashNote(LedgerSellBack, piece.SiteId, requestId, piece.Id));
                 InvalidateDiners();
                 var result = RecordCents(requestId, playerId, "sold", -piece.ChargedCents, piece.Id);
                 result.JobId = job?.Id;

@@ -309,6 +309,7 @@ namespace FoodFactoryGame.Session.Customers
             Tint(root, candidate.DistrictId, candidate.Appearance);
             DistanceCulling.Apply(root);
             var visual = new Visual { Root = root, Animator = animator, Target = spawn, Opener = root.AddComponent<DoorOpener>() };
+            visual.Opener.Customer = true;
             _visuals.Add(candidate.Id, visual);
             Follow(visual, candidate);
             return root;

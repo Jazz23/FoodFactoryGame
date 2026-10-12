@@ -29,6 +29,7 @@
                     <ui:Button name="build-tool-sell" text="Sell / remove" focusable="false" class="ff-button ff-chip" />
                     <ui:Button name="build-tool-wall" text="Wall" focusable="false" class="ff-button ff-chip" />
                     <ui:Button name="build-tool-door" text="Door" focusable="false" class="ff-button ff-chip" />
+                    <ui:Button name="build-tool-backdoor" text="Back door" focusable="false" class="ff-button ff-chip" />
                     <ui:Button name="build-tool-window" text="Window" focusable="false" class="ff-button ff-chip" />
                     <ui:Button name="build-tool-finish" text="Wall finish" focusable="false" class="ff-button ff-chip" />
                 </ui:VisualElement>

@@ -85,6 +85,61 @@ namespace FoodFactoryGame.World
             _ => new WorldRect(footprint.X - apron, footprint.Z, footprint.Width + apron, footprint.Depth)
         };
 
+        // A property's lot: its footprint extended forward by the apron and, for a restaurant with a service yard (format 4), the
+        // yard beside it.
+        public static WorldRect LotRect(WorldBuilding building, int apron)
+        {
+            var lot = LotRect(building.Footprint, building.Facing, apron);
+            if (building.ServiceYard == null) return lot;
+            var yard = building.ServiceYard;
+            var x0 = Math.Min(lot.X, yard.X);
+            var z0 = Math.Min(lot.Z, yard.Z);
+            return new WorldRect(x0, z0, Math.Max(lot.X + lot.Width, yard.X + yard.Width) - x0, Math.Max(lot.Z + lot.Depth, yard.Z + yard.Depth) - z0);
+        }
+
+        // Gives a restaurant its service yard (owner decision 2026-10-06, generator v5): a strip `width` cells wide along its low
+        // side (lower X for north/south facings, lower Z for east/west) or its high side, from the lot's street edge to the
+        // building's rear. The back door is the yard-side wall cell two cells in from the rear corner, its doorstep the yard cell
+        // outside it, and the starter dock the two yard cells beside the doorstep toward the street.
+        public static void AddServiceYard(WorldBuilding building, bool low, int width, int apron)
+        {
+            var shell = building.Footprint;
+            var lot = LotRect(shell, building.Facing, apron);
+            var (fx, fz) = Step(building.Facing);
+            if (fz != 0)
+            {
+                var wallX = low ? shell.X : shell.X + shell.Width - 1;
+                var outX = low ? shell.X - 1 : shell.X + shell.Width;
+                var rearZ = fz > 0 ? shell.Z : shell.Z + shell.Depth - 1;
+                building.ServiceYard = new WorldRect(low ? shell.X - width : shell.X + shell.Width, lot.Z, width, lot.Depth);
+                building.BackDoor = new WorldCell(wallX, rearZ + 2 * fz);
+                building.ServiceDock = new WorldRect(outX, Math.Min(rearZ + 3 * fz, rearZ + 4 * fz), 1, 2);
+            }
+            else
+            {
+                var wallZ = low ? shell.Z : shell.Z + shell.Depth - 1;
+                var outZ = low ? shell.Z - 1 : shell.Z + shell.Depth;
+                var rearX = fx > 0 ? shell.X : shell.X + shell.Width - 1;
+                building.ServiceYard = new WorldRect(lot.X, low ? shell.Z - width : shell.Z + shell.Depth, lot.Width, width);
+                building.BackDoor = new WorldCell(rearX + 2 * fx, wallZ);
+                building.ServiceDock = new WorldRect(Math.Min(rearX + 3 * fx, rearX + 4 * fx), outZ, 2, 1);
+            }
+        }
+
+        // The cell just outside a door on the perimeter of a rectangle (its side's outward neighbour); null for a non-perimeter
+        // or corner cell.
+        public static WorldCell Doorstep(WorldRect footprint, WorldCell door)
+        {
+            if (door == null) return null;
+            var west = door.X == footprint.X;
+            var east = door.X == footprint.X + footprint.Width - 1;
+            var south = door.Z == footprint.Z;
+            var north = door.Z == footprint.Z + footprint.Depth - 1;
+            if (!footprint.Contains(door.X, door.Z) || (west || east) == (south || north)) return null;
+            return west ? new WorldCell(door.X - 1, door.Z) : east ? new WorldCell(door.X + 1, door.Z)
+                : south ? new WorldCell(door.X, door.Z - 1) : new WorldCell(door.X, door.Z + 1);
+        }
+
         // The cell just outside a lot's street edge, level with the door.
         public static WorldCell AccessCell(WorldRect lot, Facing facing, WorldCell door) => facing switch
         {

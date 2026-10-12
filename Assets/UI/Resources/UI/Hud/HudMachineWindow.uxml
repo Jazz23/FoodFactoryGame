@@ -1,7 +1,7 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
     <!-- A machine with recipes (decision 0008): input grid, progress arrow, output grid (or a sale station's prices), the
          progress line, and under them the recipe chooser (decision 0043), the staff row of a register (decision 0034) or worker-bound
-         station (decision 0043) and the power switch (decision 0037). -->
+         station (decision 0043), a register's restaurant readiness (decision 0038, starting loop) and the power switch. -->
     <Style src="project://database/Assets/UI/Theme/Theme.uss" />
     <Style src="Hud.uss" />
     <ui:VisualElement name="hud-machine" class="ff-panel hud-window hud-machine">
@@ -37,6 +37,7 @@
             <ui:Label name="hud-staff-label" class="hud-register__label ff-grow" picking-mode="Ignore" />
             <ui:Button name="hud-staff-button" focusable="false" class="ff-button hud-register__button" />
         </ui:VisualElement>
+        <ui:Label name="hud-register-readiness" class="hud-note hud-readiness-line ff-wrap" picking-mode="Ignore" />
         <ui:VisualElement name="hud-power" class="ff-row hud-power">
             <ui:VisualElement class="ff-grow" picking-mode="Ignore">
                 <ui:Label text="Power" class="ff-strong" picking-mode="Ignore" />

@@ -1,0 +1,5 @@
+S1: cash $1,000,000.00 -> $1,000,000.00, charges $0.00 -> $0.00, sales 0 ($0.00), spend $0.00 (0 packs), bakes 0, units belt:50 dough:5 lift:10 | conserved
+S2: cash $1,000,000.00 -> $1,000,000.00, charges $0.00 -> $0.00, sales 0 ($0.00), spend $0.00 (0 packs), bakes 0, units belt:50 dough:5 lift:10 | conserved
+S3: cash $1,000,000.00 -> $999,847.50, charges $0.00 -> $150.00, sales 0 ($0.00), spend $2.50 (1 packs), bakes 0, units belt:50 dough:10 lift:10 | conserved
+S4: cash $999,847.50 -> $999,847.50, charges $150.00 -> $150.00, sales 0 ($0.00), spend $0.00 (0 packs), bakes 0, units belt:50 dough:10 lift:10 | conserved
+S5: cash $999,847.50 -> $999,847.50, charges $150.00 -> $150.00, sales 0 ($0.00), spend $0.00 (0 packs), bakes 10, units belt:50 bread:10 lift:10 | conserved

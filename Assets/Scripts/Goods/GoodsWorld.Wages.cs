@@ -5,6 +5,7 @@
 // again. Employees are paid in hire order (the record order), so the most recently hired stop first.
 using System;
 using System.Linq;
+using FoodFactoryGame.World;
 
 namespace FoodFactoryGame.Goods
 {
@@ -12,7 +13,8 @@ namespace FoodFactoryGame.Goods
     {
         // PROTOTYPE values (decision 0039): one game hour is one real minute of the world clock, an employee costs $10 per game
         // hour, a site allows one employee per 25 floor cells over all its storeys (at least one), and new hires have 4 hand slots.
-        public const long GameHourSeconds = 60;
+        // The shared game hour (GameClock), so wages and district demand count the same hours.
+        public const long GameHourSeconds = GameClock.HourSeconds;
         public const long WageCentsPerHour = 1000;
         public const int FloorCellsPerEmployee = 25;
         public const int HiredHandSlots = 4;
@@ -140,7 +142,8 @@ namespace FoodFactoryGame.Goods
                 foreach (var employee in _state.Employees.Where(x => !x.Unpaid))
                 {
                     var company = CompanyOfSiteLocked(employee.SiteId);
-                    if (company is null || TryDebit(company, WageCentsPerHour)) continue;
+                    if (company is null || TryDebit(company, WageCentsPerHour, new CashNote(LedgerWage, employee.SiteId, equipmentId: employee.Id,
+                        clockSeconds: _state.WagesPaidHour * GameHourSeconds))) continue;
                     employee.Unpaid = true;
                     changed = true;
                 }
@@ -148,7 +151,7 @@ namespace FoodFactoryGame.Goods
             foreach (var employee in _state.Employees.Where(x => x.Unpaid))
             {
                 var company = CompanyOfSiteLocked(employee.SiteId);
-                if (company is not null && !TryDebit(company, WageCentsPerHour)) continue;
+                if (company is not null && !TryDebit(company, WageCentsPerHour, new CashNote(LedgerWage, employee.SiteId, equipmentId: employee.Id))) continue;
                 employee.Unpaid = false;
                 changed = true;
             }

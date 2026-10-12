@@ -1,0 +1,9 @@
+CustomerRuntimeBenchmarkTests.ThousandCustomersFitAFrameAndCommitUnderTheWarningSignals (testName, editor), 2026-10-08.
+Same fixture behaviour before and after P4 (3000 per 3600 s == 50 per 60 s game hour): customers 1005->994, served 1568, walkedOut 274.
+
+P4 working tree (02:07Z): run 1 failed "max commit 58.0 ms"; run 2 passed; run 3 failed "max commit 96.5 ms".
+Committed code 4d24bb6 (git stash, 02:09Z), 3 runs:
+ run 1 passed: tick p99=0.46ms commits avg=21.1ms max=38.0ms payload=457KB
+ run 2 FAILED "max commit 60.2 ms exceeds the decision 0012 signal (50 ms)": tick p99=0.75ms commits avg=24.8ms max=60.2ms
+ run 3 passed: tick p99=1.00ms commits avg=23.7ms max=49.9ms
+Conclusion: the max-commit signal on this benchmark is intermittent on the committed code; it is not caused by P4.

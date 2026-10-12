@@ -57,6 +57,9 @@ namespace FoodFactoryGame.Session
         public const int RestaurantWidth = 11;
         public const int RestaurantDepth = 9;
         public const int RestaurantDoorX = 13;
+        // Its back door (decision 0037) on the west wall, opening west onto (8, 4), so dev docks can be placed beside it. The seeded
+        // dock at (0-1, 18) predates the rule and keeps working where it stands.
+        public const int RestaurantBackDoorZ = 4;
         // PROTOTYPE factory shell (decision 0020): 5x10 cells along the north-east edge, walls included (interior 3x8), with a
         // two-cell doorway in its south wall. It clears the seeded oven and counter, the spawn points, every PlayMode test cell
         // and everything placed in the owner's dev save.
@@ -114,9 +117,10 @@ namespace FoodFactoryGame.Session
         public const int TableCellX = 11;
         public const int TableCellZ = 3;
 
+        // Customers per game hour (decision 0039): 240 per 3600 clock s re-tuned like every older rate, about one every 2.5 s.
         public static GoodsDistrict District() => new()
         {
-            Id = DistrictId, Name = "Old Town", MapX = 0, MapZ = 60, CustomersPerHour = 240, WealthPercent = 40,
+            Id = DistrictId, Name = "Old Town", MapX = 0, MapZ = 60, CustomersPerHour = 24, WealthPercent = 40,
             Appearance = "old-town", AppearanceVariants = 4, LikedCuisines = new List<string> { "bakery" }, DineInPercent = 70,
             RangeMetres = 400
         };
@@ -379,7 +383,12 @@ namespace FoodFactoryGame.Session
             Doors = new List<GridCell>
             {
                 new() { X = RestaurantDoorX, Z = RestaurantCellZ + RestaurantDepth - 1 },
-                new() { X = RestaurantDoorX + 1, Z = RestaurantCellZ + RestaurantDepth - 1 }
+                new() { X = RestaurantDoorX + 1, Z = RestaurantCellZ + RestaurantDepth - 1 },
+                new() { X = RestaurantCellX, Z = RestaurantBackDoorZ }
+            },
+            Structures = new List<GoodsStructure>
+            {
+                new() { Kind = GoodsWorld.DoorStructure, X = RestaurantCellX, Z = RestaurantBackDoorZ, Style = GoodsWorld.BackDoorStyle, Role = GoodsWorld.ServiceDoorRole }
             }
         };
 

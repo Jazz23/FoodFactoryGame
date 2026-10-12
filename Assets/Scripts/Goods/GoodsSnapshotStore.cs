@@ -11,6 +11,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using FoodFactoryGame.World;
 using SQLite;
 using UnityEngine;
 
@@ -503,6 +504,51 @@ namespace FoodFactoryGame.Goods
             {
                 foreach (var equipment in state.Equipment ?? new()) if (equipment != null) equipment.RecipeId ??= "";
                 state.SchemaVersion = 20;
+            }
+            // The starting-loop steps below were v17 to v21 on their own branch and follow main's steps since the merge, so a save that
+            // branch wrote before the merge (v18 to v21) does not load correctly.
+            // v20 had no back doors (decision 0037, starting loop): every door record reads as a customer door and nothing moves.
+            // Docks placed before keep working where they stand; only new placements follow the back-door rule.
+            if (state != null && state.SchemaVersion == 20)
+            {
+                foreach (var piece in (state.Buildings ?? new()).Where(x => x != null).SelectMany(x => x.Structures ?? new()))
+                    if (piece != null) piece.Role ??= "";
+                state.SchemaVersion = 21;
+            }
+            // v21 restaurants of worlds made before generator v5 had no back door, so no new dock fit there (owner decision
+            // 2026-10-06): each such restaurant gets one, free, where GoodsWorld.AddBackDoor finds room. Without the lot listing the
+            // street is unknown, so a doorstep reached from any lot edge counts. Nothing else moves.
+            if (state != null && state.SchemaVersion == 21)
+            {
+                foreach (var building in (state.Buildings ?? new()).Where(x => x != null).ToList())
+                    GoodsWorld.AddBackDoor(state, building, null);
+                state.SchemaVersion = 22;
+            }
+            // v22 had no ledger (decision 0038, starting loop): the ledger starts empty and each company's cash so far is carried
+            // forward, so opening (unknown, 0) + carried + entries == cash holds from the first v23 revision. Cash itself does not change.
+            if (state != null && state.SchemaVersion == 22)
+            {
+                state.Ledger ??= new List<GoodsLedgerEntry>();
+                state.Ledger.Clear();
+                foreach (var company in (state.Companies ?? new()).Where(x => x != null))
+                {
+                    company.OpeningCents = 0;
+                    company.LedgerCarriedCents = company.Cash;
+                    company.LedgerNextNumber = 0;
+                }
+                state.SchemaVersion = 23;
+            }
+            // v23 counted district rates per 3600 clock s; v24 counts them per game hour (decision 0039, starting loop). Reading the
+            // old numbers per game hour would multiply demand by 60, so each rate is re-tuned by GameClock.FromClockHourRate, and the progress
+            // toward the next customer keeps its fraction of a customer. No goods, cash or customers change.
+            if (state != null && state.SchemaVersion == 23)
+            {
+                foreach (var district in (state.Districts ?? new()).Where(x => x != null))
+                {
+                    district.CustomersPerHour = GameClock.FromClockHourRate(district.CustomersPerHour);
+                    district.SpawnProgress = district.SpawnProgress is >= 0 and < 3600 ? district.SpawnProgress * GameClock.HourSeconds / 3600 : district.SpawnProgress;
+                }
+                state.SchemaVersion = 24;
             }
             GoodsWorld.Validate(state);
             return state;

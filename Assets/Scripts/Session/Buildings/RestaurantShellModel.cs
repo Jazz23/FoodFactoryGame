@@ -87,6 +87,8 @@ namespace FoodFactoryGame.Session.Buildings
                 var next = alongX ? (cell.X + 1, cell.Z) : (cell.X, cell.Z + 1);
                 var record = building.Structures.FirstOrDefault(s => s.Kind == GoodsWorld.DoorStructure && s.X == cell.X && s.Z == cell.Z);
                 var leaf = catalog.Leaf(record?.Style)?.leaf;
+                // A back door (decision 0037) never opens for customers.
+                var service = record?.Role == GoodsWorld.ServiceDoorRole;
                 var yaw = alongX ? 0f : 90f;
                 if (cells.Contains(next) && IsDoor(next) && !doorsDone.Contains(next))
                 {
@@ -95,15 +97,15 @@ namespace FoodFactoryGame.Session.Buildings
                     Place(catalog.DoubleDoorway, parent, center, yaw);
                     Place(catalog.DoubleFrame, parent, center, yaw);
                     var rotation = Quaternion.Euler(0f, yaw, 0f);
-                    Swing(Place(leaf, parent, center + rotation * new Vector3(DoubleHinge, 0.005f, 0f), yaw), parent, center);
-                    Swing(Place(leaf, parent, center + rotation * new Vector3(-DoubleHinge, 0.005f, 0f), yaw + 180f), parent, center);
+                    Swing(Place(leaf, parent, center + rotation * new Vector3(DoubleHinge, 0.005f, 0f), yaw), parent, center, service);
+                    Swing(Place(leaf, parent, center + rotation * new Vector3(-DoubleHinge, 0.005f, 0f), yaw + 180f), parent, center, service);
                 }
                 else
                 {
                     var center = Center(layout, cell);
                     Place(catalog.SingleDoorway, parent, center, yaw);
                     Place(catalog.SingleFrame, parent, center, yaw);
-                    Swing(Place(leaf, parent, center + Quaternion.Euler(0f, yaw, 0f) * new Vector3(SingleHinge, 0.005f, 0f), yaw), parent, center);
+                    Swing(Place(leaf, parent, center + Quaternion.Euler(0f, yaw, 0f) * new Vector3(SingleHinge, 0.005f, 0f), yaw), parent, center, service);
                 }
             }
 
@@ -120,10 +122,10 @@ namespace FoodFactoryGame.Session.Buildings
             }
         }
 
-        private static void Swing(GameObject leaf, Transform parent, Vector3 doorway)
+        private static void Swing(GameObject leaf, Transform parent, Vector3 doorway, bool service)
         {
             if (leaf == null) return;
-            leaf.AddComponent<DoorSwing>().Init(parent.TransformPoint(doorway));
+            leaf.AddComponent<DoorSwing>().Init(parent.TransformPoint(doorway), service);
         }
 
         private static Vector3 Center(SiteLayout layout, (int X, int Z) cell) => SiteGridSpace.FootprintCenter(layout, cell.X, cell.Z, 1, 1);

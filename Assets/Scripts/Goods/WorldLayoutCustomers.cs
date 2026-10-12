@@ -29,7 +29,7 @@ namespace FoodFactoryGame.Goods
 
         public static string CompetitorId(string buildingId) => "competitor-" + buildingId;
 
-        // One district record per block, spawning at the block's centre; the layout district's customers per hour are shared
+        // One district record per block, spawning at the block's centre; the layout district's customers per game hour are shared
         // between its blocks by area (largest remainder, so the blocks add up to the district's rate exactly).
         public static List<GoodsDistrict> Districts(WorldLayout layout)
         {
@@ -40,7 +40,7 @@ namespace FoodFactoryGame.Goods
                 var liked = district.Cuisines.Where(x => x.Weight >= LikedCuisineWeight)
                     .OrderByDescending(x => x.Weight).ThenBy(x => x.Cuisine, StringComparer.Ordinal).Select(x => x.Cuisine).ToList();
                 var areas = district.Areas.Select(x => (long)x.Width * x.Depth).ToList();
-                var shares = Share(district.CustomersPerHour, areas);
+                var shares = Share(layout.RatePerGameHour(district), areas);
                 for (var block = 0; block < district.Areas.Count; block++)
                 {
                     var area = district.Areas[block];

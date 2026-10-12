@@ -9,9 +9,9 @@ namespace FoodFactoryGame.World
 {
     public static class RoadTraffic
     {
-        // PROTOTYPE: one game hour lasts a real minute, so a day of rush hours passes in 24 minutes.
-        public const int HourSeconds = 60;
-        public const int DaySeconds = 24 * HourSeconds;
+        // The shared game hour and day (decision 0039); customer demand counts the same hour.
+        public const int HourSeconds = GameClock.HourSeconds;
+        public const int DaySeconds = GameClock.DaySeconds;
         // Background load never passes this percent of capacity, so city cars alone never close a road.
         public const int MaxBackgroundPercent = 90;
         // Above this load a segment admits no more trucks, unless none is on it or a truck has waited PatienceSeconds.

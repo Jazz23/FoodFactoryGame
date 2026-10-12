@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="1" result="Failed(Child)" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-10-06 22:20:22Z" end-time="2026-10-06 22:20:29Z" duration="7.3816415">
+  <test-suite type="TestSuite" id="1087" name="FoodFactoryGame" fullname="FoodFactoryGame" runstate="Runnable" testcasecount="59" result="Failed" site="Child" start-time="2026-10-06 22:20:22Z" end-time="2026-10-06 22:20:29Z" duration="7.381642" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="PlayMode" />
+    </properties>
+    <failure>
+      <message><![CDATA[One or more child tests had errors]]></message>
+    </failure>
+    <test-suite type="Assembly" id="1079" name="FoodFactoryGame.Session.PlayModeTests.dll" fullname="E:/Projects/Unity/FoodFactoryGame/Library/ScriptAssemblies/FoodFactoryGame.Session.PlayModeTests.dll" runstate="Runnable" testcasecount="57" result="Failed" site="Child" start-time="2026-10-06 22:20:22Z" end-time="2026-10-06 22:20:29Z" duration="7.372534" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="9820" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="PlayMode" />
+        <property name="EditorOnly" value="False" />
+      </properties>
+      <failure>
+        <message><![CDATA[One or more child tests had errors]]></message>
+      </failure>
+      <test-suite type="TestSuite" id="1080" name="FoodFactoryGame" fullname="FoodFactoryGame" runstate="Runnable" testcasecount="57" result="Failed" site="Child" start-time="2026-10-06 22:20:22Z" end-time="2026-10-06 22:20:29Z" duration="7.370136" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <failure>
+          <message><![CDATA[One or more child tests had errors]]></message>
+        </failure>
+        <test-suite type="TestSuite" id="1081" name="Session" fullname="FoodFactoryGame.Session" runstate="Runnable" testcasecount="57" result="Failed" site="Child" start-time="2026-10-06 22:20:22Z" end-time="2026-10-06 22:20:29Z" duration="7.368075" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <failure>
+            <message><![CDATA[One or more child tests had errors]]></message>
+          </failure>
+          <test-suite type="TestSuite" id="1082" name="PlayModeTests" fullname="FoodFactoryGame.Session.PlayModeTests" runstate="Runnable" testcasecount="57" result="Failed" site="Child" start-time="2026-10-06 22:20:22Z" end-time="2026-10-06 22:20:29Z" duration="7.366048" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <failure>
+              <message><![CDATA[One or more child tests had errors]]></message>
+            </failure>
+            <test-suite type="TestFixture" id="1061" name="StartingLoopPlaythroughTests" fullname="FoodFactoryGame.Session.PlayModeTests.StartingLoopPlaythroughTests" classname="FoodFactoryGame.Session.PlayModeTests.StartingLoopPlaythroughTests" runstate="Runnable" testcasecount="4" result="Failed" site="Child" start-time="2026-10-06 22:20:22Z" end-time="2026-10-06 22:20:29Z" duration="7.363468" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <failure>
+                <message><![CDATA[One or more child tests had errors]]></message>
+              </failure>
+              <test-case id="1064" name="PassInputFirstSeed" fullname="FoodFactoryGame.Session.PlayModeTests.StartingLoopPlaythroughTests.PassInputFirstSeed" methodname="PassInputFirstSeed" classname="FoodFactoryGame.Session.PlayModeTests.StartingLoopPlaythroughTests" runstate="Runnable" seed="261180180" result="Failed" start-time="2026-10-06 22:20:22Z" end-time="2026-10-06 22:20:29Z" duration="7.347151" asserts="0">
+                <properties>
+                  <property name="_JOINTYPE" value="UnityCombinatorial" />
+                  <property name="Timeout" value="5400000" />
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <failure>
+                  <message><![CDATA[  Steps not passing (records in E:\Projects\Unity\FoodFactoryGame\docs\verification\back-door-20261006\pass-i-piece-two).
+  Expected: <empty>
+  But was:  < "S3 skipped (debug): ", "S4 skipped (debug): ", "S5 skipped (debug): ", "S6 skipped (debug): ", "S7 skipped (debug): ", "S8 skipped (debug): ", "S9 skipped (debug): ", "S10 skipped (debug): ", "S12 skipped (debug): ", "S13 skipped (debug): " >
+]]></message>
+                  <stack-trace><![CDATA[at FoodFactoryGame.Session.PlayModeTests.StartingLoopPlaythroughTests+<Play>d__116.MoveNext () [0x0052a] in E:\Projects\Unity\FoodFactoryGame\Assets\Tests\PlayMode\Session\StartingLoopPlaythroughTests.cs:204
+at UnityEngine.TestTools.TestEnumerator+<Execute>d__7.MoveNext () [0x0003a] in .\Library\PackageCache\com.unity.test-framework@1405238725ab\UnityEngine.TestRunner\NUnitExtensions\Attributes\TestEnumerator.cs:44
+]]></stack-trace>
+                </failure>
+                <output><![CDATA[
+IgnoreFailingMessages:true
+[P0] pass I (simulated input), seed piece-two, save C:\Users\Deven\AppData\Local\Temp\FoodFactoryStartingLoop\a6ddd3e122ed449898a25f1b1a030239, output E:\Projects\Unity\FoodFactoryGame\docs\verification\back-door-20261006\pass-i-piece-two
+[P0] S1 start (input, seed piece-two)
+[World] Generated world from seed 'piece-two' (seed 15744545318268577234, attempt 0, generator v5): 1505 buildings, 607 road segments, 2 rail lines; start restaurant-0098; sha256 f6de40173bfd17869a313d3e491c06cfdc03b9c3a97a40c8c6dbb891089d108d.
+[Session] Created generated world dev-world: company-1 owns restaurant-0098 (site site-restaurant-0098); 25 districts, 157 competitors.
+[Session] Starting server...
+Local server is starting for Tugboat. Listening on port 52573.
+Local server is started for Tugboat.
+[Session] Hosting
+[Session] Connecting to 127.0.0.1...
+Local client is starting for Tugboat. Server IP is 127.0.0.1, port is 52573.
+Remote connection started for Id 0.
+Local client is started for Tugboat.
+[Session] Joined as player-6f393f1c7d5d436fa2797d4a424c596b
+[P0] S1: time to playable 2.5 s (Begin to avatar with live controls)
+[P0] S1: seed piece-two; start lot lot-restaurant-0098, site site-restaurant-0098, building restaurant-0098 14x16 at (2,4) in lot 16x20
+[P0] S1: cash $1,000,000.00 (expected $1,000,000.00)
+[P0] S1: start equipment start-dock:dock@(11,3), start-counter:counter@(8,7), start-table:table@(13,18)
+[P0] S1: spawn (-7.50, 0.05, 1.50) = cell (0,11); inside building: False
+[P0] S1: starter inventory dough x5, belt x50, lift x10
+[P0] S1: doors (2,11) (2,12) (13,4); street side (-1, 0)
+[P0] S1: districts 25, competitors 157
+[P0] S1: capture s1-start.png
+[P0] S1 pass in 2.6 s 
+[P0] S2 start (input, seed piece-two)
+[P0] S2: front door cell (2,11) facing (-1.00, 0.00, 0.00)
+[P0] S2: door swing found False, largest angle 0 deg
+[P0] S2: indoors: building restaurant-0098, camera top-down True, pointer locked False, crosshair aims with the free pointer
+[P0] S2: capture s2-indoors.png
+[P0] S2 pass in 2.2 s 
+[P0] S11 start (input, seed piece-two)
+[P0] S11: dock 2x1 on lot-restaurant-0098 outside the shell: not-beside-back-door 146, out-of-bounds 6, ok 5, blocked 5
+[P0] S11: supplier-dock preview at (12,2): 1 x dock: charge $60.00, refund $0.00
+[Build] Requesting 1 x supplier-dock (6000 cents).
+[Build] Accepted: 1 x dock bought (6000 cents, revision 201).
+[P0] S11: supplier-dock: accepted; cash now $999,940.00
+[P0] S11: dock buy:player-6f393f1c7d5d436fa2797d4a424c596b:1e1d179faab244aa95534413493edb19:0 at (12,2) rotation 0; street reach True; charged $60.00
+[P0] S11: capture s11-dock.png (overview)
+[P0] S11 pass in 1.7 s 
+Local client is stopping for Tugboat.
+Local server is stopping for Tugboat.
+Local server is stopped for Tugboat.
+Local client is stopped for Tugboat.
+[Session] Disconnected
+<b><color=#2EA3FF>MCP-FOR-UNITY</color></b>: [TestRunnerNoThrottle] Restored Interaction Mode after test run.
+Saving results to: C:/Users/Deven/AppData/LocalLow/DefaultCompany/FoodFactoryGame\TestResults.xml
+]]></output>
+              </test-case>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

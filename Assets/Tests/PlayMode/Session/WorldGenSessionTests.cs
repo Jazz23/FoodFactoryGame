@@ -1,6 +1,6 @@
 // Runs the real WorldGen scene (decision 0028, piece 2) as a host, with a loopback-UDP remote client where needed, on a new
 // generated world in a unique temporary directory: the player starts on the starting restaurant's own site, the map's starting
-// lot lines up with the site grid, a dock (small enough for a restaurant's 2 m apron) places there, a purchase through the
+// lot lines up with the site grid, a dock places there beside the back door (decision 0037), a purchase through the
 // buy panel reaches both clients, and a whole sale in the pre-equipped starting restaurant (decision 0030) reaches both.
 // The application's saves are never opened.
 using System;
@@ -23,6 +23,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
+using UnityEngine.UIElements;
 
 namespace FoodFactoryGame.Session.PlayModeTests
 {
@@ -107,6 +108,17 @@ namespace FoodFactoryGame.Session.PlayModeTests
 
         private PropertyOffer Start => _root.StartOffer;
 
+        // TEST-ONLY funding (decision 0039 cut the starting cash to $700): tests that buy buildings get $1,000,000 more through the
+        // tools' cash adjustment, recorded in the ledger, and wait until the client sees it. Gameplay values are unchanged.
+        private const long TestFundingCents = 100_000_000;
+
+        private IEnumerator Fund()
+        {
+            var cash = _root.ServerWorld.Snapshot().Companies.Single(x => x.Id == GeneratedWorld.CompanyId).Cash;
+            Assert.That(_root.ServerWorld.AdjustCashDurably(GeneratedWorld.CompanyId, TestFundingCents, _root.Options.WorldPath), Is.Null);
+            yield return Until(() => _root.ClientSite.Companies.Single().Cash == cash + TestFundingCents, "TEST-ONLY funding reaches the client");
+        }
+
         // The host's own avatar: a remote client in the same process owns one too, so ownership alone is ambiguous.
         private PlayerAvatar LocalAvatar() =>
             UnityEngine.Object.FindObjectsByType<PlayerAvatar>().FirstOrDefault(x => x.IsOwner && x.NetworkManager == _root.NetworkManager);
@@ -121,8 +133,11 @@ namespace FoodFactoryGame.Session.PlayModeTests
             Assert.That(site.Companies.Single().Cash, Is.EqualTo(GeneratedWorld.StartingCash));
             Assert.That(site.Properties.Single().LotId, Is.EqualTo(Start.LotId));
             Assert.That(site.Locations.Single(x => x.Id == GoodsWorld.InventoryLocationId(_root.Authenticator.LocalPlayerId)).SiteId, Is.EqualTo(Start.SiteId));
-            Assert.That(site.Equipment.Select(x => x.Id), Is.EquivalentTo(new[] { GeneratedWorld.StartCounterId, GeneratedWorld.StartTableId }),
-                "Pre-equipped with a counter and a table (decision 0030).");
+            Assert.That(site.Lots.Where(x => x.LocationId == GoodsWorld.InventoryLocationId(_root.Authenticator.LocalPlayerId)).Select(x => (x.ItemId, x.Quantity)),
+                Is.EqualTo(new[] { (DevWorld.DoughItemId, GeneratedWorld.StarterDough) }), "Decision 0039: the start kit is dough only, no belts or lifts.");
+            Assert.That(site.Equipment.Select(x => x.Id), Is.EquivalentTo(new[] { GeneratedWorld.StartCounterId, GeneratedWorld.StartTableId, GeneratedWorld.StartDockId }),
+                "Pre-equipped with a counter and a table (decision 0030) and the dock beside the back door (decision 0037).");
+            Assert.That(RestaurantRules.BesideBackDoor(site, site.Equipment.Single(x => x.Id == GeneratedWorld.StartDockId)), Is.True);
             Assert.That(site.Belts.Count + site.Employees.Count, Is.Zero, "No dev seed.");
             Assert.That((GameObject.Find("Navigation"), GameObject.Find("Landmark 1")), Is.EqualTo(((GameObject)null, (GameObject)null)),
                 "The dev site's ground and NavMesh are hidden in a generated world.");
@@ -177,9 +192,11 @@ namespace FoodFactoryGame.Session.PlayModeTests
             var site = _root.ClientSite;
             var dock = site.Equipment.Single(x => x.HolderId == me);
             var (width, depth) = SiteGrid.Footprint(dock.Width, dock.Depth, 0);
+            // Beside the back door's doorstep (decision 0037), as the server requires.
             var anchor = Enumerable.Range(0, Start.Width * Start.Depth).Select(i => (X: i % Start.Width, Z: i / Start.Width))
                 .First(c => !SiteGrid.Overlaps(c.X, c.Z, width, depth, Start.BuildingX, Start.BuildingZ, Start.BuildingWidth, Start.BuildingDepth)
-                            && SiteGrid.PlacementProblem(site, dock, c.X, c.Z, 0, 0) == null);
+                            && SiteGrid.PlacementProblem(site, dock, c.X, c.Z, 0, 0) == null
+                            && RestaurantRules.PlacementProblem(site, dock, c.X, c.Z, 0, Start) == null);
             bridge.RequestPlace("place-dock", dock.Id, anchor.X, anchor.Z, 0);
             yield return Until(() => results.ContainsKey("place-dock"), "placement reply");
             Assert.That(results["place-dock"].Accepted, Is.True, results["place-dock"].Reason);
@@ -198,6 +215,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
         public IEnumerator ABoughtRestaurantIsDrawnWhereItStands()
         {
             yield return StartHost();
+            yield return Fund();
             var results = new System.Collections.Generic.Dictionary<string, GoodsOutcome>();
             _root.ClientSubscription.ResultReceived += x => results[x.RequestId] = x;
             var diner = NearestForSaleRestaurant();
@@ -233,6 +251,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
         public IEnumerator WalkingIntoABoughtRestaurantCarriesTheGoodsThere()
         {
             yield return StartHost();
+            yield return Fund();
             var results = new System.Collections.Generic.Dictionary<string, GoodsOutcome>();
             _root.ClientSubscription.ResultReceived += x => results[x.RequestId] = x;
             var me = _root.Authenticator.LocalPlayerId;
@@ -291,7 +310,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
             });
             _root.ServerWorld.Bootstrap(new GoodsDistrict
             {
-                Id = "test-district", Name = "Test", MapX = diner.AccessX, MapZ = diner.AccessZ, CustomersPerHour = 720, WealthPercent = 40,
+                Id = "test-district", Name = "Test", MapX = diner.AccessX, MapZ = diner.AccessZ, CustomersPerHour = 12, WealthPercent = 40,
                 AppearanceVariants = 1, LikedCuisines = { "bakery" }, DineInPercent = 50, RangeMetres = 5
             });
             var figures = UnityEngine.Object.FindAnyObjectByType<Customers.CustomerPresenter>();
@@ -311,6 +330,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
         public IEnumerator RejoiningStartsWhereThePlayerLeftWithTheGoods()
         {
             yield return StartHost();
+            yield return Fund();
             var diner = NearestForSaleRestaurant();
             var me = _root.Authenticator.LocalPlayerId;
             _root.ClientSubscription.Bridge.RequestBuyProperty("buy-near", Start.SiteId, diner.LotId);
@@ -352,6 +372,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
         public IEnumerator ATeammateSeesTheHostEnterAndBuildInTheSecondSite()
         {
             yield return StartHost();
+            yield return Fund();
             CreateRemote();
             Assert.That(_remote.ClientManager.StartConnection(), Is.True);
             yield return Until(() => { _remoteSite.Tick(); return _remoteSite.Latest != null; }, "remote baseline of the starting site");
@@ -411,6 +432,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
             var output = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "docs", "verification", "several-sites-20260930"));
             Directory.CreateDirectory(output);
             yield return StartHost();
+            yield return Fund();
             yield return Until(() => LocalAvatar() != null, "local avatar");
             yield return new WaitForSeconds(2f);
             var one = new System.Collections.Generic.List<float>();
@@ -514,6 +536,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
 
         private IEnumerator TruckOnARoute(PropertyOffer diner, int hour)
         {
+            yield return Fund();
             var results = new System.Collections.Generic.Dictionary<string, GoodsOutcome>();
             _root.ClientSubscription.ResultReceived += x => results[x.RequestId] = x;
             var me = _root.Authenticator.LocalPlayerId;
@@ -723,6 +746,8 @@ namespace FoodFactoryGame.Session.PlayModeTests
             _root.ClientSubscription.ResultReceived += x => results[x.RequestId] = x;
             var me = _root.Authenticator.LocalPlayerId;
             var bridge = _root.ClientSubscription.Bridge;
+            // TEST-ONLY: the clock runs ten times faster; this test waits only on clock time and checks no exact interim value.
+            bridge.ClockRate = 10f;
             var inventory = GoodsWorld.InventoryLocationId(me);
             var startCash = _root.ClientSite.Companies.Single().Cash;
 
@@ -768,7 +793,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
             var map = _root.ServerWorld.Snapshot().Sites.Single(x => x.Id == Start.SiteId);
             _root.ServerWorld.Bootstrap(new GoodsDistrict
             {
-                Id = "test-district", Name = "Test", MapX = map.MapX, MapZ = map.MapZ, CustomersPerHour = 720, WealthPercent = 40,
+                Id = "test-district", Name = "Test", MapX = map.MapX, MapZ = map.MapZ, CustomersPerHour = 12, WealthPercent = 40,
                 AppearanceVariants = 1, LikedCuisines = { "bakery" }, DineInPercent = 50, RangeMetres = 5
             });
             yield return Until(() => _root.ClientSite.Companies.Single().Cash > startCash - SupplierSpend, "a customer buys bread", 60f);
@@ -808,6 +833,76 @@ namespace FoodFactoryGame.Session.PlayModeTests
 
         // TEST-ONLY expectation from the supplier content: one oven ($150.00) and one pack of dough ($2.50); bread sells for $2.50.
         private const long SupplierSpend = 15000 + 250;
+
+        // Decision 0038 in a generated world: with no screen open the HUD says why the starting restaurant cannot sell (its register
+        // unstaffed, then empty), and the register screen says the same; with bread in it (TEST-ONLY seeding) it reads open. The
+        // ledger tab lists a supplier purchase and then a sale (TEST-ONLY district) as they happen. The readout writes nothing.
+        [UnityTest]
+        public IEnumerator TheHudSaysWhyTheRestaurantCannotSellAndTheLedgerFollowsCash()
+        {
+            yield return StartHost();
+            var hud = UnityEngine.Object.FindAnyObjectByType<PlayerHud>();
+            var interaction = UnityEngine.Object.FindAnyObjectByType<EquipmentInteraction>();
+            var results = new System.Collections.Generic.Dictionary<string, GoodsOutcome>();
+            _root.ClientSubscription.ResultReceived += x => results[x.RequestId] = x;
+            var me = _root.Authenticator.LocalPlayerId;
+            var bridge = _root.ClientSubscription.Bridge;
+            // TEST-ONLY: the clock runs ten times faster; this test waits only on clock time and checks no exact interim value.
+            bridge.ClockRate = 10f;
+            var line = hud.ScreenRoot.panel.visualTree.Q<Label>("hud-readiness");
+            yield return Until(() => hud.Readiness != null, "the readout");
+            Assert.That((hud.Readiness.Blocker, hud.Readiness.ReachableRegisters), Is.EqualTo((RestaurantReadiness.NoStaffedRegister, 1)));
+            Assert.That(hud.ReadinessText, Does.StartWith("Not selling: nobody works a register"));
+            Assert.That(line.resolvedStyle.display, Is.EqualTo(DisplayStyle.Flex), "Shown with no screen open.");
+
+            bridge.RequestStaff("staff", GeneratedWorld.StartCounterId, me);
+            yield return Until(() => results.ContainsKey("staff"), "staffing the register");
+            Assert.That(results["staff"].Accepted, Is.True, results["staff"].Reason);
+            yield return Until(() => hud.Readiness?.Blocker == RestaurantReadiness.NoEdibleMenuItem, "the empty-register blocker");
+            Assert.That(hud.ReadinessText, Does.StartWith("Not selling: no menu food in a worked register"));
+            interaction.OpenMachine(GeneratedWorld.StartCounterId);
+            yield return Until(() => hud.ScreenRoot.Q<Label>("hud-register-readiness") != null, "the register screen");
+            Assert.That(hud.ScreenRoot.Q<Label>("hud-register-readiness").text, Does.StartWith("Restaurant not selling: no menu food in a worked register"));
+            Assert.That(hud.ScreenRoot.Q<Label>("hud-progress-label").text, Does.StartWith("Nothing to sell: put edible "),
+                "P0-05: an empty register says so.");
+            yield return null;
+            Assert.That(line.resolvedStyle.display, Is.EqualTo(DisplayStyle.None), "The world line hides while a screen is open.");
+            interaction.CloseScreen();
+
+            // A purchase reaches the ledger tab.
+            bridge.RequestPurchase("buy-dough", Start.SiteId, "supplier-dough-5");
+            yield return Until(() => results.ContainsKey("buy-dough"), "the purchase");
+            Assert.That(results["buy-dough"].Accepted, Is.True, results["buy-dough"].Reason);
+            yield return Until(() => _root.ClientSite.Ledger.Any(x => x.Kind == GoodsWorld.LedgerSupplierGoods && x.RequestId == "buy-dough"), "the purchase in the ledger");
+            var purchase = _root.ClientSite.Ledger.Single(x => x.RequestId == "buy-dough");
+            Assert.That(purchase.Cents, Is.EqualTo(-250));
+            interaction.ToggleInventory();
+            yield return Until(() => hud.ScreenRoot.Q<Button>("hud-tab-ledger") != null, "the inventory screen with its tabs");
+            hud.ShowLedger(true);
+            yield return Until(() => hud.ScreenRoot.Q($"hud-ledger-row-{purchase.Id}") != null, "the purchase row");
+
+            // TEST-ONLY: bread in the register and a busy district on the starting site, so a customer buys within seconds.
+            _root.ServerWorld.Bootstrap(new GoodsLot
+            {
+                Id = "test-bread", ItemId = "bread", OwnerId = Start.SiteId, LocationId = GeneratedWorld.StartCounterId + ":in", Quantity = 5, SpoilAfterSeconds = 3600
+            });
+            yield return Until(() => hud.Readiness?.Ready == true, "the open restaurant");
+            Assert.That(hud.ReadinessText, Does.StartWith("Open: "));
+            var map = _root.ServerWorld.Snapshot().Sites.Single(x => x.Id == Start.SiteId);
+            _root.ServerWorld.Bootstrap(new GoodsDistrict
+            {
+                Id = "test-district", Name = "Test", MapX = map.MapX, MapZ = map.MapZ, CustomersPerHour = 12, WealthPercent = 40,
+                AppearanceVariants = 1, LikedCuisines = { "bakery" }, DineInPercent = 0, RangeMetres = 5
+            });
+            yield return Until(() => _root.ClientSite.Ledger.Any(x => x.Kind == GoodsWorld.LedgerSale), "a sale in the ledger", 60f);
+            var sale = _root.ClientSite.Ledger.First(x => x.Kind == GoodsWorld.LedgerSale);
+            Assert.That((sale.Cents, sale.SiteId, sale.EquipmentId), Is.EqualTo((250L, Start.SiteId, GeneratedWorld.StartCounterId)));
+            yield return Until(() => hud.ScreenRoot.Q($"hud-ledger-row-{sale.Id}") != null, "the sale row");
+            Assert.That(hud.Readiness.RecentSales, Is.GreaterThanOrEqualTo(1));
+            var server = _root.ServerWorld.Snapshot();
+            Assert.That(server.Companies.All(x => GoodsWorld.LedgerBalances(server, x)), Is.True, "Opening + carried + entries == cash.");
+            interaction.CloseScreen();
+        }
 
         private static bool PathPassesNear(UnityEngine.AI.NavMeshPath path, System.Collections.Generic.List<Vector3> points, float distance)
         {

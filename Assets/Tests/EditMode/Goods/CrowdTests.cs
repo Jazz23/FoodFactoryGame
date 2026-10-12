@@ -85,8 +85,8 @@ namespace FoodFactoryGame.Goods.Tests
         [Test]
         public void AskingForCrowdsNeverChangesTheWorld()
         {
-            var watched = CreateWorld(customersPerHour: 720);
-            var unwatched = CreateWorld(customersPerHour: 720);
+            var watched = CreateWorld(customersPerHour: 12);
+            var unwatched = CreateWorld(customersPerHour: 12);
             var drawn = 0;
             for (var second = 0; second < 900; second++)
             {

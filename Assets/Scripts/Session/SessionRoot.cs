@@ -256,7 +256,8 @@ namespace FoodFactoryGame.Session
             ServerWorld = GeneratedWorld.Supports(ServerLayout)
                 ? GeneratedWorld.LoadOrCreate(_options.WorldPath, ServerLayout, items,
                     equipmentDefinitions.FirstOrDefault(x => x != null && x.Kind == DevWorld.CounterKind),
-                    equipmentDefinitions.FirstOrDefault(x => x != null && x.Kind == DevWorld.TableKind))
+                    equipmentDefinitions.FirstOrDefault(x => x != null && x.Kind == DevWorld.TableKind),
+                    equipmentDefinitions.FirstOrDefault(x => x != null && x.Kind == GoodsWorld.DockKind))
                 : null;
             StartOffer = ServerWorld != null ? GeneratedWorld.StartOffer(ServerLayout.Layout) : null;
             ServerWorld ??= DevWorld.LoadOrCreate(_options.WorldPath, equipmentDefinitions.FirstOrDefault(x => x != null && x.Kind == "oven"), items,
@@ -284,9 +285,11 @@ namespace FoodFactoryGame.Session
             // 0037); like recipes, this is configuration, not saved.
             ServerWorld.AutomaticJobs = true;
             _registry = new PlayerRegistry(_options.RegistryPath);
-            // PROTOTYPE: players start with the dev inventory and starter goods on the primary site in either kind of world.
+            // PROTOTYPE: players start with the dev inventory on the primary site in either kind of world; a generated world's start
+            // kit is dough only (decision 0039), the dev world keeps its starter goods.
             authenticator.ConfigureServer(new SessionAdmission(_registry, ServerWorld, primarySite, _options.WorldPath,
-                DevWorld.InventoryCapacity, DevWorld.StarterGoods, StartOffer == null ? DevWorld.RemoteSiteIds : null),
+                DevWorld.InventoryCapacity, StartOffer == null ? DevWorld.StarterGoods : GeneratedWorld.StarterGoods,
+                StartOffer == null ? DevWorld.RemoteSiteIds : null),
                 DevAuthenticator.DefaultMaxPlayers, Mode == SessionMode.Host && Visibility == HostVisibility.Singleplayer);
             SetStatus("Starting server...");
             if (!networkManager.ServerManager.StartConnection()) throw new InvalidOperationException("Transport refused to start the server.");

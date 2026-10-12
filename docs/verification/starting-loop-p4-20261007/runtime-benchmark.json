@@ -1,0 +1,45 @@
+﻿{
+  "success": true,
+  "command": "command run_tests",
+  "data": {
+    "command": "run_tests",
+    "parameters": {
+      "mode": "editor",
+      "filter": "FoodFactoryGame.Benchmarks.Tests.CustomerRuntimeBenchmarkTests",
+      "filter_type": "testName"
+    },
+    "result": {
+      "Summary": {
+        "Total": 1,
+        "Passed": 0,
+        "Failed": 1,
+        "Skipped": 0,
+        "Inconclusive": 0
+      },
+      "Results": [
+        {
+          "FullName": "FoodFactoryGame.Benchmarks.Tests.CustomerRuntimeBenchmarkTests.ThousandCustomersFitAFrameAndCommitUnderTheWarningSignals",
+          "Status": "Failed",
+          "Duration": 1.4772345,
+          "Message": "  Expected: <empty>\r\n  But was:  < \"max commit 58.0 ms exceeds the decision 0012 signal (50 ms)\" >\r\n",
+          "StackTrace": "at FoodFactoryGame.Benchmarks.Tests.CustomerRuntimeBenchmarkTests.ThousandCustomersFitAFrameAndCommitUnderTheWarningSignals () [0x007f1] in E:\\Projects\\Unity\\FoodFactoryGame\\Assets\\Tests\\EditMode\\Benchmarks\\CustomerRuntimeBenchmarkTests.cs:195\r\n"
+        }
+      ],
+      "Duration": 4.56,
+      "StatusPath": null,
+      "Mode": "EditMode",
+      "FilterApplied": "testname: FoodFactoryGame.Benchmarks.Tests.CustomerRuntimeBenchmarkTests",
+      "success": true,
+      "result": null
+    },
+    "target": {
+      "host": "127.0.0.1",
+      "port": 7800,
+      "projectPath": "E:\\Projects\\Unity\\FoodFactoryGame"
+    },
+    "success": true
+  },
+  "errors": [],
+  "warnings": []
+}
+

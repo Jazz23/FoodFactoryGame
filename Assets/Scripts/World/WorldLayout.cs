@@ -4,7 +4,9 @@
 // A rectangle's X/Z is its minimum cell and Width/Depth count cells along X/Z. Roads and rails are centrelines with a width.
 // Format 2 adds the land surface (WorldTerrain), rivers with bridges, level crossings, junction controls, building elevations
 // and trees; a format 1 layout (generator v1) reads as flat land with none of them. Format 3 adds lots and reserved site IDs
-// (decision 0028); format 1 and 2 layouts have no lots, so nothing in them can be bought.
+// (decision 0028); format 1 and 2 layouts have no lots, so nothing in them can be bought. Format 4 adds each restaurant's service
+// yard, back door and starter dock (generator v5); older layouts have none. Format 5 (generator v6, decision 0039) writes the
+// same lines but counts district customers per game hour (GameClock); older formats count them per 3600 clock s.
 using System.Collections.Generic;
 
 namespace FoodFactoryGame.World
@@ -115,6 +117,7 @@ namespace FoodFactoryGame.World
         public List<WorldRect> Areas = new();
         public List<CuisineWeight> Cuisines = new();
         public int MinRecipeTier;
+        // Per game hour in format 5; per 3600 clock s in older formats (read them through WorldLayout.RatePerGameHour).
         public int CustomersPerHour;
         public int TrafficPercent;
         // Building purchase price multiplier, percent of the base price.
@@ -219,6 +222,12 @@ namespace FoodFactoryGame.World
         public string SiteId = "";
         // Ground-floor level in centimetres: the land height at the entrance (0 in format 1).
         public int ElevationCm;
+        // Restaurants only, format 4 (generator v5, owner decisions of 2026-10-06): the service yard beside the shell, from the
+        // lot's street edge to the building's rear, the back door on the yard-side wall (a perimeter cell, never a corner), and
+        // the starter dock (a 2 x 1 rectangle) in the yard touching the back door's doorstep. Null in older formats.
+        public WorldRect ServiceYard;
+        public WorldCell BackDoor;
+        public WorldRect ServiceDock;
 
         public bool IsShell => Category == BuildingCategory.Restaurant || Category == BuildingCategory.Factory;
         public bool IsPurchasable => Ownership == Ownership.ForSale || Ownership == Ownership.Competitor;
@@ -253,7 +262,9 @@ namespace FoodFactoryGame.World
     public sealed class WorldLayout
     {
         // Format of WorldLayoutText; the generator version is separate (a new generator may keep the format).
-        public const int CurrentFormat = 3;
+        public const int CurrentFormat = 5;
+        // The first format whose district rates count game hours (decision 0039).
+        public const int GameHourFormat = 5;
 
         public int FormatVersion = CurrentFormat;
         public int GeneratorVersion;
@@ -278,5 +289,10 @@ namespace FoodFactoryGame.World
         public List<WorldTree> Trees = new();
         // Format 3; empty in formats 1 and 2. One per building that HasLot, in building order.
         public List<WorldLot> Lots = new();
+
+        // The district's customers per game hour: stored as is from format 5, re-tuned from per 3600 clock s before it. The
+        // stored text never changes, so an older layout keeps its hash.
+        public int RatePerGameHour(WorldDistrict district) =>
+            FormatVersion >= GameHourFormat ? district.CustomersPerHour : GameClock.FromClockHourRate(district.CustomersPerHour);
     }
 }

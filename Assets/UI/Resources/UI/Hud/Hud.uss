@@ -69,6 +69,13 @@
 
 .hud-warning__text { font-size: 13px; flex-shrink: 1; }
 
+/* Why the restaurant the player stands in can or cannot sell (decision 0038, starting loop). */
+.hud-readiness { margin-top: 8px; align-self: stretch; font-size: 13px; }
+.hud-readiness--blocked { color: var(--ff-danger-text); }
+.hud-readiness-line { max-width: 420px; }
+.hud-readiness-line--ready { color: var(--ff-positive); }
+.hud-readiness-line--blocked { color: var(--ff-danger-text); }
+
 .hud-alert {
     margin-top: 8px;
     align-self: stretch;
@@ -257,4 +264,13 @@
 .hud-dock__body { align-items: flex-start; }
 .hud-dock__outgoing { margin-right: 16px; }
 .hud-dock__warning { color: #FFBF4D; }
+
+/* Supplier and Ledger tabs (decision 0038, starting loop) and the ledger's rows. */
+.hud-tabs { margin-bottom: 8px; }
+.hud-ledger__row { margin-top: 2px; }
+.hud-ledger__cell { font-size: 12px; }
+.hud-ledger__time { width: 60px; }
+.hud-ledger__kind { width: 110px; }
+.hud-ledger__site { flex-grow: 1; flex-shrink: 1; min-width: 0; }
+.hud-ledger__amount { width: 80px; -unity-text-align: middle-right; }
 .hud-storage__body { align-items: center; }

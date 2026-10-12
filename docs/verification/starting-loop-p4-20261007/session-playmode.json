@@ -1,0 +1,363 @@
+﻿{
+    "status":  "completed",
+    "duration":  215.04,
+    "summary":  {
+                    "total":  50,
+                    "passed":  44,
+                    "failed":  0,
+                    "skipped":  6,
+                    "inconclusive":  0
+                },
+    "results":  [
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.BeltPlacementTests.ALiftCarriesAnItemUpToTheNextFloor",
+                        "Status":  "Passed",
+                        "Duration":  8.5714838,
+                        "Message":  null,
+                        "StackTrace":  null
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.BeltPlacementTests.DragWithRotateLaysACornerAndItemsRideToTheEnd",
+                        "Status":  "Passed",
+                        "Duration":  10.2890917,
+                        "Message":  null,
+                        "StackTrace":  null
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.BeltPlacementTests.HoldingRotateWhileDraggingFollowsTheCrosshairRoundCorners",
+                        "Status":  "Passed",
+                        "Duration":  1.0002037,
+                        "Message":  null,
+                        "StackTrace":  null
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.BuildingPresenterTests.AFactoryFloorIsBoughtRiddenAndBuiltOn",
+                        "Status":  "Passed",
+                        "Duration":  1.2636552,
+                        "Message":  null,
+                        "StackTrace":  null
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.BuildingPresenterTests.WalkingInSwitchesToTopDownAndHidesTheRoofUntilWalkingOut",
+                        "Status":  "Passed",
+                        "Duration":  0.899475,
+                        "Message":  null,
+                        "StackTrace":  null
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.CompetitorCustomerTests.AtTheCapTheCurrentSiteKeepsItsFiguresAndTheCapHolds",
+                        "Status":  "Passed",
+                        "Duration":  9.8868059,
+                        "Message":  null,
+                        "StackTrace":  null
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.CompetitorCustomerTests.CrowdsReachEachClientOnlyNearItsAvatar",
+                        "Status":  "Passed",
+                        "Duration":  6.0013414,
+                        "Message":  null,
+                        "StackTrace":  null
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.CompetitorCustomerTests.FiguresAppearOffScreenQueueOutsideAndGoInWhenServed",
+                        "Status":  "Passed",
+                        "Duration":  28.5343165,
+                        "Message":  null,
+                        "StackTrace":  null
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.CustomerPresenterTests.RemoteClientDrawsTheCustomerFromItsOwnReplicatedSite",
+                        "Status":  "Passed",
+                        "Duration":  1.7158919,
+                        "Message":  null,
+                        "StackTrace":  null
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.CustomerPresenterTests.ReplicatedCustomerWalksFromOffscreenTowardTheCounter",
+                        "Status":  "Passed",
+                        "Duration":  1.6838262,
+                        "Message":  null,
+                        "StackTrace":  null
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.EquipmentPlacementTests.HostAndRemoteBuyFromTheSupplierWithCompanyCash",
+                        "Status":  "Passed",
+                        "Duration":  1.3300264,
+                        "Message":  null,
+                        "StackTrace":  null
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.EquipmentPlacementTests.HostBakesBreadThroughOvenSlotsAndRemoteSeesItRun",
+                        "Status":  "Passed",
+                        "Duration":  10.6605626,
+                        "Message":  null,
+                        "StackTrace":  null
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.EquipmentPlacementTests.HostBuysAnOvenFromTheSupplierAndPlacesIt",
+                        "Status":  "Passed",
+                        "Duration":  1.0740401,
+                        "Message":  null,
+                        "StackTrace":  null
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.EquipmentPlacementTests.HostMovesSeededOvenAndRemoteSeesEveryStep",
+                        "Status":  "Passed",
+                        "Duration":  2.06349,
+                        "Message":  null,
+                        "StackTrace":  null
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.EquipmentPlacementTests.HostSellsBreadAtTheCounterAndRemoteSeesTheCash",
+                        "Status":  "Passed",
+                        "Duration":  12.5777568,
+                        "Message":  null,
+                        "StackTrace":  null
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.EquipmentPlacementTests.HotbarKeysOverAStackAndDropsOnTheHotbarAssignSlots",
+                        "Status":  "Passed",
+                        "Duration":  0.8806653,
+                        "Message":  null,
+                        "StackTrace":  null
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.EquipmentPlacementTests.ServerRestartShowsOvenWhereLastCommitted",
+                        "Status":  "Passed",
+                        "Duration":  1.0163276,
+                        "Message":  null,
+                        "StackTrace":  null
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.EquipmentPlacementTests.ShiftClickSendsAStackAcrossOrFillsTheOtherContainer",
+                        "Status":  "Passed",
+                        "Duration":  1.3560341,
+                        "Message":  null,
+                        "StackTrace":  null
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.EquipmentPlacementTests.SlotButtonsTakeShiftClicksAndPlainClicks",
+                        "Status":  "Passed",
+                        "Duration":  0.9813608,
+                        "Message":  null,
+                        "StackTrace":  null
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.EquipmentPlacementTests.ThePressThatOpensAScreenNeverClicksASlot",
+                        "Status":  "Passed",
+                        "Duration":  0.8469843,
+                        "Message":  null,
+                        "StackTrace":  null
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.LogisticsPanelTests.PanelShipsStockEditsRoutesAndManagesTheFleet",
+                        "Status":  "Passed",
+                        "Duration":  5.1887841,
+                        "Message":  null,
+                        "StackTrace":  null
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.LogisticsPanelTests.TruckCardControlsTakeThePointerAfterTheWindowGrows",
+                        "Status":  "Passed",
+                        "Duration":  1.1735109,
+                        "Message":  null,
+                        "StackTrace":  null
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.RestaurantBuildingSessionTests.BuildModeAndDecoratedRestaurantCaptures",
+                        "Status":  "Skipped",
+                        "Duration":  0.4666191,
+                        "Message":  "Captures run on request: create Temp/restaurant-captures.flag.",
+                        "StackTrace":  "at FoodFactoryGame.Session.PlayModeTests.RestaurantBuildingSessionTests+\u003cBuildModeAndDecoratedRestaurantCaptures\u003ed__31.MoveNext () [0x00079] in E:\\Projects\\Unity\\FoodFactoryGame\\Assets\\Tests\\PlayMode\\Session\\RestaurantBuildingSessionTests.cs:345\r\nat UnityEngine.TestTools.TestEnumerator+\u003cExecute\u003ed__7.MoveNext () [0x0003a] in .\\Library\\PackageCache\\com.unity.test-framework@1405238725ab\\UnityEngine.TestRunner\\NUnitExtensions\\Attributes\\TestEnumerator.cs:44\r\n"
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.RestaurantBuildingSessionTests.BuildModeOrdersReachTheServerAndATeammate",
+                        "Status":  "Passed",
+                        "Duration":  4.1757516,
+                        "Message":  null,
+                        "StackTrace":  null
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.RestaurantBuildingSessionTests.RegisterStaffingReplicatesAndEndsWhenThePlayerLeaves",
+                        "Status":  "Passed",
+                        "Duration":  3.7732984,
+                        "Message":  null,
+                        "StackTrace":  null
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.RestaurantBuildingSessionTests.RestaurantDocksInTheYardServeOneTruckAtATime",
+                        "Status":  "Passed",
+                        "Duration":  8.2737694,
+                        "Message":  null,
+                        "StackTrace":  null
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.ScreenOpeningTests.AssistantTabShowsTheErrorAndKeepsTheDraftAfterThreeBadReplies",
+                        "Status":  "Passed",
+                        "Duration":  0.9895258,
+                        "Message":  null,
+                        "StackTrace":  null
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.ScreenOpeningTests.AssistantTabWritesTheCorrectedScriptIntoTheScriptTab",
+                        "Status":  "Passed",
+                        "Duration":  0.7934772,
+                        "Message":  null,
+                        "StackTrace":  null
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.ScreenOpeningTests.EClosesEmployeeScriptUnlessTypingInIt",
+                        "Status":  "Passed",
+                        "Duration":  0.8598518,
+                        "Message":  null,
+                        "StackTrace":  null
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.ScreenOpeningTests.EmployeeScriptOpenedByLeftClickIsNotFocusedByThatClick",
+                        "Status":  "Passed",
+                        "Duration":  0.8740215,
+                        "Message":  null,
+                        "StackTrace":  null
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.ScreenOpeningTests.EmployeeScriptOpensUnfocusedAndLosesFocusWhenClosed",
+                        "Status":  "Passed",
+                        "Duration":  0.7971799,
+                        "Message":  null,
+                        "StackTrace":  null
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.ScreenOpeningTests.LeftClickOpensTheStorageOnlyWhenHighlighted",
+                        "Status":  "Passed",
+                        "Duration":  0.8248208,
+                        "Message":  null,
+                        "StackTrace":  null
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.SessionBootstrapTests.HostAndRemoteJoinWithStableIdsOwnedAvatarsAndSiteState",
+                        "Status":  "Passed",
+                        "Duration":  1.8937201,
+                        "Message":  null,
+                        "StackTrace":  null
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.SessionBootstrapTests.ServerOnlyStartAdvancesWorldWithoutAnyClient",
+                        "Status":  "Passed",
+                        "Duration":  2.4782487,
+                        "Message":  null,
+                        "StackTrace":  null
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.StartingLoopPlaythroughTests.PassInputFirstSeed",
+                        "Status":  "Skipped",
+                        "Duration":  0.0036056,
+                        "Message":  "SetUp : The P0 playthrough runs on request: create Temp/starting-loop.flag.",
+                        "StackTrace":  "at FoodFactoryGame.Session.PlayModeTests.StartingLoopPlaythroughTests+\u003cSetUp\u003ed__115.MoveNext () [0x0002d] in E:\\Projects\\Unity\\FoodFactoryGame\\Assets\\Tests\\PlayMode\\Session\\StartingLoopPlaythroughTests.cs:129\r\nat UnityEngine.TestTools.EnumeratorHelper+\u003cProgressOnEnumerator\u003ed__5.MoveNext () [0x00017] in .\\Library\\PackageCache\\com.unity.test-framework@1405238725ab\\UnityEngine.TestRunner\\NUnitExtensions\\Attributes\\EnumeratorHelper.cs:35\r\nat UnityEngine.TestTools.BeforeAfterTestCommandBase`1+\u003cExecuteEnumerable\u003ed__16[T].MoveNext () [0x00132] in .\\Library\\PackageCache\\com.unity.test-framework@1405238725ab\\UnityEngine.TestRunner\\NUnitExtensions\\Commands\\BeforeAfterTestCommandBase.cs:155\r\n"
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.StartingLoopPlaythroughTests.PassInputSecondSeed",
+                        "Status":  "Skipped",
+                        "Duration":  0.0016052,
+                        "Message":  "SetUp : The P0 playthrough runs on request: create Temp/starting-loop.flag.",
+                        "StackTrace":  "at FoodFactoryGame.Session.PlayModeTests.StartingLoopPlaythroughTests+\u003cSetUp\u003ed__115.MoveNext () [0x0002d] in E:\\Projects\\Unity\\FoodFactoryGame\\Assets\\Tests\\PlayMode\\Session\\StartingLoopPlaythroughTests.cs:129\r\nat UnityEngine.TestTools.EnumeratorHelper+\u003cProgressOnEnumerator\u003ed__5.MoveNext () [0x00017] in .\\Library\\PackageCache\\com.unity.test-framework@1405238725ab\\UnityEngine.TestRunner\\NUnitExtensions\\Attributes\\EnumeratorHelper.cs:35\r\nat UnityEngine.TestTools.BeforeAfterTestCommandBase`1+\u003cExecuteEnumerable\u003ed__16[T].MoveNext () [0x00132] in .\\Library\\PackageCache\\com.unity.test-framework@1405238725ab\\UnityEngine.TestRunner\\NUnitExtensions\\Commands\\BeforeAfterTestCommandBase.cs:155\r\n"
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.StartingLoopPlaythroughTests.PassRequestsFirstSeed",
+                        "Status":  "Skipped",
+                        "Duration":  0.0033775,
+                        "Message":  "SetUp : The P0 playthrough runs on request: create Temp/starting-loop.flag.",
+                        "StackTrace":  "at FoodFactoryGame.Session.PlayModeTests.StartingLoopPlaythroughTests+\u003cSetUp\u003ed__115.MoveNext () [0x0002d] in E:\\Projects\\Unity\\FoodFactoryGame\\Assets\\Tests\\PlayMode\\Session\\StartingLoopPlaythroughTests.cs:129\r\nat UnityEngine.TestTools.EnumeratorHelper+\u003cProgressOnEnumerator\u003ed__5.MoveNext () [0x00017] in .\\Library\\PackageCache\\com.unity.test-framework@1405238725ab\\UnityEngine.TestRunner\\NUnitExtensions\\Attributes\\EnumeratorHelper.cs:35\r\nat UnityEngine.TestTools.BeforeAfterTestCommandBase`1+\u003cExecuteEnumerable\u003ed__16[T].MoveNext () [0x00132] in .\\Library\\PackageCache\\com.unity.test-framework@1405238725ab\\UnityEngine.TestRunner\\NUnitExtensions\\Commands\\BeforeAfterTestCommandBase.cs:155\r\n"
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.StartingLoopPlaythroughTests.PassRequestsSecondSeed",
+                        "Status":  "Skipped",
+                        "Duration":  0.0019764,
+                        "Message":  "SetUp : The P0 playthrough runs on request: create Temp/starting-loop.flag.",
+                        "StackTrace":  "at FoodFactoryGame.Session.PlayModeTests.StartingLoopPlaythroughTests+\u003cSetUp\u003ed__115.MoveNext () [0x0002d] in E:\\Projects\\Unity\\FoodFactoryGame\\Assets\\Tests\\PlayMode\\Session\\StartingLoopPlaythroughTests.cs:129\r\nat UnityEngine.TestTools.EnumeratorHelper+\u003cProgressOnEnumerator\u003ed__5.MoveNext () [0x00017] in .\\Library\\PackageCache\\com.unity.test-framework@1405238725ab\\UnityEngine.TestRunner\\NUnitExtensions\\Attributes\\EnumeratorHelper.cs:35\r\nat UnityEngine.TestTools.BeforeAfterTestCommandBase`1+\u003cExecuteEnumerable\u003ed__16[T].MoveNext () [0x00132] in .\\Library\\PackageCache\\com.unity.test-framework@1405238725ab\\UnityEngine.TestRunner\\NUnitExtensions\\Commands\\BeforeAfterTestCommandBase.cs:155\r\n"
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.WorldGenSessionTests.ABoughtRestaurantIsDrawnWhereItStands",
+                        "Status":  "Passed",
+                        "Duration":  3.1186857,
+                        "Message":  null,
+                        "StackTrace":  null
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.WorldGenSessionTests.ABuildingBoughtThroughThePanelReachesBothClients",
+                        "Status":  "Passed",
+                        "Duration":  3.2811841,
+                        "Message":  null,
+                        "StackTrace":  null
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.WorldGenSessionTests.ADockPlacesOnTheApron",
+                        "Status":  "Passed",
+                        "Duration":  3.1346867,
+                        "Message":  null,
+                        "StackTrace":  null
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.WorldGenSessionTests.ANewWorldStartsThePlayerOnItsOwnRestaurant",
+                        "Status":  "Passed",
+                        "Duration":  3.639484,
+                        "Message":  null,
+                        "StackTrace":  null
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.WorldGenSessionTests.ATeammateSeesTheHostEnterAndBuildInTheSecondSite",
+                        "Status":  "Passed",
+                        "Duration":  3.7858083,
+                        "Message":  null,
+                        "StackTrace":  null
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.WorldGenSessionTests.ATruckDrivesTheGeneratedRoadsWhereItIsDrawn",
+                        "Status":  "Passed",
+                        "Duration":  27.972982,
+                        "Message":  null,
+                        "StackTrace":  null
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.WorldGenSessionTests.AWholeSaleInTheStartingRestaurantReachesBothClients",
+                        "Status":  "Passed",
+                        "Duration":  5.7752357,
+                        "Message":  null,
+                        "StackTrace":  null
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.WorldGenSessionTests.RejoiningStartsWhereThePlayerLeftWithTheGoods",
+                        "Status":  "Passed",
+                        "Duration":  9.3845803,
+                        "Message":  null,
+                        "StackTrace":  null
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.WorldGenSessionTests.TheHudSaysWhyTheRestaurantCannotSellAndTheLedgerFollowsCash",
+                        "Status":  "Passed",
+                        "Duration":  3.4880221,
+                        "Message":  null,
+                        "StackTrace":  null
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.WorldGenSessionTests.TheMapsStartingLotLinesUpWithTheSiteGrid",
+                        "Status":  "Passed",
+                        "Duration":  2.6365375,
+                        "Message":  null,
+                        "StackTrace":  null
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.WorldGenSessionTests.TrucksAndCityTrafficCaptures",
+                        "Status":  "Skipped",
+                        "Duration":  0.4822354,
+                        "Message":  "Captures run on request: create Temp/truck-captures.flag.",
+                        "StackTrace":  "at FoodFactoryGame.Session.PlayModeTests.WorldGenSessionTests+\u003cTrucksAndCityTrafficCaptures\u003ed__33.MoveNext () [0x0007e] in E:\\Projects\\Unity\\FoodFactoryGame\\Assets\\Tests\\PlayMode\\Session\\WorldGenSessionTests.cs:640\r\nat UnityEngine.TestTools.TestEnumerator+\u003cExecute\u003ed__7.MoveNext () [0x0003a] in .\\Library\\PackageCache\\com.unity.test-framework@1405238725ab\\UnityEngine.TestRunner\\NUnitExtensions\\Attributes\\TestEnumerator.cs:44\r\n"
+                    },
+                    {
+                        "FullName":  "FoodFactoryGame.Session.PlayModeTests.WorldGenSessionTests.WalkingIntoABoughtRestaurantCarriesTheGoodsThere",
+                        "Status":  "Passed",
+                        "Duration":  13.0106289,
+                        "Message":  null,
+                        "StackTrace":  null
+                    }
+                ]
+}

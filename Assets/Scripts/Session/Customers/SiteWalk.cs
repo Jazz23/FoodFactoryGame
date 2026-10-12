@@ -1,5 +1,6 @@
 // Presentation only: routes customer figures over a drawn site's walkable cells (RestaurantRules.Walkable: walls, windows and
-// placed object-layer pieces block; doors do not), so they come in through a door instead of crossing a wall. One instance per
+// placed object-layer pieces block; customer doors do not, back doors do, decision 0037), so they come in through a front door
+// instead of crossing a wall. One instance per
 // replicated snapshot of a site (a new baseline gets a new one). A route walks straight to the lot's nearest open edge cell when
 // it starts outside the lot, follows a shortest four-way cell path, and ends with a short step onto the exact target (a seat or a
 // queue spot) when that lies on a blocked cell. A register's service spot is the reachable open cell beside it, preferring the
@@ -27,7 +28,7 @@ namespace FoodFactoryGame.Session.Customers
         private SiteWalk(GoodsSnapshot snapshot, SiteLayout layout)
         {
             _layout = layout;
-            _open = RestaurantRules.Walkable(snapshot, layout.SiteId);
+            _open = RestaurantRules.Walkable(snapshot, layout.SiteId, customers: true);
             var queue = new Queue<(int X, int Z)>();
             foreach (var cell in RestaurantRules.EdgeCells(layout).Where(Open))
                 if (_outward.TryAdd(cell, cell)) queue.Enqueue(cell);

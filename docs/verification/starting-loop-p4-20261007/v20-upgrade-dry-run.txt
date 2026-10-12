@@ -1,0 +1,27 @@
+v20 -> v21 upgrade dry run (2026-10-08 UTC)
+
+Source: a real schema-v20 world.db made with the committed build 4d24bb6 (git stash of the P4 work, recompiled) through
+GeneratedWorld.LoadOrCreate on seed piece-two with the real content, advanced 437 clock s and committed, in the session
+scratchpad (isolated). The dry run loaded a second copy with the P4 build (eval, GoodsSnapshotStore.Load). No commit was
+made. The application database was never opened. Scripts: make-v20.cs, dry-run-v21.cs (session scratchpad).
+
+Created (committed build): schema=20 revision=191 clock=437 districts=25 rateSum=1870 customers=122 cash=100000000 layoutFormat=4 generator=5
+
+before load: schema=20 revision=191 clock=437 districts=25 rateSum=1870 (per 3600 clock s) customers=122 cash=100000000
+after load (in memory): schema=21 revision=191 districts=25 rateSum=186 (per game hour) customers=122 cash=100000000 ledgerBalances=True
+  district-downtown-0: rate 482 -> 48, progress 1834 -> 30
+  district-downtown-1: rate 418 -> 42, progress 2666 -> 44
+  district-residential-0: rate 52 -> 5, progress 1124 -> 18
+  district-residential-1: rate 37 -> 4, progress 1769 -> 29
+  district-residential-2: rate 50 -> 5, progress 250 -> 4
+  district-residential-3: rate 44 -> 4, progress 1228 -> 20
+  district-residential-4: rate 45 -> 5, progress 1665 -> 27
+  district-residential-5: rate 32 -> 3, progress 3184 -> 53
+stored layout format 4 generator 5; snapshot records that differ from the layout's derived records: 3
+  district-residential-9:4/5 district-wealthy-5:5/6 district-industrial-3:3/2   (upgraded record / layout-derived)
+world.db sha256 before 500ab0ce3411a97e860cd0f0ce2d265908329b9f752bdda61992edc409d9ff58
+world.db sha256 after  500ab0ce3411a97e860cd0f0ce2d265908329b9f752bdda61992edc409d9ff58 (unchanged)
+
+Note: the snapshot upgrade rounds each block's rate; the layout path rounds the district's total and then shares it, so 3
+of 25 blocks differ by one customer per game hour (city 186 vs 187). Records are added only when missing (by ID), so
+nothing is added, lost or duplicated; the stored records are authoritative.

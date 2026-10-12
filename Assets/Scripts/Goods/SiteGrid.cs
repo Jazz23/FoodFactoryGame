@@ -162,6 +162,36 @@ namespace FoodFactoryGame.Goods
             (OnPerimeter(building, cellX, cellZ) && building.Doors.Any(x => x.X == cellX && x.Z == cellZ))
             || (IsPartition(building, cellX, cellZ) && HasStructure(building, GoodsWorld.DoorStructure, cellX, cellZ));
 
+        // A back door (decision 0037): a door whose record has the service role. Customers treat it as a wall.
+        public static bool IsServiceDoor(GoodsBuilding building, int cellX, int cellZ) =>
+            IsDoor(building, cellX, cellZ) && building.Structures?.Any(x => x != null && x.Kind == GoodsWorld.DoorStructure && x.X == cellX && x.Z == cellZ
+                && x.Role == GoodsWorld.ServiceDoorRole) == true;
+
+        // Every back door of a building.
+        public static IEnumerable<(int X, int Z)> ServiceDoors(GoodsBuilding building) =>
+            (building.Structures ?? new List<GoodsStructure>()).Where(x => x != null && x.Kind == GoodsWorld.DoorStructure && x.Role == GoodsWorld.ServiceDoorRole
+                && IsDoor(building, x.X, x.Z)).Select(x => (x.X, x.Z));
+
+        // Every customer (front) door of a building: a door on an outer wall (it has a doorstep) that is not a back door.
+        public static IEnumerable<(int X, int Z)> CustomerDoors(GoodsBuilding building) =>
+            (building.Doors ?? new List<GridCell>()).Select(x => (x.X, x.Z))
+                .Concat((building.Structures ?? new List<GoodsStructure>()).Where(x => x != null && x.Kind == GoodsWorld.DoorStructure).Select(x => (x.X, x.Z)))
+                .Distinct().Where(c => IsDoor(building, c.X, c.Z) && !IsServiceDoor(building, c.X, c.Z) && Doorstep(building, c.X, c.Z) != null);
+
+        // The doorstep of a door on an outer wall: the neighbour across the wall that is not interior (null for a door between two
+        // rooms). Footprint perimeter cells and free walls count as wall line, door cells included. While a free-walled shell is open
+        // (a wall taken out to be redrawn) it has no interior, so both sides qualify; then the side outside the footprint wins, which
+        // keeps an outer wall's doorstep where it was.
+        public static (int X, int Z)? Doorstep(GoodsBuilding building, int cellX, int cellZ)
+        {
+            var outside = new List<(int X, int Z)>();
+            foreach (var (x, z) in new[] { (cellX + 1, cellZ), (cellX - 1, cellZ), (cellX, cellZ + 1), (cellX, cellZ - 1) })
+                if (!OnPerimeter(building, x, z) && !IsPartition(building, x, z) && !IsInterior(building, x, z)) outside.Add((x, z));
+            if (outside.Count == 1) return outside[0];
+            var beyond = outside.Where(c => !Overlaps(c.X, c.Z, 1, 1, building.CellX, building.CellZ, building.Width, building.Depth)).ToList();
+            return outside.Count == 2 && beyond.Count == 1 ? beyond[0] : null;
+        }
+
         public static bool IsPartition(GoodsBuilding building, int cellX, int cellZ) =>
             HasStructure(building, GoodsWorld.PartitionStructure, cellX, cellZ);
 

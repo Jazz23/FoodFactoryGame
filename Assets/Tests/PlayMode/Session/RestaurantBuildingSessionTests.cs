@@ -110,6 +110,11 @@ namespace FoodFactoryGame.Session.PlayModeTests
             yield return Until(() => _root.ClientSite != null && _root.ClientSubscription.Bridge != null && _map.Generated, "host baseline and map", 90f);
             _root.ClientSubscription.ResultReceived += x => _results[x.RequestId] = x;
             yield return Until(() => LocalAvatar() != null, "local avatar");
+            // TEST-ONLY funding (decision 0039 cut the starting cash to $700): these tests buy buildings, docks, trucks and decor,
+            // so the company gets $1,000,000 more through the tools' cash adjustment before anything is measured.
+            var cash = _root.ServerWorld.Snapshot().Companies.Single().Cash;
+            Assert.That(_root.ServerWorld.AdjustCashDurably(GeneratedWorld.CompanyId, 100_000_000, _root.Options.WorldPath), Is.Null);
+            yield return Until(() => _root.ClientSite.Companies.Single().Cash == cash + 100_000_000, "TEST-ONLY funding reaches the client");
         }
 
         private IEnumerator StartRemote()
@@ -406,6 +411,8 @@ namespace FoodFactoryGame.Session.PlayModeTests
                 $"{_results["route"].Reason} / {_results["truck-1"].Reason} / {_results["truck-2"].Reason}");
             var route = GoodsWorld.RouteIdFor(_root.Authenticator.LocalPlayerId, "route");
             _root.ServerWorld.Bootstrap(new GoodsLot { Id = "test-crates", ItemId = "crate", OwnerId = Start.SiteId, LocationId = pickup + ":in", Quantity = 8, SpoilAfterSeconds = 1_000_000 });
+            // TEST-ONLY: trucks drive ten times faster; the dock rule is checked on every server snapshot, one clock second at a time.
+            bridge.ClockRate = 10f;
             bridge.RequestAssignTruck("assign-1", $"buy:{_root.Authenticator.LocalPlayerId}:truck-1", route);
             bridge.RequestAssignTruck("assign-2", $"buy:{_root.Authenticator.LocalPlayerId}:truck-2", route);
             var docked = 0;

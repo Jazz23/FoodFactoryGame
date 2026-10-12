@@ -9,6 +9,9 @@
 // ceiling it needs; selling a piece is its own order. Shell edits apply to restaurants only and are instant once paid.
 // Free walls (decision 0036): every order but a resize first turns a rectangular restaurant into free walls (ToFreeWalls), so
 // the owner then places and removes outer walls exactly like interior ones, anywhere in the lot; the footprint follows the walls.
+// Back doors (decision 0037): a back door is a door record with the service role on an outer wall. A restaurant that has one
+// keeps at least one (no-back-door), and no order may take away the back door or open doorstep a dock stands beside
+// (dock-attached).
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -25,6 +28,8 @@ namespace FoodFactoryGame.Goods
         public const string Window = "window";
         public const string Remove = "remove";
         public const string WallFinish = "finish";
+        // A back door (decision 0037): a door on an outer wall, for staff and goods only.
+        public const string BackDoor = "backdoor";
         // Resize applies only to a restaurant without free walls (decision 0036); build mode no longer offers it.
 
         public string Kind;
@@ -199,12 +204,21 @@ namespace FoodFactoryGame.Goods
                     }
                     break;
                 case ShellOrder.Door:
+                case ShellOrder.BackDoor:
+                {
                     if (!DoorStyles.Contains(order.Style ?? "")) return Fail("invalid-style");
                     if (SiteGrid.WindowAt(current, order.X, order.Z) != null || SiteGrid.IsDoor(current, order.X, order.Z)) return Fail("invalid-cell");
+                    // A back door opens from an outer wall onto open ground of the lot (decision 0037).
+                    var back = order.Kind == ShellOrder.BackDoor;
+                    if (back && (SiteGrid.Doorstep(current, order.X, order.Z) is not { } step
+                            || lot == null || step.X < 0 || step.Z < 0 || step.X >= lot.Width || step.Z >= lot.Depth))
+                        return Fail("invalid-cell");
                     if (SiteGrid.IsDoorCell(current, order.X, order.Z)) next.Doors.Add(new GridCell { X = order.X, Z = order.Z });
                     else if (!SiteGrid.IsPartition(current, order.X, order.Z) || IsCorner(current, order.X, order.Z)) return Fail("invalid-cell");
-                    Add(DoorStructure, order.X, order.Z, ShellDoorCents, order.Style);
+                    var door = Add(DoorStructure, order.X, order.Z, ShellDoorCents, order.Style);
+                    if (back) door.Role = ServiceDoorRole;
                     break;
+                }
                 case ShellOrder.Window:
                 {
                     if (!WindowStyles.Contains(order.Style ?? "")) return Fail("invalid-style");
@@ -265,6 +279,30 @@ namespace FoodFactoryGame.Goods
                 next.Depth = walls.Max(x => x.Z) - next.CellZ + 1;
             }
             if (next.Doors.Count == 0 && !next.Structures.Any(x => x.Kind == DoorStructure)) return Fail("no-door");
+            // Decision 0037: a restaurant that has a back door keeps one (move one by placing the new door first), and a dock that
+            // stood beside a back door still does: its door stays and its doorstep stays open.
+            if (SiteGrid.ServiceDoors(current).Any() && !SiteGrid.ServiceDoors(next).Any()) return Fail("no-back-door");
+            // Customers enter only by customer doors (owner decision 2026-10-06): a restaurant that has one keeps one.
+            if (SiteGrid.CustomerDoors(current).Any() && !SiteGrid.CustomerDoors(next).Any()) return Fail("no-customer-door");
+            // A back door's doorstep stays clear of object-layer pieces and belts (decision 0037; belts since 2026-10-06), so a new
+            // back door, or a doorstep a wall change moves, may not land on one.
+            var oldSteps = SiteGrid.ServiceDoors(current).Select(d => SiteGrid.Doorstep(current, d.X, d.Z)).ToList();
+            if (SiteGrid.ServiceDoors(next).Select(d => SiteGrid.Doorstep(next, d.X, d.Z))
+                    .Any(s => s is { } step && !oldSteps.Contains(step) && RestaurantRules.Covered(state, current.SiteId, step.X, step.Z)))
+                return Fail("doorstep");
+            var withNext = new GoodsSnapshot
+            {
+                WorldId = state.WorldId, SiteLayouts = state.SiteLayouts, Equipment = state.Equipment,
+                Buildings = state.Buildings.Select(x => x.Id == current.Id ? next : x).ToList()
+            };
+            var withCurrent = new GoodsSnapshot
+            {
+                WorldId = state.WorldId, SiteLayouts = state.SiteLayouts, Equipment = state.Equipment,
+                Buildings = state.Buildings.Select(x => x.Id == current.Id ? current : x).ToList()
+            };
+            if (state.Equipment.Any(x => x.SiteId == current.SiteId && x.Kind == DockKind && x.State == EquipmentState.Placed
+                    && RestaurantRules.BesideBackDoor(withCurrent, current, x) && !RestaurantRules.BesideBackDoor(withNext, next, x)))
+                return Fail("dock-attached");
             // The fee rides on the first new piece, so removing everything an order built refunds the fee too.
             if (plan.Added.Count > 0) plan.Added[0].ChargedCents = checked(plan.Added[0].ChargedCents + ScaledCents(ShellOrderFeeCents, pricePercent));
             plan.ChargeCents = plan.Added.Sum(x => x.ChargedCents);
@@ -359,8 +397,8 @@ namespace FoodFactoryGame.Goods
 
                 // All checks precede this single locked mutation: the new building and the net payment together.
                 _state.Buildings[_state.Buildings.IndexOf(building)] = plan.Building;
-                if (net > 0) TryDebit(company, net);
-                else if (net < 0) TryCredit(company, -net);
+                if (net > 0) TryDebit(company, net, new CashNote(LedgerShell, building.SiteId, requestId));
+                else if (net < 0) TryCredit(company, -net, new CashNote(LedgerShell, building.SiteId, requestId));
                 InvalidateDiners();
                 return RecordCents(requestId, playerId, "shell-changed", net, null);
             }

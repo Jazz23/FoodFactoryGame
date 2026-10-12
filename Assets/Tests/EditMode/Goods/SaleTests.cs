@@ -116,6 +116,9 @@ namespace FoodFactoryGame.Goods.Tests
             Assert.That(Cash(), Is.EqualTo(1000));
             _world.Advance(1);
             Assert.That((Cash(), _world.Snapshot().Jobs.Count), Is.EqualTo((1250L, 0)));
+            var sale = _world.Snapshot().Ledger.Single();
+            Assert.That((sale.Kind, sale.Cents, sale.SiteId, sale.EquipmentId, sale.OfferId, sale.ClockSeconds),
+                Is.EqualTo((GoodsWorld.LedgerSale, 250L, "restaurant", "counter-1", "sell-bread", 2L)), "The counter sale's ledger entry (decision 0038).");
             _world.Advance(20);
             Assert.That((Cash(), Bread()), Is.EqualTo((1250L, 2)), "No new sale starts; the stock stays for customers.");
         }

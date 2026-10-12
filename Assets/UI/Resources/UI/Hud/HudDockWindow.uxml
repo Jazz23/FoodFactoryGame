@@ -1,6 +1,7 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
     <!-- A loading dock (decision 0022): Outgoing (trucks load) beside Incoming (trucks unload), the trucks serving it, and a
-         warning when its lot's street cannot reach it (decision 0032). -->
+         warning when its lot's street cannot reach it (decision 0032), and a
+         mark when a restaurant dock is not beside a back door (decision 0037, starting loop). -->
     <Style src="project://database/Assets/UI/Theme/Theme.uss" />
     <Style src="Hud.uss" />
     <ui:VisualElement name="hud-machine" class="ff-panel hud-window">
@@ -19,5 +20,6 @@
         </ui:VisualElement>
         <ui:Label name="hud-dock-trucks" class="hud-note ff-muted ff-wrap" picking-mode="Ignore" />
         <ui:Label name="hud-dock-street-warning" text="Warning: no clear path from the street to this dock. Trucks still use it." class="hud-note hud-dock__warning ff-wrap" picking-mode="Ignore" />
+        <ui:Label name="hud-dock-back-door-mark" text="Not beside a back door. Trucks still use it; new docks go beside a back door." class="hud-note hud-dock__warning ff-wrap" picking-mode="Ignore" />
     </ui:VisualElement>
 </ui:UXML>

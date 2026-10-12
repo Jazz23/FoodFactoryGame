@@ -2,7 +2,8 @@
 // A lot's site grid covers exactly the lot, with site cell (0,0) at the lot's minimum world cell. The whole world grid is
 // axis-aligned, so the mapping is a translation only and the building keeps its offset from the lot's corner. A restaurant or
 // factory shell becomes the site's decision-0019 GoodsBuilding; farms and stations get no shell. Layouts without lots
-// (formats 1 and 2) list nothing.
+// (formats 1 and 2) list nothing. A format 4 restaurant also lists its back door and the starter dock that comes with it
+// (decision 0037).
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -35,8 +36,23 @@ namespace FoodFactoryGame.Goods
                 LotX = lot.X, LotZ = lot.Z, Width = lot.Width, Depth = lot.Depth, AccessX = lot.Access.X, AccessZ = lot.Access.Z,
                 BuildingX = building.X - lot.X, BuildingZ = building.Z - lot.Z, BuildingWidth = building.Width, BuildingDepth = building.Depth,
                 Doors = building.Doors.Select(x => new GridCell { X = x.X - lot.X, Z = x.Z - lot.Z }).ToList(),
+                BackDoors = building.BackDoor == null ? new List<GridCell>() : new List<GridCell> { new() { X = building.BackDoor.X - lot.X, Z = building.BackDoor.Z - lot.Z } },
+                HasDock = building.ServiceDock != null,
+                DockX = building.ServiceDock == null ? 0 : building.ServiceDock.X - lot.X,
+                DockZ = building.ServiceDock == null ? 0 : building.ServiceDock.Z - lot.Z,
+                DockRotation = DockRotation(building),
                 Floors = building.IsShell ? building.Floors : 1, PricePercent = pricePercent
             };
+        }
+
+        // The dock content is 2 x 1 along X at rotation 0 and faces +Z, its upright door frame on that side. The starter dock faces
+        // the shell (owner decision 2026-10-06), so the frame stands against the wall: a dock along Z is a quarter turn, and a
+        // dock on the high side of the shell is turned round.
+        private static int DockRotation(WorldBuilding building)
+        {
+            var dock = building.ServiceDock;
+            if (dock == null) return 0;
+            return dock.Depth > dock.Width ? (dock.X < building.X ? 1 : 3) : (dock.Z < building.Z ? 0 : 2);
         }
 
         public static SiteLayout SiteLayoutFor(WorldLot lot) => new() { SiteId = lot.SiteId, Width = lot.Width, Depth = lot.Depth };

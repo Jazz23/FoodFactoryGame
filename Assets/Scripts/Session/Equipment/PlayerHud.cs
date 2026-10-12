@@ -11,7 +11,8 @@
 // The site company's cash is shown top right, read from the latest baseline. Edible goods slots show the ambient time left
 // before their first lot spoils, frozen (blue) while refrigerated because refrigeration pauses spoilage (decision 0018), and
 // the hover line gives the full time; a machine with no recipes (the fridge) opens as plain storage, and a loading dock as its
-// outgoing and incoming grids (decision 0022). Inside a factory the inventory screen also offers its next floor (decision 0020).
+// outgoing and incoming grids (decision 0022), marked when a restaurant dock is not beside a back door (decision 0037, starting
+// loop). Inside a factory the inventory screen also offers its next floor (decision 0020).
 // A machine with a power switch (decision 0037, the oven) shows it under its grids; it bakes only while switched on.
 // Under the cash are the game clock and, when the company's cash is running short of its wages or employees are unpaid, a
 // warning whose threshold each player sets; the inventory screen has a Staff window to hire and fire (decision 0039).
@@ -32,7 +33,7 @@ using UnityEngine.UIElements;
 namespace FoodFactoryGame.Session.Equipment
 {
     [DisallowMultipleComponent]
-    public sealed class PlayerHud : MonoBehaviour
+    public sealed partial class PlayerHud : MonoBehaviour
     {
         public const string InventoryGrid = "inventory";
         public const string StorageGrid = "storage";
@@ -135,6 +136,7 @@ namespace FoodFactoryGame.Session.Equipment
             _alert = root.Part("hud-alert");
             _alertText = root.Part<Label>("hud-alert-text");
             _alertTime = root.Part<Label>("hud-alert-time");
+            CreateReadiness(root);
             _screenArea = root.Part("hud-screen-area");
             _screen = root.Part("hud-screen");
             _hotbar = root.Part("hud-hotbar");
@@ -172,6 +174,7 @@ namespace FoodFactoryGame.Session.Equipment
             }
             UpdateClock(active ? site : null);
             UpdateAlert(active ? site : null);
+            UpdateReadiness(site, active && hasCompany);
             UpdatePrompt(active);
             UpdateRemoveWheel(active);
             _statusColumn.Show(interaction.Screen != InteractionScreen.Build);
@@ -540,6 +543,9 @@ namespace FoodFactoryGame.Session.Equipment
             // The cursor stack stays on the pointer outside screens, so its count is shown there too.
             if (interaction.CursorGoods != null) text.Append('|').Append(interaction.CursorLots(_site).Sum(x => x.Quantity));
             if (interaction.Screen == InteractionScreen.None) return text.ToString();
+            // The ledger tab, and while it shows, each new entry (decision 0038).
+            text.Append("|ledger:").Append(_ledgerShown);
+            if (_ledgerShown) text.Append('/').Append(_site.Ledger.LastOrDefault()?.Id).Append('/').Append(_site.Companies.FirstOrDefault()?.Cash);
             var building = interaction.Buildings.LocalBuilding;
             text.Append('|').Append(building?.Id).Append(building?.Floors);
             foreach (var grid in _grids.OrderBy(x => x.Key, StringComparer.Ordinal))
@@ -637,6 +643,7 @@ namespace FoodFactoryGame.Session.Equipment
             _hoverLabel = null;
             _timers.Clear();
             _hovered = null;
+            _registerReadiness = null;
             var inventoryId = interaction.InventoryId;
             if (interaction.Screen is InteractionScreen.None or InteractionScreen.Employee or InteractionScreen.PickPosition or InteractionScreen.Logistics
                     or InteractionScreen.Build
@@ -663,7 +670,8 @@ namespace FoodFactoryGame.Session.Equipment
                 side.AddToClassList("hud-side");
                 var room = _screenArea.resolvedStyle.height;
                 if (room > 0f) side.style.maxHeight = room;
-                if (interaction.Session.Offers.Count > 0) side.Add(SupplierWindow());
+                // The Supplier and the company ledger (decision 0038) share a window, one tab each.
+                if (interaction.Session.Offers.Count > 0) side.Add(_ledgerShown ? LedgerWindow(site) : SupplierWindow());
                 if (site.Companies is { Count: > 0 })
                 {
                     var staff = StaffWindow(site);
@@ -684,6 +692,7 @@ namespace FoodFactoryGame.Session.Equipment
         private VisualElement SupplierWindow()
         {
             var window = Window("hud-supplier", "Supplier");
+            AddTabs(window);
             // Truck offers are bought on the logistics screen (decision 0023); restaurant furnishings in build mode (decision 0034).
             foreach (var offer in interaction.Session.Offers.Where(x => x != null && x.Truck == null && (x.Equipment == null || string.IsNullOrEmpty(x.Equipment.Category))))
             {
@@ -846,6 +855,7 @@ namespace FoodFactoryGame.Session.Equipment
             else window.Part("hud-recipe").RemoveFromHierarchy();
             if (equipment.Kind == GoodsWorld.CounterKind || interaction.IsWorkerBound(equipment.Kind)) FillRegister(window.Part("hud-staff"), site, equipment);
             else window.Part("hud-staff").RemoveFromHierarchy();
+            FillRegisterReadiness(window, equipment.Kind == GoodsWorld.CounterKind);
             if (HasPowerSwitch(equipment.Kind)) FillPower(window.Part("hud-power"), equipment);
             else window.Part("hud-power").RemoveFromHierarchy();
             return window;
@@ -951,6 +961,9 @@ namespace FoodFactoryGame.Session.Equipment
             var offer = lot == null ? null : SitePlacement.Active.OfferOf(lot.Id);
             var unreachable = offer != null && !RestaurantRules.IsRestaurantSite(site, equipment.SiteId) && !RestaurantRules.ReachesStreet(site, equipment, offer);
             if (!unreachable) window.Part("hud-dock-street-warning").RemoveFromHierarchy();
+            // A restaurant dock placed before back doors (decision 0037) keeps working where it stands; it is only marked.
+            if (!RestaurantRules.IsRestaurantSite(site, equipment.SiteId) || RestaurantRules.BesideBackDoor(site, equipment))
+                window.Part("hud-dock-back-door-mark").RemoveFromHierarchy();
             return window;
         }
 
@@ -1155,15 +1168,16 @@ namespace FoodFactoryGame.Session.Equipment
         }
 
         // Why customers at an idle counter wait (decision 0024), naming the first blocker: no edible menu item in this counter,
-        // or every table seat taken while a dine-in customer queues. Otherwise they are on their way to being served.
+        // or every table seat taken while a dine-in customer queues. Otherwise they are on their way to being served. With nobody
+        // waiting it says whether the input holds anything to sell (P0-05: it used to say "keep ... in the input" when it was empty).
         private static string WaitingText(GoodsSnapshot site, GoodsEquipment counter, List<RecipeAsset> menu, List<string> ingredients, int waiting)
         {
             var food = string.Join(" or ", ingredients);
-            if (waiting == 0) return $"No customers waiting; keep {food} in the input";
-            var who = $"{waiting} customer{(waiting == 1 ? "" : "s")} waiting";
             var items = new HashSet<string>(menu.SelectMany(x => x.Inputs).Select(x => x.itemId));
-            if (!site.Lots.Any(x => x.LocationId == counter.InputLocationId && !x.Spoiled && items.Contains(x.ItemId)))
-                return $"{who}: put edible {food} in the input";
+            var edible = site.Lots.Where(x => x.LocationId == counter.InputLocationId && !x.Spoiled && items.Contains(x.ItemId)).Sum(x => x.Quantity);
+            if (waiting == 0) return edible == 0 ? $"Nothing to sell: put edible {food} in the input" : $"No customers waiting; {edible} {food} ready to sell";
+            var who = $"{waiting} customer{(waiting == 1 ? "" : "s")} waiting";
+            if (edible == 0) return $"{who}: put edible {food} in the input";
             var tables = site.Equipment.Where(x => GoodsWorld.IsTable(x) && x.State == EquipmentState.Placed).ToList();
             var freeSeats = tables.Sum(x => x.Seats) - site.Customers.Count(x => tables.Any(y => y.Id == x.TableId));
             if (freeSeats <= 0 && site.Customers.Any(x => x.State == CustomerState.Queued && x.DineIn))

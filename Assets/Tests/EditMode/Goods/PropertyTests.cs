@@ -80,6 +80,9 @@ namespace FoodFactoryGame.Goods.Tests
             var loaded = GoodsSnapshotStore.Load(PathForSave).Snapshot();
             Assert.That(loaded.Revision, Is.EqualTo(outcome.Revision), "The site, ownership and payment commit at the order's revision.");
             Assert.That(loaded.Companies.Single().Cash, Is.EqualTo(StartCash - FactoryPrice));
+            var entry = loaded.Ledger.Single();
+            Assert.That((entry.Kind, entry.Cents, entry.SiteId, entry.RequestId, entry.OfferId),
+                Is.EqualTo((GoodsWorld.LedgerProperty, -(long)FactoryPrice, "home", "buy-factory", "lot-factory")), "The ledger entry names the paying site and the lot (decision 0038).");
             Assert.That(loaded.Companies.Single().SiteIds, Is.EqualTo(new[] { "home", "site-factory" }));
             var property = loaded.Properties.Single();
             Assert.That((property.LotId, property.SiteId, property.CompanyId), Is.EqualTo(("lot-factory", "site-factory", "company")));

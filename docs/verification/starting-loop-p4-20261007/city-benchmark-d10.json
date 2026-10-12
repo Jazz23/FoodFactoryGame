@@ -1,0 +1,52 @@
+﻿{
+  "success": true,
+  "command": "command run_tests",
+  "data": {
+    "command": "run_tests",
+    "parameters": {
+      "mode": "editor",
+      "filter": "FoodFactoryGame.Benchmarks.Tests.CityCustomerBenchmarkTests",
+      "filter_type": "testName"
+    },
+    "result": {
+      "Summary": {
+        "Total": 2,
+        "Passed": 2,
+        "Failed": 0,
+        "Skipped": 0,
+        "Inconclusive": 0
+      },
+      "Results": [
+        {
+          "FullName": "FoodFactoryGame.Benchmarks.Tests.CityCustomerBenchmarkTests.AGeneratedCityFitsAFrameAndCommitsUnderTheWarningSignals",
+          "Status": "Passed",
+          "Duration": 1.2996052,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Benchmarks.Tests.CityCustomerBenchmarkTests.CrowdViewsForEightConnectionsStayUnderTheirBudget",
+          "Status": "Passed",
+          "Duration": 0.8123454,
+          "Message": null,
+          "StackTrace": null
+        }
+      ],
+      "Duration": 5.17,
+      "StatusPath": null,
+      "Mode": "EditMode",
+      "FilterApplied": "testname: FoodFactoryGame.Benchmarks.Tests.CityCustomerBenchmarkTests",
+      "success": true,
+      "result": null
+    },
+    "target": {
+      "host": "127.0.0.1",
+      "port": 7800,
+      "projectPath": "E:\\Projects\\Unity\\FoodFactoryGame"
+    },
+    "success": true
+  },
+  "errors": [],
+  "warnings": []
+}
+

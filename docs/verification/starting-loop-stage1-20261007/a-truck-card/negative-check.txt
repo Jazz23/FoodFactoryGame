@@ -1,0 +1,5 @@
+Negative check (2026-10-07): LogisticsPanel temporarily restored to the old centring (position absolute, left/top 50%,
+translate -50% -50%), everything else unchanged. Filter FoodFactoryGame.Session.PlayModeTests.LogisticsPanelTests.TruckCardControlsTakeThePointerAfterTheWindowGrows
+(testName, playmode), 1 matched, 1 failed:
+  full width: '<' at (x:692.08, y:201.80, width:34.29, height:37.22) picks 'logistics-truck-buy:player-...' (x:604.90, y:117.55, width:330.12, height:174.37)
+The fix was then restored and the test passes (see the stage-1 record).

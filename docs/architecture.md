@@ -42,7 +42,7 @@ The existing demo prefab catalog remains baseline authoring only.
 
 - `FoodFactoryGame.Goods` holds server-instantiated stable-ID lots and locations, integer quantities, one location per lot, owner/site grants, binary spoilage, elapsed exposure, active reservations, terminal command outcomes, and an integer-second authoritative clock. Ambient time accumulates exposure; refrigerated time does not (confirmed by the owner in [decision 0018](decisions/0018-spoilage-timing-and-refrigeration.md)). Moves retain prior exposure. Equivalent lots merge only when owner, location, item, condition, and exposure/threshold match; reserved lots cannot merge.
 - `Transfer` validates a same-site route, grant, source owner, unreserved quantity or owned reservation, and destination unit capacity before locked mutation. A partial transfer splits with a new ID. Duplicate request IDs replay stored terminal outcomes; another actor cannot replay someone else's outcome. `Cancel` releases an unconsumed reservation; committed transfers are not reversible. No in-flight transport or cross-site route has been implemented.
-- `GoodsSnapshotStore` serializes (schema v4 since conveyor belts, below) world ID, time/revision, lots, locations, grants, reservations, and outcomes with a checksum. An explicit path is required; each commit is one SQLite transaction that keeps the previous committed revision as a fallback (see [SQLite storage](#implemented-sqlite-storage-2026-09-23)). Recovery validates invariants; unknown newer schemas fail. Concurrent saves reject older/conflicting revisions. Every acknowledged mutation has a durable boundary: `TransferDurably`, `ReserveDurably`, `CancelDurably`, and the clock tick `TryAdvanceDurably` commit the snapshot before acknowledging and restore the pre-command state if the commit fails. Terminal outcomes are keyed per actor (player ID + request ID), so one actor cannot claim or poison another actor’s request ID. This is a goods-slice snapshot, **not** the full-world decision-0002 persistence contract; no production snapshot cadence is implemented; the only migrations are the in-memory v1→…→v16 upgrades (v5: company cash; v6: sale jobs; v7: building shells; v8: factory floors; v9: employee records; v10-v15: lifts, trucks, routes, customers, properties, competitor lots; v16: restaurant building; all below). The current goods snapshot schema is **v18** (machine power switches and employee task lists, decision 0037, 2026-10-06; v17: free restaurant walls; v16: restaurant building).
+- `GoodsSnapshotStore` serializes (schema v4 since conveyor belts, below) world ID, time/revision, lots, locations, grants, reservations, and outcomes with a checksum. An explicit path is required; each commit is one SQLite transaction that keeps the previous committed revision as a fallback (see [SQLite storage](#implemented-sqlite-storage-2026-09-23)). Recovery validates invariants; unknown newer schemas fail. Concurrent saves reject older/conflicting revisions. Every acknowledged mutation has a durable boundary: `TransferDurably`, `ReserveDurably`, `CancelDurably`, and the clock tick `TryAdvanceDurably` commit the snapshot before acknowledging and restore the pre-command state if the commit fails. Terminal outcomes are keyed per actor (player ID + request ID), so one actor cannot claim or poison another actor’s request ID. This is a goods-slice snapshot, **not** the full-world decision-0002 persistence contract; no production snapshot cadence is implemented; the only migrations are the in-memory v1→…→v24 upgrades (v5: company cash; v6: sale jobs; v7: building shells; v8: factory floors; v9: employee records; v10-v15: lifts, trucks, routes, customers, properties, competitor lots; v16: restaurant building; v17: free walls; v18: machine power switches and employee task lists; v19: wages; v20: machine recipe settings; v21-v22: back doors; v23: cash ledger; v24: game-hour district rates; all below). The current goods snapshot schema is **v24** (the starting-loop branch's v18-v21 steps became v21-v24 when it merged into main on 2026-10-12, after main's v18-v20; saves written by that branch before the merge do not load correctly).
 - `GoodsNetworkBridge` is compiled FishNet RPC transport for connection-resolved transfer intent/result and server-validated, revisioned full site baselines. It ticks the same world even with zero subscribers. Its `InitializeServer` requires a pre-existing matching committed save and an authenticated connection-to-player resolver supplied by a session owner. It also exposes reserve/cancel RPCs through the durable paths and rejects requests while clock persistence is failing. An Editor PlayMode listen-server fixture (host + separate loopback-UDP remote client, test-owned bootstrap and connection→player map) has demonstrated an authorized transfer, an unauthorized remote transfer and subscription rejection, a granted site baseline, and unsubscribed site progression persisted to the snapshot. There is still no production session owner or authenticator, player build, client UI, pickup visuals, or multi-process multiplayer evidence. Full baselines (not deltas) are used to avoid a partial replication protocol.
 - EditMode tests with *test-only* restaurant/ingredient/storage/fridge/kitchen capacities and spoilage threshold verify domain and isolated file recovery without any camera or client. The PlayMode fixture above covers the live FishNet path within one Editor process; it does not prove pickup projections, real authentication, or separate-process play. See [verification record](verification/goods-20260922.md).
 
@@ -468,7 +468,8 @@ filter_type assembly; status JSON in the same folder): `FoodFactoryGame.World.Ed
 being the known nondeterministic `TruckTests.StepSizeDoesNotChangeTheOutcome` (GUID tie-break; it passed in the batch run
 and in 1 of 3 `TruckTests` reruns, `editor-trucks-1..3.json`). Not run: PlayMode and multiplayer suites (no networking changed).
 
-- Generator: `WorldGenerator.Version` = 3 (4 since 2026-10-02: larger restaurants, decision 0036), `WorldLayout.CurrentFormat` = 3. Every building that `HasLot` (restaurant and
+- Generator: `WorldGenerator.Version` = 3 (4 since 2026-10-02: larger restaurants, decision 0036; 5 since 2026-10-06: service yards,
+  decision 0037; 6 since 2026-10-07: game-hour district rates, decision 0039), `WorldLayout.CurrentFormat` = 3 (4 since decision 0037, 5 since decision 0039). Every building that `HasLot` (restaurant and
   factory shells, farms, stations; ownership ForSale, Competitor or Player) gets one `WorldLot { Id = lot-<building>,
   BuildingId, SiteId = site-<building>, X, Z, Width, Depth, Access }` and `WorldBuilding.SiteId` = the lot's site ID; scenery
   gets neither. A lot is the footprint extended forward to its street by `WorldSettings.SetbackFor(category)` (`Setback` 2 m;
@@ -870,6 +871,65 @@ Decision: [0043](decisions/0043-recipes-kitchen-stations-and-food-prices.md). Go
   worker-bound stations. Employee Lua gains `work(station, recipe)` and `set_recipe(machine, recipe)`; the visual task list gains
   Work at counter and Set machine recipe (`EmployeeTaskType.Work`, `Recipe`; `EmployeeTask.Recipe`).
 - Open: per-restaurant menu selection, farms as ingredient sources, more tier 3 dishes, and every PROTOTYPE number.
+
+## Implemented: back doors and the dock rule (2026-10-06)
+
+Merged from the starting-loop branch on 2026-10-12. Its schema numbers below are as recorded on that branch; on main they are v21 (back-door roles), v22 (free back doors), v23 (ledger) and v24 (game-hour rates). The branch's decisions 0037-0039 share numbers with main's 0037-0039 (different files). Main's wages are recorded in the ledger (`LedgerWage`) and count the same game hour (`GoodsWorld.GameHourSeconds` = `GameClock.HourSeconds`).
+
+Decision: [0037](decisions/0037-back-doors-and-the-dock-rule.md) (piece P1 of [the starting-loop plan](starting-loop-plan.md)).
+Goods snapshot schema **v18**; `WorldGenerator.Version` 5; layout format 4. Verification:
+[record](verification/back-door-20261006.md). Supersedes the restaurant dock rule of 0034/0035.
+
+- Implemented: door records carry a role (`GoodsStructure.Role`, back door = `service`); `ShellOrder.BackDoor`; the
+  `no-back-door` and `dock-attached` guards; restaurant docks must touch an open back-door doorstep (`not-beside-back-door`)
+  and reach the street; other object-layer pieces keep doorsteps clear (`doorstep`); customers treat back doors as walls and come
+  only from the street edge (`RestaurantRules.Walkable(customers: true)`, `StreetCells`).
+- Implemented: every generated restaurant lot has a service yard with a back door and a starter dock; new worlds get
+  `start-dock`, bought restaurants `dock:<site>` (free); the dev restaurant has a back door at (9, 4).
+- Implemented (presentation): build-mode Back door tool, dock-screen mark for docks placed before the rule, restaurant rules in
+  the placement ghost, customer figures never open or route through back doors.
+- Keep and mark: docks placed before v18 keep serving trucks where they stand; older worlds have no yard.
+- Implemented (owner answers, 2026-10-06; goods snapshot schema **v19**): a restaurant without a back door gets one free
+  (`GoodsWorld.AddBackDoor`) when a pre-v5 lot is bought and in the v18 to v19 save upgrade; belts and lifts stay off
+  back-door doorsteps (`RestaurantRules.BeltProblem`, `doorstep`), and a shell order may not give a back door a covered doorstep;
+  the last customer door stays (`SiteGrid.CustomerDoors`, `no-customer-door`); starter docks face their shell and build mode
+  turns a dock to put its door frame against a wall.
+- Not done: the "staff" sign art; independent visual review; a running-game capture of the dock orientation.
+
+## Implemented: cash ledger, readiness readout and the truck-card fix (2026-10-07)
+
+Decision: [0038](decisions/0038-cash-ledger-and-restaurant-readiness.md) (truck-card fix and P3 of
+[the starting-loop plan](starting-loop-plan.md)). Goods snapshot schema **v20**. Verification:
+[record](verification/starting-loop-stage1-20261007.md).
+
+- Implemented: `GoodsSnapshot.Ledger`, written only by `TryCredit`/`TryDebit` in the same commit as the cash change, for every
+  cash path (supplier goods, equipment and trucks, property, floors, build-mode buy-and-place, sell-back and shell orders,
+  customer and sale-job sales, adjustments). Rejected, replayed and failed requests write nothing. PROTOTYPE retention of 50
+  entries per company folds older entries into `LedgerCarriedCents`; `Validate` checks opening + carried + entries == cash. The
+  v19 to v20 upgrade is in memory (opening 0, carried = cash). `View` sends only the viewed site's company's entries.
+- Implemented (presentation): `RestaurantReadiness` on the client from the baseline, with rules shared with the customer
+  simulation (`RestaurantRules.CustomerReach`, `ServesCustomers`, `IsMenuItem`, `GoodsWorld.InputPlan`); the HUD line with no
+  screen open, the register screen line, the empty-register text and the Ledger tab on the inventory screen.
+- Superseded on merge: `CentredWindow.Overlay` (the P0-01 centring fix) was removed; main's UXML screens (decision 0042)
+  centre their windows. The readout and Ledger tab are UXML/USS parts of the HUD (`hud-readiness`,
+  `hud-register-readiness`, `hud-tabs`).
+- Not done: independent visual review; partial stack moves (P0-07, deferred).
+
+## Implemented: demand on the game hour and the start kit (2026-10-07)
+
+Decision: [0039](decisions/0039-demand-on-the-game-hour-and-start-kit.md) (P4 of [the starting-loop plan](starting-loop-plan.md)).
+Goods snapshot schema **v21**, layout format **5**, generator **v6**. Verification: [record](verification/starting-loop-p4-20261007.md).
+
+- Implemented: `GameClock` (World) is the one game hour (60 clock s) for road traffic and customer demand.
+  `GoodsDistrict.CustomersPerHour` counts customers per game hour. v20 saves upgrade in memory (rates through
+  `GameClock.FromClockHourRate`, divisor 10, progress scaled); format 4 and older layouts are read through
+  `WorldLayout.RatePerGameHour`, so older worlds derive the same district records. Stored layouts are never rewritten.
+- Implemented: a new generated world's company starts with $700 (PROTOTYPE) and players admitted to a generated world get 20
+  dough and nothing else; DevSite keeps the dev starter goods. Older worlds keep their cash.
+- Measured: first sale 120-174 s after a stocked, staffed register opens; 0.5-1.0 sales a real minute; about 800 customers
+  alive in the city (about 135 before). 0025 budgets hold at that size.
+- Planned / undecided: the first-customer target (about a minute) is limited by walking distance; options are with the owner.
+  Demand does not follow the time-of-day traffic curve.
 
 ## Baseline Test Evolution
 

@@ -63,6 +63,9 @@ namespace FoodFactoryGame.Goods.Tests
             Assert.That(Cash(), Is.EqualTo(750));
             var saved = GoodsSnapshotStore.Load(PathForSave).Snapshot();
             Assert.That((saved.Companies.Single().Cash, saved.Lots.Any(x => x.Id == outcome.MovedLotId)), Is.EqualTo((750L, true)), "Committed together.");
+            var entry = saved.Ledger.Single();
+            Assert.That((entry.Kind, entry.Cents, entry.SiteId, entry.RequestId, entry.OfferId), Is.EqualTo((GoodsWorld.LedgerSupplierGoods, -250L, "restaurant", "buy-1", "dough-5")),
+                "The ledger entry commits with the payment (decision 0038).");
         }
 
         [Test]
@@ -159,6 +162,9 @@ namespace FoodFactoryGame.Goods.Tests
             Assert.That(Cash(), Is.EqualTo(400));
             var saved = GoodsSnapshotStore.Load(PathForSave).Snapshot();
             Assert.That((saved.Companies.Single().Cash, saved.Equipment.Any(x => x.Id == outcome.EquipmentId)), Is.EqualTo((400L, true)), "Committed together.");
+            var entry = saved.Ledger.Single();
+            Assert.That((entry.Kind, entry.Cents, entry.RequestId, entry.EquipmentId, entry.OfferId),
+                Is.EqualTo((GoodsWorld.LedgerSupplierEquipment, -600L, "oven-1", outcome.EquipmentId, "oven")), "The ledger entry commits with the payment (decision 0038).");
 
             // The template is copied, not shared: a second machine is a separate piece with its own ID.
             Assert.That(_world.AdjustCashDurably("co", 600, PathForSave), Is.Null);

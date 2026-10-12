@@ -127,7 +127,7 @@ namespace FoodFactoryGame.Benchmarks.Tests
             var site = end.Sites.Single(x => x.Id == siteId);
             burstWorld.Bootstrap(new GoodsDistrict
             {
-                Id = "burst", Name = "Burst", MapX = site.MapX, MapZ = site.MapZ, CustomersPerHour = BurstCustomers * 3600, WealthPercent = 50,
+                Id = "burst", Name = "Burst", MapX = site.MapX, MapZ = site.MapZ, CustomersPerHour = BurstCustomers * GameClock.HourSeconds, WealthPercent = 50,
                 AppearanceVariants = 1, LikedCuisines = { "bakery" }, DineInPercent = 50, RangeMetres = 450
             });
             var burstCandidates = end.Competitors.Count(x => Math.Abs(x.MapX - site.MapX) + Math.Abs(x.MapZ - site.MapZ) <= 450) + 1;

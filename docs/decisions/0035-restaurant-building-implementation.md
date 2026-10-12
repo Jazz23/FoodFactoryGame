@@ -101,8 +101,10 @@ named constant or content asset (list below). Verification: [record](../verifica
 
 ## Owner decisions needed
 
-1. Should restoring a bought building's original walls be free (see Shell orders)?
+1. Should restoring a bought building's original walls be free (see Shell orders)? **Owner, 2026-10-07: no;** they are
+   charged like any wall (today's behaviour).
 2. Should equipment bought before v16 refund its offer price instead of 0?
 3. Should competitors have ambience, and should ambience change spend (GDD section 7 says "choice and spend")?
 4. Should wall finishes count toward ambience and cost money?
 5. Should a register serve only while its staff is near it (today staffing is an explicit command; position is not trusted)?
+   **Owner, 2026-10-07: no, for now;** staffing stays an explicit command.

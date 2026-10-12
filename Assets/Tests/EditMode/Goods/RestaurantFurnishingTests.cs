@@ -1,8 +1,9 @@
 // Verifies restaurant furnishing (decision 0034, slices 3-5): buy-and-place orders charge once for all pieces or change nothing;
 // selling refunds exactly what was charged and moves a piece's goods to the seller's inventory first; decor layers (floor, wall,
 // ceiling, tabletop) overlap only their own kind; a register sells only while staffed and reachable, and only reachable tables
-// give seats; ambience is one capped score per restaurant that customers weigh; restaurant docks need a path from the street
-// and serve one truck at a time while other sites' docks keep their old rules. Isolated saves only.
+// give seats; ambience is one capped score per restaurant that customers weigh; a restaurant dock (beside a back door, decision
+// 0037, whose rules BackDoorTests cover) serves one truck at a time while other sites' docks keep their old rules. Isolated saves
+// only.
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -98,6 +99,9 @@ namespace FoodFactoryGame.Goods.Tests
                 Is.EquivalentTo(new[] { "1", "2", "3" }.Select(n => $"{GoodsWorld.TableKind}-{n}")));
             Assert.That(_world.Snapshot().Equipment.Where(x => x.Kind == GoodsWorld.TableKind).Select(x => x.ChargedCents), Is.All.EqualTo(4000));
             Assert.That(Cash, Is.EqualTo(StartCash - 12000));
+            var entry = _world.Snapshot().Ledger.Last();
+            Assert.That((entry.Kind, entry.Cents, entry.RequestId, entry.EquipmentId, entry.OfferId),
+                Is.EqualTo((GoodsWorld.LedgerFurnish, -12000L, "tables", Placed("tables"), "table")), "One ledger entry for the order (decision 0038).");
 
             var before = JsonUtility.ToJson(_world.Snapshot());
             Assert.That(Furnish("overlap", "table", (4, 4, 0), (4, 4, 0)).Reason, Is.EqualTo("blocked"), "Pieces of one order see each other.");
@@ -142,6 +146,9 @@ namespace FoodFactoryGame.Goods.Tests
             Assert.That(state.Lots.Single(x => x.Id == "bread").LocationId, Is.EqualTo("carried:chef"), "The goods keep their ID and move to the seller.");
             Assert.That(state.Locations.Any(x => x.Id.StartsWith(register, StringComparison.Ordinal)), Is.False);
             Assert.That(Cash, Is.EqualTo(StartCash), "A full refund.");
+            var refund = state.Ledger.Last();
+            Assert.That((refund.Kind, refund.Cents, refund.RequestId, refund.EquipmentId), Is.EqualTo((GoodsWorld.LedgerSellBack, 5000L, "sell", register)),
+                "The refund's ledger entry (decision 0038).");
 
             // Goods that do not fit block the sale.
             Assert.That(Furnish("register-2", "register", (4, 4, 0)).Accepted, Is.True);
@@ -246,7 +253,7 @@ namespace FoodFactoryGame.Goods.Tests
                 world.Bootstrap(new GoodsCompetitor { Id = "rival", Name = "Rival", Cuisine = "bakery", Tier = 1, PriceCents = 250, Servers = 1, ServiceSeconds = 4, Seats = 4 });
                 world.Bootstrap(new GoodsDistrict
                 {
-                    Id = "d", Name = "D", MapZ = 10, CustomersPerHour = 3600, WealthPercent = 50, AppearanceVariants = 1, LikedCuisines = { "bakery" },
+                    Id = "d", Name = "D", MapZ = 10, CustomersPerHour = 60, WealthPercent = 50, AppearanceVariants = 1, LikedCuisines = { "bakery" },
                     DineInPercent = 0, RangeMetres = 100, SpawnProgress = 0
                 });
                 world.Advance(400);
@@ -258,17 +265,12 @@ namespace FoodFactoryGame.Goods.Tests
         }
 
         [Test]
-        public void RestaurantDocksNeedAStreetPathAndServeOneTruckAtATime()
+        public void RestaurantDocksServeOneTruckAtATime()
         {
-            // The dock inside the shell with the only door bricked up: no path from the street.
-            Assert.That(Furnish("dock-in", "dock", (4, 5, 0)).Accepted, Is.True);
-            Assert.That(_world.OrderShell("chef", "door-2", new ShellOrder { Kind = ShellOrder.Door, BuildingId = "shop", X = 9, Z = 4, Style = "panel" }).Accepted, Is.True);
-            Assert.That(_world.OrderShell("chef", "close", new ShellOrder { Kind = ShellOrder.Remove, BuildingId = "shop", Cells = { new GridCell { X = 9, Z = 4 } } }).Accepted,
+            // A back door on the east wall (doorstep (10, 4)) and a dock beside it (decision 0037; the rule itself is BackDoorTests').
+            Assert.That(_world.OrderShell("chef", "back", new ShellOrder { Kind = ShellOrder.BackDoor, BuildingId = "shop", X = 9, Z = 4, Style = "kitchen" }).Accepted,
                 Is.True);
-            var walled = new ShellOrder { Kind = ShellOrder.Partition, BuildingId = "shop", Style = "plaster", Cells = { new GridCell { X = 5, Z = 3 } } };
-            Assert.That(_world.OrderShell("chef", "wall", walled).Accepted, Is.True, "Seals the doorway's inward cell.");
-            Assert.That(Furnish("dock-sealed", "dock", (6, 4, 0)).Reason, Is.EqualTo("no-street-access"));
-            Assert.That(Furnish("dock-yard", "dock", (12, 9, 0), (12, 0, 0)).Accepted, Is.True, "Anywhere in the lot outside the shell.");
+            Assert.That(Furnish("dock-yard", "dock", (10, 5, 0)).Accepted, Is.True, "Beside the back door, reachable from the street.");
 
             // Two trucks on one route to the yard dock: one unloads, the other waits its turn.
             var world = _world;

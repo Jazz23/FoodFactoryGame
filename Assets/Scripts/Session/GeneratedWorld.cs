@@ -6,7 +6,7 @@
 // A world made before these existed gains each missing part once, by ID or by kind, committed before serving.
 // Nothing else is seeded: no storage, belts, machines, employees or warehouse. A save made in this scene before piece 2 (a
 // format 3 layout beside a dev-world snapshot, which never got its starting restaurant) is left untouched and not opened as a
-// generated world.
+// generated world. Since decision 0037 a new world's starting restaurant also has its back door and the dock beside it.
 using System.Collections.Generic;
 using System.Linq;
 using FoodFactoryGame.Goods;
@@ -18,13 +18,23 @@ namespace FoodFactoryGame.Session
 {
     public static class GeneratedWorld
     {
-        // PROTOTYPE starting capital of the one company every player joins (owner, 2026-09-29: $1,000,000), in whole cents.
         public const string CompanyId = "company-1";
-        public const long StartingCash = 100_000_000;
+        // PROTOTYPE starting capital of the one company every player joins, in whole cents (owner decision 9 of the starting-loop
+        // plan, 2026-10-07; decision 0039): about an oven, a fridge, a few tables and an hour of dough. Only a new world gets it;
+        // an older world keeps its cash (it was $1,000,000).
+        public const long StartingCash = 70_000;
+        // PROTOTYPE start kit of each player admitted to a generated world (decision 0039): dough for two full bakes, nothing else.
+        // DevSite keeps DevWorld.StarterGoods.
+        public const int StarterDough = 20;
+        public static IReadOnlyList<GoodsLot> StarterGoods => new[]
+        {
+            new GoodsLot { ItemId = DevWorld.DoughItemId, Quantity = StarterDough, SpoilAfterSeconds = DevWorld.DoughSpoilAfterSeconds }
+        };
         // Layout format that has lots (decision 0028); older formats keep the dev site beside the map.
         public const int FirstFormat = 3;
         public const string StartCounterId = "start-counter";
         public const string StartTableId = "start-table";
+        public const string StartDockId = "start-dock";
 
         public static bool Supports(StoredWorldLayout stored) => stored?.Layout != null && stored.Layout.FormatVersion >= FirstFormat;
 
@@ -41,7 +51,7 @@ namespace FoodFactoryGame.Session
         // (content) are registered before anything is counted in slots. Without a counter or table definition that piece is
         // not placed.
         public static GoodsWorld LoadOrCreate(string worldPath, StoredWorldLayout stored, IEnumerable<ItemDefinition> items = null,
-            EquipmentDefinition counter = null, EquipmentDefinition table = null)
+            EquipmentDefinition counter = null, EquipmentDefinition table = null, EquipmentDefinition dock = null)
         {
             if (!Supports(stored)) throw new System.ArgumentException("A generated world needs a layout with lots.");
             var start = StartOffer(stored.Layout);
@@ -73,6 +83,7 @@ namespace FoodFactoryGame.Session
             world.RegisterRoads(RoadNetwork.For(stored.Layout));
             world.Bootstrap(new GoodsCompany { Id = CompanyId, Cash = StartingCash });
             world.Bootstrap(start, CompanyId);
+            PlaceStartDock(world, start, dock);
             Equip(world, start, counter, table);
             AddCustomers(world, stored.Layout);
             GoodsSnapshotStore.Save(world, worldPath);
@@ -106,6 +117,16 @@ namespace FoodFactoryGame.Session
                 PlaceIn(world, start, table, StartTableId, TableCells(start), placedCounter);
         }
 
+        // A new world's starting restaurant comes with its dock beside the back door (decision 0037), placed before the counter and
+        // table so they keep clear of it. Only at creation: a world never gains it later, so a dock the owner sold stays sold, and a
+        // layout older than format 4 has none.
+        private static void PlaceStartDock(GoodsWorld world, PropertyOffer start, EquipmentDefinition dock)
+        {
+            if (dock == null || !start.HasDock) return;
+            try { world.Bootstrap(dock.CreatePlaced(StartDockId, start.SiteId, start.DockX, start.DockZ, start.DockRotation)); }
+            catch (System.ArgumentException) { Debug.LogWarning($"[Session] The starter dock does not fit at ({start.DockX}, {start.DockZ}); this world starts without it."); }
+        }
+
         // Interior bounds of the starting shell in site cells: (x0, z0, x1, z1), inclusive.
         private static (int X0, int Z0, int X1, int Z1) Interior(PropertyOffer start) =>
             (start.BuildingX + 1, start.BuildingZ + 1, start.BuildingX + start.BuildingWidth - 2, start.BuildingZ + start.BuildingDepth - 2);
@@ -135,8 +156,8 @@ namespace FoodFactoryGame.Session
         private static GoodsEquipment PlaceIn(GoodsWorld world, PropertyOffer start, EquipmentDefinition definition, string id,
             IEnumerable<(int X, int Z)> cells, GoodsEquipment avoid)
         {
-            // A door's inward neighbour stays clear so the way in is never blocked.
-            var inward = new HashSet<(int, int)>(start.Doors.Select(door => (
+            // A door's inward neighbour (front and back doors) stays clear so the way in is never blocked.
+            var inward = new HashSet<(int, int)>(start.Doors.Concat(start.BackDoors).Select(door => (
                 System.Math.Clamp(door.X, start.BuildingX + 1, start.BuildingX + start.BuildingWidth - 2),
                 System.Math.Clamp(door.Z, start.BuildingZ + 1, start.BuildingZ + start.BuildingDepth - 2))));
             foreach (var (x, z) in cells)

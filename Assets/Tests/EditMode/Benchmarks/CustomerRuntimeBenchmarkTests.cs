@@ -93,7 +93,7 @@ namespace FoodFactoryGame.Benchmarks.Tests
             for (var index = 0; index < 5; index++)
                 world.Bootstrap(new GoodsDistrict
                 {
-                    Id = $"district-{index}", Name = $"District {index}", MapX = index * 400, MapZ = 400, CustomersPerHour = 3000,
+                    Id = $"district-{index}", Name = $"District {index}", MapX = index * 400, MapZ = 400, CustomersPerHour = 50,
                     WealthPercent = 20 * index, AppearanceVariants = 4, LikedCuisines = { index % 2 == 0 ? "bakery" : "noodles" },
                     DineInPercent = 60, RangeMetres = 700
                 });
