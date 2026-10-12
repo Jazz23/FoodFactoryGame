@@ -55,6 +55,20 @@ namespace FoodFactoryGame.Session.Tests
         private GoodsWorld Open(StoredWorldLayout stored, bool equip = true) =>
             GeneratedWorld.LoadOrCreate(WorldPath, stored, SessionTestFiles.ContentItems(), equip ? Counter() : null, equip ? Table() : null);
 
+        // Starting-loop decision 28: a new world (generator v7) gets districts whose customers spawn on the street by the restaurant
+        // they chose; the same layout stamped as an older generator derives the whole walk, as a world made before did.
+        [Test]
+        public void ANewWorldsCustomersSpawnByTheStreet()
+        {
+            var stored = Layout();
+            Assert.That(stored.Layout.GeneratorVersion, Is.GreaterThanOrEqualTo(WorldLayoutCustomers.StreetSpawnGenerator));
+            Assert.That(Open(stored).Snapshot().Districts.Select(x => x.SpawnWalkMetres).Distinct(), Is.EqualTo(new[] { WorldLayoutCustomers.StreetSpawnMetres }));
+            Assert.That(WorldLayoutCustomers.StreetSpawnMetres / GoodsWorld.WalkMetresPerSecond, Is.LessThanOrEqualTo(10), "PROTOTYPE: well within a minute.");
+            var older = WorldLayoutText.Read(stored.Text);
+            older.GeneratorVersion = WorldLayoutCustomers.StreetSpawnGenerator - 1;
+            Assert.That(WorldLayoutCustomers.Districts(older).Select(x => x.SpawnWalkMetres).Distinct(), Is.EqualTo(new[] { 0 }));
+        }
+
         [Test]
         public void DistrictsAndCompetitorsDeriveDeterministicallyFromTheSeed()
         {

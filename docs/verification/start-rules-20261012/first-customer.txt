@@ -1,0 +1,13 @@
+First customer at a stocked, staffed starting register, 2026-10-12 19:14:42Z, Unity 6000.5.9f1; generator v7, street spawn 10 m, walk 2 m/s, game hour 60 clock s; 1 s steps; target: mean first arrival at most 120 s
+seed | opened at | districts in range (per game hour) | first decision | first arrival | first sale
+piece-two | 0 s | 6 (22) | 90 s | 95 s | 95 s
+piece-two | 60 s | 6 (22) | 45 s | 50 s | 50 s
+piece-two | 120 s | 6 (22) | 216 s | 221 s | 221 s
+piece-two | 180 s | 6 (22) | 24 s | 29 s | 29 s
+piece-two | 240 s | 6 (22) | 105 s | 110 s | 110 s
+p0-second | 0 s | 5 (59) | 12 s | 17 s | 17 s
+p0-second | 60 s | 5 (59) | 45 s | 50 s | 50 s
+p0-second | 120 s | 5 (59) | 167 s | 172 s | 172 s
+p0-second | 180 s | 5 (59) | 80 s | 85 s | 85 s
+p0-second | 240 s | 5 (59) | 56 s | 61 s | 61 s
+mean 89 s, median 73 s, min 17 s, max 221 s, 4 of 10 under 60 s

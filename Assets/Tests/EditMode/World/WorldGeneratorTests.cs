@@ -2,8 +2,9 @@
 // hash, so an output change without a new generator version fails), validation holds across many seeds, districts sit where
 // GDD section 3 puts them, v2 worlds have land relief, a bridged river, level crossings, junction controls, trees and denser
 // blocks, every property has exactly one lot with a reserved site ID (v3, decision 0028), format 1 and 2 layouts still read
-// and write unchanged, retries use derived seeds and are reported, the validator catches broken layouts and lots, and every
-// generated shell's lot is a valid decision-0019 building site.
+// and write unchanged, retries use derived seeds and are reported, the validator catches broken layouts and lots, every
+// generated shell's lot is a valid decision-0019 building site, and (generator v7, starting-loop decision 19) the start stands in
+// a district where bread sells, enforced by the validator, with every layout otherwise v6's.
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,9 +16,10 @@ namespace FoodFactoryGame.World.Tests
     public sealed class WorldGeneratorTests
     {
         private const ulong KnownSeed = 20260927;
-        // WorldLayoutText.Hash of generator v6's layout for KnownSeed (v1's was c8aed6b7…4269, v2's 6e12b0fd…b598, the pin before v5
-        // 5667d34e…47ec, v5's d0a58a01…8d7f). Changing it requires bumping WorldGenerator.Version.
-        private const string KnownHash = "75040b43e7bb5f33b7d01c5d70c59049bd0aaa760ebc495d581fb7e412bd4855";
+        // WorldLayoutText.Hash of generator v7's layout for KnownSeed (v1's was c8aed6b7…4269, v2's 6e12b0fd…b598, the pin before v5
+        // 5667d34e…47ec, v5's d0a58a01…8d7f, v6's 75040b43…4855). Changing it requires bumping WorldGenerator.Version.
+        private const string KnownHash = "34c8eeee803edecf8e19c56875905ee12fcaad51df1011ad96625c15f9bfeefc";
+        private const string KnownHashV6 = "75040b43e7bb5f33b7d01c5d70c59049bd0aaa760ebc495d581fb7e412bd4855";
         private const string KnownHashV5 = "d0a58a011d03fa053ddb5e3df9726dd67115863b6289e56dbdd8bd2f82768d7f";
         private const int SeedCount = 120;
 
@@ -29,7 +31,7 @@ namespace FoodFactoryGame.World.Tests
             var first = WorldLayoutText.Write(Generate(KnownSeed));
             var second = WorldLayoutText.Write(Generate(KnownSeed));
             Assert.That(second, Is.EqualTo(first));
-            Assert.That(first, Does.StartWith("food-factory-world-layout 5\ngenerator 6\n").And.Contains("\nlot lot-").And.Contains("\nservice restaurant-"),
+            Assert.That(first, Does.StartWith("food-factory-world-layout 5\ngenerator 7\n").And.Contains("\nlot lot-").And.Contains("\nservice restaurant-"),
                 "the same lots, service yards and IDs, in format 5");
             TestContext.WriteLine($"seed {KnownSeed}: sha256 {WorldLayoutText.Hash(first)}, {first.Length} chars");
             Assert.That(WorldLayoutText.Hash(first), Is.EqualTo(KnownHash), "Generator output changed: bump WorldGenerator.Version and re-pin.");
@@ -45,6 +47,58 @@ namespace FoodFactoryGame.World.Tests
             layout.GeneratorVersion = 5;
             foreach (var district in layout.Districts) district.CustomersPerHour *= GameClock.RetuneDivisor;
             Assert.That(WorldLayoutText.Hash(WorldLayoutText.Write(layout)), Is.EqualTo(KnownHashV5));
+        }
+
+        // Starting-loop decision 19: generator v7 only adds the rule that the start stands where bread sells. With the default
+        // settings it already did, so a v7 layout written back as v6 is byte for byte v6's, for the pinned seed and both P0 seeds.
+        [Test]
+        public void GeneratorV7IsV6WithTheStartTierRule()
+        {
+            var layout = Generate(KnownSeed);
+            layout.GeneratorVersion = 6;
+            Assert.That(WorldLayoutText.Hash(WorldLayoutText.Write(layout)), Is.EqualTo(KnownHashV6));
+            foreach (var text in new[] { "piece-two", "p0-second" })
+            {
+                var (requested, seed) = WorldSeed.Resolve(text);
+                var v7 = WorldGenerator.Generate(requested, seed).Layout;
+                var v6 = WorldLayoutText.Write(v7).Replace("\ngenerator 7\n", "\ngenerator 6\n");
+                v7.GeneratorVersion = 6;
+                Assert.That(WorldLayoutText.Write(v7), Is.EqualTo(v6), $"seed {text}: only the version line differs");
+            }
+        }
+
+        // Decision 19 on both P0 seeds: the starting restaurant's layout district has minimum recipe tier 1, and the customer district
+        // of the block it stands in buys tier 1 food (GoodsWorld.MinTier from wealth, decision 0043), so bread sells there.
+        [TestCase("piece-two")]
+        [TestCase("p0-second")]
+        public void TheStartStandsInADistrictWhereBreadSells(string text)
+        {
+            var (requested, seed) = WorldSeed.Resolve(text);
+            var layout = WorldGenerator.Generate(requested, seed).Layout;
+            var start = layout.Buildings.Single(x => x.Id == layout.StartRestaurantId);
+            Assert.That(layout.Districts.Single(x => x.Id == start.DistrictId).MinRecipeTier, Is.EqualTo(1));
+            var access = layout.Lots.Single(x => x.BuildingId == start.Id).Access;
+            var blocks = layout.Districts.SelectMany(d => d.Areas.Select((area, block) => (Id: WorldLayoutCustomers.DistrictId(d, block), Area: area)))
+                .Where(x => access.X >= x.Area.X && access.X < x.Area.X + x.Area.Width && access.Z >= x.Area.Z && access.Z < x.Area.Z + x.Area.Depth)
+                .Select(x => x.Id).ToList();
+            var home = WorldLayoutCustomers.Districts(layout).Where(x => blocks.Contains(x.Id)).ToList();
+            Assert.That(home, Is.Not.Empty, "the start stands in a district block");
+            Assert.That(home.Select(GoodsWorld.MinTier), Is.All.EqualTo(1));
+        }
+
+        // Decision 19 is enforced, not luck: with no district of minimum tier 1 for the start, no layout is accepted.
+        [Test]
+        public void NoStartWhereBreadDoesNotSell()
+        {
+            var settings = WorldSettings.Default;
+            settings.Profile(DistrictKind.Residential).MinRecipeTier = 2;
+            settings.MaxAttempts = 2;
+            var failure = Assert.Throws<WorldGenerationException>(() => WorldGenerator.Generate("tier", 7, settings));
+            Assert.That(failure.Attempts.SelectMany(x => x.Problems), Has.Some.StartWith("start: no starting restaurant"));
+
+            var layout = Generate(KnownSeed);
+            layout.Districts.Single(x => x.Id == layout.Buildings.Single(b => b.Id == layout.StartRestaurantId).DistrictId).MinRecipeTier = 2;
+            Assert.That(WorldLayoutValidator.Validate(layout), Has.Member("start: its district's minimum recipe tier must be 1"));
         }
 
         [Test]

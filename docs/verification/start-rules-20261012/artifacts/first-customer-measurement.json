@@ -1,0 +1,44 @@
+{
+  "success": true,
+  "command": "command run_tests",
+  "data": {
+    "command": "run_tests",
+    "parameters": {
+      "mode": "editor",
+      "filter": "FoodFactoryGame.Session.Tests.StartingLoopFirstCustomerMeasurement.TheFirstCustomerComesInAboutOneToTwoMinutes",
+      "filter_type": "testName"
+    },
+    "result": {
+      "Summary": {
+        "Total": 1,
+        "Passed": 1,
+        "Failed": 0,
+        "Skipped": 0,
+        "Inconclusive": 0
+      },
+      "Results": [
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.StartingLoopFirstCustomerMeasurement.TheFirstCustomerComesInAboutOneToTwoMinutes",
+          "Status": "Passed",
+          "Duration": 9.3454784,
+          "Message": null,
+          "StackTrace": null
+        }
+      ],
+      "Duration": 11.83,
+      "StatusPath": null,
+      "Mode": "EditMode",
+      "FilterApplied": "testname: FoodFactoryGame.Session.Tests.StartingLoopFirstCustomerMeasurement.TheFirstCustomerComesInAboutOneToTwoMinutes",
+      "success": true,
+      "result": null
+    },
+    "target": {
+      "host": "127.0.0.1",
+      "port": 7800,
+      "projectPath": "E:\\Projects\\Unity\\FoodFactoryGame"
+    },
+    "success": true
+  },
+  "errors": [],
+  "warnings": []
+}

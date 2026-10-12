@@ -98,6 +98,46 @@ namespace FoodFactoryGame.Goods.Tests
             return JsonUtility.ToJson(state);
         }
 
+        // Starting-loop decision 28: a district with a street spawn sends its customers from the street by the restaurant they chose
+        // (a 10 m, 5 s walk); one without walks the whole 300 m (150 s) as before. Range is still measured from the district.
+        [Test]
+        public void AStreetSpawnShortensOnlyTheWalk()
+        {
+            Stock("bread-1", 5);
+            GoodsDistrict Far(string id, int range, int spawnWalk)
+            {
+                var district = District(mapZ: 300, range: range);
+                district.Id = id;
+                district.SpawnWalkMetres = spawnWalk;
+                return district;
+            }
+            _world.Bootstrap(Far("street", 400, 10));
+            _world.Bootstrap(Far("block", 400, 0));
+            _world.Bootstrap(Far("beyond", 299, 10));
+            Assert.Throws<ArgumentException>(() => _world.Bootstrap(Far("negative", 400, -1)), "A negative spawn walk is invalid.");
+
+            var walks = new System.Collections.Generic.Dictionary<string, long>();
+            var arrived = false;
+            for (var second = 0; second < 30; second++)
+            {
+                _world.Advance(1);
+                foreach (var customer in _world.Snapshot().Customers)
+                {
+                    if (customer.State == CustomerState.Travelling) walks.TryAdd(customer.Id, customer.RemainingSeconds);
+                    else if (customer.DistrictId == "street") arrived = true;
+                }
+            }
+            var street = walks.Where(x => x.Key.StartsWith("customer:street:")).Select(x => x.Value).ToList();
+            var block = walks.Where(x => x.Key.StartsWith("customer:block:")).Select(x => x.Value).ToList();
+            Assert.That(street, Is.Not.Empty.And.All.EqualTo(10 / GoodsWorld.WalkMetresPerSecond), "Seen first in the second they chose.");
+            Assert.That(block, Is.Not.Empty.And.All.EqualTo(300 / GoodsWorld.WalkMetresPerSecond));
+            Assert.That(arrived, Is.True, "A street customer reached the restaurant within 30 s.");
+            Assert.That(_world.Snapshot().Customers.Where(x => x.DistrictId == "beyond"), Is.Empty, "Out of range from its district: never chosen.");
+            Assert.That((GoodsWorld.WalkMetres(Far("a", 400, 10), 4), GoodsWorld.WalkMetres(Far("b", 400, 0), 4)), Is.EqualTo((4, 4)),
+                "A restaurant nearer than the street spawn is walked to directly.");
+            Assert.DoesNotThrow(() => GoodsWorld.Validate(_world.Snapshot()));
+        }
+
         [Test]
         public void DistrictSpawnsAtItsRateAndCustomersOnlyChooseRestaurantsInRange()
         {

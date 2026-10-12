@@ -1,12 +1,13 @@
 /* The logistics screen (decisions 0022, 0023) in the shared look: routes, trucks and other sites in three columns of cards.
    Shared pieces come from Theme.uss. */
 
-.logi { padding: 18px 20px 14px 20px; max-height: 90%; }
+.logi { padding: 18px 20px 14px 20px; max-width: 100%; max-height: 90%; }
 .logi__header { margin-bottom: 8px; }
 .logi__scroll { flex-shrink: 1; }
 .logi__columns { align-items: flex-start; }
-.logi__column { width: 330px; }
-.logi__column--routes { width: 430px; }
+/* A column narrows (to a floor) on a narrow screen instead of pushing the window past its edge. */
+.logi__column { flex-basis: 330px; flex-shrink: 1; min-width: 200px; }
+.logi__column--routes { flex-basis: 430px; }
 .logi__column--gap { margin-left: 14px; }
 .logi__heading { margin-bottom: 2px; }
 .logi__empty { margin-top: 6px; font-size: 12px; color: var(--ff-muted); white-space: normal; }
@@ -19,10 +20,14 @@
 .logi-card__delete { margin-left: 6px; }
 
 .logi-chooser { margin-top: 3px; }
-.logi-chooser__caption { width: 70px; }
-.logi-chooser__step { width: 26px; height: 26px; }
-.logi-chooser__value { width: 200px; font-size: 12px; -unity-text-align: middle-center; }
-.logi-chooser--narrow .logi-chooser__value { width: 170px; }
+/* The value gives up width (and elides) before the caption and arrows do, so both arrows stay inside the card. */
+.logi-chooser__caption { width: 70px; flex-shrink: 0; }
+.logi-chooser__step { width: 26px; height: 26px; flex-shrink: 0; }
+.logi-chooser__value {
+    flex-basis: 200px; flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+    font-size: 12px; -unity-text-align: middle-center;
+}
+.logi-chooser--narrow .logi-chooser__value { flex-basis: 170px; }
 
 .logi-stock__heading { margin-top: 6px; font-size: 12px; -unity-font-style: bold; color: var(--ff-text-soft); }
 .logi-stock { margin-top: 2px; }

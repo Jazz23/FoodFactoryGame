@@ -1,0 +1,296 @@
+{
+  "success": true,
+  "command": "command run_tests",
+  "data": {
+    "command": "run_tests",
+    "parameters": {
+      "mode": "editor",
+      "filter": "FoodFactoryGame.World.EditModeTests",
+      "filter_type": "assembly"
+    },
+    "result": {
+      "Summary": {
+        "Total": 37,
+        "Passed": 37,
+        "Failed": 0,
+        "Skipped": 0,
+        "Inconclusive": 0
+      },
+      "Results": [
+        {
+          "FullName": "FoodFactoryGame.World.Tests.GameClockTests.AFormat4LayoutReadsItsRatesAsReTunedGameHourRates",
+          "Status": "Passed",
+          "Duration": 0.3500212,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.World.Tests.GameClockTests.OldClockHourRatesAreReTunedHalfUp",
+          "Status": "Passed",
+          "Duration": 0.0003044,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.World.Tests.GameClockTests.TheDefaultDistrictRatesAreGeneratorV5RatesReTuned",
+          "Status": "Passed",
+          "Duration": 0.0010021,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.World.Tests.GameClockTests.TrafficCountsTheGameHour",
+          "Status": "Passed",
+          "Duration": 0.0011064,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.World.Tests.RoadNetworkTests.AccessCellsLocateTheNearestCentreline",
+          "Status": "Passed",
+          "Duration": 0.0032719,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.World.Tests.RoadNetworkTests.ACostlySegmentIsDrivenAround",
+          "Status": "Passed",
+          "Duration": 0.0052171,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.World.Tests.RoadNetworkTests.GeneratedRoutesAreContiguousAndCrossTheRiverOnBridges",
+          "Status": "Passed",
+          "Duration": 0.1761607,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.World.Tests.RoadNetworkTests.LoadSlowsSegmentsAndFullSegmentsRefuseTrucks",
+          "Status": "Passed",
+          "Duration": 0.0011569,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.World.Tests.RoadNetworkTests.TheQuickestRoutePrefersTheArterialAndIsStable",
+          "Status": "Passed",
+          "Duration": 0.0015584,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.World.Tests.RoadNetworkTests.TrafficLightsAlternateByAxis",
+          "Status": "Passed",
+          "Duration": 0.0011866,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.World.Tests.WorldGeneratorTests.AFailedAttemptRetriesWithADerivedSeedAndIsReported",
+          "Status": "Passed",
+          "Duration": 1.5546072,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.World.Tests.WorldGeneratorTests.AFormatOneLayoutStillReadsAndWritesUnchanged",
+          "Status": "Passed",
+          "Duration": 0.0048475,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.World.Tests.WorldGeneratorTests.AFormatTwoLayoutHasNoLotsAndRoundTrips",
+          "Status": "Passed",
+          "Duration": 0.4764493,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.World.Tests.WorldGeneratorTests.DifferentSeedsProduceDifferentLayouts",
+          "Status": "Passed",
+          "Duration": 0.3379687,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.World.Tests.WorldGeneratorTests.DistrictsArePlacedAsTheDesignSays",
+          "Status": "Passed",
+          "Duration": 5.2710469,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.World.Tests.WorldGeneratorTests.EveryGeneratedShellsLotIsAValidBuildingSite",
+          "Status": "Passed",
+          "Duration": 0.1563526,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.World.Tests.WorldGeneratorTests.GeneratorV6IsV5WithGameHourRates",
+          "Status": "Passed",
+          "Duration": 0.1314113,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.World.Tests.WorldGeneratorTests.GeneratorV7IsV6WithTheStartTierRule",
+          "Status": "Passed",
+          "Duration": 0.525606,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.World.Tests.WorldGeneratorTests.LandHeightIsTheSameAfterAQuarterTurn",
+          "Status": "Passed",
+          "Duration": 0.1965016,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.World.Tests.WorldGeneratorTests.LayoutTextRoundTrips",
+          "Status": "Passed",
+          "Duration": 0.3429329,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.World.Tests.WorldGeneratorTests.NoStartWhereBreadDoesNotSell",
+          "Status": "Passed",
+          "Duration": 0.5370624,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.World.Tests.WorldGeneratorTests.SameSeedProducesAnIdenticalLayout",
+          "Status": "Passed",
+          "Duration": 0.353408,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.World.Tests.WorldGeneratorTests.SeedTextIsRepeatable",
+          "Status": "Passed",
+          "Duration": 0.0007263,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.World.Tests.WorldGeneratorTests.StopSignsStopTheMinorRoadOrEveryApproach",
+          "Status": "Passed",
+          "Duration": 0.0007221,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.World.Tests.WorldGeneratorTests.TheStartStandsInADistrictWhereBreadSells(\"piece-two\")",
+          "Status": "Passed",
+          "Duration": 0.1526894,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.World.Tests.WorldGeneratorTests.TheStartStandsInADistrictWhereBreadSells(\"p0-second\")",
+          "Status": "Passed",
+          "Duration": 0.1305418,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.World.Tests.WorldGeneratorTests.TheValidatorReportsBrokenLandRiversCrossingsJunctionsAndTrees",
+          "Status": "Passed",
+          "Duration": 1.9923286,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.World.Tests.WorldGeneratorTests.TheValidatorReportsBrokenLayouts",
+          "Status": "Passed",
+          "Duration": 1.8369266,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.World.Tests.WorldGeneratorTests.TheValidatorReportsBrokenLots",
+          "Status": "Passed",
+          "Duration": 2.3343525,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.World.Tests.WorldGeneratorTests.TheValidatorReportsBrokenServiceYards",
+          "Status": "Passed",
+          "Duration": 1.3455344,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.World.Tests.WorldGeneratorTests.ValidationPassesAcrossManySeeds",
+          "Status": "Passed",
+          "Duration": 21.7434061,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.World.Tests.WorldGeneratorTests.WorldsHaveLandRiverBridgesCrossingsJunctionsAndTrees",
+          "Status": "Passed",
+          "Duration": 2.3623908,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.World.Tests.WorldLayoutStoreTests.ADamagedLayoutIsRefusedAndNotRegenerated",
+          "Status": "Passed",
+          "Duration": 0.2864374,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.World.Tests.WorldLayoutStoreTests.ALayoutIsWrittenOnceAndNeverReplaced",
+          "Status": "Passed",
+          "Duration": 0.476758,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.World.Tests.WorldLayoutStoreTests.AnExistingWorldCannotGainALayout",
+          "Status": "Passed",
+          "Duration": 0.1804647,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.World.Tests.WorldLayoutStoreTests.AnOldSaveLoadsUnchangedWithNoLayout",
+          "Status": "Passed",
+          "Duration": 0.2023428,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.World.Tests.WorldLayoutStoreTests.AStoredLayoutReloadsExactlyAlongsideTheWorld",
+          "Status": "Passed",
+          "Duration": 0.3218649,
+          "Message": null,
+          "StackTrace": null
+        }
+      ],
+      "Duration": 45.05,
+      "StatusPath": null,
+      "Mode": "EditMode",
+      "FilterApplied": "assembly: FoodFactoryGame.World.EditModeTests",
+      "success": true,
+      "result": null
+    },
+    "target": {
+      "host": "127.0.0.1",
+      "port": 7800,
+      "projectPath": "E:\\Projects\\Unity\\FoodFactoryGame"
+    },
+    "success": true
+  },
+  "errors": [],
+  "warnings": []
+}

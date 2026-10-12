@@ -1,0 +1,1066 @@
+{
+  "success": true,
+  "command": "command run_tests",
+  "data": {
+    "command": "run_tests",
+    "parameters": {
+      "mode": "editor",
+      "filter": "FoodFactoryGame.Session.EditModeTests",
+      "filter_type": "assembly"
+    },
+    "result": {
+      "Summary": {
+        "Total": 147,
+        "Passed": 144,
+        "Failed": 0,
+        "Skipped": 3,
+        "Inconclusive": 0
+      },
+      "Results": [
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.ClientSettingsTests.EveryRebindableRowHasAPrimaryAndAnEmptyOrKeyedAlternate",
+          "Status": "Passed",
+          "Duration": 0.0502656,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.ClientSettingsTests.LoadingWithoutADatabaseGivesDefaultsAndCreatesNothing",
+          "Status": "Passed",
+          "Duration": 0.0025663,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.ClientSettingsTests.SavedSettingsRoundTrip",
+          "Status": "Passed",
+          "Duration": 0.0373386,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.ClientSettingsTests.SavingAgainReplacesValuesAndClampsSensitivity",
+          "Status": "Passed",
+          "Duration": 0.0115558,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.ClientSettingsTests.SettingsSwitchNamesTheSettingsDatabase",
+          "Status": "Passed",
+          "Duration": 0.0025191,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.CompetitorFrontageTests.EveryCompetitorsFiguresStandOnItsApronOrItsStreet",
+          "Status": "Passed",
+          "Duration": 0.4473815,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.DevWorldBuildingTests.NewWorldHasTheRestaurantShellClearOfTheSeedAndTheSpawnPoints",
+          "Status": "Passed",
+          "Duration": 0.1043969,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.DevWorldBuildingTests.OlderSaveGainsTheShellOnce",
+          "Status": "Passed",
+          "Duration": 0.0820076,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.DevWorldBuildingTests.OlderSaveWithSomethingOnTheFactoryWallsGetsOnlyTheRestaurant",
+          "Status": "Passed",
+          "Duration": 0.0616049,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.DevWorldBuildingTests.OlderSaveWithSomethingOnTheWallsIsLeftWithoutAShell",
+          "Status": "Passed",
+          "Duration": 0.0611902,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.DevWorldCompanyTests.NewWorldStartsWithTheDevCompany",
+          "Status": "Passed",
+          "Duration": 0.028709,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.DevWorldCompanyTests.OlderSaveGainsTheDevCompanyExactlyOnce",
+          "Status": "Passed",
+          "Duration": 0.0837395,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.DevWorldCounterTests.NewWorldHasThePlacedCounterAndCustomersBuyThereForTheDevCompany",
+          "Status": "Passed",
+          "Duration": 0.3810011,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.DevWorldCounterTests.OlderSaveGainsTheCounterOnceAndAHeldCounterIsNeverReplaced",
+          "Status": "Passed",
+          "Duration": 0.0560929,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.DevWorldCustomersTests.NewWorldHasTheDistrictCompetitorsAndPlacedTable",
+          "Status": "Passed",
+          "Duration": 0.0188903,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.DevWorldCustomersTests.OlderSaveGainsCustomersOnceAndAHeldTableIsNeverReplaced",
+          "Status": "Passed",
+          "Duration": 0.0699925,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.DevWorldLogisticsTests.AdmissionGrantsTheWarehouseWithoutAnInventoryThere",
+          "Status": "Passed",
+          "Duration": 0.0525908,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.DevWorldLogisticsTests.NewWorldTruckDeliversWarehouseDoughToTheRestaurantDock",
+          "Status": "Passed",
+          "Duration": 0.0537649,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.DevWorldLogisticsTests.OlderSaveGainsTheLogisticsOnce",
+          "Status": "Passed",
+          "Duration": 0.0426483,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.DevWorldLogisticsTests.SavedWarehouseAtAnOlderPositionFollowsTheSeedMap",
+          "Status": "Passed",
+          "Duration": 0.0478386,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.EmployeeScriptTests.BlockingCallSuspendsUntilItsOperationFinishes",
+          "Status": "Passed",
+          "Duration": 0.0643991,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.EmployeeScriptTests.HelpersAreHiddenFromScripts",
+          "Status": "Passed",
+          "Duration": 0.0022583,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.EmployeeScriptTests.OverlongSourceIsRefused",
+          "Status": "Passed",
+          "Duration": 0.0010539,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.EmployeeScriptTests.RunawayLoopYieldsEachStep",
+          "Status": "Passed",
+          "Duration": 0.0037728,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.EmployeeScriptTests.RuntimeErrorFailsTheScript",
+          "Status": "Passed",
+          "Duration": 0.003245,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.EmployeeScriptTests.SandboxHasNoFileOrProcessAccess",
+          "Status": "Passed",
+          "Duration": 0.0017449,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.EmployeeScriptTests.SyntaxErrorThrowsWithTheLine",
+          "Status": "Passed",
+          "Duration": 0.0015899,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.EmployeeTaskTests.GeneratedLuaRunsAgainstTheApiStandIns",
+          "Status": "Passed",
+          "Duration": 0.0161767,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.EmployeeTaskTests.SameListSameTextAndJsonRoundTrips",
+          "Status": "Passed",
+          "Duration": 0.0028026,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.EmployeeTaskTests.UnfinishedTasksAreCommentsAndTextIsQuoted",
+          "Status": "Passed",
+          "Duration": 0.0189262,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.GeneratedWorldCustomersTests.ACustomerFromTheMapBuysAtTheStartingCounter",
+          "Status": "Passed",
+          "Duration": 0.4937385,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.GeneratedWorldCustomersTests.ANewWorldGetsThemOnceWithTheStartingCounterAndTableInside",
+          "Status": "Passed",
+          "Duration": 0.5343809,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.GeneratedWorldCustomersTests.ANewWorldsCustomersSpawnByTheStreet",
+          "Status": "Passed",
+          "Duration": 0.4766842,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.GeneratedWorldCustomersTests.ANewWorldStartsWithItsBackDoorAndTheDockBesideIt",
+          "Status": "Passed",
+          "Duration": 0.5932427,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.GeneratedWorldCustomersTests.APieceTwoWorldGainsThemOnceAndIsUnchangedOnTheNextLoad",
+          "Status": "Passed",
+          "Duration": 0.742849,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.GeneratedWorldCustomersTests.DevWorldsKeepTheirOwnDistrictAndUnlinkedCompetitors",
+          "Status": "Passed",
+          "Duration": 0.26214,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.GeneratedWorldCustomersTests.DistrictsAndCompetitorsDeriveDeterministicallyFromTheSeed",
+          "Status": "Passed",
+          "Duration": 0.779202,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.GeneratedWorldTests.ANewWorldCreatesTheStartingSiteOnceAndReloadsUnchanged",
+          "Status": "Passed",
+          "Duration": 0.4891558,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.GeneratedWorldTests.AnOlderWorldLoadsWithReTunedDistrictsAndItsCash",
+          "Status": "Passed",
+          "Duration": 0.4686111,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.GeneratedWorldTests.JoiningGrantsTheStartingSiteAndEveryCompanySite",
+          "Status": "Passed",
+          "Duration": 0.7851589,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.GeneratedWorldTests.LayoutsWithoutLotsAndOlderSavesKeepTheDevWorld",
+          "Status": "Passed",
+          "Duration": 0.2852131,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.GeneratedWorldTests.OnlyANewWorldStartsWithAMillionDollars",
+          "Status": "Passed",
+          "Duration": 0.5133809,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.GeneratedWorldTests.PlayersSpawnOnTheStartingApronInFrontOfTheDoor",
+          "Status": "Passed",
+          "Duration": 0.2906203,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.KitchenContentTests.EveryRecipeAndPriceIsValidContentForKnownItems",
+          "Status": "Passed",
+          "Duration": 0.015931,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.KitchenContentTests.EverySuppliedIngredientIsUsed",
+          "Status": "Passed",
+          "Duration": 0.0032123,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.KitchenContentTests.StationsAreSoldWithAFittingModelAndTheirControls",
+          "Status": "Passed",
+          "Duration": 0.0185449,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.KitchenContentTests.TheNewDishesAreMadeAndSoldWithTiers",
+          "Status": "Passed",
+          "Duration": 0.003565,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.PlayerRegistryTests.ClientIdentityIsCreatedOnceAndReused",
+          "Status": "Passed",
+          "Duration": 0.0267946,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.PlayerRegistryTests.CommandLineSelectsModeAndIsolatedPaths",
+          "Status": "Passed",
+          "Duration": 0.001697,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.PlayerRegistryTests.DifferentSecretWithSameNameGetsDifferentId",
+          "Status": "Passed",
+          "Duration": 0.0466398,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.PlayerRegistryTests.DuplicateOfConnectedPlayerIsRejectedBeforeAnyWrite",
+          "Status": "Passed",
+          "Duration": 0.0367457,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.PlayerRegistryTests.DurableGrantRejectsUnknownSiteWithoutWriting",
+          "Status": "Passed",
+          "Duration": 0.2050329,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.PlayerRegistryTests.FailedGrantCommitRejectsAndRetryReusesIdentity",
+          "Status": "Passed",
+          "Duration": 0.0369009,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.PlayerRegistryTests.InvalidNameOrSecretIsRejectedWithoutWrites(\"\",\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"invalid-name\")",
+          "Status": "Passed",
+          "Duration": 0.0241402,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.PlayerRegistryTests.InvalidNameOrSecretIsRejectedWithoutWrites(\"   \",\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"invalid-name\")",
+          "Status": "Passed",
+          "Duration": 0.0240913,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.PlayerRegistryTests.InvalidNameOrSecretIsRejectedWithoutWrites(\"123456789012345678901234567890123\",\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"invalid-name\")",
+          "Status": "Passed",
+          "Duration": 0.0212513,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.PlayerRegistryTests.InvalidNameOrSecretIsRejectedWithoutWrites(\"tab\\tname\",\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"invalid-name\")",
+          "Status": "Passed",
+          "Duration": 0.0211504,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.PlayerRegistryTests.InvalidNameOrSecretIsRejectedWithoutWrites(\"Alice\",\"\",\"invalid-secret\")",
+          "Status": "Passed",
+          "Duration": 0.0270987,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.PlayerRegistryTests.InvalidNameOrSecretIsRejectedWithoutWrites(\"Alice\",\"short-secret\",\"invalid-secret\")",
+          "Status": "Passed",
+          "Duration": 0.021976,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.PlayerRegistryTests.LastPoseSurvivesReopeningAndIsReplaced",
+          "Status": "Passed",
+          "Duration": 0.021764,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.PlayerRegistryTests.LegacyClientSecretIsImportedOnceAndLeftInPlace",
+          "Status": "Passed",
+          "Duration": 0.0109961,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.PlayerRegistryTests.LegacyWorldSnapshotIsImportedOnceAndLeftInPlace",
+          "Status": "Passed",
+          "Duration": 0.0603149,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.PlayerRegistryTests.NewerRegistrySchemaIsRefused",
+          "Status": "Passed",
+          "Duration": 0.010092,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.PlayerRegistryTests.NewSecretCreatesIdentityAndCommitsGrantBeforeAdmission",
+          "Status": "Passed",
+          "Duration": 0.0364262,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.PlayerRegistryTests.OversizedSecretIsRejected",
+          "Status": "Passed",
+          "Duration": 0.0209312,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.PlayerRegistryTests.SameSecretResolvesSameIdAfterReopeningStores",
+          "Status": "Passed",
+          "Duration": 0.0515997,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.PlayerRegistryTests.SecretsAreNeverStoredOrExposed",
+          "Status": "Passed",
+          "Duration": 0.0422615,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.PlayerRegistryTests.UnwritableRegistryRejectsNewPlayer",
+          "Status": "Passed",
+          "Duration": 0.0441961,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.PlayerRegistryTests.VersionOneRegistryGainsPosesAndKeepsItsPlayers",
+          "Status": "Passed",
+          "Duration": 0.0278403,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.PlayerRegistryTests.VersionTwoRegistryGainsSettingsAndKeepsPoses",
+          "Status": "Passed",
+          "Duration": 0.0316073,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.PlayerRegistryTests.WageWarningIsSavedPerPlayerAndSurvivesReopening",
+          "Status": "Passed",
+          "Duration": 0.0263194,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.RestaurantContentTests.EveryArtKitModelIsBuildableInBothSessionScenes",
+          "Status": "Passed",
+          "Duration": 0.4571795,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.RestaurantContentTests.EveryServerStyleHasItsModelsAndDecorDefinitionsAreConsistent",
+          "Status": "Passed",
+          "Duration": 0.0075667,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.SavedWorldsTests.ListsWorldSavesMostRecentlyPlayedFirst",
+          "Status": "Passed",
+          "Duration": 0.0143534,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.SavedWorldsTests.MissingSavesDirectoryHasNoWorlds",
+          "Status": "Passed",
+          "Duration": 0.0007112,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.SavedWorldsTests.SkipsFoldersWithoutAWorldSaveOrWithAnInvalidName",
+          "Status": "Passed",
+          "Duration": 0.0044474,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.ScriptAssistantTests.AcceptsAParsingReplyFromItsCodeBlock",
+          "Status": "Passed",
+          "Duration": 0.0056306,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.ScriptAssistantTests.AnEmptyRequestNeverReachesTheModel",
+          "Status": "Passed",
+          "Duration": 0.0006178,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.ScriptAssistantTests.CheckSyntaxAcceptsTheGameApiWithoutRunningIt",
+          "Status": "Passed",
+          "Duration": 0.0003122,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.ScriptAssistantTests.DryRunCoversTheWholeEmployeeApi",
+          "Status": "Passed",
+          "Duration": 0.0016966,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.ScriptAssistantTests.DryRunPassesWorkingProgramsIncludingEndlessLoops",
+          "Status": "Passed",
+          "Duration": 0.113595,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.ScriptAssistantTests.DryRunReportsRuntimeErrors(\"walk_to(\\\"oven\\\")\",\"nil\")",
+          "Status": "Passed",
+          "Duration": 0.0039259,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.ScriptAssistantTests.DryRunReportsRuntimeErrors(\"local p = position()\\nsay(p.y + 1)\",\"arithmetic\")",
+          "Status": "Passed",
+          "Duration": 0.0026964,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.ScriptAssistantTests.DryRunReportsRuntimeErrors(\"local ovens = find(\\\"oven\\\")\\nput(ovens[1] .. \\\":in\\\", \\\"dough\\\")\\nlocal n = take(\\\"storage\\\")\\nsay(n .. \\\" \\\" .. carrying())\\nerror(\\\"stop\\\")\",\"stop\")",
+          "Status": "Passed",
+          "Duration": 0.0022999,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.ScriptAssistantTests.ExtractsCode(\"```Lua\\r\\nsay(1)\\r\\n```\",\"say(1)\")",
+          "Status": "Passed",
+          "Duration": 0.0001548,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.ScriptAssistantTests.ExtractsCode(\"```\\nsay(1)\\n```\",\"say(1)\")",
+          "Status": "Passed",
+          "Duration": 0.0000371,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.ScriptAssistantTests.ExtractsCode(\"say(1)\",\"say(1)\")",
+          "Status": "Passed",
+          "Duration": 0.0000278,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.ScriptAssistantTests.FailsWithTheLastErrorAfterThreeBadReplies",
+          "Status": "Passed",
+          "Duration": 0.0036337,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.ScriptAssistantTests.FeedsRuntimeErrorsFromTheDryRunBack",
+          "Status": "Passed",
+          "Duration": 0.0130827,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.ScriptAssistantTests.FeedsTheSyntaxErrorBackAndAcceptsTheCorrection",
+          "Status": "Passed",
+          "Duration": 0.0043399,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.ScriptAssistantTests.RepeatingAFailingProgramIsCalledOut",
+          "Status": "Passed",
+          "Duration": 0.004463,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.ScriptAssistantTests.RetryMessageCarriesTheProgramTheErrorAndTheRequest",
+          "Status": "Passed",
+          "Duration": 0.0078179,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.ScriptAssistantTests.TreatsAnEmptyReplyAsAFailedAttempt",
+          "Status": "Passed",
+          "Duration": 0.0026717,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.SessionAuthoringTests.BeltPrefabsAreTileCentredWithTriggerAndScrollingTread(\"Assets/Prefabs/Belts/BeltStraight.prefab\")",
+          "Status": "Passed",
+          "Duration": 0.162947,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.SessionAuthoringTests.BeltPrefabsAreTileCentredWithTriggerAndScrollingTread(\"Assets/Prefabs/Belts/BeltCornerLeft.prefab\")",
+          "Status": "Passed",
+          "Duration": 0.0009928,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.SessionAuthoringTests.BeltPrefabsAreTileCentredWithTriggerAndScrollingTread(\"Assets/Prefabs/Belts/BeltCornerRight.prefab\")",
+          "Status": "Passed",
+          "Duration": 0.000837,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.SessionAuthoringTests.BreadRecipeTurnsDoughIntoBreadInTheOven",
+          "Status": "Passed",
+          "Duration": 0.0021289,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.SessionAuthoringTests.CounterDefinitionHasFootprintIconAndServerFreeVisual",
+          "Status": "Passed",
+          "Duration": 0.0019611,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.SessionAuthoringTests.DockDefinitionIsABuyableTwoBufferMachineAndTheTruckHasNoCollider",
+          "Status": "Passed",
+          "Duration": 0.0403691,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.SessionAuthoringTests.FridgeIsRefrigeratedStorageSoldByTheSupplier",
+          "Status": "Passed",
+          "Duration": 0.0502951,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.SessionAuthoringTests.GamePrefabCatalogListsOnlyProjectSpawnables",
+          "Status": "Passed",
+          "Duration": 0.0355233,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.SessionAuthoringTests.OvenDefinitionHasFootprintCapacitiesAndServerFreeVisual",
+          "Status": "Passed",
+          "Duration": 0.0050071,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.SessionAuthoringTests.PlayerMapHasMovementCameraAndEquipmentActions",
+          "Status": "Passed",
+          "Duration": 0.002908,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.SessionAuthoringTests.PlayerPrefabHasNetworkedBodyAndDisabledOwnerRig",
+          "Status": "Passed",
+          "Duration": 0.0041288,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.SessionAuthoringTests.SellBreadRecipeSellsOneBreadAtTheCounter",
+          "Status": "Passed",
+          "Duration": 0.0017053,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.SessionAuthoringTests.SpoilTimesAreFormattedForSlotsAndTheHoverLine(0,True,\"0s\")",
+          "Status": "Passed",
+          "Duration": 0.0004637,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.SessionAuthoringTests.SpoilTimesAreFormattedForSlotsAndTheHoverLine(59,True,\"59s\")",
+          "Status": "Passed",
+          "Duration": 0.0000398,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.SessionAuthoringTests.SpoilTimesAreFormattedForSlotsAndTheHoverLine(754,True,\"12m\")",
+          "Status": "Passed",
+          "Duration": 0.0000374,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.SessionAuthoringTests.SpoilTimesAreFormattedForSlotsAndTheHoverLine(14400,True,\"4h\")",
+          "Status": "Passed",
+          "Duration": 0.0000351,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.SessionAuthoringTests.SpoilTimesAreFormattedForSlotsAndTheHoverLine(200000,True,\"2d\")",
+          "Status": "Passed",
+          "Duration": 0.0000332,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.SessionAuthoringTests.SpoilTimesAreFormattedForSlotsAndTheHoverLine(45,False,\"45s\")",
+          "Status": "Passed",
+          "Duration": 0.0000325,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.SessionAuthoringTests.SpoilTimesAreFormattedForSlotsAndTheHoverLine(754,False,\"12m 34s\")",
+          "Status": "Passed",
+          "Duration": 0.0002793,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.SessionAuthoringTests.SpoilTimesAreFormattedForSlotsAndTheHoverLine(3900,False,\"1h 05m\")",
+          "Status": "Passed",
+          "Duration": 0.0000442,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.SessionAuthoringTests.SpoilTimesAreFormattedForSlotsAndTheHoverLine(-5,False,\"0s\")",
+          "Status": "Passed",
+          "Duration": 0.0000318,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.SessionAuthoringTests.SupplierCounterOfferSellsTheCounterDefinition",
+          "Status": "Passed",
+          "Duration": 0.0011835,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.SessionAuthoringTests.SupplierOffersAreValidContentForKnownItems",
+          "Status": "Passed",
+          "Duration": 0.0067138,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.SessionAuthoringTests.SupplierOvenOfferSellsTheOvenDefinition",
+          "Status": "Passed",
+          "Duration": 0.0006525,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.SessionAuthoringTests.SupplierTruckOfferSellsTheDevTruckModel",
+          "Status": "Passed",
+          "Duration": 0.0018677,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.SessionAuthoringTests.TableDefinitionIsABuyableFourSeatTable",
+          "Status": "Passed",
+          "Duration": 0.000699,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.SessionAuthoringTests.WorldGenIsTheBuildSceneAndDevSiteIsWiredForSessions",
+          "Status": "Passed",
+          "Duration": 0.0255261,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.SitePlacementTests.AnotherLotStandsWhereTheMapPutsItsBuilding",
+          "Status": "Passed",
+          "Duration": 0.3158522,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.SitePlacementTests.CellsRoundTripThroughTheScene",
+          "Status": "Passed",
+          "Duration": 0.3690948,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.SitePlacementTests.DevLayoutsKeepEverySiteAtTheOrigin",
+          "Status": "Passed",
+          "Duration": 0.2243206,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.SitePlacementTests.DistanceToALotIsZeroInsideAndGrowsOutside",
+          "Status": "Passed",
+          "Duration": 0.333289,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.SitePlacementTests.TheStartingSiteMatchesTodaysGrid",
+          "Status": "Passed",
+          "Duration": 0.2295581,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.SiteWalkTests.ARoomWithoutADoorHasNoRouteAndNoServiceSpot",
+          "Status": "Passed",
+          "Duration": 0.0104172,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.SiteWalkTests.FromTheStreetAFigureComesInThroughTheDoorAndNeverCrossesAWall",
+          "Status": "Passed",
+          "Duration": 0.0027504,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.SiteWalkTests.TheQueueStandsOnOpenCellsBackAlongTheWayIn",
+          "Status": "Passed",
+          "Duration": 0.0009379,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.StartingLoopDemandMeasurement.DemandAtAStockedStaffedStartingRestaurant",
+          "Status": "Skipped",
+          "Duration": 0.0041838,
+          "Message": "SetUp : The P0 demand measurement runs on request: create Temp/starting-loop.flag.",
+          "StackTrace": "at FoodFactoryGame.Session.Tests.StartingLoopDemandMeasurement.SetUp () [0x00025] in E:\\Projects\\Unity\\FoodFactoryGame\\Assets\\Tests\\EditMode\\Session\\StartingLoopDemandMeasurement.cs:30\r\n"
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.StartingLoopFirstCustomerMeasurement.TheFirstCustomerComesInAboutOneToTwoMinutes",
+          "Status": "Skipped",
+          "Duration": 0.0005132,
+          "Message": "SetUp : The first-customer measurement runs on request: create Temp/starting-loop.flag.",
+          "StackTrace": "at FoodFactoryGame.Session.Tests.StartingLoopFirstCustomerMeasurement.SetUp () [0x00025] in E:\\Projects\\Unity\\FoodFactoryGame\\Assets\\Tests\\EditMode\\Session\\StartingLoopFirstCustomerMeasurement.cs:35\r\n"
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.StartingLoopPacingMeasurement.PacingAtAStockedStaffedStartingRestaurant",
+          "Status": "Skipped",
+          "Duration": 0.0003391,
+          "Message": "SetUp : The P4 pacing measurement runs on request: create Temp/starting-loop.flag.",
+          "StackTrace": "at FoodFactoryGame.Session.Tests.StartingLoopPacingMeasurement.SetUp () [0x00025] in E:\\Projects\\Unity\\FoodFactoryGame\\Assets\\Tests\\EditMode\\Session\\StartingLoopPacingMeasurement.cs:38\r\n"
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.UiTemplatesTests.EveryScreenStylesheetIsImportedByTheTheme",
+          "Status": "Passed",
+          "Duration": 0.0039655,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.UiTemplatesTests.EveryTemplateLoadsAndClones",
+          "Status": "Passed",
+          "Duration": 0.7967798,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.UiTemplatesTests.ItemTemplatesHaveOneRootAndScreensAnFfRoot",
+          "Status": "Passed",
+          "Duration": 0.005392,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.VehicleTests.CarsQueueAtARedLightAndNeverOverlap",
+          "Status": "Passed",
+          "Duration": 0.0138183,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.VehicleTests.CityCarsAreTheSameForTheSameClockAndNearestFirst",
+          "Status": "Passed",
+          "Duration": 0.0045615,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.VehicleTests.EverySessionSceneDrawsTheBlenderVehicles(\"Assets/Scenes/DevSite.unity\")",
+          "Status": "Passed",
+          "Duration": 0.0053539,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.VehicleTests.EverySessionSceneDrawsTheBlenderVehicles(\"Assets/Scenes/SampleScene.unity\")",
+          "Status": "Passed",
+          "Duration": 0.0038963,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.VehicleTests.EverySessionSceneDrawsTheBlenderVehicles(\"Assets/Scenes/WorldGen.unity\")",
+          "Status": "Passed",
+          "Duration": 0.003141,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.VehicleTests.KerbLaneCarsWaitBehindATruck",
+          "Status": "Passed",
+          "Duration": 0.0039765,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.VehicleTests.RushHourIsBusierThanNight",
+          "Status": "Passed",
+          "Duration": 0.0011625,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.VehicleTests.VehiclePrefabsHaveNoCollidersAndAPaintableBody",
+          "Status": "Passed",
+          "Duration": 0.0039453,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.WorldArtAuthoringTests.WorldGenPresenterHasEveryArtPiece",
+          "Status": "Passed",
+          "Duration": 0.0061923,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.WorldGenerationTests.ABlankSeedIsRandomAndRecorded",
+          "Status": "Passed",
+          "Duration": 0.2805284,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.WorldGenerationTests.ANewWorldStoresItsLayoutAndLaterStartsNeverRegenerateIt",
+          "Status": "Passed",
+          "Duration": 0.2886568,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.WorldGenerationTests.AnExistingSaveWithoutALayoutKeepsNone",
+          "Status": "Passed",
+          "Duration": 0.0345692,
+          "Message": null,
+          "StackTrace": null
+        },
+        {
+          "FullName": "FoodFactoryGame.Session.Tests.WorldGenerationTests.TheSeedSwitchIsRead",
+          "Status": "Passed",
+          "Duration": 0.000991,
+          "Message": null,
+          "StackTrace": null
+        }
+      ],
+      "Duration": 16.18,
+      "StatusPath": null,
+      "Mode": "EditMode",
+      "FilterApplied": "assembly: FoodFactoryGame.Session.EditModeTests",
+      "success": true,
+      "result": null
+    },
+    "target": {
+      "host": "127.0.0.1",
+      "port": 7800,
+      "projectPath": "E:\\Projects\\Unity\\FoodFactoryGame"
+    },
+    "success": true
+  },
+  "errors": [],
+  "warnings": []
+}

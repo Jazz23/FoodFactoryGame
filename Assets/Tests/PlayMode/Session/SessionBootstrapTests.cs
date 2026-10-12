@@ -49,7 +49,12 @@ namespace FoodFactoryGame.Session.PlayModeTests
             _input.Setup();
             _directory = Path.Combine(Path.GetTempPath(), "FoodFactorySessionPlay", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(_directory);
-            yield return SceneManager.LoadSceneAsync(ScenePath, LoadSceneMode.Single);
+            // DevSite is not in the build list (WorldGen is the build scene since 88c023b), so the Editor loads it by path.
+#if UNITY_EDITOR
+            yield return UnityEditor.SceneManagement.EditorSceneManager.LoadSceneAsyncInPlayMode(ScenePath, new LoadSceneParameters(LoadSceneMode.Single));
+#else
+            yield return null;
+#endif
             _root = UnityEngine.Object.FindAnyObjectByType<SessionRoot>();
             Assert.That(_root, Is.Not.Null, "DevSite must contain a SessionRoot.");
             _root.Configure(new SessionOptions

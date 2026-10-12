@@ -56,10 +56,12 @@ namespace FoodFactoryGame.Session.Tests
         }
 
         [Test]
-        public void DevSiteIsTheOnlyBuildSceneAndIsWiredForSessions()
+        public void WorldGenIsTheBuildSceneAndDevSiteIsWiredForSessions()
         {
+            // Since 88c023b the build is WorldGen; DevSite stays listed but disabled and is loaded by path in the Editor.
             var enabled = EditorBuildSettings.scenes.Where(x => x.enabled).Select(x => x.path).ToArray();
-            Assert.That(enabled, Is.EqualTo(new[] { ScenePath }));
+            Assert.That(enabled, Is.EqualTo(new[] { "Assets/Scenes/WorldGen.unity" }));
+            Assert.That(EditorBuildSettings.scenes.Any(x => x.path == ScenePath && !x.enabled), Is.True, "DevSite is listed, disabled.");
             var scene = EditorSceneManager.OpenPreviewScene(ScenePath);
             try
             {

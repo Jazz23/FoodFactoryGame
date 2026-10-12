@@ -42,6 +42,7 @@ namespace FoodFactoryGame.Benchmarks.Tests
 
         // TEST data: 10 player restaurants on a 2 km map, each a company site with 2 counters (200 bread each) and 5 four-seat
         // tables; 10 competitors (3 servers, 20 seats); 5 districts sending 3,000 customers an hour each, with a 700 m range.
+        // District wealth is 0-60%, below GoodsWorld.PickyWealthPercent, so every district still buys the tier-1 bread (decision 0043).
         private static GoodsWorld CreateWorld()
         {
             var world = new GoodsWorld("benchmark-world");
@@ -94,7 +95,7 @@ namespace FoodFactoryGame.Benchmarks.Tests
                 world.Bootstrap(new GoodsDistrict
                 {
                     Id = $"district-{index}", Name = $"District {index}", MapX = index * 400, MapZ = 400, CustomersPerHour = 50,
-                    WealthPercent = 20 * index, AppearanceVariants = 4, LikedCuisines = { index % 2 == 0 ? "bakery" : "noodles" },
+                    WealthPercent = 15 * index, AppearanceVariants = 4, LikedCuisines = { index % 2 == 0 ? "bakery" : "noodles" },
                     DineInPercent = 60, RangeMetres = 700
                 });
             world.Grant("benchmark-player", "site-0");

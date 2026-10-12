@@ -872,6 +872,27 @@ Decision: [0043](decisions/0043-recipes-kitchen-stations-and-food-prices.md). Go
   Work at counter and Set machine recipe (`EmployeeTaskType.Work`, `Recipe`; `EmployeeTask.Recipe`).
 - Open: per-restaurant menu selection, farms as ingredient sources, more tier 3 dishes, and every PROTOTYPE number.
 
+## Implemented: start rules for new generated worlds (2026-10-12)
+
+Decision: [0044](decisions/0044-start-rules-for-new-generated-worlds.md) (owner decisions 17, 19, 28 and 29 of
+[the starting-loop plan](starting-loop-plan.md)). Goods snapshot schema **v25**, generator **v7**, layout format unchanged (5).
+Verification: [record](verification/start-rules-20261012.md); the post-merge baseline before it: [record](verification/post-merge-20261012.md).
+
+- Implemented: a new generated world's company starts with $1,000,000 (`GeneratedWorld.StartingCash`, PROTOTYPE). Older worlds
+  keep their cash; DevSite is unchanged.
+- Implemented: generator v7 places the start only in a district of minimum recipe tier 1, and the validator rejects any other
+  (`start: its district's minimum recipe tier must be 1`). With the default settings every seed's layout is v6's apart from the
+  version line. No stored layout changes.
+- Implemented: `GoodsDistrict.SpawnWalkMetres` (schema v25; 0 = the whole walk from the block point). Districts derived from a v7
+  layout get `WorldLayoutCustomers.StreetSpawnMetres` (10 m, a 5 s walk, PROTOTYPE testing value). Range and scoring still use the
+  block point. Older worlds and DevSite keep 0, and a v24 save loads with every district at 0.
+- Measured: the 0025 city benchmark passes (tick p99 0.26 ms, commits at most 12.2 ms, 248 KB, 531 customers alive against 840
+  with the whole walk).
+- Accepted (owner decision 30): a first customer in about one to two minutes. The walk is 5 s; the first decision for the
+  restaurant takes 12-216 s. The measured mean first arrival is 89 s over 10 openings on the two P0 seeds (max 221 s), checked
+  against a 120 s mean.
+- Planned (P2 and later, not done): supplier depot and delivery orders, the employee in the loop, the P5 and P6 acceptance runs.
+
 ## Implemented: back doors and the dock rule (2026-10-06)
 
 Merged from the starting-loop branch on 2026-10-12. Its schema numbers below are as recorded on that branch; on main they are v21 (back-door roles), v22 (free back doors), v23 (ledger) and v24 (game-hour rates). The branch's decisions 0037-0039 share numbers with main's 0037-0039 (different files). Main's wages are recorded in the ledger (`LedgerWage`) and count the same game hour (`GoodsWorld.GameHourSeconds` = `GameClock.HourSeconds`).
@@ -913,7 +934,15 @@ Decision: [0038](decisions/0038-cash-ledger-and-restaurant-readiness.md) (truck-
 - Superseded on merge: `CentredWindow.Overlay` (the P0-01 centring fix) was removed; main's UXML screens (decision 0042)
   centre their windows. The readout and Ledger tab are UXML/USS parts of the HUD (`hud-readiness`,
   `hud-register-readiness`, `hud-tabs`).
-- Not done: independent visual review; partial stack moves (P0-07, deferred).
+- Implemented (2026-10-12, after the UXML port; [record](verification/post-merge-fixes-20261012.md)): the port brought P0-01
+  back on the logistics screen, because `ff-centered` centres with `translate: -50% -50%`. When the window grows (a new route
+  or truck card), UI Toolkit keeps drawing it, and reporting `worldBound`, with the translate resolved at its old size while
+  `Pick` uses the new one (measured: an 81 px vertical split, so no button in the window picked itself). The logistics root
+  now centres the window by flex (`ff-centering` in `Theme.uss`, on `logistics-root`), and its columns and chooser values
+  give up width on a narrow screen (`Logistics.uss`, the branch's rules as USS). Element names are unchanged.
+  `LogisticsPanelTests.TruckCardControlsTakeThePointerAfterTheWindowGrows` passes (full width, narrow, virtual-mouse `>` and Assign).
+- Open: the Employee script and Property windows still use `ff-centered` (the same latent pattern, not observed failing);
+  a real-mouse click on the truck card in the Editor; independent visual review; partial stack moves (P0-07, deferred).
 
 ## Implemented: demand on the game hour and the start kit (2026-10-07)
 
@@ -924,11 +953,12 @@ Goods snapshot schema **v21**, layout format **5**, generator **v6**. Verificati
   `GoodsDistrict.CustomersPerHour` counts customers per game hour. v20 saves upgrade in memory (rates through
   `GameClock.FromClockHourRate`, divisor 10, progress scaled); format 4 and older layouts are read through
   `WorldLayout.RatePerGameHour`, so older worlds derive the same district records. Stored layouts are never rewritten.
-- Implemented: a new generated world's company starts with $700 (PROTOTYPE) and players admitted to a generated world get 20
-  dough and nothing else; DevSite keeps the dev starter goods. Older worlds keep their cash.
+- Implemented: a new generated world's company starts with $700 (PROTOTYPE; $1,000,000 since 0044) and players admitted to a
+  generated world get 20 dough and nothing else; DevSite keeps the dev starter goods. Older worlds keep their cash.
 - Measured: first sale 120-174 s after a stocked, staffed register opens; 0.5-1.0 sales a real minute; about 800 customers
   alive in the city (about 135 before). 0025 budgets hold at that size.
 - Planned / undecided: the first-customer target (about a minute) is limited by walking distance; options are with the owner.
+  The owner chose a street spawn (0044), which removes the walk but not the wait for the first decision.
   Demand does not follow the time-of-day traffic curve.
 
 ## Baseline Test Evolution

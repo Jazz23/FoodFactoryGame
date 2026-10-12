@@ -363,6 +363,9 @@ namespace FoodFactoryGame.World
             else if (start.Category != BuildingCategory.Restaurant || start.DistrictId != residential || start.Ownership != Ownership.Player
                      || start.Width * start.Depth > settings.StartMaxArea)
                 problems.Add("start: must be a small player-owned restaurant shell in the residential district");
+            // Decision 19 of the starting-loop plan (generator v7): the start stands where bread, a tier 1 dish, sells.
+            if (start != null && layout.Districts.FirstOrDefault(x => x.Id == start.DistrictId)?.MinRecipeTier != 1)
+                problems.Add("start: its district's minimum recipe tier must be 1");
             if (layout.Buildings.Count(x => x.Ownership == Ownership.Player) != 1) problems.Add("start: exactly one player-owned building");
             var restaurants = layout.Buildings.Where(x => x.Category == BuildingCategory.Restaurant).ToList();
             if (!restaurants.Any(x => x.Ownership == Ownership.ForSale)) problems.Add("property: no restaurant for sale");

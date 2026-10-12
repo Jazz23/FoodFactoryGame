@@ -1,0 +1,6 @@
+Pre-merge save copies (same scratch copies as post-merge-20261012/artifacts/pre-merge-saves.txt) loaded with the start-rules code
+(goods schema 25), live Editor eval 2026-10-12 ~18:43Z. Only copies were opened.
+dev-world: schema=25 cash=[dev-company:9000] goods=[belt:195,bread:5,dough:240,lift:19] spawnWalk=0 districts=1
+world-5: schema=25 cash=[company-1:97991000] goods=[belt:50,dough:25,lift:10] spawnWalk=0 districts=25
+world-9: schema=25 cash=[company-1:100000000] goods=[belt:50,dough:5,lift:10] spawnWalk=0 districts=25
+world-10: schema=25 cash=[company-1:100000000] goods=[belt:50,dough:5,lift:10] spawnWalk=0 districts=25

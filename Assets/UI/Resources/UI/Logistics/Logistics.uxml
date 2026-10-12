@@ -3,9 +3,11 @@
          LogisticsPanel with the Logistics*.uxml cards. -->
     <Style src="project://database/Assets/UI/Theme/Theme.uss" />
     <Style src="Logistics.uss" />
-    <ui:VisualElement name="logistics-root" class="ff-root ff-fill" picking-mode="Ignore">
+    <!-- The root centres the window by flex, not by a percentage translate: the window grows as routes and trucks are added,
+         and a translate resolved at its old size would leave drawn controls where the pointer cannot reach them (P0-01). -->
+    <ui:VisualElement name="logistics-root" class="ff-root ff-fill ff-centering" picking-mode="Ignore">
         <ui:VisualElement name="logistics-dim" class="ff-fill ff-dim" picking-mode="Ignore" />
-        <ui:VisualElement name="logistics" class="ff-panel ff-centered logi">
+        <ui:VisualElement name="logistics" class="ff-panel logi">
             <ui:VisualElement class="ff-row logi__header">
                 <ui:Label text="Logistics" class="ff-title ff-grow" picking-mode="Ignore" />
                 <ui:Button name="logistics-close" focusable="false" class="ff-button ff-button--icon">

@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="10" result="Passed" total="10" passed="10" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-10-12 19:51:21Z" end-time="2026-10-12 19:51:37Z" duration="16.1555803">
+  <test-suite type="TestSuite" id="1699" name="FoodFactoryGame" fullname="FoodFactoryGame" runstate="Runnable" testcasecount="473" result="Passed" start-time="2026-10-12 19:51:21Z" end-time="2026-10-12 19:51:37Z" duration="16.155580" total="10" passed="10" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="EditMode" />
+    </properties>
+    <test-suite type="Assembly" id="1024" name="FoodFactoryGame.Benchmarks.EditModeTests.dll" fullname="E:/Projects/Unity/FoodFactoryGame/Library/ScriptAssemblies/FoodFactoryGame.Benchmarks.EditModeTests.dll" runstate="Runnable" testcasecount="10" result="Passed" start-time="2026-10-12 19:51:21Z" end-time="2026-10-12 19:51:37Z" duration="16.151268" total="10" passed="10" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="13200" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="EditMode" />
+        <property name="EditorOnly" value="True" />
+      </properties>
+      <test-suite type="TestSuite" id="1025" name="FoodFactoryGame" fullname="FoodFactoryGame" runstate="Runnable" testcasecount="10" result="Passed" start-time="2026-10-12 19:51:21Z" end-time="2026-10-12 19:51:37Z" duration="16.151026" total="10" passed="10" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-suite type="TestSuite" id="1026" name="Benchmarks" fullname="FoodFactoryGame.Benchmarks" runstate="Runnable" testcasecount="10" result="Passed" start-time="2026-10-12 19:51:21Z" end-time="2026-10-12 19:51:37Z" duration="16.150786" total="10" passed="10" failed="0" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <test-suite type="TestSuite" id="1027" name="Tests" fullname="FoodFactoryGame.Benchmarks.Tests" runstate="Runnable" testcasecount="10" result="Passed" start-time="2026-10-12 19:51:21Z" end-time="2026-10-12 19:51:37Z" duration="16.150510" total="10" passed="10" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-suite type="TestFixture" id="1010" name="CityCustomerBenchmarkTests" fullname="FoodFactoryGame.Benchmarks.Tests.CityCustomerBenchmarkTests" classname="FoodFactoryGame.Benchmarks.Tests.CityCustomerBenchmarkTests" runstate="Runnable" testcasecount="2" result="Passed" start-time="2026-10-12 19:51:21Z" end-time="2026-10-12 19:51:23Z" duration="1.403113" total="2" passed="2" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties>
+                <property name="Category" value="Benchmark" />
+              </properties>
+              <test-case id="1011" name="AGeneratedCityFitsAFrameAndCommitsUnderTheWarningSignals" fullname="FoodFactoryGame.Benchmarks.Tests.CityCustomerBenchmarkTests.AGeneratedCityFitsAFrameAndCommitsUnderTheWarningSignals" methodname="AGeneratedCityFitsAFrameAndCommitsUnderTheWarningSignals" classname="FoodFactoryGame.Benchmarks.Tests.CityCustomerBenchmarkTests" runstate="Runnable" seed="103141914" result="Passed" start-time="2026-10-12 19:51:21Z" end-time="2026-10-12 19:51:22Z" duration="0.822984" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <output><![CDATA[[Benchmark] city customers: districts=25 competitors=157 warmup=1800s customers 511->531 (Eating=395,Ordering=57,Queued=48,Travelling=31) diners=158 served=6382 (player 25) walkedOut=26 | tick mean=0.063ms p99=0.251ms max=0.305ms over 300 ticks | burst 100 decisions x 47 candidates=1.44ms catch-up 60s=3.00ms | commits=31 avg=8.7ms max=12.6ms payload=248KB | cpu="AMD Ryzen 5 5600X 6-Core Processor " unity=6000.5.9f1 editor-mono
+[Benchmark] city customers: districts=25 competitors=157 warmup=1800s customers 511->531 (Eating=395,Ordering=57,Queued=48,Travelling=31) diners=158 served=6382 (player 25) walkedOut=26 | tick mean=0.063ms p99=0.251ms max=0.305ms over 300 ticks | burst 100 decisions x 47 candidates=1.44ms catch-up 60s=3.00ms | commits=31 avg=8.7ms max=12.6ms payload=248KB | cpu="AMD Ryzen 5 5600X 6-Core Processor " unity=6000.5.9f1 editor-mono
+[Benchmark] city customers: districts=25 competitors=157 warmup=1800s customers 511->531 (Eating=395,Ordering=57,Queued=48,Travelling=31) diners=158 served=6382 (player 25) walkedOut=26 | tick mean=0.063ms p99=0.251ms max=0.305ms over 300 ticks | burst 100 decisions x 47 candidates=1.44ms catch-up 60s=3.00ms | commits=31 avg=8.7ms max=12.6ms payload=248KB | cpu="AMD Ryzen 5 5600X 6-Core Processor " unity=6000.5.9f1 editor-mono
+[Benchmark] city customers: districts=25 competitors=157 warmup=1800s customers 511->531 (Eating=395,Ordering=57,Queued=48,Travelling=31) diners=158 served=6382 (player 25) walkedOut=26 | tick mean=0.063ms p99=0.251ms max=0.305ms over 300 ticks | burst 100 decisions x 47 candidates=1.44ms catch-up 60s=3.00ms | commits=31 avg=8.7ms max=12.6ms payload=248KB | cpu="AMD Ryzen 5 5600X 6-Core Processor " unity=6000.5.9f1 editor-mono
+[Benchmark] city save phases over 30 tick commits (mean/max ms): validate=0.75/0.89 json=2.25/3.03 transaction=3.55/4.38 commit+sync=2.16/5.58
+[Benchmark] city save phases over 30 tick commits (mean/max ms): validate=0.75/0.89 json=2.25/3.03 transaction=3.55/4.38 commit+sync=2.16/5.58
+[Benchmark] city save phases over 30 tick commits (mean/max ms): validate=0.75/0.89 json=2.25/3.03 transaction=3.55/4.38 commit+sync=2.16/5.58
+[Benchmark] city save phases over 30 tick commits (mean/max ms): validate=0.75/0.89 json=2.25/3.03 transaction=3.55/4.38 commit+sync=2.16/5.58
+]]></output>
+              </test-case>
+              <test-case id="1012" name="CrowdViewsForEightConnectionsStayUnderTheirBudget" fullname="FoodFactoryGame.Benchmarks.Tests.CityCustomerBenchmarkTests.CrowdViewsForEightConnectionsStayUnderTheirBudget" methodname="CrowdViewsForEightConnectionsStayUnderTheirBudget" classname="FoodFactoryGame.Benchmarks.Tests.CityCustomerBenchmarkTests" runstate="Runnable" seed="1548334168" result="Passed" start-time="2026-10-12 19:51:22Z" end-time="2026-10-12 19:51:23Z" duration="0.579347" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <output><![CDATA[[Benchmark] crowd views: 8 connections x 300 s after 1800 s warm-up, radius 150 m | view mean=0.029ms p99=0.055ms max=0.077ms per second (all connections) mean=0.236ms | competitors with customers mean=4.8 max=9 | customers sent mean=8.5 max=17 | json mean=2083B max=3936B | cpu="AMD Ryzen 5 5600X 6-Core Processor " unity=6000.5.9f1 editor-mono
+[Benchmark] crowd views: 8 connections x 300 s after 1800 s warm-up, radius 150 m | view mean=0.029ms p99=0.055ms max=0.077ms per second (all connections) mean=0.236ms | competitors with customers mean=4.8 max=9 | customers sent mean=8.5 max=17 | json mean=2083B max=3936B | cpu="AMD Ryzen 5 5600X 6-Core Processor " unity=6000.5.9f1 editor-mono
+[Benchmark] crowd views: 8 connections x 300 s after 1800 s warm-up, radius 150 m | view mean=0.029ms p99=0.055ms max=0.077ms per second (all connections) mean=0.236ms | competitors with customers mean=4.8 max=9 | customers sent mean=8.5 max=17 | json mean=2083B max=3936B | cpu="AMD Ryzen 5 5600X 6-Core Processor " unity=6000.5.9f1 editor-mono
+[Benchmark] crowd views: 8 connections x 300 s after 1800 s warm-up, radius 150 m | view mean=0.029ms p99=0.055ms max=0.077ms per second (all connections) mean=0.236ms | competitors with customers mean=4.8 max=9 | customers sent mean=8.5 max=17 | json mean=2083B max=3936B | cpu="AMD Ryzen 5 5600X 6-Core Processor " unity=6000.5.9f1 editor-mono
+]]></output>
+              </test-case>
+            </test-suite>
+            <test-suite type="TestFixture" id="1013" name="CustomerChoiceBenchmarkTests" fullname="FoodFactoryGame.Benchmarks.Tests.CustomerChoiceBenchmarkTests" classname="FoodFactoryGame.Benchmarks.Tests.CustomerChoiceBenchmarkTests" runstate="Runnable" testcasecount="6" result="Passed" start-time="2026-10-12 19:51:23Z" end-time="2026-10-12 19:51:23Z" duration="0.114039" total="6" passed="6" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties>
+                <property name="Category" value="Benchmark" />
+              </properties>
+              <test-case id="1018" name="AllocationCheck_DetectsAnAllocation" fullname="FoodFactoryGame.Benchmarks.Tests.CustomerChoiceBenchmarkTests.AllocationCheck_DetectsAnAllocation" methodname="AllocationCheck_DetectsAnAllocation" classname="FoodFactoryGame.Benchmarks.Tests.CustomerChoiceBenchmarkTests" runstate="Runnable" seed="348113918" result="Passed" start-time="2026-10-12 19:51:23Z" end-time="2026-10-12 19:51:23Z" duration="0.001875" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1015" name="LunchRush_EveryCustomerDecidesInOneTick" fullname="FoodFactoryGame.Benchmarks.Tests.CustomerChoiceBenchmarkTests.LunchRush_EveryCustomerDecidesInOneTick" methodname="LunchRush_EveryCustomerDecidesInOneTick" classname="FoodFactoryGame.Benchmarks.Tests.CustomerChoiceBenchmarkTests" runstate="Runnable" seed="869896373" result="Passed" start-time="2026-10-12 19:51:23Z" end-time="2026-10-12 19:51:23Z" duration="0.007209" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <output><![CDATA[[Benchmark] lunch rush 1000 customers / 20 sites: burst tick median=0.317ms max=0.577ms over 15 worlds; evaluations in last burst=4374 | cpu="AMD Ryzen 5 5600X 6-Core Processor " cores=12 unity=6000.5.9f1 editor-mono
+[Benchmark] lunch rush 1000 customers / 20 sites: burst tick median=0.317ms max=0.577ms over 15 worlds; evaluations in last burst=4374 | cpu="AMD Ryzen 5 5600X 6-Core Processor " cores=12 unity=6000.5.9f1 editor-mono
+[Benchmark] lunch rush 1000 customers / 20 sites: burst tick median=0.317ms max=0.577ms over 15 worlds; evaluations in last burst=4374 | cpu="AMD Ryzen 5 5600X 6-Core Processor " cores=12 unity=6000.5.9f1 editor-mono
+[Benchmark] lunch rush 1000 customers / 20 sites: burst tick median=0.317ms max=0.577ms over 15 worlds; evaluations in last burst=4374 | cpu="AMD Ryzen 5 5600X 6-Core Processor " cores=12 unity=6000.5.9f1 editor-mono
+]]></output>
+              </test-case>
+              <test-case id="1019" name="SameSeed_GivesSameOutcome" fullname="FoodFactoryGame.Benchmarks.Tests.CustomerChoiceBenchmarkTests.SameSeed_GivesSameOutcome" methodname="SameSeed_GivesSameOutcome" classname="FoodFactoryGame.Benchmarks.Tests.CustomerChoiceBenchmarkTests" runstate="Runnable" seed="965154389" result="Passed" start-time="2026-10-12 19:51:23Z" end-time="2026-10-12 19:51:23Z" duration="0.006393" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1014" name="TargetPopulation_SteadyTickFitsProvisionalBudget" fullname="FoodFactoryGame.Benchmarks.Tests.CustomerChoiceBenchmarkTests.TargetPopulation_SteadyTickFitsProvisionalBudget" methodname="TargetPopulation_SteadyTickFitsProvisionalBudget" classname="FoodFactoryGame.Benchmarks.Tests.CustomerChoiceBenchmarkTests" runstate="Runnable" seed="1370858958" result="Passed" start-time="2026-10-12 19:51:23Z" end-time="2026-10-12 19:51:23Z" duration="0.015604" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <output><![CDATA[[Benchmark] target 1000 customers / 20 sites: ticks=12000 tick=0.1s simulated=1200s mean=0.0010ms p50=0.0010ms p99=0.0016ms max=0.0126ms; decisions=2186 evaluations=9692 served=1386 abandoned=15 stayedHome=644 peakQueue=12 revenue=$12318.39 | cpu="AMD Ryzen 5 5600X 6-Core Processor " cores=12 unity=6000.5.9f1 editor-mono
+[Benchmark] target 1000 customers / 20 sites: ticks=12000 tick=0.1s simulated=1200s mean=0.0010ms p50=0.0010ms p99=0.0016ms max=0.0126ms; decisions=2186 evaluations=9692 served=1386 abandoned=15 stayedHome=644 peakQueue=12 revenue=$12318.39 | cpu="AMD Ryzen 5 5600X 6-Core Processor " cores=12 unity=6000.5.9f1 editor-mono
+[Benchmark] target 1000 customers / 20 sites: ticks=12000 tick=0.1s simulated=1200s mean=0.0010ms p50=0.0010ms p99=0.0016ms max=0.0126ms; decisions=2186 evaluations=9692 served=1386 abandoned=15 stayedHome=644 peakQueue=12 revenue=$12318.39 | cpu="AMD Ryzen 5 5600X 6-Core Processor " cores=12 unity=6000.5.9f1 editor-mono
+[Benchmark] target 1000 customers / 20 sites: ticks=12000 tick=0.1s simulated=1200s mean=0.0010ms p50=0.0010ms p99=0.0016ms max=0.0126ms; decisions=2186 evaluations=9692 served=1386 abandoned=15 stayedHome=644 peakQueue=12 revenue=$12318.39 | cpu="AMD Ryzen 5 5600X 6-Core Processor " cores=12 unity=6000.5.9f1 editor-mono
+]]></output>
+              </test-case>
+              <test-case id="1016" name="TenfoldPopulation_ReportsScaling" fullname="FoodFactoryGame.Benchmarks.Tests.CustomerChoiceBenchmarkTests.TenfoldPopulation_ReportsScaling" methodname="TenfoldPopulation_ReportsScaling" classname="FoodFactoryGame.Benchmarks.Tests.CustomerChoiceBenchmarkTests" runstate="Runnable" seed="589527132" result="Passed" start-time="2026-10-12 19:51:23Z" end-time="2026-10-12 19:51:23Z" duration="0.045762" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <output><![CDATA[[Benchmark] tenfold 10000 customers / 200 sites: ticks=3000 tick=0.1s simulated=300s mean=0.0119ms p50=0.0118ms p99=0.0184ms max=0.0525ms; decisions=5162 evaluations=29600 served=2105 abandoned=22 stayedHome=1665 peakQueue=23 revenue=$21597.09 | cpu="AMD Ryzen 5 5600X 6-Core Processor " cores=12 unity=6000.5.9f1 editor-mono
+[Benchmark] tenfold 10000 customers / 200 sites: ticks=3000 tick=0.1s simulated=300s mean=0.0119ms p50=0.0118ms p99=0.0184ms max=0.0525ms; decisions=5162 evaluations=29600 served=2105 abandoned=22 stayedHome=1665 peakQueue=23 revenue=$21597.09 | cpu="AMD Ryzen 5 5600X 6-Core Processor " cores=12 unity=6000.5.9f1 editor-mono
+[Benchmark] tenfold 10000 customers / 200 sites: ticks=3000 tick=0.1s simulated=300s mean=0.0119ms p50=0.0118ms p99=0.0184ms max=0.0525ms; decisions=5162 evaluations=29600 served=2105 abandoned=22 stayedHome=1665 peakQueue=23 revenue=$21597.09 | cpu="AMD Ryzen 5 5600X 6-Core Processor " cores=12 unity=6000.5.9f1 editor-mono
+[Benchmark] tenfold 10000 customers / 200 sites: ticks=3000 tick=0.1s simulated=300s mean=0.0119ms p50=0.0118ms p99=0.0184ms max=0.0525ms; decisions=5162 evaluations=29600 served=2105 abandoned=22 stayedHome=1665 peakQueue=23 revenue=$21597.09 | cpu="AMD Ryzen 5 5600X 6-Core Processor " cores=12 unity=6000.5.9f1 editor-mono
+]]></output>
+              </test-case>
+              <test-case id="1017" name="WaitSignal_ComparesLiveBestScoreWithPublishedLogit" fullname="FoodFactoryGame.Benchmarks.Tests.CustomerChoiceBenchmarkTests.WaitSignal_ComparesLiveBestScoreWithPublishedLogit" methodname="WaitSignal_ComparesLiveBestScoreWithPublishedLogit" classname="FoodFactoryGame.Benchmarks.Tests.CustomerChoiceBenchmarkTests" runstate="Runnable" seed="1852383537" result="Passed" start-time="2026-10-12 19:51:23Z" end-time="2026-10-12 19:51:23Z" duration="0.028429" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <output><![CDATA[[Benchmark] live wait + best score: ticks=12000 tick=0.1s simulated=1200s mean=0.0010ms p50=0.0010ms p99=0.0016ms max=0.0286ms; decisions=2255 evaluations=10025 served=1325 abandoned=36 stayedHome=772 peakQueue=21 revenue=$10580.68 | cpu="AMD Ryzen 5 5600X 6-Core Processor " cores=12 unity=6000.5.9f1 editor-mono
+[Benchmark] live wait + best score: ticks=12000 tick=0.1s simulated=1200s mean=0.0010ms p50=0.0010ms p99=0.0016ms max=0.0286ms; decisions=2255 evaluations=10025 served=1325 abandoned=36 stayedHome=772 peakQueue=21 revenue=$10580.68 | cpu="AMD Ryzen 5 5600X 6-Core Processor " cores=12 unity=6000.5.9f1 editor-mono
+[Benchmark] live wait + best score: ticks=12000 tick=0.1s simulated=1200s mean=0.0010ms p50=0.0010ms p99=0.0016ms max=0.0286ms; decisions=2255 evaluations=10025 served=1325 abandoned=36 stayedHome=772 peakQueue=21 revenue=$10580.68 | cpu="AMD Ryzen 5 5600X 6-Core Processor " cores=12 unity=6000.5.9f1 editor-mono
+[Benchmark] live wait + best score: ticks=12000 tick=0.1s simulated=1200s mean=0.0010ms p50=0.0010ms p99=0.0016ms max=0.0286ms; decisions=2255 evaluations=10025 served=1325 abandoned=36 stayedHome=772 peakQueue=21 revenue=$10580.68 | cpu="AMD Ryzen 5 5600X 6-Core Processor " cores=12 unity=6000.5.9f1 editor-mono
+[Benchmark] published wait + logit: ticks=12000 tick=0.1s simulated=1200s mean=0.0010ms p50=0.0009ms p99=0.0016ms max=0.0136ms; decisions=2186 evaluations=9692 served=1386 abandoned=15 stayedHome=644 peakQueue=12 revenue=$12318.39 | cpu="AMD Ryzen 5 5600X 6-Core Processor " cores=12 unity=6000.5.9f1 editor-mono
+[Benchmark] published wait + logit: ticks=12000 tick=0.1s simulated=1200s mean=0.0010ms p50=0.0009ms p99=0.0016ms max=0.0136ms; decisions=2186 evaluations=9692 served=1386 abandoned=15 stayedHome=644 peakQueue=12 revenue=$12318.39 | cpu="AMD Ryzen 5 5600X 6-Core Processor " cores=12 unity=6000.5.9f1 editor-mono
+[Benchmark] published wait + logit: ticks=12000 tick=0.1s simulated=1200s mean=0.0010ms p50=0.0009ms p99=0.0016ms max=0.0136ms; decisions=2186 evaluations=9692 served=1386 abandoned=15 stayedHome=644 peakQueue=12 revenue=$12318.39 | cpu="AMD Ryzen 5 5600X 6-Core Processor " cores=12 unity=6000.5.9f1 editor-mono
+[Benchmark] published wait + logit: ticks=12000 tick=0.1s simulated=1200s mean=0.0010ms p50=0.0009ms p99=0.0016ms max=0.0136ms; decisions=2186 evaluations=9692 served=1386 abandoned=15 stayedHome=644 peakQueue=12 revenue=$12318.39 | cpu="AMD Ryzen 5 5600X 6-Core Processor " cores=12 unity=6000.5.9f1 editor-mono
+]]></output>
+              </test-case>
+            </test-suite>
+            <test-suite type="TestFixture" id="1020" name="CustomerRuntimeBenchmarkTests" fullname="FoodFactoryGame.Benchmarks.Tests.CustomerRuntimeBenchmarkTests" classname="FoodFactoryGame.Benchmarks.Tests.CustomerRuntimeBenchmarkTests" runstate="Runnable" testcasecount="1" result="Passed" start-time="2026-10-12 19:51:23Z" end-time="2026-10-12 19:51:24Z" duration="0.889332" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties>
+                <property name="Category" value="Benchmark" />
+              </properties>
+              <test-case id="1021" name="ThousandCustomersFitAFrameAndCommitUnderTheWarningSignals" fullname="FoodFactoryGame.Benchmarks.Tests.CustomerRuntimeBenchmarkTests.ThousandCustomersFitAFrameAndCommitUnderTheWarningSignals" methodname="ThousandCustomersFitAFrameAndCommitUnderTheWarningSignals" classname="FoodFactoryGame.Benchmarks.Tests.CustomerRuntimeBenchmarkTests" runstate="Runnable" seed="566782360" result="Passed" start-time="2026-10-12 19:51:23Z" end-time="2026-10-12 19:51:24Z" duration="0.887227" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <output><![CDATA[[Benchmark] player transfer: customers=1001 total=23.45ms save=14.73ms wrapper/action=8.72ms save phases copy=0.00 validate=2.94 json=3.74 transaction=5.84 commit+sync=2.20ms
+[Benchmark] player transfer: customers=1001 total=23.45ms save=14.73ms wrapper/action=8.72ms save phases copy=0.00 validate=2.94 json=3.74 transaction=5.84 commit+sync=2.20ms
+[Benchmark] player transfer: customers=1001 total=23.45ms save=14.73ms wrapper/action=8.72ms save phases copy=0.00 validate=2.94 json=3.74 transaction=5.84 commit+sync=2.20ms
+[Benchmark] player transfer: customers=1001 total=23.45ms save=14.73ms wrapper/action=8.72ms save phases copy=0.00 validate=2.94 json=3.74 transaction=5.84 commit+sync=2.20ms
+[Benchmark] runtime customers: warmup=450s customers 1001->963 (Eating=290,Queued=252,Ordering=18,Travelling=403) served=1632 walkedOut=279 | tick mean=0.25ms p99=0.95ms max=17.41ms over 300 ticks (step 0.18ms) | commits=30 avg=17.3ms max=35.2ms payload=465KB | cpu="AMD Ryzen 5 5600X 6-Core Processor " unity=6000.5.9f1 editor-mono
+[Benchmark] runtime customers: warmup=450s customers 1001->963 (Eating=290,Queued=252,Ordering=18,Travelling=403) served=1632 walkedOut=279 | tick mean=0.25ms p99=0.95ms max=17.41ms over 300 ticks (step 0.18ms) | commits=30 avg=17.3ms max=35.2ms payload=465KB | cpu="AMD Ryzen 5 5600X 6-Core Processor " unity=6000.5.9f1 editor-mono
+[Benchmark] runtime customers: warmup=450s customers 1001->963 (Eating=290,Queued=252,Ordering=18,Travelling=403) served=1632 walkedOut=279 | tick mean=0.25ms p99=0.95ms max=17.41ms over 300 ticks (step 0.18ms) | commits=30 avg=17.3ms max=35.2ms payload=465KB | cpu="AMD Ryzen 5 5600X 6-Core Processor " unity=6000.5.9f1 editor-mono
+[Benchmark] runtime customers: warmup=450s customers 1001->963 (Eating=290,Queued=252,Ordering=18,Travelling=403) served=1632 walkedOut=279 | tick mean=0.25ms p99=0.95ms max=17.41ms over 300 ticks (step 0.18ms) | commits=30 avg=17.3ms max=35.2ms payload=465KB | cpu="AMD Ryzen 5 5600X 6-Core Processor " unity=6000.5.9f1 editor-mono
+[Benchmark] save phases over 30 tick commits (mean/max ms): copy=0.00/0.00 validate=3.40/5.83 json=4.51/12.63 transaction=6.97/14.77 commit+sync=2.46/7.28
+[Benchmark] save phases over 30 tick commits (mean/max ms): copy=0.00/0.00 validate=3.40/5.83 json=4.51/12.63 transaction=6.97/14.77 commit+sync=2.46/7.28
+[Benchmark] save phases over 30 tick commits (mean/max ms): copy=0.00/0.00 validate=3.40/5.83 json=4.51/12.63 transaction=6.97/14.77 commit+sync=2.46/7.28
+[Benchmark] save phases over 30 tick commits (mean/max ms): copy=0.00/0.00 validate=3.40/5.83 json=4.51/12.63 transaction=6.97/14.77 commit+sync=2.46/7.28
+]]></output>
+              </test-case>
+            </test-suite>
+            <test-suite type="TestFixture" id="1022" name="TruckRoadBenchmarkTests" fullname="FoodFactoryGame.Benchmarks.Tests.TruckRoadBenchmarkTests" classname="FoodFactoryGame.Benchmarks.Tests.TruckRoadBenchmarkTests" runstate="Runnable" testcasecount="1" result="Passed" start-time="2026-10-12 19:51:24Z" end-time="2026-10-12 19:51:37Z" duration="13.743391" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-case id="1023" name="HundredTrucksOnTheGeneratedRoads" fullname="FoodFactoryGame.Benchmarks.Tests.TruckRoadBenchmarkTests.HundredTrucksOnTheGeneratedRoads" methodname="HundredTrucksOnTheGeneratedRoads" classname="FoodFactoryGame.Benchmarks.Tests.TruckRoadBenchmarkTests" runstate="Runnable" seed="1580362421" result="Passed" start-time="2026-10-12 19:51:24Z" end-time="2026-10-12 19:51:37Z" duration="13.741223" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <output><![CDATA[[Benchmark] trucks on roads: seed 20260927, 100 trucks, 20 sites, hour 12, 300 clock seconds x 3 runs: median p99=15.94ms (p99s 15.34ms, 24.14ms, 15.94ms) || run 1: mean=3.18ms p99=15.34ms max=29.40ms | legs entered 3471, queued truck-seconds 1954, on the road now 89, crates delivered 35675 | lots 450 (in docks 20, out 374, cargo 56); states ToDropoff=45,Loading=6,ToPickup=44,Unloading=5 first tick 2.1ms | slowest: t186:29.4ms legs=12 working=16 queued=9 gc=1314; t93:27.6ms legs=13 working=12 queued=5 gc=1313; t185:15.3ms legs=6 working=15 queued=10 gc=1313; t92:12.6ms legs=13 working=11 queued=5 gc=1312; t273:11.6ms legs=11 working=9 queued=10 gc=1315; t182:7.6ms legs=15 working=13 queued=6 gc=1313 || run 2: mean=3.88ms p99=24.14ms max=29.20ms | legs entered 3471, queued truck-seconds 1954, on the road now 89, crates delivered 35675 | lots 450 (in docks 20, out 374, cargo 56); states ToDropoff=45,Loading=6,ToPickup=44,Unloading=5 first tick 2.1ms | slowest: t225:29.2ms legs=13 working=17 queued=9 gc=1321; t14:27.2ms legs=17 working=10 queued=7 gc=1320; t113:24.1ms legs=18 working=18 queued=10 gc=1321; t228:22.5ms legs=9 working=16 queued=6 gc=1322; t112:18.3ms legs=13 working=20 queued=9 gc=1320; t226:14.5ms legs=16 working=16 queued=9 gc=1321 || run 3: mean=3.12ms p99=15.94ms max=23.92ms | legs entered 3471, queued truck-seconds 1954, on the road now 89, crates delivered 35675 | lots 450 (in docks 20, out 374, cargo 56); states ToDropoff=45,Loading=6,ToPickup=44,Unloading=5 first tick 2.0ms | slowest: t62:23.9ms legs=11 working=11 queued=7 gc=1328; t246:22.2ms legs=13 working=19 queued=5 gc=1330; t60:15.9ms legs=14 working=14 queued=5 gc=1327; t245:14.6ms legs=9 working=19 queued=5 gc=1329; t155:12.5ms legs=18 working=14 queued=1 gc=1328; t61:11.7ms legs=14 working=11 queued=6 gc=1327
+[Benchmark] trucks on roads: seed 20260927, 100 trucks, 20 sites, hour 12, 300 clock seconds x 3 runs: median p99=15.94ms (p99s 15.34ms, 24.14ms, 15.94ms) || run 1: mean=3.18ms p99=15.34ms max=29.40ms | legs entered 3471, queued truck-seconds 1954, on the road now 89, crates delivered 35675 | lots 450 (in docks 20, out 374, cargo 56); states ToDropoff=45,Loading=6,ToPickup=44,Unloading=5 first tick 2.1ms | slowest: t186:29.4ms legs=12 working=16 queued=9 gc=1314; t93:27.6ms legs=13 working=12 queued=5 gc=1313; t185:15.3ms legs=6 working=15 queued=10 gc=1313; t92:12.6ms legs=13 working=11 queued=5 gc=1312; t273:11.6ms legs=11 working=9 queued=10 gc=1315; t182:7.6ms legs=15 working=13 queued=6 gc=1313 || run 2: mean=3.88ms p99=24.14ms max=29.20ms | legs entered 3471, queued truck-seconds 1954, on the road now 89, crates delivered 35675 | lots 450 (in docks 20, out 374, cargo 56); states ToDropoff=45,Loading=6,ToPickup=44,Unloading=5 first tick 2.1ms | slowest: t225:29.2ms legs=13 working=17 queued=9 gc=1321; t14:27.2ms legs=17 working=10 queued=7 gc=1320; t113:24.1ms legs=18 working=18 queued=10 gc=1321; t228:22.5ms legs=9 working=16 queued=6 gc=1322; t112:18.3ms legs=13 working=20 queued=9 gc=1320; t226:14.5ms legs=16 working=16 queued=9 gc=1321 || run 3: mean=3.12ms p99=15.94ms max=23.92ms | legs entered 3471, queued truck-seconds 1954, on the road now 89, crates delivered 35675 | lots 450 (in docks 20, out 374, cargo 56); states ToDropoff=45,Loading=6,ToPickup=44,Unloading=5 first tick 2.0ms | slowest: t62:23.9ms legs=11 working=11 queued=7 gc=1328; t246:22.2ms legs=13 working=19 queued=5 gc=1330; t60:15.9ms legs=14 working=14 queued=5 gc=1327; t245:14.6ms legs=9 working=19 queued=5 gc=1329; t155:12.5ms legs=18 working=14 queued=1 gc=1328; t61:11.7ms legs=14 working=11 queued=6 gc=1327
+[Benchmark] trucks on roads: seed 20260927, 100 trucks, 20 sites, hour 12, 300 clock seconds x 3 runs: median p99=15.94ms (p99s 15.34ms, 24.14ms, 15.94ms) || run 1: mean=3.18ms p99=15.34ms max=29.40ms | legs entered 3471, queued truck-seconds 1954, on the road now 89, crates delivered 35675 | lots 450 (in docks 20, out 374, cargo 56); states ToDropoff=45,Loading=6,ToPickup=44,Unloading=5 first tick 2.1ms | slowest: t186:29.4ms legs=12 working=16 queued=9 gc=1314; t93:27.6ms legs=13 working=12 queued=5 gc=1313; t185:15.3ms legs=6 working=15 queued=10 gc=1313; t92:12.6ms legs=13 working=11 queued=5 gc=1312; t273:11.6ms legs=11 working=9 queued=10 gc=1315; t182:7.6ms legs=15 working=13 queued=6 gc=1313 || run 2: mean=3.88ms p99=24.14ms max=29.20ms | legs entered 3471, queued truck-seconds 1954, on the road now 89, crates delivered 35675 | lots 450 (in docks 20, out 374, cargo 56); states ToDropoff=45,Loading=6,ToPickup=44,Unloading=5 first tick 2.1ms | slowest: t225:29.2ms legs=13 working=17 queued=9 gc=1321; t14:27.2ms legs=17 working=10 queued=7 gc=1320; t113:24.1ms legs=18 working=18 queued=10 gc=1321; t228:22.5ms legs=9 working=16 queued=6 gc=1322; t112:18.3ms legs=13 working=20 queued=9 gc=1320; t226:14.5ms legs=16 working=16 queued=9 gc=1321 || run 3: mean=3.12ms p99=15.94ms max=23.92ms | legs entered 3471, queued truck-seconds 1954, on the road now 89, crates delivered 35675 | lots 450 (in docks 20, out 374, cargo 56); states ToDropoff=45,Loading=6,ToPickup=44,Unloading=5 first tick 2.0ms | slowest: t62:23.9ms legs=11 working=11 queued=7 gc=1328; t246:22.2ms legs=13 working=19 queued=5 gc=1330; t60:15.9ms legs=14 working=14 queued=5 gc=1327; t245:14.6ms legs=9 working=19 queued=5 gc=1329; t155:12.5ms legs=18 working=14 queued=1 gc=1328; t61:11.7ms legs=14 working=11 queued=6 gc=1327
+<b><color=#2EA3FF>MCP-FOR-UNITY</color></b>: [TestRunnerNoThrottle] Restored Interaction Mode after test run.
+<b><color=#2EA3FF>MCP-FOR-UNITY</color></b>: [TestRunnerNoThrottle] Restored Interaction Mode after test run.
+<b><color=#2EA3FF>MCP-FOR-UNITY</color></b>: [TestRunnerNoThrottle] Restored Interaction Mode after test run.
+Saving results to: C:/Users/Deven/AppData/LocalLow/DefaultCompany/FoodFactoryGame\TestResults.xml
+Saving results to: C:/Users/Deven/AppData/LocalLow/DefaultCompany/FoodFactoryGame\TestResults.xml
+Saving results to: C:/Users/Deven/AppData/LocalLow/DefaultCompany/FoodFactoryGame\TestResults.xml
+]]></output>
+              </test-case>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

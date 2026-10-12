@@ -550,6 +550,9 @@ namespace FoodFactoryGame.Goods
                 }
                 state.SchemaVersion = 24;
             }
+            // v24 districts had no street spawn (starting-loop decision 28): every SpawnWalkMetres reads 0, so their customers keep
+            // walking the whole way. The version still changes so an older build refuses a v25 save instead of dropping the setting.
+            if (state != null && state.SchemaVersion == 24) state.SchemaVersion = 25;
             GoodsWorld.Validate(state);
             return state;
         }

@@ -51,7 +51,12 @@ namespace FoodFactoryGame.Session.PlayModeTests
             _results.Clear();
             _directory = Path.Combine(Path.GetTempPath(), "FoodFactoryEquipmentPlay", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(_directory);
-            yield return SceneManager.LoadSceneAsync(ScenePath, LoadSceneMode.Single);
+            // DevSite is not in the build list (WorldGen is the build scene since 88c023b), so the Editor loads it by path.
+#if UNITY_EDITOR
+            yield return UnityEditor.SceneManagement.EditorSceneManager.LoadSceneAsyncInPlayMode(ScenePath, new LoadSceneParameters(LoadSceneMode.Single));
+#else
+            yield return null;
+#endif
             _root = UnityEngine.Object.FindAnyObjectByType<SessionRoot>();
             _presenter = UnityEngine.Object.FindAnyObjectByType<EquipmentPresenter>();
             Assert.That(_root, Is.Not.Null);
@@ -469,25 +474,45 @@ namespace FoodFactoryGame.Session.PlayModeTests
             Assert.That(hud.CountAt(PlayerHud.InventoryGrid, hud.SlotOf(PlayerHud.InventoryGrid, "dough#1")), Is.EqualTo(5));
             interaction.CloseScreen();
 
-            // Machine screen: once switched on, the oven's single input slot takes the full stack, and a batch takes one dough
-            // straight away.
+            // The oven's input has as many slots as its content definition gives it (3 since decision 0043). Buy supplier dough
+            // until the inventory holds one full stack per input slot plus a stack of 5.
+            var slots = _root.ClientSite.Locations.Single(x => x.Id == input).Capacity;
+            var stack = _root.MaxStack(DevWorld.DoughItemId);
+            var full = slots * stack;
+            for (var bought = 0; Count(inventory) < full + 5; bought++)
+            {
+                var request = "buy-dough-" + bought;
+                _root.ClientSubscription.Bridge.RequestPurchase(request, DevWorld.SiteId, "supplier-dough-5");
+                yield return Await(request);
+                Assert.That(_results[request].Reason, Is.EqualTo("bought"));
+                yield return Until(() => !interaction.HasPendingRequests && Count(inventory) >= DevWorld.StarterDough + DevWorld.StorageDough + 5 * (bought + 1),
+                    "bought dough in the inventory");
+            }
+            Assert.That(Count(inventory), Is.EqualTo(full + 5), "One full stack per oven input slot and a stack of 5.");
+
+            // Machine screen: once switched on, the oven's empty input takes a full stack, and a batch takes one dough straight
+            // away; each later full stack still fits whole, until the input is one dough short of full in every slot.
             yield return Until(() => { interaction.OpenMachine(DevWorld.OvenId); return interaction.Screen == InteractionScreen.Machine; }, "oven screen");
             hud.ClickPower(DevWorld.OvenId, true);
             yield return Until(() => _root.ClientSite.Equipment.Single(x => x.Id == DevWorld.OvenId).PoweredOn && !interaction.HasPendingRequests, "oven switched on");
             yield return null;
-            Assert.That(_root.ClientSite.Locations.Single(x => x.Id == input).Capacity, Is.EqualTo(1));
-            hud.QuickTransferSlot(PlayerHud.InventoryGrid, hud.SlotOf(PlayerHud.InventoryGrid, "dough#0"));
-            yield return Until(() => Count(input) == 19 && _root.ClientSite.Jobs.Any(x => x.StationId == DevWorld.OvenId) && !interaction.HasPendingRequests,
-                "full input and the first batch");
-            yield return null;
+            for (var slot = 0; slot < slots; slot++)
+            {
+                var expected = (slot + 1) * stack - 1;
+                Assert.That(hud.CountAt(PlayerHud.InventoryGrid, hud.SlotOf(PlayerHud.InventoryGrid, "dough#0")), Is.EqualTo(stack));
+                hud.QuickTransferSlot(PlayerHud.InventoryGrid, hud.SlotOf(PlayerHud.InventoryGrid, "dough#0"));
+                yield return Until(() => Count(input) == expected && _root.ClientSite.Jobs.Any(x => x.StationId == DevWorld.OvenId) && !interaction.HasPendingRequests,
+                    $"whole stack {slot + 1} of {slots} in the input beside the first batch");
+                yield return null;
+            }
 
-            // Only one dough fits beside the 19 left, so shift-clicking the stack of 5 moves just that one (a batch lasts 10 s).
+            // Only one dough fits beside the rest, so shift-clicking the stack of 5 moves just that one (a batch lasts 10 s).
             var rest = hud.SlotOf(PlayerHud.InventoryGrid, "dough");
             Assert.That(hud.CountAt(PlayerHud.InventoryGrid, rest), Is.EqualTo(5));
             hud.QuickTransferSlot(PlayerHud.InventoryGrid, rest);
             yield return Until(() => Count(inventory) == 4 && !interaction.HasPendingRequests, "input filled from part of the stack");
             Assert.That(interaction.LastRejection, Is.Null);
-            Assert.That(Count(input), Is.EqualTo(20));
+            Assert.That(Count(input), Is.EqualTo(full));
             interaction.CloseScreen();
         }
 

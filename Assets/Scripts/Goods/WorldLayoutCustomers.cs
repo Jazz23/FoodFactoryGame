@@ -25,12 +25,19 @@ namespace FoodFactoryGame.Goods
             _ => throw new ArgumentOutOfRangeException(nameof(kind))
         };
 
+        // PROTOTYPE, a testing value (starting-loop decision 28): customers of a layout from generator v7 on enter the world on the
+        // street this close to the restaurant they chose (GoodsDistrict.SpawnWalkMetres), a 5 s walk, so the first customer of a
+        // stocked, staffed register comes well within a minute. Earlier layouts keep the whole walk from the block centre.
+        public const int StreetSpawnMetres = 10;
+        public const int StreetSpawnGenerator = 7;
+
         public static string DistrictId(WorldDistrict district, int block) => $"district-{district.Id}-{block}";
 
         public static string CompetitorId(string buildingId) => "competitor-" + buildingId;
 
-        // One district record per block, spawning at the block's centre; the layout district's customers per game hour are shared
-        // between its blocks by area (largest remainder, so the blocks add up to the district's rate exactly).
+        // One district record per block, spawning at the block's centre (from generator v7, on the street by the chosen restaurant);
+        // the layout district's customers per game hour are shared between its blocks by area (largest remainder, so the blocks add
+        // up to the district's rate exactly).
         public static List<GoodsDistrict> Districts(WorldLayout layout)
         {
             var result = new List<GoodsDistrict>();
@@ -49,7 +56,8 @@ namespace FoodFactoryGame.Goods
                         Id = DistrictId(district, block), Name = $"{district.Kind} {block + 1}",
                         MapX = area.X + area.Width / 2, MapZ = area.Z + area.Depth / 2, CustomersPerHour = shares[block],
                         WealthPercent = wealth, Appearance = district.Id, AppearanceVariants = AppearanceVariants,
-                        LikedCuisines = liked.ToList(), DineInPercent = dineIn, RangeMetres = range
+                        LikedCuisines = liked.ToList(), DineInPercent = dineIn, RangeMetres = range,
+                        SpawnWalkMetres = layout.GeneratorVersion >= StreetSpawnGenerator ? StreetSpawnMetres : 0
                     });
                 }
             }

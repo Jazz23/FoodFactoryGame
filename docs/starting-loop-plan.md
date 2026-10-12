@@ -1,6 +1,10 @@
 # Plan: Close the Starting Restaurant Loop
 
-Date: 2026-10-06. Revised 2026-10-07 after P0, P1 and the owner's answers to the plan's open questions.
+Date: 2026-10-06. Revised 2026-10-07 after P0, P1 and the owner's answers to the plan's open questions. Revised 2026-10-12
+with the owner's answers after the merge into main (decisions 13-25).
+
+The rest of this plan predates the merge. Where it cites schema v19-v21 or decisions 0037-0039, see `docs/architecture.md`:
+on main those migrations are v21-v24, and decision numbers 0037-0039 are each shared by two files.
 
 Status: **accepted in direction (owner, 2026-10-07).** P4 implemented 2026-10-07. The owner's decisions are under
 [Owner decisions recorded](#owner-decisions-recorded). Values marked PROTOTYPE are open. Each piece gets a decision record in
@@ -18,8 +22,8 @@ to end with no dev seeds, console commands or editor help:
 The loop is **one restaurant** (owner, 2026-10-07; GDD section 16, early phase "one site"). It stays correct across a restart,
 with a second player in a separate process, and in a player build.
 
-Not part of this loop: a second restaurant that sells while nobody staffs it. A register sells only while staffed (0035),
-and employees are a later piece. Buying buildings, player trucks and several sites keep working but are not acceptance
+Not part of this loop: a second restaurant that sells while nobody staffs it. A register sells only while staffed (0035).
+The loop does use an employee (decision 20). Buying buildings, player trucks and several sites keep working but are not acceptance
 criteria here.
 
 ## Owner decisions recorded
@@ -51,7 +55,7 @@ criteria here.
    Goods are never deleted or duplicated.
 9. **Start kit and cash.** The starting restaurant has its counter, table, back door and dock, nothing else. The player
    starts holding enough dough for a few bakes, not the dev starter goods (no belts or lifts). Starting cash covers about an
-   oven, a fridge, a few tables and an hour of ingredients. All numbers PROTOTYPE.
+   oven, a fridge, a few tables and an hour of ingredients. All numbers PROTOTYPE. *Starting cash superseded by decision 17.*
 10. **Demand follows the traffic hour.** District customer rates are defined per traffic hour (60 clock s,
     `RoadTraffic.HourSeconds`), not per 3600 s. Rates are re-tuned so the city does not jump 60x. **Margins stay as they
     are** for now ($2.50 bread, current offer and building prices).
@@ -59,6 +63,43 @@ criteria here.
     own piece (P6).
 12. **0035 Q5: no, for now.** A register serves while its staff is named, wherever the staff stands.
     **0035 Q1: no.** Restoring a bought building's original walls is charged like any wall (today's behaviour).
+
+**2026-10-12 (after the merge into main):**
+
+13. **Supplier depot:** the world generator places it (generator version and layout format bump). How worlds made before it
+    get one is still open.
+14. **Who orders:** any player with a grant on the site may order ingredients to its docks, validated by the server.
+15. **Full-dock timeout:** 2 minutes (120 clock s, two game hours) for decision 8. PROTOTYPE.
+16. **`DevSite` keeps instant ingredient buying.** Generated worlds use supplier delivery only.
+17. **Starting cash: $1,000,000** for a new generated world (replaces decision 9's sizing). The 20 dough held at start
+    stays. PROTOTYPE.
+18. **Prices stay as they are** (decision 10 holds after 0043): bread $2.50; `FoodBalance` and offer prices unchanged.
+19. **The starting restaurant is placed where bread sells:** its district's minimum tier is 1 (wealth below the 0043
+    tier-2 threshold). This is a generator rule.
+20. **The loop uses an employee.** Hiring and wages (0039 hiring) are part of acceptance. Which jobs the employee does in the
+    loop is still open.
+21. **The loop's dish is bread only** (dough → bread at the oven). Other dishes are not acceptance. Choosing a menu per
+    restaurant (0043) stays open and does not block the loop.
+22. **First customer:** customers spawn nearer the street, so the first one arrives within about a minute. Replaces the
+    other options in 0039 (demand).
+23. **Agent recommendation, adopted:** spoil-soon warning when a register item's remaining life is under the shorter of
+    600 clock s and a quarter of its shelf life. 600 s alone flags 0043's short-lived goods (chicken, 240 s) as soon as they
+    are bought. Ledger retention stays at 50 entries per company. Both PROTOTYPE.
+24. **A player's switch-off holds across a restart** (0038 owner feedback): after a restart a player must switch the machine
+    back on; an employee cannot.
+25. **Agent recommendation, adopted:** the employee screen marks a "Turn machine on" task that is blocked by a player's
+    switch-off ("switched off by a player"), using the existing `held-off` refusal.
+26. **The starting loop is for new worlds only.** Worlds generated before the depot get no depot and no supplier delivery.
+    They keep instant ingredient buying, as `DevSite` does, which is not part of acceptance. They must still load without
+    losing goods or cash.
+27. **The employee does a mix of jobs in the loop:** working the register, carrying goods, and running the oven. P5 checks
+    all three.
+28. **Customers spawn very near the street, for testing.** The first customer should arrive well within a minute. This is a
+    testing value, not tuned pacing. PROTOTYPE.
+29. **Worlds made before the "start where bread sells" rule (decision 19) are left as they are.**
+30. **First customer: about one to two minutes is accepted** (after decision 28's street spawn was measured, 0044). The walk is
+    5 s; the wait for the first customer to choose the restaurant stays as it is. Checked as a mean first arrival of at most
+    120 s over the measured openings on both seeds. PROTOTYPE.
 
 ## Where things stand
 
@@ -126,7 +167,8 @@ The loop fails silently: an unstaffed register, an empty register and unreachabl
 
 Status: **implemented 2026-10-07** ([plan](starting-loop-p4-plan.md), [0039](decisions/0039-demand-on-the-game-hour-and-start-kit.md),
 [record](verification/starting-loop-p4-20261007.md)). Goods snapshot v21, layout format 5, generator v6. The playthrough rerun on the new start is pending. The first-customer
-target (about a minute) is not reached by rate alone; options are with the owner (Still open 1). Every value stays PROTOTYPE.
+target (about a minute) is not reached by rate alone; the owner chose spawning customers nearer the street (decision 22),
+which is not implemented yet. Starting cash becomes $1,000,000 (decision 17). Every value stays PROTOTYPE.
 
 - **Start kit and cash** (decision 9). Generated worlds only; `DevSite` and its tests keep the dev starter goods.
 - **Demand on the traffic hour** (decision 10). Re-base `GoodsDistrict.CustomersPerHour` (`GoodsWorld.Customers.cs`) on
@@ -136,16 +178,16 @@ target (about a minute) is not reached by rate alone; options are with the owner
   the player's cooking and seats, not by arrivals; spoilage of a normal stock stays small at that rate (bread lasts 3600 s).
 - **Budgets.** Rerun 0025 (`CityCustomerBenchmarkTests`: tick p99, decision burst, commit time and payload) after re-tuning.
   Editor commits reached 381 ms in P0 (P0-08); the player-build rerun is in P5.
-- No running costs. Wages belong to employees; rent does not exist.
+- The only running cost is employee wages ($10 per game hour, 0039 hiring). Rent does not exist.
 
 ### P2 - Ingredients arrive at the back-door dock
 
 GDD section 3 ("an ingredient supplier reachable by road") and sections 5 and 9 (inbound docks receive real goods from real
 trucks). Decisions 6-8.
 
-- **Supplier depot:** PROPOSAL: a world-owned site on the road network near the starting restaurant (0028 world-owned
-  sites, 0032 roads). Open in the design: whether it is a generator change (version and layout format bump) or placed at
-  world creation, and how worlds made before it get one (no silent loss; dry-run the upgrade on a copy).
+- **Supplier depot:** a world-owned site on the road network near the starting restaurant (0028 world-owned sites, 0032
+  roads), placed by the world generator (decision 13; version and layout format bump). Worlds made before it get none
+  (decision 26); they must still load with goods and cash intact.
 - **Server contract:**
   - An order is a durable record with a stable ID, charged exactly once when accepted. Duplicate request IDs replay.
   - Goods are created on the supplier's truck and do not age there (decision 7). They unload into the dock at
@@ -153,9 +195,10 @@ trucks). Decisions 6-8.
   - Failure behaviour is decision 8. A refund covers exactly the goods not unloaded.
   - No goods lost or duplicated, and no payment doubled, across a restart in any order state.
   - Supplier trucks are not in the player's fleet. `TruckPresenter` draws them; they drive real legs with traffic.
-  - PROPOSAL: any player with a grant on the site may order to its docks (as other site actions), validated by the server.
-- **Removing instant ingredient buying** in generated worlds. `DevSite` keeps the instant supplier unless its tests are
-  moved; P0's S3 step changes to an order.
+  - Any player with a grant on the site may order to its docks (as other site actions), validated by the server (decision 14).
+  - Full-dock timeout: 120 clock s (decision 15).
+- **Removing instant ingredient buying** in generated worlds that have a depot. `DevSite` and worlds generated before the
+  depot keep the instant supplier (decisions 16, 26); P0's S3 step changes to an order.
 - **UI:** the Supplier window orders to a dock and shows the ETA. Open orders appear in the logistics screen.
 - The flaky `WorldGenSessionTests.ATruckDrivesTheGeneratedRoadsWhereItIsDrawn` (7 of 8 drawn samples in P0's baseline)
   gets a diagnosis before P2 changes trucks.
@@ -199,17 +242,16 @@ authentication, multi-process evidence) and plan them; this piece may need its o
 
 ## Out of scope
 
-Employees and wages, a second restaurant selling unattended, more recipes and menus, competitor AI, bankruptcy and loans
+A second restaurant selling unattended, dishes other than bread and per-restaurant menus (decision 21), competitor AI, bankruptcy and loans
 (GDD section 14, undecided), restaurant extra floors (deferred), truck animation at docks (owner: none), several companies
 per world, factories' back doors, price and margin changes (decision 10).
 
 ## Still open
 
-1. **First customer** (P4): the owner confirmed "within about a minute" (2026-10-07). Measured: customers walk 60-66 s from
-   the nearest blocks, and the first arrival was 81-219 s in every run, so spawn rate alone cannot reach it. Options in
-   [0039](decisions/0039-demand-on-the-game-hour-and-start-kit.md): accept about two minutes, spawn customers nearer the
-   street, a faster walk, or divisor 6 (about 1,400 customers in the city).
-2. **Supplier depot placement and older worlds** (P2): generator change or world-creation placement; the design goes to
-   the owner before P2 is implemented.
-3. PROTOTYPE values: 20 dough held at start, $700 starting cash and re-tune divisor 10 (P4, owner-confirmed as starting points), the full-dock timeout, the spoil-soon warning window, ledger
-   retention.
+Decided on 2026-10-12 (decisions 13-25): depot placement, who orders, the full-dock timeout, starting cash, the dish, the
+first-customer approach, the spoil-soon window and ledger retention.
+
+Decided later on 2026-10-12 (decisions 26-29): older worlds, the employee's jobs and how near customers spawn.
+
+1. PROTOTYPE values: 20 dough held at start, $1,000,000 starting cash, re-tune divisor 10, the 120 s full-dock timeout, the
+   spoil-soon rule and 50-entry ledger retention.

@@ -49,7 +49,10 @@ namespace FoodFactoryGame.World
         // 5 (2026-10-06): every restaurant lot has a service yard beside the shell with a back door and a starter dock (layout
         // format 4, decision 0037).
         // 6 (2026-10-07): district customer rates count game hours (layout format 5, decision 0039); nothing else changes.
-        public const int Version = 6;
+        // 7 (2026-10-12): the starting restaurant must stand in a district whose minimum recipe tier is 1, where bread sells
+        // (starting-loop decision 19), checked by the validator; with the default settings every seed's layout is v6's. Customers of
+        // a v7 world spawn on the street by the restaurant they chose (decision 28, WorldLayoutCustomers). Layout format unchanged.
+        public const int Version = 7;
 
         // extraRule adds problems of its own (tests use it to force retries); it cannot waive validator problems.
         public static WorldGenerationResult Generate(string requestedSeed, ulong seed, WorldSettings settings = null,
@@ -1013,11 +1016,15 @@ namespace FoodFactoryGame.World
                 }
             }
 
-            // The smallest (then cheapest, then first) residential restaurant shell that is small enough becomes the player's.
+            // The smallest (then cheapest, then first) residential restaurant shell that is small enough becomes the player's, if the
+            // residential district's minimum recipe tier is 1 (decision 19: bread sells there); otherwise there is no start and the
+            // validator rejects the attempt.
             private void PickStart()
             {
+                var residential = _s.Profile(DistrictKind.Residential);
+                if (residential.MinRecipeTier != 1) return;
                 var start = _layout.Buildings
-                    .Where(x => x.Category == BuildingCategory.Restaurant && x.DistrictId == _s.Profile(DistrictKind.Residential).Id
+                    .Where(x => x.Category == BuildingCategory.Restaurant && x.DistrictId == residential.Id
                         && x.Width * x.Depth <= _s.StartMaxArea)
                     .OrderBy(x => x.Width * x.Depth).ThenBy(x => x.PriceCents).FirstOrDefault();
                 if (start == null) return;

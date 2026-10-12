@@ -3,8 +3,8 @@
 // the starting counter and table: GeneratedWorldCustomersTests), and
 // reloads without changing; layouts without lots, and a format 3 save made before piece 2, keep the dev world; joining grants
 // the starting site with an inventory (the dough-only start kit, decision 0039) and every other site of the company without one;
-// the starting cash covers a basic kit; an older world loads with re-tuned district rates and its cash; players spawn on the
-// starting apron.
+// only a new world starts with $1,000,000 (starting-loop decision 17) while an older world and DevSite keep their cash; an older
+// world loads with re-tuned district rates, its cash and no street spawn; players spawn on the starting apron.
 using System;
 using System.IO;
 using System.Linq;
@@ -125,19 +125,27 @@ namespace FoodFactoryGame.Session.Tests
                 "Decision 0039: a generated world's start kit is dough only, no belts or lifts.");
         }
 
-        // Decision 0039 (owner decision 9): the starting cash covers about an oven, a fridge, a few tables and an hour of dough,
-        // priced from the real offers, with less than 2x slack, so a price change shows up here.
+        // Starting-loop decision 17: only a new generated world's company starts with $1,000,000. A world made earlier (here with
+        // decision 0039's $700, in a v24 save) keeps its own cash when it is opened again, and DevSite keeps its own starting cash.
         [Test]
-        public void TheStartingCashCoversABasicKitAndLittleMore()
+        public void OnlyANewWorldStartsWithAMillionDollars()
         {
-            long Price(string name) => UnityEditor.AssetDatabase.LoadAssetAtPath<Equipment.OfferAsset>($"Assets/Content/Offers/{name}.asset").PriceCents;
-            // The dough pack is a FoodBalance supply row since decision 0043 (the Dough5 asset is retired; its offer ID is unchanged).
-            var dough = UnityEditor.AssetDatabase.LoadAssetAtPath<Equipment.FoodBalance>("Assets/Content/FoodBalance.asset").Offers().Single(x => x.Id == "supplier-dough-5");
-            // PROTOTYPE: an hour of dough at about one sale a real minute (the pacing target), in whole packs.
-            var hourOfDough = (60 + dough.Quantity - 1) / dough.Quantity * dough.PriceCents;
-            var kit = Price("Oven1") + Price("Fridge1") + 3 * Price("Table1") + hourOfDough;
-            TestContext.WriteLine($"basic kit {kit} cents, starting cash {GeneratedWorld.StartingCash} cents");
-            Assert.That(GeneratedWorld.StartingCash, Is.GreaterThanOrEqualTo(kit).And.LessThan(2 * kit));
+            Assert.That(GeneratedWorld.StartingCash, Is.EqualTo(100_000_000L), "PROTOTYPE: $1,000,000 in whole cents.");
+            var stored = Layout();
+            var world = Open(stored);
+            Assert.That(world.Snapshot().Companies.Single(x => x.Id == GeneratedWorld.CompanyId).Cash, Is.EqualTo(100_000_000L));
+
+            // TEST-ONLY: the same world as decision 0039 made it, with $700, in a v24 save written before decision 17.
+            Assert.That(world.AdjustCashDurably(GeneratedWorld.CompanyId, 70_000 - GeneratedWorld.StartingCash, WorldPath), Is.Null);
+            ReplaceLatestPayload(WithoutStreetSpawn(LatestPayload()).Replace($"\"SchemaVersion\":{GoodsSnapshot.CurrentSchema}", "\"SchemaVersion\":24"));
+            var reopened = Open(stored).Snapshot();
+            Assert.That(reopened.Companies.Single().Cash, Is.EqualTo(70_000L), "An older world keeps its cash; nothing tops it up.");
+            Assert.That(GoodsSnapshotStore.Load(WorldPath).Snapshot().Companies.Single().Cash, Is.EqualTo(70_000L));
+
+            var devPath = Path.Combine(_directory, "dev", SessionOptions.WorldFileName);
+            Directory.CreateDirectory(Path.GetDirectoryName(devPath));
+            Assert.That(DevWorld.LoadOrCreate(devPath, items: SessionTestFiles.ContentItems()).Snapshot().Companies.Single().Cash,
+                Is.EqualTo(DevWorld.StartingCash), "DevSite is unchanged.");
         }
 
         // Decision 0039: a world created before the game hour (goods v23, layout format 4) loads with its districts re-tuned in
@@ -148,10 +156,10 @@ namespace FoodFactoryGame.Session.Tests
             var stored = Layout();
             var world = Open(stored);
             var created = world.Snapshot();
-            // TEST-ONLY: the same world as decision 0038 left it, with $1,000,000 and per-3600 s district rates in a v23 save.
-            Assert.That(world.AdjustCashDurably(GeneratedWorld.CompanyId, 100_000_000 - GeneratedWorld.StartingCash, WorldPath), Is.Null);
+            // TEST-ONLY: the same world with $700 (decision 0039's starting cash) and per-3600 s district rates in a v23 save.
+            Assert.That(world.AdjustCashDurably(GeneratedWorld.CompanyId, 70_000 - GeneratedWorld.StartingCash, WorldPath), Is.Null);
             var payload = LatestPayload();
-            var v23 = System.Text.RegularExpressions.Regex.Replace(payload, "\"CustomersPerHour\":(\\d+)",
+            var v23 = System.Text.RegularExpressions.Regex.Replace(WithoutStreetSpawn(payload), "\"CustomersPerHour\":(\\d+)",
                     m => $"\"CustomersPerHour\":{int.Parse(m.Groups[1].Value) * GameClock.RetuneDivisor}")
                 .Replace($"\"SchemaVersion\":{GoodsSnapshot.CurrentSchema}", "\"SchemaVersion\":23");
             ReplaceLatestPayload(v23);
@@ -159,8 +167,14 @@ namespace FoodFactoryGame.Session.Tests
             var loaded = Open(stored).Snapshot();
             Assert.That(loaded.Districts.Select(x => (x.Id, x.CustomersPerHour)), Is.EqualTo(created.Districts.Select(x => (x.Id, x.CustomersPerHour))),
                 "Rates come back as the game-hour rates a new world gets; no district is added twice.");
-            Assert.That(loaded.Companies.Single().Cash, Is.EqualTo(100_000_000L), "An older world keeps its cash.");
+            Assert.That(loaded.Companies.Single().Cash, Is.EqualTo(70_000L), "An older world keeps its cash.");
+            Assert.That(loaded.Districts.Select(x => x.SpawnWalkMetres).Distinct(), Is.EqualTo(new[] { 0 }),
+                "Decision 28 does not reach an older world: its customers keep the whole walk.");
         }
+
+        // TEST-ONLY: a payload as a build before schema v25 wrote it, with no SpawnWalkMetres field.
+        private static string WithoutStreetSpawn(string payload) =>
+            System.Text.RegularExpressions.Regex.Replace(payload, ",\"SpawnWalkMetres\":\\d+", "");
 
         [Test]
         public void PlayersSpawnOnTheStartingApronInFrontOfTheDoor()

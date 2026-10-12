@@ -119,6 +119,14 @@
     translate: -50% -50%;
 }
 
+/* A full-screen layer that centres its in-flow child by flex. Use it for a window that grows while open: UI Toolkit keeps
+   drawing a percentage translate (ff-centered) resolved at the window's old size while picking uses the new one, so drawn
+   controls stop taking clicks (starting-loop finding P0-01). Pair with ff-fill; the window itself stays in flow. */
+.ff-centering {
+    align-items: center;
+    justify-content: center;
+}
+
 /* ---------- Surfaces ---------- */
 
 /* A screen window: solid panel, hairline edge, 14 px corners. */

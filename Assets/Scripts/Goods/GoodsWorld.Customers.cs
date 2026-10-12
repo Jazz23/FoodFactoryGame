@@ -36,6 +36,10 @@ namespace FoodFactoryGame.Goods
         public int RangeMetres;
         // Customer-seconds accumulated toward the next customer; below GameClock.HourSeconds.
         public long SpawnProgress;
+        // Decision 28 of the starting-loop plan (schema v25): when above 0, a customer enters the world on the street at most this
+        // many metres from the restaurant it chose, so its walk is that short; range and scoring still measure from MapX/MapZ.
+        // 0 (older saves, DevSite) walks the whole way from MapX/MapZ.
+        public int SpawnWalkMetres;
     }
 
     // A fixed AI restaurant (PROTOTYPE of GDD section 11): one menu item, servers and seats, unlimited stock, no cash.
@@ -477,12 +481,16 @@ namespace FoodFactoryGame.Goods
                 customer.State = CustomerState.Travelling;
                 customer.RestaurantId = option.Diner.Id;
                 customer.RecipeId = option.RecipeId;
-                customer.RemainingSeconds = Math.Max(1, distance / WalkMetresPerSecond);
+                customer.RemainingSeconds = Math.Max(1, WalkMetres(district, distance) / WalkMetresPerSecond);
                 customer.QueuedAtSeconds = 0;
                 return true;
             }
             return false;
         }
+
+        // How far a customer of the district walks to a restaurant `distance` metres from its spawn point (GoodsDistrict.SpawnWalkMetres).
+        public static int WalkMetres(GoodsDistrict district, int distance) =>
+            district.SpawnWalkMetres > 0 ? Math.Min(distance, district.SpawnWalkMetres) : distance;
 
         // The restaurants within the district's range, in catalog (ID) order, so the draw matches scoring every restaurant.
         private List<(Diner Diner, int Distance)> Candidates(GoodsDistrict district, List<Diner> diners)
@@ -639,7 +647,8 @@ namespace FoodFactoryGame.Goods
             if (state.NextCustomerNumber < 0
                 || state.Districts.Any(x => x is null || string.IsNullOrWhiteSpace(x.Id) || x.Name is null || x.CustomersPerHour < 0
                     || x.WealthPercent is < 0 or > 100 || x.DineInPercent is < 0 or > 100 || x.AppearanceVariants < 1
-                    || x.Appearance is null || x.LikedCuisines is null || x.RangeMetres < 1 || x.SpawnProgress < 0 || x.SpawnProgress >= GameClock.HourSeconds)
+                    || x.Appearance is null || x.LikedCuisines is null || x.RangeMetres < 1 || x.SpawnProgress < 0 || x.SpawnProgress >= GameClock.HourSeconds
+                    || x.SpawnWalkMetres < 0)
                 || state.Districts.GroupBy(x => x.Id).Any(x => x.Count() != 1)
                 || state.Competitors.Any(x => x is null || string.IsNullOrWhiteSpace(x.Id) || x.Name is null || x.Cuisine is null
                     || x.Tier < 1 || x.PriceCents < 1 || x.Servers < 1 || x.ServiceSeconds < 1 || x.Seats < 0

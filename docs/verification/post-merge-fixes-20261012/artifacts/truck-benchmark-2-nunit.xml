@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="1" result="Failed(Child)" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-10-12 19:45:11Z" end-time="2026-10-12 19:45:26Z" duration="14.4522871">
+  <test-suite type="TestSuite" id="1580" name="FoodFactoryGame" fullname="FoodFactoryGame" runstate="Runnable" testcasecount="473" result="Failed" site="Child" start-time="2026-10-12 19:45:11Z" end-time="2026-10-12 19:45:26Z" duration="14.452287" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="EditMode" />
+    </properties>
+    <failure>
+      <message><![CDATA[One or more child tests had errors]]></message>
+    </failure>
+    <test-suite type="Assembly" id="1024" name="FoodFactoryGame.Benchmarks.EditModeTests.dll" fullname="E:/Projects/Unity/FoodFactoryGame/Library/ScriptAssemblies/FoodFactoryGame.Benchmarks.EditModeTests.dll" runstate="Runnable" testcasecount="10" result="Failed" site="Child" start-time="2026-10-12 19:45:11Z" end-time="2026-10-12 19:45:26Z" duration="14.448140" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="13200" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="EditMode" />
+        <property name="EditorOnly" value="True" />
+      </properties>
+      <failure>
+        <message><![CDATA[One or more child tests had errors]]></message>
+      </failure>
+      <test-suite type="TestSuite" id="1025" name="FoodFactoryGame" fullname="FoodFactoryGame" runstate="Runnable" testcasecount="10" result="Failed" site="Child" start-time="2026-10-12 19:45:11Z" end-time="2026-10-12 19:45:26Z" duration="14.447915" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <failure>
+          <message><![CDATA[One or more child tests had errors]]></message>
+        </failure>
+        <test-suite type="TestSuite" id="1026" name="Benchmarks" fullname="FoodFactoryGame.Benchmarks" runstate="Runnable" testcasecount="10" result="Failed" site="Child" start-time="2026-10-12 19:45:11Z" end-time="2026-10-12 19:45:26Z" duration="14.447705" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <failure>
+            <message><![CDATA[One or more child tests had errors]]></message>
+          </failure>
+          <test-suite type="TestSuite" id="1027" name="Tests" fullname="FoodFactoryGame.Benchmarks.Tests" runstate="Runnable" testcasecount="10" result="Failed" site="Child" start-time="2026-10-12 19:45:11Z" end-time="2026-10-12 19:45:26Z" duration="14.447467" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <failure>
+              <message><![CDATA[One or more child tests had errors]]></message>
+            </failure>
+            <test-suite type="TestFixture" id="1022" name="TruckRoadBenchmarkTests" fullname="FoodFactoryGame.Benchmarks.Tests.TruckRoadBenchmarkTests" classname="FoodFactoryGame.Benchmarks.Tests.TruckRoadBenchmarkTests" runstate="Runnable" testcasecount="1" result="Failed" site="Child" start-time="2026-10-12 19:45:11Z" end-time="2026-10-12 19:45:26Z" duration="14.447251" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <failure>
+                <message><![CDATA[One or more child tests had errors]]></message>
+              </failure>
+              <test-case id="1023" name="HundredTrucksOnTheGeneratedRoads" fullname="FoodFactoryGame.Benchmarks.Tests.TruckRoadBenchmarkTests.HundredTrucksOnTheGeneratedRoads" methodname="HundredTrucksOnTheGeneratedRoads" classname="FoodFactoryGame.Benchmarks.Tests.TruckRoadBenchmarkTests" runstate="Runnable" seed="1580362421" result="Failed" start-time="2026-10-12 19:45:11Z" end-time="2026-10-12 19:45:26Z" duration="14.446774" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <failure>
+                  <message><![CDATA[  [Benchmark] trucks on roads: seed 20260927, 100 trucks, 20 sites, hour 12, 300 clock seconds x 3 runs: median p99=18.13ms (p99s 20.67ms, 18.13ms, 16.97ms) || run 1: mean=3.40ms p99=20.67ms max=26.67ms | legs entered 3471, queued truck-seconds 1954, on the road now 89, crates delivered 35675 | lots 450 (in docks 20, out 374, cargo 56); states ToDropoff=45,Loading=6,ToPickup=44,Unloading=5 first tick 2.3ms | slowest: t211:26.7ms legs=14 working=14 queued=9 gc=1247; t292:24.1ms legs=9 working=18 queued=0 gc=1248; t31:20.7ms legs=14 working=9 queued=8 gc=1245; t121:20.0ms legs=15 working=14 queued=6 gc=1246; t120:15.9ms legs=14 working=15 queued=6 gc=1245; t291:14.1ms legs=11 working=17 queued=0 gc=1247 || run 2: mean=3.48ms p99=18.13ms max=21.73ms | legs entered 3471, queued truck-seconds 1954, on the road now 89, crates delivered 35675 | lots 450 (in docks 20, out 374, cargo 56); states ToDropoff=45,Loading=6,ToPickup=44,Unloading=5 first tick 2.1ms | slowest: t284:21.7ms legs=17 working=17 queued=2 gc=1256; t200:19.5ms legs=13 working=11 queued=10 gc=1255; t199:18.1ms legs=10 working=11 queued=9 gc=1254; t17:18.0ms legs=11 working=11 queued=6 gc=1253; t283:17.5ms legs=7 working=17 queued=3 gc=1255; t111:14.3ms legs=7 working=21 queued=7 gc=1254 || run 3: mean=3.96ms p99=16.97ms max=34.56ms | legs entered 3471, queued truck-seconds 1954, on the road now 89, crates delivered 35675 | lots 450 (in docks 20, out 374, cargo 56); states ToDropoff=45,Loading=6,ToPickup=44,Unloading=5 first tick 9.4ms | slowest: t290:34.6ms legs=12 working=17 queued=2 gc=1264; t100:22.2ms legs=7 working=16 queued=6 gc=1262; t2:17.0ms legs=9 working=12 queued=3 gc=1261; t197:16.7ms legs=12 working=14 queued=7 gc=1262; t193:16.5ms legs=18 working=15 queued=10 gc=1262; t206:14.9ms legs=12 working=11 queued=3 gc=1262
+  Expected: less than or equal to 16.666666666666668d
+  But was:  18.134899999999998d
+]]></message>
+                  <stack-trace><![CDATA[at FoodFactoryGame.Benchmarks.Tests.TruckRoadBenchmarkTests.HundredTrucksOnTheGeneratedRoads () [0x00146] in E:\Projects\Unity\FoodFactoryGame\Assets\Tests\EditMode\Benchmarks\TruckRoadBenchmarkTests.cs:36
+]]></stack-trace>
+                </failure>
+                <output><![CDATA[[Benchmark] trucks on roads: seed 20260927, 100 trucks, 20 sites, hour 12, 300 clock seconds x 3 runs: median p99=18.13ms (p99s 20.67ms, 18.13ms, 16.97ms) || run 1: mean=3.40ms p99=20.67ms max=26.67ms | legs entered 3471, queued truck-seconds 1954, on the road now 89, crates delivered 35675 | lots 450 (in docks 20, out 374, cargo 56); states ToDropoff=45,Loading=6,ToPickup=44,Unloading=5 first tick 2.3ms | slowest: t211:26.7ms legs=14 working=14 queued=9 gc=1247; t292:24.1ms legs=9 working=18 queued=0 gc=1248; t31:20.7ms legs=14 working=9 queued=8 gc=1245; t121:20.0ms legs=15 working=14 queued=6 gc=1246; t120:15.9ms legs=14 working=15 queued=6 gc=1245; t291:14.1ms legs=11 working=17 queued=0 gc=1247 || run 2: mean=3.48ms p99=18.13ms max=21.73ms | legs entered 3471, queued truck-seconds 1954, on the road now 89, crates delivered 35675 | lots 450 (in docks 20, out 374, cargo 56); states ToDropoff=45,Loading=6,ToPickup=44,Unloading=5 first tick 2.1ms | slowest: t284:21.7ms legs=17 working=17 queued=2 gc=1256; t200:19.5ms legs=13 working=11 queued=10 gc=1255; t199:18.1ms legs=10 working=11 queued=9 gc=1254; t17:18.0ms legs=11 working=11 queued=6 gc=1253; t283:17.5ms legs=7 working=17 queued=3 gc=1255; t111:14.3ms legs=7 working=21 queued=7 gc=1254 || run 3: mean=3.96ms p99=16.97ms max=34.56ms | legs entered 3471, queued truck-seconds 1954, on the road now 89, crates delivered 35675 | lots 450 (in docks 20, out 374, cargo 56); states ToDropoff=45,Loading=6,ToPickup=44,Unloading=5 first tick 9.4ms | slowest: t290:34.6ms legs=12 working=17 queued=2 gc=1264; t100:22.2ms legs=7 working=16 queued=6 gc=1262; t2:17.0ms legs=9 working=12 queued=3 gc=1261; t197:16.7ms legs=12 working=14 queued=7 gc=1262; t193:16.5ms legs=18 working=15 queued=10 gc=1262; t206:14.9ms legs=12 working=11 queued=3 gc=1262
+<b><color=#2EA3FF>MCP-FOR-UNITY</color></b>: [TestRunnerNoThrottle] Restored Interaction Mode after test run.
+Saving results to: C:/Users/Deven/AppData/LocalLow/DefaultCompany/FoodFactoryGame\TestResults.xml
+]]></output>
+              </test-case>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

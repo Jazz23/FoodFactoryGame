@@ -1,0 +1,31 @@
+Pre-merge save probe, 2026-10-12 ~18:27Z, live Editor eval on main 8cfcff1 (working tree: only the FishNet DefaultPrefabObjects reorder and the plan edit).
+Copies of %USERPROFILE%\AppData\LocalLow\DefaultCompany\FoodFactoryGame\Saves\{dev-world,world-5,world-9,world-10}\*.db made into the
+session scratchpad; the application saves were not opened. RAW = latest stored payload parsed without upgrade; LOADED = GoodsSnapshotStore.Load.
+
+dev-world RAW    schema=13 rev=7429 cash=[dev-company:9000] goods=[belt:195,bread:5,dough:240,lift:19] lots=50 equipment=8 sites=2
+dev-world LOADED schema=24 rev=7429 cash=[dev-company:9000] goods=[belt:195,bread:5,dough:240,lift:19] lots=50 equipment=8 sites=2
+dev-world layout=none
+world-5 RAW    schema=15 rev=991 cash=[company-1:97991000] goods=[belt:50,dough:25,lift:10] lots=7 equipment=6 sites=3
+world-5 LOADED schema=24 rev=991 cash=[company-1:97991000] goods=[belt:50,dough:25,lift:10] lots=7 equipment=6 sites=3
+world-5 layout=format 3 gen v3 seed 16776525321738331289 start restaurant-0070
+world-9 RAW    schema=19 rev=685 cash=[company-1:100000000] goods=[belt:50,dough:5,lift:10] lots=3 equipment=3 sites=1
+world-9 LOADED schema=24 rev=685 cash=[company-1:100000000] goods=[belt:50,dough:5,lift:10] lots=3 equipment=3 sites=1
+world-9 layout=format 4 gen v5 seed 13913655453173278431 start restaurant-0062
+world-10 RAW    schema=19 rev=8154 cash=[company-1:100000000] goods=[belt:50,dough:5,lift:10] lots=3 equipment=3 sites=1
+world-10 LOADED schema=24 rev=8154 cash=[company-1:100000000] goods=[belt:50,dough:5,lift:10] lots=3 equipment=3 sites=1
+world-10 layout=format 4 gen v5 seed 11595535901002964021 start restaurant-0027
+
+Reconciliation detail (world-9/10 were written by the starting-loop branch at ITS schema 19 = free back doors):
+world-9 RAW doors: restaurant-0062{door/servicex1}      LOADED: restaurant-0062{door/servicex1}
+world-9 ledger entries=0 carried=[company-1:100000000]   rates raw->loaded: downtown-0 531->53, downtown-1 369->37, residential-0 43->4
+world-10 RAW doors: restaurant-0027{door/servicex1}     LOADED: restaurant-0027{door/servicex1}
+world-10 ledger entries=0 carried=[company-1:100000000]  rates raw->loaded: downtown-0 449->45, downtown-1 451->45, residential-0 41->4
+world-5 RAW doors: restaurant-0070{} restaurant-0087{} restaurant-0094{}
+world-5 LOADED doors: each {door/servicex1} (free back door, owner decision 2026-10-06)
+world-5 ledger entries=0 carried=[company-1:97991000]    rates raw->loaded: downtown-0 438->44, downtown-1 462->46, residential-0 40->4
+
+Session loader (GeneratedWorld.LoadOrCreate with the stored layout, no content definitions), then GoodsSnapshotStore.Save and a fresh Load:
+world-5  SESSION-LOADED / RELOADED: rev=991 cash=[company-1:97991000] goods=[belt:50,dough:25,lift:10] equipment=6
+world-9  SESSION-LOADED / RELOADED: rev=685 cash=[company-1:100000000] goods=[belt:50,dough:5,lift:10] equipment=3
+world-10 SESSION-LOADED / RELOADED: rev=8154 cash=[company-1:100000000] goods=[belt:50,dough:5,lift:10] equipment=3
+(The revision did not change, so Save wrote nothing; the upgrade stays in memory until the next real commit.)
