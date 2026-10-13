@@ -1,6 +1,8 @@
 // The main menu, hidden during a session (decision 0041): Resume repeats the last session this menu started (a hosted world or
 // a server address), Select World hosts a saved or new world as singleplayer or for others, Connect to Server joins by
-// address, Settings holds the name, mouse sensitivity and key bindings, and Quit exits. Its look is the MainMenu UXML and USS
+// address, Settings holds the name, mouse sensitivity and key bindings, and Quit exits. A saved world is deleted from Select
+// World after a second click confirms it. During a session the same overlay is the in-game menu while EquipmentInteraction's
+// Menu screen is open (Esc): Resume, Settings, Quit to Main Menu (ends the session) and Quit Game; nothing pauses. Its look is the MainMenu UXML and USS
 // under Assets/UI/Resources/UI (decision 0042); this class clones a screen, fills it in and wires its buttons.
 // Presentation only: it reads session state and calls SessionRoot; admission and simulation stay on the server. Client
 // settings load from the session's settings path (none in tests, which then keep defaults and write nothing).
@@ -8,6 +10,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using FoodFactoryGame.Session.Equipment;
 using FoodFactoryGame.Session.Player;
 using SQLite;
 using UnityEngine;
@@ -29,7 +32,9 @@ namespace FoodFactoryGame.Session
             Main,
             Worlds,
             Connect,
-            Settings
+            Settings,
+            // The in-game menu (during a session only).
+            Pause
         }
 
         // A session this menu started, recorded as the Resume target once its local player is admitted.
@@ -52,6 +57,13 @@ namespace FoodFactoryGame.Session
         private string _message;
         private string _lastStatus;
         private bool _wasRunning;
+        private bool _wasPaused;
+        // The local interaction layer whose Menu screen shows this overlay in game; null in a scene without one.
+        private EquipmentInteraction _interaction;
+        // Frame a key rebind ended on: the Esc that cancels a rebind must not also leave the settings screen.
+        private int _rebindEndedFrame = -10;
+        // The world whose Delete button was pressed once; a second press deletes it.
+        private string _confirmDelete;
 
         // World screen state.
         private string _selectedWorld;
@@ -77,12 +89,15 @@ namespace FoodFactoryGame.Session
             _overlay = root.Part("main-menu");
             _content = root.Part("main-menu-content");
             _status = root.Part<Label>("main-menu-status");
+            // Above the HUD and the other screens, so the in-game menu covers them.
+            document.sortingOrder = 50;
             Show(MenuScreen.Main);
         }
 
         private void OnDestroy()
         {
             if (session != null) session.Configured -= LoadSettings;
+            if (_interaction != null) _interaction.MenuEscape = null;
             _rebinding?.Cancel();
         }
 
@@ -90,8 +105,18 @@ namespace FoodFactoryGame.Session
         {
             if (_overlay == null) return;
             var running = session.IsRunning;
-            _overlay.Show(!running);
-            if (running) _rebinding?.Cancel();
+            if (_interaction == null)
+            {
+                _interaction = FindAnyObjectByType<EquipmentInteraction>();
+                if (_interaction != null) _interaction.MenuEscape = MenuEscape;
+            }
+            var paused = running && _interaction != null && _interaction.Screen == InteractionScreen.Menu;
+            _overlay.Show(!running || paused);
+            _overlay.EnableInClassList("menu--ingame", running);
+            // Opening the in-game menu starts on its first screen; closing it from a sub-screen saves the settings changed there.
+            if (paused != _wasPaused && running) Show(MenuScreen.Pause);
+            _wasPaused = paused;
+            if (running && !paused) _rebinding?.Cancel();
             // The menu's own session becomes the Resume target once this client is admitted.
             if (_pending.HasValue && session.Authenticator.LocalPlayerId != null) RecordPending();
             if (_pending.HasValue && !running) _pending = null;
@@ -246,6 +271,19 @@ namespace FoodFactoryGame.Session
 
         // ---------- Screens ----------
 
+        // Where Back and Done return: the in-game menu during a session, else the main screen.
+        private MenuScreen Home => session.IsRunning ? MenuScreen.Pause : MenuScreen.Main;
+
+        // Esc in the in-game menu: a sub-screen goes back to the menu (and the Esc that cancels a key rebind does nothing more);
+        // on the menu itself Esc is not taken, so it closes the menu.
+        private bool MenuEscape()
+        {
+            if (_rebinding != null || Time.frameCount - _rebindEndedFrame <= 1) return true;
+            if (_screen == MenuScreen.Pause) return false;
+            Show(MenuScreen.Pause);
+            return true;
+        }
+
         private void Show(MenuScreen screen)
         {
             if (_screen == MenuScreen.Settings && screen != MenuScreen.Settings && _content.childCount > 0)
@@ -277,9 +315,40 @@ namespace FoodFactoryGame.Session
                     _content.Add(_page);
                     FillSettings();
                     break;
+                case MenuScreen.Pause:
+                    _page = UiTemplates.Clone(Templates + "MenuPause");
+                    _content.Add(_page);
+                    FillPause();
+                    break;
             }
             var back = _page.Q<Button>("menu-back");
-            if (back != null) back.clicked += () => Show(MenuScreen.Main);
+            if (back != null) back.clicked += () => Show(Home);
+        }
+
+        // ---------- In-game menu ----------
+
+        private void FillPause()
+        {
+            _page.Part<Label>("menu-pause-detail").text = session.Mode == SessionMode.Client ? $"Server {session.Options.Address}" : session.WorldName;
+            _page.Part<Button>("menu-pause-resume").clicked += ClickResumeGame;
+            _page.Part<Button>("menu-pause-settings").clicked += ClickInGameSettings;
+            _page.Part<Button>("menu-pause-main-menu").clicked += ClickQuitToMainMenu;
+            _page.Part<Button>("menu-pause-quit").clicked += Quit;
+        }
+
+        // The in-game menu's buttons. Public so tests drive the same paths.
+        public void ClickResumeGame()
+        {
+            if (_interaction != null) _interaction.CloseScreen();
+        }
+
+        public void ClickInGameSettings() => Show(MenuScreen.Settings);
+
+        // Ends the session (a host stops its world, which is saved as it runs) and returns to the main screen.
+        public void ClickQuitToMainMenu()
+        {
+            ClickResumeGame();
+            session.Shutdown();
         }
 
         private void FillMain()
@@ -358,6 +427,7 @@ namespace FoodFactoryGame.Session
             }
             foreach (var world in worlds) list.Add(WorldRow(world));
 
+            if (_confirmDelete != _selectedWorld || _creatingWorld) _confirmDelete = null;
             var existing = _page.Part("menu-world-existing");
             var fresh = _page.Part("menu-world-new");
             existing.Show(!_creatingWorld && _selectedWorld != null);
@@ -376,6 +446,12 @@ namespace FoodFactoryGame.Session
                 _page.Part<Label>("menu-world-name").text = _selectedWorld;
                 var played = worlds.FirstOrDefault(x => x.Name == _selectedWorld).LastPlayedUtc;
                 _page.Part<Label>("menu-world-played").text = played == default ? "Not played yet" : $"Last played {Ago(played).ToLowerInvariant()}";
+                var delete = _page.Part<Button>("menu-delete-world");
+                var confirming = _confirmDelete == _selectedWorld;
+                delete.text = confirming ? "Click again to delete it for good" : "Delete world";
+                delete.EnableInClassList("menu-delete--confirming", confirming);
+                var world = _selectedWorld;
+                delete.clicked += () => ClickDeleteWorld(world);
             }
 
             FillVisibility();
@@ -395,6 +471,34 @@ namespace FoodFactoryGame.Session
                 }
                 else if (_selectedWorld != null) HostWorld(_selectedWorld, _visibility);
             };
+        }
+
+        // The first press asks for a second; the second deletes the world's save folder for good. Public so tests drive the
+        // same path as the button.
+        public void ClickDeleteWorld(string name)
+        {
+            if (_confirmDelete != name)
+            {
+                _confirmDelete = name;
+                Show(MenuScreen.Worlds);
+                return;
+            }
+            _confirmDelete = null;
+            var problem = session.DeleteWorld(name);
+            if (problem != null) _message = $"Could not delete {name}: {problem}";
+            else
+            {
+                _message = $"Deleted {name}.";
+                // Resume no longer offers a world that is gone.
+                if (_settings.LastKind == LastSessionKind.World && string.Equals(_settings.LastWorld, name, StringComparison.OrdinalIgnoreCase))
+                {
+                    _settings.LastKind = LastSessionKind.None;
+                    _settings.LastWorld = "";
+                    SaveSettings();
+                }
+                _selectedWorld = null;
+            }
+            Show(MenuScreen.Worlds);
         }
 
         private VisualElement WorldRow(SavedWorld world)
@@ -483,7 +587,7 @@ namespace FoodFactoryGame.Session
         {
             _bindingNotice = null;
             _page.Part<Button>("menu-reset-settings").clicked += ResetSettings;
-            _page.Part<Button>("menu-settings-done").clicked += () => Show(MenuScreen.Main);
+            _page.Part<Button>("menu-settings-done").clicked += () => Show(Home);
             var name = _page.Part<TextField>("menu-settings-name");
             name.maxLength = PlayerRegistry.MaxNameLength;
             name.value = DisplayName;
@@ -602,6 +706,7 @@ namespace FoodFactoryGame.Session
             operation = KeyBindings.Rebind(row.Action, index, changed =>
             {
                 if (_rebinding == operation) _rebinding = null;
+                _rebindEndedFrame = Time.frameCount;
                 if (changed)
                 {
                     _settings.BindingOverrides = _actions.SaveBindingOverridesAsJson();

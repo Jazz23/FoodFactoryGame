@@ -4,9 +4,11 @@
 // moves the avatar, opens the inventory or presses hotbar keys. The screen itself is EmployeeScriptPanel.
 // "Select world pos" hides the screen (InteractionScreen.PickPosition) with walking and looking back on: the ground cell or
 // the machine/storage under the crosshair is shown red, and a click hands its Lua text ({x, z} or "<id>") back to the screen.
-// The Tasks tab's "Set source", "Set destination" and "Select machine" (decision 0037) pick the same way, but only among
-// valid targets, which all pulse red (the one under the crosshair solid red): everything with goods a player can open for a
-// source or destination, a machine with a power switch for a machine. A click or E hands back its place text (unquoted).
+// The Tasks tab's "Set source", "Set destination", "Select machine" and "Select counter" (decisions 0037, 0043) pick the same
+// way, but only among valid targets: everything with goods a player can open for a source or destination, a machine with a
+// power switch for a machine, a register or worker-bound station for a counter. Every valid target gets a light green tint
+// drawn through walls (pickTintMaterial) and a thin outline; the one under the crosshair gets a bold outline. A click or E
+// hands back its place text (unquoted).
 // Local presentation only; the text is resolved again by the server when the script runs.
 using System;
 using System.Collections.Generic;
@@ -23,26 +25,22 @@ namespace FoodFactoryGame.Session.Equipment
     {
         private static readonly int OutlineColor = Shader.PropertyToID("_Color");
         private static readonly int OutlineWidth = Shader.PropertyToID("_Width");
-        // Outline widths (metres) while picking a target: the pulse swings between the first two; the one under the crosshair
-        // holds the third.
-        private const float PulseThin = 0.035f;
-        private const float PulseThick = 0.08f;
-        private const float PickedWidth = 0.09f;
+        // Outline widths (metres) while picking a target: every valid one, and the one under the crosshair.
+        private const float ValidWidth = 0.02f;
+        private const float PickedWidth = 0.07f;
         // Player actions left on while picking a world position, so the player can walk and look for the spot.
-        private static readonly string[] PickMovementActions = { "Move", "Look", "Jump", "Sprint", "Zoom", "SwitchCamera" };
-
-        // Seconds per pulse of the valid targets' outline while picking one.
-        private const float PulseSeconds = 0.9f;
+        private static readonly string[] PickMovementActions = { "Move", "Look", "Jump", "Sprint", "Zoom" };
 
         private readonly List<InputAction> _suspendedActions = new();
         private readonly List<Component> _pulsing = new();
-        private Material _pulseOutline;
+        private Material _validOutline;
         private float _nextTargetRefresh;
         private EmployeeWorker _hoveredEmployee;
         private Action<string> _pickDone;
         private Component _pickObject;
         private Renderer _pickMarker;
         private Material _pickOutline;
+        private Material _targetOutline;
 
         // Employee whose script screen is open; null unless Screen is Employee or PickPosition.
         public EmployeeWorker OpenEmployee { get; private set; }
@@ -53,8 +51,10 @@ namespace FoodFactoryGame.Session.Equipment
         public string PickText { get; private set; }
         // What the current pick is for; Position for "Select world pos".
         public PickTarget PickMode { get; private set; }
-        // The targets that pulse while picking a source, destination or machine (empty otherwise).
+        // The valid targets shown while picking a source, destination, machine or counter (empty otherwise).
         public IReadOnlyList<Component> PickTargets => _pulsing;
+        // The valid target under the crosshair while picking one; null on nothing valid.
+        public Component PickHovered { get; private set; }
 
         public void OpenEmployeeScreen(EmployeeWorker employee)
         {
@@ -163,12 +163,14 @@ namespace FoodFactoryGame.Session.Equipment
             SetPickObject(null);
             ShowPickMarker(false);
             PickText = null;
+            PickHovered = null;
             foreach (var target in _pulsing)
                 if (target != null) HoverOutline.For(target, hoverOutlineMaterial).SetHighlighted(false);
             _pulsing.Clear();
         }
 
-        // Pulses every valid target red and marks the one under the crosshair solid red; a click or E picks that one.
+        // Tints every valid target through walls with a thin outline and gives the one under the crosshair a bold outline; a click
+        // or E picks that one.
         private void UpdateTargetPick(GoodsSnapshot site)
         {
             if (Time.unscaledTime >= _nextTargetRefresh)
@@ -181,41 +183,40 @@ namespace FoodFactoryGame.Session.Equipment
                 _pulsing.AddRange(valid);
             }
             _pulsing.RemoveAll(x => x == null);
-            var hit = UnderCrosshair();
+            // The nearest valid target along the aim, even behind a wall: they are all drawn through walls, so all can be picked.
             Component hovered = null;
-            if (hit != null)
+            foreach (var hit in Physics.RaycastAll(AimRay(), maximumRayDistance, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)
+                         .OrderBy(x => x.distance))
             {
-                var visual = hit.GetComponentInParent<EquipmentVisual>();
-                var marker = hit.GetComponentInParent<SiteLocationMarker>();
+                var visual = hit.collider.GetComponentInParent<EquipmentVisual>();
+                var marker = hit.collider.GetComponentInParent<SiteLocationMarker>();
                 hovered = visual != null && _pulsing.Contains(visual) ? visual : marker != null && _pulsing.Contains(marker) ? marker : null;
+                if (hovered != null) break;
             }
             if (hoverOutlineMaterial != null)
             {
                 // Unity-aware checks: an unassigned Material field is a fake null that ??= takes for an object.
-                if (_pickOutline == null) _pickOutline = Outline("PickOutline", invalidColor);
-                if (_pulseOutline == null) _pulseOutline = Outline("PulseOutline", invalidColor);
-                _pickOutline.SetFloat(OutlineWidth, PickedWidth);
-                var pulse = 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * Mathf.PI * 2f / PulseSeconds);
-                var dim = invalidColor * 0.55f;
-                dim.a = 1f;
-                _pulseOutline.SetColor(OutlineColor, Color.Lerp(dim, invalidColor, pulse));
-                _pulseOutline.SetFloat(OutlineWidth, Mathf.Lerp(PulseThin, PulseThick, pulse));
+                if (_validOutline == null) _validOutline = Outline("ValidOutline", validColor, ValidWidth);
+                if (_targetOutline == null) _targetOutline = Outline("TargetOutline", Color.Lerp(validColor, Color.white, 0.35f), PickedWidth);
                 foreach (var target in _pulsing)
-                    HoverOutline.For(target, hoverOutlineMaterial).SetHighlighted(true, target == hovered ? _pickOutline : _pulseOutline);
+                    HoverOutline.For(target, hoverOutlineMaterial).SetHighlighted(true, target == hovered ? _targetOutline : _validOutline, pickTintMaterial);
             }
+            PickHovered = hovered;
             PickText = hovered == null ? null : TargetText(site, hovered);
         }
 
-        private Material Outline(string name, Color color)
+        private Material Outline(string name, Color color, float width)
         {
             var material = new Material(hoverOutlineMaterial) { name = name };
+            color.a = 1f;
             material.SetColor(OutlineColor, color);
+            material.SetFloat(OutlineWidth, width);
             return material;
         }
 
         // Valid targets on the current site: for a source or destination, every placed piece a player can open for goods (not
         // tables or decor) and the storage; for a machine, every placed piece whose kind has a power switch; for a station, every
-        // worker-bound piece; for a recipe machine, every piece whose kind has more than one recipe (decision 0043).
+        // register or worker-bound piece; for a recipe machine, every piece whose kind has more than one recipe (decision 0043).
         private List<Component> ValidTargets(GoodsSnapshot site)
         {
             var placed = site.Equipment.Where(x => x.State == EquipmentState.Placed && x.SiteId == session.ClientSiteId)
@@ -228,7 +229,7 @@ namespace FoodFactoryGame.Session.Equipment
                 var valid = PickMode switch
                 {
                     PickTarget.Machine => definition != null && definition.ManualPower,
-                    PickTarget.Station => definition != null && definition.WorkerBound,
+                    PickTarget.Station => equipment.Kind == GoodsWorld.CounterKind || (definition != null && definition.WorkerBound),
                     PickTarget.RecipeMachine => session.Recipes.Count(x => x != null && !x.IsSale && x.StationKind == equipment.Kind) > 1,
                     _ => definition?.OpensScreen != false && !GoodsWorld.IsTable(equipment)
                 };

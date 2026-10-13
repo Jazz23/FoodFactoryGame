@@ -1,4 +1,4 @@
-// Owner-only camera with two views that SwitchCamera toggles, blending smoothly between them. The third-person view
+// Owner-only camera with two views, blending smoothly between them. The third-person view
 // orbits with Look (the gameplay cursor is locked to a centre crosshair) unless the local UI suspends it through
 // OrbitEnabled while a screen is open; its pivot sits beside the avatar (over the shoulder), so the crosshair aims past
 // the avatar at the floor ahead instead of through it. Pitch runs from straight up to straight down; looking up pulls the
@@ -9,11 +9,14 @@
 // collider at least WallHeight tall that is not an avatar, a machine, furniture, an employee or the dev storage (colliders the
 // cast starts inside are ignored), and indoors it also stays under the room's ceiling,
 // so in a small room the camera squeezes in beside the avatar instead of looking in from outside.
-// Indoors uses the top-down view (GDD section 3): SetIndoors switches views only when the avatar crosses a building's
-// threshold, so SwitchCamera still overrides the view until the next crossing (decision 0019).
+// Indoors uses the top-down view (GDD section 3): SetIndoors switches views when the avatar crosses a building's threshold
+// (decision 0019). There is no manual switch: C opens the phone instead (owner, 2026-10-13, decision 0047).
 // Build mode (decision 0034) frames a whole lot: while BuildFocus is set the camera looks at that point from BuildDistance instead
 // of following the avatar, and the previous view returns when it is cleared. While BuildControls is on, Move pans the focus,
 // Zoom changes the distance and holding CameraTilt turns Look into tilt (pitch) and turn (yaw).
+// Zoom is ignored while ZoomEnabled is off (a screen is open, so the wheel scrolls its lists). When a wall or ceiling holds the
+// third-person arm shorter than its distance, zooming in starts from where the camera actually is, so indoors the first step
+// already moves it.
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -37,7 +40,6 @@ namespace FoodFactoryGame.Session.Player
         [SerializeField] private Transform cameraTransform;
         [SerializeField] private InputActionReference lookAction;
         [SerializeField] private InputActionReference zoomAction;
-        [SerializeField] private InputActionReference switchViewAction;
         // Build mode camera controls (Player/Move pans, Player/CameraTilt held tilts).
         [SerializeField] private InputActionReference moveAction;
         [SerializeField] private InputActionReference tiltAction;
@@ -50,6 +52,8 @@ namespace FoodFactoryGame.Session.Player
         // Least height (metres) the third-person camera keeps above the avatar's feet when looking up.
         [SerializeField] private float floorClearance = 0.3f;
         [SerializeField] private float minDistance = 3f;
+        // Closest third-person zoom; below minDistance so a camera held in by walls indoors can still be zoomed in.
+        [SerializeField] private float minOrbitDistance = 1f;
         [SerializeField] private float maxDistance = 20f;
         [SerializeField] private float yaw;
         [SerializeField] private float pitch = 40f;
@@ -77,10 +81,13 @@ namespace FoodFactoryGame.Session.Player
         public float Yaw =>BuildFocus.HasValue ? _buildYaw : Mathf.LerpAngle(yaw, _topDownYaw, Eased);
         public float Pitch => pitch;
         public float Distance => distance;
+        public float TopDownDistance => topDownDistance;
         // The view the rig is showing or blending towards.
         public bool TopDown { get; private set; }
         // Presentation state owned by the local interaction layer; false while an inventory or machine screen is open.
         public bool OrbitEnabled { get; set; } = true;
+        // Presentation state owned by the local interaction layer; false while a screen is open, so its lists scroll instead.
+        public bool ZoomEnabled { get; set; } = true;
         // Build mode's framing (decision 0034); null while the rig follows the avatar.
         public Vector3? BuildFocus { get; private set; }
         public float BuildDistance { get; private set; }
@@ -116,8 +123,6 @@ namespace FoodFactoryGame.Session.Player
             zoomAction.action.Enable();
             moveAction.action.Enable();
             tiltAction.action.Enable();
-            switchViewAction.action.performed += OnSwitchView;
-            switchViewAction.action.Enable();
         }
 
         private void OnDisable()
@@ -125,13 +130,6 @@ namespace FoodFactoryGame.Session.Player
             lookAction.action.Disable();
             zoomAction.action.Disable();
             tiltAction.action.Disable();
-            switchViewAction.action.performed -= OnSwitchView;
-            switchViewAction.action.Disable();
-        }
-
-        private void OnSwitchView(InputAction.CallbackContext _)
-        {
-            if (!BuildFocus.HasValue) SetTopDown(!TopDown);
         }
 
         // Presentation state from the local building presenter: true while the avatar stands inside a building, with the height
@@ -162,14 +160,19 @@ namespace FoodFactoryGame.Session.Player
                 pitch -= delta.y * orbitDegreesPerUnit * LookSensitivity;
             }
             // Scroll magnitude differs by platform/device, so each nonzero frame is one step.
-            var scroll = BuildFocus.HasValue ? 0f : zoomAction.action.ReadValue<Vector2>().y;
+            var scroll = BuildFocus.HasValue || !ZoomEnabled ? 0f : zoomAction.action.ReadValue<Vector2>().y;
             if (!Mathf.Approximately(scroll, 0f))
             {
                 if (TopDown) topDownDistance -= Mathf.Sign(scroll) * zoomStep;
-                else distance -= Mathf.Sign(scroll) * zoomStep;
+                else
+                {
+                    // Zooming in from behind a wall starts at the arm the wall allows, not at the distance it hides.
+                    if (scroll > 0f && CurrentArm > 0f && distance > CurrentArm) distance = CurrentArm;
+                    distance -= Mathf.Sign(scroll) * zoomStep;
+                }
             }
             pitch = Mathf.Clamp(pitch, minPitch, maxPitch);
-            distance = Mathf.Clamp(distance, minDistance, maxDistance);
+            distance = Mathf.Clamp(distance, Mathf.Min(minOrbitDistance, minDistance), maxDistance);
             topDownDistance = Mathf.Clamp(topDownDistance, minDistance, maxDistance);
             _blend = transitionSeconds > 0f ? Mathf.MoveTowards(_blend, TopDown ? 1f : 0f, Time.deltaTime / transitionSeconds) : TopDown ? 1f : 0f;
 

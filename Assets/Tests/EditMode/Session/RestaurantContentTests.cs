@@ -30,11 +30,47 @@ namespace FoodFactoryGame.Session.Tests
         private static IEnumerable<string> ModelsUsedBy(Object asset) =>
             asset == null ? Enumerable.Empty<string>() : AssetDatabase.GetDependencies(AssetDatabase.GetAssetPath(asset), true).Where(x => x.StartsWith(ModelRoot));
 
+        // Owner request (2026-10-12): a storage shelf shows more boxes as its slots fill, one stack per slot, bottom deck first.
+        [Test]
+        public void AStorageShelfShowsAStackOfBoxesPerUsedSlot()
+        {
+            var definition = AssetDatabase.FindAssets("t:EquipmentDefinition", new[] { "Assets/Content" }).Select(AssetDatabase.GUIDToAssetPath)
+                .Select(AssetDatabase.LoadAssetAtPath<EquipmentDefinition>).Single(x => x.Kind == "rt-shelf");
+            var shelf = (GameObject)PrefabUtility.InstantiatePrefab(definition.VisualPrefab);
+            try
+            {
+                var display = shelf.GetComponent<StorageFillDisplay>();
+                Assert.That(display, Is.Not.Null, "The shelf prefab has a fill display.");
+                var stages = Enumerable.Range(1, 8).Select(i => shelf.transform.Find($"Boxes/Boxes_{i}").gameObject).ToList();
+                Assert.That(stages.All(x => !x.activeSelf), Is.True, "An empty shelf (and the placement ghost copied from the prefab) shows no boxes.");
+                var steel = shelf.transform.Find("RT_StorageShelf_1_2m").GetComponent<Renderer>();
+                Assert.That(stages.SelectMany(x => x.GetComponentsInChildren<Renderer>(true)).All(x => x.sharedMaterials.All(m => m != null && m.name.StartsWith("RT_"))),
+                    Is.True, "Every box material is a kit material.");
+                foreach (var (used, shown) in new[] { (0, 0), (1, 1), (3, 3), (7, 7), (8, 8), (9, 8) })
+                {
+                    display.SetFill(used, definition.InputCapacity);
+                    Assert.That(stages.Count(x => x.activeSelf), Is.EqualTo(shown), $"{used} of {definition.InputCapacity} slots used.");
+                    Assert.That(stages.Take(shown).All(x => x.activeSelf), Is.True, "Stacks fill in order.");
+                }
+                // The stacks stand inside the shelf's frame, so the shelf's footprint and pivot do not depend on what it holds.
+                var frame = steel.bounds;
+                foreach (var renderer in stages.SelectMany(x => x.GetComponentsInChildren<Renderer>()))
+                    Assert.That(renderer.bounds.min.x >= frame.min.x && renderer.bounds.max.x <= frame.max.x && renderer.bounds.min.z >= frame.min.z
+                        && renderer.bounds.max.z <= frame.max.z && renderer.bounds.min.y >= frame.min.y, Is.True, $"{renderer.name} {renderer.bounds} inside {frame}");
+                Assert.That(StorageFillDisplay.StagesFor(1, 40, 8), Is.EqualTo(1), "A larger store still shows its first goods.");
+            }
+            finally
+            {
+                Object.DestroyImmediate(shelf);
+            }
+        }
+
         [Test]
         public void EveryArtKitModelIsBuildableInBothSessionScenes()
         {
             var models = KitModels();
-            Assert.That(models.Count, Is.EqualTo(59), "The kit's 59 models (docs/verification/restaurant-art-20261001.md).");
+            Assert.That(models.Count, Is.EqualTo(60),
+                "The kit's 59 models (docs/verification/restaurant-art-20261001.md) and the storage shelf's box stacks (built with the shelf).");
             var catalog = AssetDatabase.LoadAssetAtPath<RestaurantStyleCatalog>(CatalogPath);
             Assert.That(catalog, Is.Not.Null);
             var styleModels = new HashSet<string>(ModelsUsedBy(catalog));

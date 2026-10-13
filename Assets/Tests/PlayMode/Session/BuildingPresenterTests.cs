@@ -114,6 +114,18 @@ namespace FoodFactoryGame.Session.PlayModeTests
             Assert.That(leaves.Length, Is.EqualTo(building0.Doors.Count), "One leaf per door cell (a double door has two).");
             Assert.That(shell.GetComponentsInChildren<Collider>().Count(x => x.GetComponent<DoorSwing>() == null), Is.EqualTo(walls.Count),
                 "Only walls and door leaves are solid; floor, lintels and roof never catch aim rays.");
+            // Owner report: the two shut leaves of a double door left a visible gap between them. Their free ends now meet.
+            Assert.That(leaves.GroupBy(x => x.Doorway).Any(x => x.Count() == 2), Is.True, "The dev restaurant has a double door.");
+            foreach (var pair in leaves.GroupBy(x => x.Doorway).Where(x => x.Count() == 2))
+            {
+                var bounds = pair.Select(x => x.GetComponentsInChildren<Renderer>().Select(r => r.bounds)
+                    .Aggregate((a, b) => { a.Encapsulate(b); return a; })).ToList();
+                var axisX = bounds[0].size.x > bounds[0].size.z;
+                float Lo(Bounds b) => axisX ? b.min.x : b.min.z;
+                float Hi(Bounds b) => axisX ? b.max.x : b.max.z;
+                var between = Mathf.Max(Lo(bounds[0]), Lo(bounds[1])) - Mathf.Min(Hi(bounds[0]), Hi(bounds[1]));
+                Assert.That(between, Is.LessThan(0.01f), $"The shut leaves of the double door at {pair.Key} meet (gap {between:F3} m).");
+            }
             var layout = _root.ClientSite.SiteLayouts.Single();
             var building = _root.ClientSite.Buildings.Single(x => x.Id == DevWorld.RestaurantId);
             var gap = SiteGridSpace.FootprintCenter(layout, DevWorld.RestaurantDoorX, building.CellZ + building.Depth - 1, 2, 1) + Vector3.up;
@@ -140,6 +152,10 @@ namespace FoodFactoryGame.Session.PlayModeTests
             yield return StandIn(15, 5);
             Assert.That(rig.TopDown, Is.False, "Moving within the building keeps the player's chosen view.");
 
+            // A teleport onto the door cell lands in the plane of a shut leaf, and the controller would be pushed out to either side.
+            // A player never stands there before the leaves open, so the test waits for them to swing open and stands there again.
+            yield return StandIn(DevWorld.RestaurantDoorX, building.CellZ + building.Depth - 1);
+            yield return Until(() => leaves.Where(x => (x.Doorway - _avatar.transform.position).sqrMagnitude < 9f).All(x => !x.Blocking), "the doorway's leaves swing open");
             yield return StandIn(DevWorld.RestaurantDoorX, building.CellZ + building.Depth - 1);
             Assert.That(_presenter.LocalBuildingId, Is.Null, "The doorway is a threshold, not indoors.");
             yield return StandIn(14, 4);

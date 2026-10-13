@@ -119,6 +119,24 @@ namespace FoodFactoryGame.Goods.Tests
             Assert.That(world.SetEmployeePose("employee-a", float.PositiveInfinity, 0f, 0f, 0f), Is.False);
         }
 
+        // Owner feedback 2026-10-12: a rename is trimmed, saved with the record and survives a reload; a bad name, an unknown
+        // employee or a failed commit changes nothing.
+        [Test]
+        public void RenameIsSavedAndABadOneChangesNothing()
+        {
+            var world = CreateWorld();
+            GoodsSnapshotStore.Save(world, PathForSave);
+            Assert.That(world.RenameEmployeeDurably("employee-a", "  Sam the Baker ", PathForSave), Is.Null);
+            Assert.That(GoodsSnapshotStore.Load(PathForSave).Employees().Single().Name, Is.EqualTo("Sam the Baker"));
+            var revision = world.Snapshot().Revision;
+            Assert.That(world.RenameEmployeeDurably("employee-a", "   ", PathForSave), Is.EqualTo("invalid-name"));
+            Assert.That(world.RenameEmployeeDurably("employee-a", new string('x', GoodsWorld.MaxEmployeeNameLength + 1), PathForSave), Is.EqualTo("invalid-name"));
+            Assert.That(world.RenameEmployeeDurably("employee-a", "Tab\tName", PathForSave), Is.EqualTo("invalid-name"));
+            Assert.That(world.RenameEmployeeDurably("employee-z", "Zed", PathForSave), Is.EqualTo("unknown-employee"));
+            Assert.That(world.RenameEmployeeDurably("employee-a", "Lost", MissingPath), Is.EqualTo("persistence-unavailable"));
+            Assert.That((world.Employees().Single().Name, world.Snapshot().Revision), Is.EqualTo(("Sam the Baker", revision)));
+        }
+
         [Test]
         public void RecoveryRejectsAnEmployeeWithoutItsHandsOrGrant()
         {

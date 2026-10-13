@@ -120,7 +120,7 @@ namespace FoodFactoryGame.Goods
                     TryDebit(company, vehicle.PriceCents, new CashNote(LedgerTruck, siteId, requestId, deliveredId, offerId: offerId));
                     AddTruck(new GoodsTruck
                     {
-                        Id = deliveredId, CompanyId = company, Name = $"{vehicle.Name} {_state.Trucks.Count(x => x.CompanyId == company) + 1}",
+                        Id = deliveredId, CompanyId = company, Name = $"{vehicle.Name} {_state.Trucks.Count(x => x.CompanyId == company && !x.Supplier) + 1}",
                         CargoSlots = vehicle.CargoSlots, SpeedMetresPerSecond = vehicle.SpeedMetresPerSecond,
                         LoadUnitsPerSecond = vehicle.LoadUnitsPerSecond, State = TruckState.Parked, SiteId = siteId
                     });

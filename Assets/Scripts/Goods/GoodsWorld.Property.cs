@@ -135,6 +135,29 @@ namespace FoodFactoryGame.Goods
             return Commit(playerId, requestId, savePath, () => BuyProperty(playerId, requestId, payingSiteId, lotId));
         }
 
+        public const int MaxSiteNameLength = 32;
+
+        // Volatile primitive for tests. Live request handlers must call RenameSiteDurably.
+        // Renames a site of the player's company (decision 0047: the phone's Properties tab): the player needs a grant on it
+        // (forbidden) and a company must own it (no-company); the trimmed name is 1 to MaxSiteNameLength characters without control
+        // characters (invalid-name). Only an accepted rename is recorded.
+        public GoodsOutcome RenameSite(string playerId, string requestId, string siteId, string name)
+        {
+            return RouteCommand(playerId, requestId, reject =>
+            {
+                var site = _state.Sites.FirstOrDefault(x => x.Id == siteId);
+                if (site is null || !CanView(playerId, siteId)) return reject("forbidden");
+                if (CompanyOfSiteLocked(siteId) is null) return reject("no-company");
+                var trimmed = name?.Trim();
+                if (!IsValidEmployeeName(trimmed) || trimmed.Length > MaxSiteNameLength) return reject("invalid-name");
+                site.Name = trimmed;
+                return Record(requestId, playerId, true, "renamed", null);
+            });
+        }
+
+        public GoodsOutcome RenameSiteDurably(string playerId, string requestId, string siteId, string name, string savePath) =>
+            Commit(playerId, requestId, savePath, () => RenameSite(playerId, requestId, siteId, name));
+
         // Server-only, for world creation (the starting restaurant): gives a lot to a company without charge or grant. When a
         // catalog is registered the offer must be the listed one. Callers commit.
         public void Bootstrap(PropertyOffer offer, string companyId)

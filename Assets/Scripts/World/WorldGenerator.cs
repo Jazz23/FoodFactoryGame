@@ -52,7 +52,9 @@ namespace FoodFactoryGame.World
         // 7 (2026-10-12): the starting restaurant must stand in a district whose minimum recipe tier is 1, where bread sells
         // (starting-loop decision 19), checked by the validator; with the default settings every seed's layout is v6's. Customers of
         // a v7 world spawn on the street by the restaurant they chose (decision 28, WorldLayoutCustomers). Layout format unchanged.
-        public const int Version = 7;
+        // 8 (2026-10-12): the starting restaurant is the largest residential restaurant instead of the smallest (owner feedback:
+        // the start was too small; decision 0045). Layout format unchanged.
+        public const int Version = 8;
 
         // extraRule adds problems of its own (tests use it to force retries); it cannot waive validator problems.
         public static WorldGenerationResult Generate(string requestedSeed, ulong seed, WorldSettings settings = null,
@@ -1016,9 +1018,9 @@ namespace FoodFactoryGame.World
                 }
             }
 
-            // The smallest (then cheapest, then first) residential restaurant shell that is small enough becomes the player's, if the
-            // residential district's minimum recipe tier is 1 (decision 19: bread sells there); otherwise there is no start and the
-            // validator rejects the attempt.
+            // The largest (then cheapest, then first) residential restaurant shell within StartMaxArea becomes the player's (generator
+            // v8; StartLargest off picks the smallest, as v7 did), if the residential district's minimum recipe tier is 1 (decision
+            // 19: bread sells there); otherwise there is no start and the validator rejects the attempt.
             private void PickStart()
             {
                 var residential = _s.Profile(DistrictKind.Residential);
@@ -1026,7 +1028,7 @@ namespace FoodFactoryGame.World
                 var start = _layout.Buildings
                     .Where(x => x.Category == BuildingCategory.Restaurant && x.DistrictId == residential.Id
                         && x.Width * x.Depth <= _s.StartMaxArea)
-                    .OrderBy(x => x.Width * x.Depth).ThenBy(x => x.PriceCents).FirstOrDefault();
+                    .OrderBy(x => _s.StartLargest ? -x.Width * x.Depth : x.Width * x.Depth).ThenBy(x => x.PriceCents).FirstOrDefault();
                 if (start == null) return;
                 start.Ownership = Ownership.Player;
                 _layout.StartRestaurantId = start.Id;

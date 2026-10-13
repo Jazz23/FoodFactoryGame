@@ -52,13 +52,13 @@ namespace FoodFactoryGame.Session
             ("Building", "Remove", "Remove", null),
             ("Building", "Rotate", "Rotate", null),
             ("Building", "Confirm build", "BuildConfirm", null),
-            ("Camera and floors", "Switch camera", "SwitchCamera", null),
             ("Camera and floors", "Tilt camera", "CameraTilt", null),
             ("Camera and floors", "Zoom", "Zoom", "fixed:Scroll"),
             ("Camera and floors", "Floor up", "FloorUp", null),
             ("Camera and floors", "Floor down", "FloorDown", null),
             ("Camera and floors", "Flip lift", "FlipLift", null),
             ("Camera and floors", "Logistics", "Logistics", null),
+            ("Camera and floors", "Phone", "Phone", null),
             ("Hotbar", "Hotbar slots", "Hotbar", "fixed:1 – 9")
         };
 

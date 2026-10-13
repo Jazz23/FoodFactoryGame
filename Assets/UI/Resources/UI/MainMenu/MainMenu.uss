@@ -335,3 +335,28 @@
     color: var(--ff-disabled);
     -unity-text-align: middle-center;
 }
+
+/* ---------- In-game menu (Esc during a session) ---------- */
+
+/* See-through: the world keeps rendering (and running) behind it. */
+.menu--ingame { background-color: rgba(12, 13, 16, 0.78); }
+
+.menu-pause__brand { margin-bottom: 28px; }
+
+.menu-pause__title {
+    margin-top: 8px;
+    font-size: 36px;
+    -unity-font-style: bold;
+    color: var(--ff-text);
+    -unity-text-align: middle-center;
+}
+
+/* ---------- Select World: delete ---------- */
+
+.menu-delete { align-self: flex-start; margin-top: -8px; }
+
+.menu-delete--confirming {
+    background-color: var(--ff-danger);
+    border-color: var(--ff-danger);
+    color: var(--ff-text);
+}

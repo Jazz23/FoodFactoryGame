@@ -1,7 +1,8 @@
 // Shows placed equipment from the latest replicated baselines of every drawn site (DrawnSites): one local visual per placed
 // piece, keyed by equipment ID (unique across sites). Visuals never own state; held equipment has no visual, and a missing
 // baseline clears the scene rather than guessing.
-// A visual shows "running" exactly while the baseline has a running (not blocked) job on its station.
+// A visual shows "running" exactly while the baseline has a running (not blocked) job on its station, and its storage fill
+// (a shelf's boxes) from the slots its input buffer's stacks take in the baseline.
 // Decor (decision 0034) stands where its mount says: on a wall face, under the ceiling, on the table top under it or (a sink)
 // back to the wall behind it; pieces
 // marked hide-from-above (ceiling panels) hide their renderers, not their lights, while this client looks down on the room
@@ -69,6 +70,7 @@ namespace FoodFactoryGame.Session.Equipment
                 _placed.Remove(id);
                 _fromAbove.Remove(id);
             }
+            var lotsBySite = new Dictionary<DrawnSite, ILookup<string, GoodsLot>>();
             foreach (var (site, equipment) in placed.OrderBy(x => x.Equipment.Layer == SiteGrid.TabletopLayer))
             {
                 if (!_visuals.TryGetValue(equipment.Id, out var visual))
@@ -87,6 +89,9 @@ namespace FoodFactoryGame.Session.Equipment
                 // A machine with a power switch (decision 0037) shows whether it is switched on; others whether a batch runs.
                 visual.SetRunning(definition != null && definition.ManualPower ? equipment.PoweredOn
                     : site.Snapshot.Jobs.Any(x => x.StationId == equipment.Id && x.State == StationJobState.Running));
+                var input = site.Snapshot.Locations.FirstOrDefault(x => x.Id == equipment.InputLocationId);
+                if (!lotsBySite.TryGetValue(site, out var lots)) lotsBySite[site] = lots = site.Snapshot.Lots.ToLookup(x => x.LocationId);
+                visual.SetFill(input == null ? 0 : GoodsSlots.SlotsUsed(lots[input.Id], session.MaxStack), input?.Capacity ?? 0);
             }
         }
 

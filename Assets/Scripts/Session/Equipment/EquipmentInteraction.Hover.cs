@@ -14,6 +14,8 @@ namespace FoodFactoryGame.Session.Equipment
     {
         // Outline drawn round the hover target (the employees' prefab brings its own).
         [SerializeField] private Material hoverOutlineMaterial;
+        // Light green see-through tint (FoodFactory/XRayTint) on every valid target while picking one for an employee task.
+        [SerializeField] private Material pickTintMaterial;
         // Farthest the avatar may stand from a map building (metres across the ground) to open its buy panel.
         [SerializeField] private float propertyReach = 60f;
 
@@ -28,7 +30,7 @@ namespace FoodFactoryGame.Session.Equipment
 
         private void UpdateHover()
         {
-            var hovered = _camera != null && Screen == InteractionScreen.None && !_released ? HoverUnderCrosshair() : null;
+            var hovered = _camera != null && Screen == InteractionScreen.None ? HoverUnderCrosshair() : null;
             _hoveredEmployee = _held == null ? hovered as EmployeeWorker : null;
             if (hovered == _hovered) return;
             SetOutline(_hovered, false);

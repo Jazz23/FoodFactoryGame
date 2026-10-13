@@ -138,8 +138,10 @@ namespace FoodFactoryGame.World
         public long FactoryCentsPerCell = 8000;
         public long FarmCentsPerCell = 1500;
         public long StationCentsPerCell = 12000;
-        // Largest footprint the starting restaurant may have.
-        public int StartMaxArea = 400;
+        // Largest footprint the starting restaurant may have (v7's 400 kept the biggest restaurants out; 480 allows every
+        // restaurant size), and whether the largest qualifying restaurant is the start (generator v8) or the smallest (v7).
+        public int StartMaxArea = 480;
+        public bool StartLargest = true;
 
         public int MaxAttempts = 8;
 

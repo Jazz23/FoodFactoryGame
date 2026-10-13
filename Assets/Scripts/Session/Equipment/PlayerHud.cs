@@ -646,7 +646,7 @@ namespace FoodFactoryGame.Session.Equipment
             _registerReadiness = null;
             var inventoryId = interaction.InventoryId;
             if (interaction.Screen is InteractionScreen.None or InteractionScreen.Employee or InteractionScreen.PickPosition or InteractionScreen.Logistics
-                    or InteractionScreen.Build
+                    or InteractionScreen.Build or InteractionScreen.Menu
                 || inventoryId == null) return;
             var inventory = Window("hud-inventory", "Inventory", SlotsUsed(site, inventoryId));
             inventory.Add(GridView(InventoryGrid));
@@ -953,8 +953,12 @@ namespace FoodFactoryGame.Session.Equipment
             window.Part("output-grid").Add(GridView(OutputGrid));
             var trucks = site.Trucks.Select(x => (Truck: x, Route: GoodsWorld.RouteOf(site, x)))
                 .Where(x => x.Route?.PickupDockId == equipment.Id || x.Route?.DropoffDockId == equipment.Id).ToList();
-            window.Part<Label>("hud-dock-trucks").text = trucks.Count == 0 ? "No truck serves this dock; press L to set up a route."
-                : string.Join("\n", trucks.Select(x => $"{x.Truck.Name}: {(x.Route.PickupDockId == equipment.Id ? "picks up here" : "delivers here")}"));
+            // Farm orders bound for this dock (decision 0047).
+            var orders = site.FarmOrders.Where(x => x.DockId == equipment.Id).ToList();
+            window.Part<Label>("hud-dock-trucks").text = trucks.Count == 0 && orders.Count == 0
+                ? "No truck serves this dock; press L to set up a route, or C to order from a farm."
+                : string.Join("\n", trucks.Select(x => $"{x.Truck.Name}: {(x.Route.PickupDockId == equipment.Id ? "picks up here" : "delivers here")}")
+                    .Concat(orders.Select(x => $"Farm order: {x.Units} {x.ItemId} on the way ({x.UnloadedUnits} unloaded)")));
             // Docks on a generated lot that is not a restaurant are never refused for this (decision 0032, owner: warn only);
             // restaurant docks cannot be placed out of the street's reach at all (decision 0034).
             var lot = SitePlacement.Active?.LotOf(equipment.SiteId);

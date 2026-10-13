@@ -16,14 +16,28 @@ namespace FoodFactoryGame.World.Tests
     public sealed class WorldGeneratorTests
     {
         private const ulong KnownSeed = 20260927;
-        // WorldLayoutText.Hash of generator v7's layout for KnownSeed (v1's was c8aed6b7…4269, v2's 6e12b0fd…b598, the pin before v5
-        // 5667d34e…47ec, v5's d0a58a01…8d7f, v6's 75040b43…4855). Changing it requires bumping WorldGenerator.Version.
-        private const string KnownHash = "34c8eeee803edecf8e19c56875905ee12fcaad51df1011ad96625c15f9bfeefc";
+        // WorldLayoutText.Hash of generator v8's layout for KnownSeed (v1's was c8aed6b7…4269, v2's 6e12b0fd…b598, the pin before v5
+        // 5667d34e…47ec, v5's d0a58a01…8d7f, v6's 75040b43…4855, v7's 34c8eeee…feefc). Changing it requires bumping
+        // WorldGenerator.Version.
+        private const string KnownHash = "b9f41eb9a2edf9e17f574e814b03f7f59ec76de48a6d318496f59c444d904643";
+        private const string KnownHashV7 = "34c8eeee803edecf8e19c56875905ee12fcaad51df1011ad96625c15f9bfeefc";
         private const string KnownHashV6 = "75040b43e7bb5f33b7d01c5d70c59049bd0aaa760ebc495d581fb7e412bd4855";
         private const string KnownHashV5 = "d0a58a011d03fa053ddb5e3df9726dd67115863b6289e56dbdd8bd2f82768d7f";
         private const int SeedCount = 120;
 
         private static WorldLayout Generate(ulong seed) => WorldGenerator.Generate(seed.ToString(), seed).Layout;
+
+        // Generator v7's start rule (the smallest residential restaurant of at most 400 cells), for the tests that pin older
+        // versions' output.
+        private static WorldSettings V7Settings()
+        {
+            var settings = WorldSettings.Default;
+            settings.StartLargest = false;
+            settings.StartMaxArea = 400;
+            return settings;
+        }
+
+        private static WorldLayout GenerateV7(string requested, ulong seed) => WorldGenerator.Generate(requested, seed, V7Settings()).Layout;
 
         [Test]
         public void SameSeedProducesAnIdenticalLayout()
@@ -31,7 +45,7 @@ namespace FoodFactoryGame.World.Tests
             var first = WorldLayoutText.Write(Generate(KnownSeed));
             var second = WorldLayoutText.Write(Generate(KnownSeed));
             Assert.That(second, Is.EqualTo(first));
-            Assert.That(first, Does.StartWith("food-factory-world-layout 5\ngenerator 7\n").And.Contains("\nlot lot-").And.Contains("\nservice restaurant-"),
+            Assert.That(first, Does.StartWith("food-factory-world-layout 5\ngenerator 8\n").And.Contains("\nlot lot-").And.Contains("\nservice restaurant-"),
                 "the same lots, service yards and IDs, in format 5");
             TestContext.WriteLine($"seed {KnownSeed}: sha256 {WorldLayoutText.Hash(first)}, {first.Length} chars");
             Assert.That(WorldLayoutText.Hash(first), Is.EqualTo(KnownHash), "Generator output changed: bump WorldGenerator.Version and re-pin.");
@@ -42,7 +56,7 @@ namespace FoodFactoryGame.World.Tests
         [Test]
         public void GeneratorV6IsV5WithGameHourRates()
         {
-            var layout = Generate(KnownSeed);
+            var layout = GenerateV7(KnownSeed.ToString(), KnownSeed);
             layout.FormatVersion = 4;
             layout.GeneratorVersion = 5;
             foreach (var district in layout.Districts) district.CustomersPerHour *= GameClock.RetuneDivisor;
@@ -54,17 +68,44 @@ namespace FoodFactoryGame.World.Tests
         [Test]
         public void GeneratorV7IsV6WithTheStartTierRule()
         {
-            var layout = Generate(KnownSeed);
+            var layout = GenerateV7(KnownSeed.ToString(), KnownSeed);
             layout.GeneratorVersion = 6;
             Assert.That(WorldLayoutText.Hash(WorldLayoutText.Write(layout)), Is.EqualTo(KnownHashV6));
             foreach (var text in new[] { "piece-two", "p0-second" })
             {
                 var (requested, seed) = WorldSeed.Resolve(text);
-                var v7 = WorldGenerator.Generate(requested, seed).Layout;
+                var v7 = GenerateV7(requested, seed);
+                v7.GeneratorVersion = 7;
                 var v6 = WorldLayoutText.Write(v7).Replace("\ngenerator 7\n", "\ngenerator 6\n");
                 v7.GeneratorVersion = 6;
                 Assert.That(WorldLayoutText.Write(v7), Is.EqualTo(v6), $"seed {text}: only the version line differs");
             }
+        }
+
+        // Generator v8 (owner feedback 2026-10-12, decision 0045) only changes which residential restaurant is the start: with v7's
+        // start rule its layout is byte for byte v7's.
+        [Test]
+        public void GeneratorV8IsV7WithTheLargestStart()
+        {
+            var layout = GenerateV7(KnownSeed.ToString(), KnownSeed);
+            layout.GeneratorVersion = 7;
+            Assert.That(WorldLayoutText.Hash(WorldLayoutText.Write(layout)), Is.EqualTo(KnownHashV7));
+        }
+
+        // Decision 0045: the start is the largest restaurant of its residential district (v7's start size is logged beside it).
+        [TestCase("piece-two")]
+        [TestCase("p0-second")]
+        public void TheStartIsTheLargestResidentialRestaurant(string text)
+        {
+            var (requested, seed) = WorldSeed.Resolve(text);
+            var layout = WorldGenerator.Generate(requested, seed).Layout;
+            var start = layout.Buildings.Single(x => x.Id == layout.StartRestaurantId);
+            var largest = layout.Buildings.Where(x => x.Category == BuildingCategory.Restaurant && x.DistrictId == start.DistrictId)
+                .Max(x => x.Width * x.Depth);
+            var v7 = GenerateV7(requested, seed);
+            var v7Start = v7.Buildings.Single(x => x.Id == v7.StartRestaurantId);
+            TestContext.WriteLine($"seed {text}: start {start.Width}x{start.Depth}, v7 start {v7Start.Width}x{v7Start.Depth}");
+            Assert.That(start.Width * start.Depth, Is.EqualTo(largest));
         }
 
         // Decision 19 on both P0 seeds: the starting restaurant's layout district has minimum recipe tier 1, and the customer district
@@ -193,7 +234,7 @@ namespace FoodFactoryGame.World.Tests
                 Assert.That((start.Category, district[start.DistrictId], start.Ownership),
                     Is.EqualTo((BuildingCategory.Restaurant, DistrictKind.Residential, Ownership.Player)));
                 var residential = layout.Buildings.Where(x => x.Category == BuildingCategory.Restaurant && x.DistrictId == start.DistrictId).ToList();
-                Assert.That(start.Width * start.Depth, Is.EqualTo(residential.Min(x => x.Width * x.Depth)), "start is the smallest residential shell");
+                Assert.That(start.Width * start.Depth, Is.EqualTo(residential.Max(x => x.Width * x.Depth)), "start is the largest residential shell (decision 0045)");
                 var restaurants = layout.Buildings.Where(x => x.Category == BuildingCategory.Restaurant).ToList();
                 Assert.That(restaurants.Any(x => x.Ownership == Ownership.ForSale) && restaurants.Any(x => x.Ownership == Ownership.Competitor));
                 Assert.That(layout.Buildings.Where(x => x.Category is BuildingCategory.Factory or BuildingCategory.Farm or BuildingCategory.Station)

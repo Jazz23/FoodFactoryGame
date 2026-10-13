@@ -1132,7 +1132,8 @@ MonoBehaviour:
   belts: {fileID: 431893038}
   placeItemAction: {fileID: -5323955772092899608, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   takeItemAction: {fileID: -2323420383534807687, guid: 052faaac586de48259a63d0c4782560b, type: 3}
-  hoverOutlineMaterial: {fileID: 0}
+  hoverOutlineMaterial: {fileID: 2100000, guid: 63c6299bfbcad5742a91f14aeaf6cf39, type: 2}
+  pickTintMaterial: {fileID: 2100000, guid: 017907d37e64d30469f62926c0a21cd9, type: 2}
   propertyReach: 60
   session: {fileID: 1957645435}
   buildings: {fileID: 1051813736}
@@ -1203,6 +1204,78 @@ Transform:
   - {fileID: 502774819}
   - {fileID: 69068496}
   m_Father: {fileID: 1957645436}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1334623188
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1334623191}
+  - component: {fileID: 1334623190}
+  - component: {fileID: 1334623189}
+  m_Layer: 0
+  m_Name: PhonePanel
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1334623189
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1334623188}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 15ae57a5178b6dc4d87910ab0814120d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: FoodFactoryGame.Session::FoodFactoryGame.Session.WorldMap.PhonePanel
+  document: {fileID: 1334623190}
+  interaction: {fileID: 1162993844}
+  map: {fileID: 391669105}
+  logistics: {fileID: 1375277384}
+--- !u!114 &1334623190
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1334623188}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 19102, guid: 0000000000000000e000000000000000, type: 0}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.dll::UnityEngine.UIElements.UIDocument
+  m_PanelSettings: {fileID: 11400000, guid: 4ce2abbea3080ac4698637a6f6a2457d, type: 2}
+  m_ParentUI: {fileID: 0}
+  sourceAsset: {fileID: 0}
+  m_SortingOrder: 11
+  m_Position: 0
+  m_WorldSpaceSizeMode: 1
+  m_WorldSpaceWidth: 1920
+  m_WorldSpaceHeight: 1080
+  m_PivotReferenceSize: 0
+  m_Pivot: 0
+  m_WorldSpaceCollider: {fileID: 0}
+--- !u!4 &1334623191
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1334623188}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1354021855
 GameObject:
@@ -2211,7 +2284,7 @@ MonoBehaviour:
   m_OverrideTileSize: 0
   m_TileSize: 256
   m_OverrideVoxelSize: 0
-  m_VoxelSize: 0.16666667
+  m_VoxelSize: 0.1
   m_MinRegionArea: 2
   m_NavMeshData: {fileID: 23800000, guid: 9aae96ecb96ed8a4ca3f6d71049eb853, type: 2}
   m_BuildHeightMesh: 0
@@ -2319,3 +2392,4 @@ SceneRoots:
   - {fileID: 1018102765}
   - {fileID: 103802103}
   - {fileID: 16160438}
+  - {fileID: 1334623191}

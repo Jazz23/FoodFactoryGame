@@ -431,7 +431,7 @@ namespace FoodFactoryGame.Session.Tests
             var rig = prefab.GetComponentInChildren<OrbitCameraRig>(true);
             Assert.That(rig, Is.Not.Null);
             Assert.That(rig.gameObject.activeSelf, Is.False, "Only the owning client enables the rig.");
-            AssertAssigned(rig, "target", "cameraTransform", "lookAction", "zoomAction", "switchViewAction");
+            AssertAssigned(rig, "target", "cameraTransform", "lookAction", "zoomAction");
             Assert.That(rig.GetComponentsInChildren<Camera>(true).Length, Is.EqualTo(1));
             Assert.That(prefab.GetComponentsInChildren<Camera>(true).Single().transform.IsChildOf(rig.transform), Is.True);
             Assert.That(prefab.GetComponentsInChildren<AudioListener>(true).All(x => x.transform.IsChildOf(rig.transform)), Is.True);
@@ -471,7 +471,10 @@ namespace FoodFactoryGame.Session.Tests
             Assert.That(player.FindAction("FloorUp").bindings.Any(x => x.path == "<Keyboard>/pageUp"), Is.True, "PgUp rides the elevator up.");
             Assert.That(player.FindAction("FloorDown").bindings.Any(x => x.path == "<Keyboard>/pageDown"), Is.True, "PgDn rides the elevator down.");
             Assert.That(player.FindAction("Logistics").bindings.Any(x => x.path == "<Keyboard>/l"), Is.True, "L opens the logistics screen.");
-            foreach (var name in new[] { "Place", "Remove", "Inventory", "ClearCursor", "CloseScreen", "PlaceItem", "TakeItem", "FloorUp", "FloorDown", "Logistics" })
+            Assert.That(player.FindAction("Phone").bindings.Any(x => x.path == "<Keyboard>/c"), Is.True, "C opens the phone (decision 0047).");
+            Assert.That(player.FindAction("SwitchCamera"), Is.Null, "C no longer switches to the top-down camera.");
+            Assert.That(player.actions.Where(x => x.name != "Phone").SelectMany(x => x.bindings).Any(x => x.path == "<Keyboard>/c"), Is.False, "C does nothing else.");
+            foreach (var name in new[] { "Place", "Remove", "Inventory", "ClearCursor", "CloseScreen", "PlaceItem", "TakeItem", "FloorUp", "FloorDown", "Logistics", "Phone" })
                 Assert.That(player.FindAction(name).interactions, Is.Empty, $"{name} is a press, not a hold.");
             // Each hotbar key reads as its slot number through a scale processor.
             var hotbar = player.FindAction("Hotbar");

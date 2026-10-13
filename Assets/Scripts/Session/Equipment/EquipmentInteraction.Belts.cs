@@ -110,7 +110,7 @@ namespace FoodFactoryGame.Session.Equipment
                 _beltHoldId = null;
                 _beltSweep = false;
             }
-            else if (active && !_released) RemoveAimedBelt();
+            else if (active) RemoveAimedBelt();
             else _beltHoldId = null;
             if (!active || CursorGoods == null)
             {
@@ -383,7 +383,7 @@ namespace FoodFactoryGame.Session.Equipment
             var site = session.ClientSite;
             var bridge = _subscription?.Bridge;
             var layout = belts.Layout;
-            if (site == null || bridge == null || layout == null || _released || Screen != InteractionScreen.None) return;
+            if (site == null || bridge == null || layout == null || Screen != InteractionScreen.None) return;
             if (_aimBelt == null)
             {
                 LastRejection = "aim at a belt";
@@ -407,7 +407,7 @@ namespace FoodFactoryGame.Session.Equipment
         {
             var site = session.ClientSite;
             var bridge = _subscription?.Bridge;
-            if (!ItemCursor || site == null || bridge == null || _released) return;
+            if (!ItemCursor || site == null || bridge == null || Screen == InteractionScreen.Menu) return;
             if (_aimBelt == null)
             {
                 LastRejection = "aim at a belt";

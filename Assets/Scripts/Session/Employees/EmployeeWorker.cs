@@ -160,6 +160,27 @@ namespace FoodFactoryGame.Session.Employees
             if (IsClientStarted) ServerStop();
         }
 
+        // Client request: rename this employee. The server checks the sender's grant and the name, saves it with the record and
+        // only then shows it (DisplayName); a refused name changes nothing.
+        public void RequestRename(string name)
+        {
+            if (IsClientStarted) ServerRename(name ?? "");
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        private void ServerRename(string name, NetworkConnection sender = null)
+        {
+            if (!Authorized(sender)) return;
+            var bridge = Bridge;
+            var problem = bridge == null ? "persistence-unavailable" : bridge.RecordWorkerName(_employeeId, name);
+            if (problem != null)
+            {
+                Debug.LogWarning($"[Employee] Refused renaming {_employeeId}: {problem}.");
+                return;
+            }
+            _name.Value = name.Trim();
+        }
+
         [ServerRpc(RequireOwnership = false)]
         private void ServerRun(string source, string tasks, NetworkConnection sender = null)
         {
@@ -695,16 +716,18 @@ namespace FoodFactoryGame.Session.Employees
         // work(station, recipe): walks to a station that runs only while worked (decision 0043, the kitchen counter), sets its
         // recipe when one is given (as set_recipe), and works it for one batch: it stays until the batch is done, or leaves
         // after a moment if no batch starts (the ingredients are not in). Returns the number of batches made (1 or 0) and, for
-        // 0, a reason.
+        // 0, a reason. A register (the task list's "Work at counter" accepts one) is not a batch station: the employee walks there
+        // and takes it over, as the register screen's Assign does, and stays assigned when it walks on (1, or 0 and a reason).
         private IEnumerator Work(CallbackArguments args, EmployeeScript.Result result)
         {
             var view = View();
             var place = Resolve(args[0], view);
             var kind = place.EquipmentId == null ? null : view?.Equipment.FirstOrDefault(x => x.Id == place.EquipmentId)?.Kind;
+            var register = kind == GoodsWorld.CounterKind;
             if (place.Problem == null && place.EquipmentId == null) place.Problem = $"{place.Name} is not a machine";
-            if (place.Problem == null && Bridge?.RequiresWorker(kind) != true) place.Problem = $"{place.Name} does not need a worker";
+            if (place.Problem == null && !register && Bridge?.RequiresWorker(kind) != true) place.Problem = $"{place.Name} does not need a worker";
             var given = OptionalString(args, 1);
-            var recipeId = place.Problem == null && given != null ? RecipeFor(kind, given, out place.Problem, place.Name) : null;
+            var recipeId = place.Problem == null && given != null && !register ? RecipeFor(kind, given, out place.Problem, place.Name) : null;
             if (place.Problem != null)
             {
                 result.Set(DynValue.NewNumber(0), DynValue.NewString(place.Problem));
@@ -721,6 +744,14 @@ namespace FoodFactoryGame.Session.Employees
                 yield break;
             }
             var stationId = place.EquipmentId;
+            if (register)
+            {
+                var serving = Bridge?.WorkerStaff(_employeeId, stationId, true);
+                var taken = serving?.Accepted == true || serving?.Reason == "unchanged";
+                if (taken) _status.Value = $"Running: serving at {place.Name}";
+                result.Set(DynValue.NewNumber(taken ? 1 : 0), taken ? DynValue.Nil : Reason(serving));
+                yield break;
+            }
             if (recipeId != null && View()?.Equipment.FirstOrDefault(x => x.Id == stationId)?.RecipeId != recipeId)
             {
                 var set = Bridge?.WorkerSelectRecipe(_employeeId, stationId, recipeId);

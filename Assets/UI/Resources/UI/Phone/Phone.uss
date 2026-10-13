@@ -1,0 +1,94 @@
+/* The phone (decision 0047) in the shared look: a dark handset with a thick bezel that fills most of the screen. Shared pieces
+   come from Theme.uss. Map colours are drawn by PhoneMapView; the legend swatches here match them. */
+
+.phone {
+    width: 82%;
+    height: 88%;
+    max-width: 1500px;
+    padding: 14px;
+    background-color: #0C0D0F;
+    border-width: 2px;
+    border-color: #3A3D42;
+    border-radius: 38px;
+}
+
+.phone__screen {
+    flex-grow: 1;
+    background-color: var(--ff-panel);
+    border-radius: 26px;
+    padding: 6px 18px 12px 18px;
+    overflow: hidden;
+}
+
+.phone__statusbar { height: 26px; align-items: center; justify-content: space-between; }
+.phone__clock { font-size: 13px; -unity-font-style: bold; color: var(--ff-text-soft); width: 160px; }
+.phone__cash { font-size: 13px; -unity-font-style: bold; color: var(--ff-positive); width: 160px; -unity-text-align: middle-right; }
+.phone__notch { width: 110px; height: 16px; border-radius: 8px; background-color: #0C0D0F; }
+
+.phone__header { align-items: center; margin: 6px 0 10px 0; }
+.phone__tab { min-width: 92px; }
+
+.phone__body { flex-grow: 1; flex-shrink: 1; }
+.phone__page { flex-grow: 1; flex-shrink: 1; }
+/* The map page is a row: the map and its details fill its height (ff-row alone would centre them). */
+.phone__page.ff-row { align-items: stretch; }
+.phone__list { padding-right: 6px; }
+
+.phone__map {
+    flex-grow: 1;
+    background-color: #1E2A20;
+    border-radius: 14px;
+    border-width: 1px;
+    border-color: var(--ff-edge);
+    overflow: hidden;
+}
+
+.phone__map-empty { position: absolute; left: 16px; top: 16px; }
+.phone__legend { position: absolute; left: 10px; bottom: 10px; align-items: center; background-color: var(--ff-overlay); border-radius: 8px; padding: 4px 8px; }
+.phone__legend-text { margin: 0 10px 0 4px; }
+.phone__swatch { width: 10px; height: 10px; border-radius: 2px; }
+.phone__swatch--yours { background-color: #4FC46A; }
+.phone__swatch--sale { background-color: #F2A33A; }
+.phone__swatch--farm { background-color: #D9C35A; }
+.phone__swatch--taken { background-color: #8A4B44; }
+
+.phone__detail { width: 360px; flex-shrink: 0; margin-left: 14px; }
+
+.phone__heading { margin: 12px 0 6px 0; }
+.phone__line { margin: 4px 0 8px 0; }
+.phone__status { margin-top: 6px; font-size: 12px; min-height: 16px; color: var(--ff-danger-text); }
+.phone__status--ok { color: var(--ff-positive); }
+.phone__hire { align-self: flex-start; margin: 4px 0 10px 0; }
+
+/* Detail of the selected lot. */
+.phone-detail__title { font-size: 19px; -unity-font-style: bold; white-space: normal; }
+.phone-detail__kind { margin-top: 2px; }
+.phone-detail__facts { margin-top: 10px; padding: 12px; }
+.phone-detail__state { margin-top: 4px; font-size: 13px; color: var(--ff-text-soft); white-space: normal; }
+.phone-detail__state--yours { color: var(--ff-positive); }
+.phone-detail__state--taken { color: var(--ff-danger-text); }
+.phone-detail__buy { margin-top: 10px; }
+.phone-detail__section { margin-top: 14px; }
+
+/* One good a farm sells; the chosen one is lit. */
+.phone-good { align-items: center; margin-top: 6px; padding: 6px 10px; }
+.phone-good--chosen { border-color: var(--ff-accent); }
+.phone-good__icon { width: 32px; height: 32px; margin-right: 10px; }
+.phone-good__price { margin-left: 8px; -unity-text-align: middle-right; }
+
+/* The order form. */
+.phone-form { margin-top: 10px; padding: 12px; }
+.phone-form__row { align-items: center; margin-top: 8px; }
+.phone-form__label { width: 92px; font-size: 12px; color: var(--ff-muted); }
+.phone-form__value { flex-grow: 1; flex-shrink: 1; -unity-text-align: middle-center; font-size: 13px; }
+.phone-form__step { width: 34px; min-width: 34px; height: 30px; padding: 0; margin: 0 2px; }
+.phone-form__total { margin-top: 10px; font-size: 14px; -unity-font-style: bold; }
+.phone-form__submit { margin-top: 10px; }
+
+/* Rows of the Orders, Staff and Places apps. */
+.phone-row { align-items: center; }
+.phone-row__text { flex-grow: 1; flex-shrink: 1; margin-right: 10px; }
+.phone-row__title { font-size: 14px; -unity-font-style: bold; white-space: normal; }
+.phone-row__sub { margin-top: 2px; white-space: normal; }
+.phone-row__button { margin-left: 6px; }
+.phone-row__field { flex-grow: 1; flex-shrink: 1; margin-right: 8px; }

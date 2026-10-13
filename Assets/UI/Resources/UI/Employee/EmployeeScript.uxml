@@ -3,9 +3,9 @@
          EmployeeTaskCard.uxml) and the Lua source page; Stop and Run. EmployeeScriptPanel fills and wires it. -->
     <Style src="project://database/Assets/UI/Theme/Theme.uss" />
     <Style src="Employee.uss" />
-    <ui:VisualElement name="employee-script-root" class="ff-root ff-fill" picking-mode="Ignore">
+    <ui:VisualElement name="employee-script-root" class="ff-root ff-fill ff-centering" picking-mode="Ignore">
         <ui:VisualElement name="employee-script-dim" class="ff-fill ff-dim" picking-mode="Ignore" />
-        <ui:VisualElement name="employee-script" class="ff-panel ff-centered emp">
+        <ui:VisualElement name="employee-script" class="ff-panel emp">
             <ui:VisualElement class="emp__head">
                 <ui:VisualElement class="ff-row emp__top">
                     <ui:VisualElement class="ff-avatar ff-avatar--lg" picking-mode="Ignore">
@@ -18,10 +18,18 @@
                             <ui:Label name="employee-script-status" class="emp__status ff-wrap" picking-mode="Ignore" />
                         </ui:VisualElement>
                     </ui:VisualElement>
+                    <ui:Button name="employee-script-rename" text="Rename" focusable="false" class="ff-button emp__head-button" />
+                    <ui:Button name="employee-script-fire" text="Fire" focusable="false" class="ff-button ff-button--danger emp__head-button" />
                     <ui:Button name="employee-script-close" focusable="false" class="ff-button ff-button--icon emp__close">
                         <ui:VisualElement class="ff-glyph ff-glyph--close ff-glyph--sm" />
                     </ui:Button>
                 </ui:VisualElement>
+                <ui:VisualElement name="employee-script-rename-row" class="ff-row emp__rename">
+                    <ui:TextField name="employee-script-name" class="ff-text-field ff-grow emp__rename-field" />
+                    <ui:Button name="employee-script-rename-save" text="Save" focusable="false" class="ff-button ff-button--primary" />
+                    <ui:Button name="employee-script-rename-cancel" text="Cancel" focusable="false" class="ff-button" />
+                </ui:VisualElement>
+                <ui:Label name="employee-script-notice" class="emp__notice ff-wrap" picking-mode="Ignore" />
                 <ui:VisualElement name="employee-hands" class="ff-row emp__hands" />
                 <ui:VisualElement class="ff-row emp__tabs">
                     <ui:Button name="employee-script-tab-tasks" text="Tasks" focusable="false" class="emp__tab" />

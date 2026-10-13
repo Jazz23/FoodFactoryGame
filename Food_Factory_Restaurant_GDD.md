@@ -130,7 +130,7 @@ Owner decisions recorded 2026-09-27:
   - Farms are premade Blender models for now.
   - Houses, apartments, and offices are premade, non-enterable Blender models. They are scenery only and hold no population.
 - Property for sale: only buildings are sold; there is no empty land (section 29.5). At world start some restaurants are empty and for sale, and the rest are AI competitors that can become purchasable when they struggle (section 11). Factories, farms, and stations can also be bought.
-- Starting position: the generator gives the player a small, cheap restaurant shell in the residential district with an ingredient supplier reachable by road.
+- Starting position: the generator gives the player a restaurant shell in the residential district with an ingredient supplier reachable by road. It is the largest restaurant of that district (owner, 2026-10-12: the smallest one was too small; decision 0045).
 - Sites (owner decisions 2026-09-29, `docs/decisions/0028-sites-for-generated-buildings.md`):
   - A. One site per building, shell only.
   - B. One site per purchasable building plus its lot: the building and a paved area reaching its street, for docks, trucks and outdoor equipment. [SELECTED]
@@ -474,6 +474,16 @@ Owner decisions, 2026-10-01; numbers and formulas are PROTOTYPE and open (`docs/
 
 - Until farms exist, every raw ingredient (section 6, Recipe Catalog) is bought from the supplier (owner decision 2026-10-12).
 
+- Farm orders (owner decisions 2026-10-13, decision 0047):
+  - Farm types: Dairy (milk, cheese), Cattle (beef), Poultry (egg, chicken), Vegetable (potato, tomato, lettuce), Grain
+    (flour, dough) and Fishery (fish). Each farm sells the base goods of its type.
+  - Players order a farm's goods from the phone to one of their docks. Either they pay a flat delivery fee and a supplier truck
+    drives the goods over the roads to the dock, or one of their own trucks picks them up at the farm's pickup point.
+  - Goods from a farm the player owns cost less.
+  - Orders can repeat on a schedule.
+  - Prices, the fee and the owner discount are PROTOTYPE values (0047). Whether an owned farm also produces goods on its own
+    stays open.
+
 # 11. Competition & Acquisitions
 
 - AI restaurants compete for the same local customer pool.
@@ -565,6 +575,11 @@ support them.
 - Remote task assignment lets the player manage distant sites without
   physically traveling there.
 
+- The phone (owner decision 2026-10-13, decision 0047): C opens a phone that fills most of the screen. It holds the world
+  map (lots, farms and buildings with their prices; buying property), farm orders and repeating orders, hiring and the
+  employee task screen, truck routes and buying trucks, and renaming the player's restaurants, buildings and lots. C no longer
+  switches the camera; indoors still uses the top-down view (section 3).
+
 - Alerts identify stockouts, spoilage risk, route failures, queues, and
   unprofitable locations.
 
@@ -612,7 +627,7 @@ support them.
 
 # 18. Major Decisions Still To Lock
 
-- Starting position: LOCKED - tiny restaurant with hands-on early play.
+- Starting position: LOCKED - a restaurant with hands-on early play (owner, 2026-10-12: the residential district's largest restaurant, not a tiny one; decision 0045).
 
 - Hands-on cooking/production: LOCKED - automation-first station interactions; tasks run automatically once started.
 

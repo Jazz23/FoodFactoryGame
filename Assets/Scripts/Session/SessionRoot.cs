@@ -193,6 +193,27 @@ namespace FoodFactoryGame.Session
         // The worlds SelectWorld can open, most recently played first.
         public IReadOnlyList<SavedWorld> SavedWorlds() => SessionOptions.SavedWorlds(WorldsDirectory);
 
+        // Deletes a saved world (its whole save folder beside the current one) for the Select World screen. Never while a session
+        // runs, and only a folder SavedWorlds lists. Returns null when deleted, otherwise why not.
+        public string DeleteWorld(string name)
+        {
+            if (IsRunning) return "leave the world first";
+            name = name?.Trim();
+            if (!SessionOptions.IsValidWorldName(name) || SavedWorlds().All(x => !string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase)))
+                return "there is no such world";
+            try
+            {
+                Directory.Delete(Path.Combine(WorldsDirectory, name), true);
+                Debug.Log($"[Session] Deleted the world {name}.");
+                return null;
+            }
+            catch (Exception error) when (error is IOException || error is UnauthorizedAccessException)
+            {
+                Debug.LogWarning($"[Session] Could not delete the world {name}: {error.Message}");
+                return error.Message;
+            }
+        }
+
         // The folder holding the current save folder and its sibling worlds.
         private string WorldsDirectory => Path.GetDirectoryName(_options.SaveDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
 

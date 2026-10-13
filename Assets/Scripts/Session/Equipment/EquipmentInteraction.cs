@@ -1,6 +1,7 @@
 // Local player's Factorio-style controls. The gameplay cursor is locked to a centre crosshair so Look always orbits (the
 // top-down camera view instead leaves the pointer free and aims where it points);
-// opening a screen (E, or clicking a machine) frees the pointer and suspends orbiting. E opens the screen of whatever
+// opening a screen (E, or clicking a machine) frees the pointer and suspends orbiting and zooming. Esc with nothing open and
+// an empty cursor opens the in-game menu (InteractionScreen.Menu, drawn by SessionPanel), which suspends gameplay input. E opens the screen of whatever
 // openable thing the crosshair is on (EquipmentInteraction.Hover.cs), or the inventory when it is on nothing openable. Hotbar slots point to a
 // machine kind or an item, assigned on a screen (a hotbar key over a stack, or dropping the cursor on a hotbar slot); this
 // client's arrangement only, never saved or sent. Hotbar keys (or picking a machine out of the inventory grid) put a held
@@ -37,7 +38,11 @@ namespace FoodFactoryGame.Session.Equipment
         // A map building's price, owner and Buy button (decision 0028, PropertyPanel).
         Property,
         // Restaurant build mode (decision 0034, BuildMode): top-down grid, ghosts, prices and orders.
-        Build
+        Build,
+        // The in-game menu (SessionPanel): resume, settings, quit to the main menu or quit the game. The session keeps running.
+        Menu,
+        // The phone (decision 0047, PhonePanel): the world map with lots and farms, farm orders, staff and site names. C opens it.
+        Phone
     }
 
     // What a world pick on the employee screen is for: a cell or machine for the Lua text box, or a task's source,
@@ -127,7 +132,6 @@ namespace FoodFactoryGame.Session.Equipment
         private (int X, int Z) _target;
         private int _targetLevel;
         private int _rotation;
-        private bool _released;
         private bool? _appliedLock;
         // Set when a screen opens and cleared once Place is seen released, so the click that opened a machine screen is
         // never also taken by the slot that appears under the pointer.
@@ -195,8 +199,18 @@ namespace FoodFactoryGame.Session.Equipment
         public Func<HotbarEntry> HoveredEntry { get; set; }
         // Set by build mode: true when Esc was taken to cancel a drag in progress instead of closing the screen.
         public Func<bool> BuildEscape { get; set; }
+        // Set by the in-game menu: true when Esc was taken there (going back from its settings, or cancelling a key rebind)
+        // instead of closing the menu.
+        public Func<bool> MenuEscape { get; set; }
         // Set by build mode: ClearCursor (X) there clears its selected tool or item.
         public Action BuildClear { get; set; }
+        // Set each frame by the phone while one of its text boxes has focus, so a C typed there is text, not a close.
+        public bool PhoneTextFocused { get; set; }
+        // True while the employee screen was opened from the phone: Esc goes back to the phone.
+        public bool EmployeeFromPhone { get; private set; }
+
+        // The phone's key (decision 0047): looked up in the project-wide Player map, like every other action here.
+        private InputAction PhoneAction => placeAction.action.actionMap?.FindAction("Phone");
 
         // The cursor's machine kind, or an unspoiled goods stack carried from the inventory.
         private HotbarEntry CursorEntry => CursorKind != null ? HotbarEntry.Machine(CursorKind)
@@ -223,6 +237,11 @@ namespace FoodFactoryGame.Session.Equipment
             placeItemAction.action.performed += OnPlaceItem;
             takeItemAction.action.performed += OnTakeItem;
             foreach (var action in Actions) action.action.Enable();
+            if (PhoneAction != null)
+            {
+                PhoneAction.performed += OnPhone;
+                PhoneAction.Enable();
+            }
             EnableLiftInput();
             ghost.gameObject.SetActive(false);
         }
@@ -239,6 +258,11 @@ namespace FoodFactoryGame.Session.Equipment
             hotbarAction.action.performed -= OnHotbar;
             placeItemAction.action.performed -= OnPlaceItem;
             takeItemAction.action.performed -= OnTakeItem;
+            if (PhoneAction != null)
+            {
+                PhoneAction.performed -= OnPhone;
+                PhoneAction.Disable();
+            }
             DisableLiftInput();
             CloseEmployeeScreen();
             ClearHover();
@@ -291,8 +315,13 @@ namespace FoodFactoryGame.Session.Equipment
             if (CursorGoods != null && (site == null || !CursorLots(site).Any())) CursorGoods = null;
 
             // The top-down view does not orbit, so it aims with a free pointer instead of the centre crosshair.
-            ApplyPointerLock(_camera != null && Screen is InteractionScreen.None or InteractionScreen.PickPosition && !_released && !_rig.TopDown);
-            if (_rig != null) _rig.OrbitEnabled = PointerLocked;
+            ApplyPointerLock(_camera != null && Screen is InteractionScreen.None or InteractionScreen.PickPosition && !_rig.TopDown);
+            if (_rig != null)
+            {
+                _rig.OrbitEnabled = PointerLocked;
+                // On a screen the wheel scrolls its lists; build mode zooms through its own controls.
+                _rig.ZoomEnabled = Screen is InteractionScreen.None or InteractionScreen.PickPosition;
+            }
             if (Screen is InteractionScreen.Employee or InteractionScreen.PickPosition && OpenEmployee == null) CloseScreen();
             UpdateHover();
             UpdatePick(site);
@@ -332,8 +361,9 @@ namespace FoodFactoryGame.Session.Equipment
                     InteractionScreen.PickPosition => "Select world pos: look at a cell or a machine (red) and click to insert it into the script; Esc returns"
                         + (PickText != null ? $" [{PickText}]" : ""),
                     InteractionScreen.Machine => "Machine: put ingredients in the input, take results from the output (shift+click moves a stack); E or Esc closes" + suffix,
-                    _ => _released ? "Cursor released: click to resume" + suffix
-                        : ElevatorHint() + HoverHint() + "B: build mode, E: inventory (pick belts or goods to carry them out), L: trucks, 1-9: hotbar, left click: open machine, right click: pick up, R: turn belt, F: take an item off a belt" + suffix
+                    InteractionScreen.Menu => "Menu: Resume or Esc returns to the game",
+                    InteractionScreen.Phone => "Phone: tap the map to see lots and farms, order from farms, manage staff and names; C or Esc closes" + suffix,
+                    _ => ElevatorHint() + HoverHint() + "B: build mode, E: inventory (pick belts or goods to carry them out), L: trucks, 1-9: hotbar, left click: open machine, right click: pick up, R: turn belt, F: take an item off a belt" + suffix
                 };
                 return;
             }
@@ -534,6 +564,38 @@ namespace FoodFactoryGame.Session.Equipment
             else if (Screen == InteractionScreen.Logistics) CloseScreen();
         }
 
+        // The phone (decision 0047) opens from the world and closes with C or Esc. Like the in-game menu it frees the pointer and
+        // suspends gameplay input (all but Esc, the pointer and C), so typing a name never moves the avatar.
+        public void TogglePhone()
+        {
+            if (Screen == InteractionScreen.Phone)
+            {
+                if (!PhoneTextFocused) CloseScreen();
+                return;
+            }
+            OpenPhone();
+        }
+
+        public bool OpenPhone()
+        {
+            if (Screen != InteractionScreen.None || _camera == null || session.ClientSite == null) return false;
+            ClearHover();
+            ClearCursor();
+            Screen = InteractionScreen.Phone;
+            _awaitingRelease = true;
+            SuspendGameplayInput(true, "Phone");
+            return true;
+        }
+
+        // From the phone's staff list: the employee's task screen; Esc there returns to the phone.
+        public void OpenEmployeeFromPhone(Employees.EmployeeWorker employee)
+        {
+            if (Screen != InteractionScreen.Phone || employee == null) return;
+            CloseScreen();
+            OpenEmployeeScreen(employee);
+            EmployeeFromPhone = Screen == InteractionScreen.Employee;
+        }
+
         // The buy panel of a map building's lot (decision 0028); presentation only, the panel sends the request.
         public void OpenProperty(string lotId)
         {
@@ -569,6 +631,8 @@ namespace FoodFactoryGame.Session.Equipment
             StorageOpen = false;
             OpenMachineId = null;
             OpenLotId = null;
+            PhoneTextFocused = false;
+            EmployeeFromPhone = false;
             CloseEmployeeScreen();
             if (CursorGoods != null && CursorGoods.LocationId != InventoryId) CursorGoods = null;
         }
@@ -707,11 +771,6 @@ namespace FoodFactoryGame.Session.Equipment
                 return;
             }
             if (Screen != InteractionScreen.None || _camera == null) return;
-            if (_released)
-            {
-                _released = false;
-                return;
-            }
             var bridge = _subscription?.Bridge;
             if (_held == null && _hoveredEmployee != null)
             {
@@ -754,7 +813,7 @@ namespace FoodFactoryGame.Session.Equipment
         private void OnRemove(InputAction.CallbackContext _)
         {
             var bridge = _subscription?.Bridge;
-            if (Screen != InteractionScreen.None || _released || bridge == null || _camera == null) return;
+            if (Screen != InteractionScreen.None || bridge == null || _camera == null) return;
             var visual = EquipmentUnderCrosshair();
             // Belts under the crosshair are taken up while Remove is held (UpdateBelts).
             if (visual == null && _aimBelt != null) return;
@@ -776,22 +835,39 @@ namespace FoodFactoryGame.Session.Equipment
 
         private void OnLogistics(InputAction.CallbackContext _) => ToggleLogistics();
 
+        private void OnPhone(InputAction.CallbackContext _) => TogglePhone();
+
         private void OnClearCursor(InputAction.CallbackContext _)
         {
             if (Screen == InteractionScreen.Build) BuildClear?.Invoke();
             ClearCursor();
         }
 
-        // Esc closes an open screen, else empties a non-empty cursor; otherwise it releases the pointer (so the window can be
-        // left) until the next click.
+        // Esc closes an open screen, else empties a non-empty cursor; otherwise it opens the in-game menu.
         private void OnCloseScreen(InputAction.CallbackContext _)
         {
             // Build mode first drops a drag in progress; the next Esc leaves it.
             if (Screen == InteractionScreen.Build && BuildEscape?.Invoke() == true) return;
+            if (Screen == InteractionScreen.Menu && MenuEscape?.Invoke() == true) return;
             if (Screen == InteractionScreen.PickPosition) CancelPick();
+            else if (Screen == InteractionScreen.Employee && EmployeeFromPhone)
+            {
+                CloseScreen();
+                OpenPhone();
+            }
             else if (Screen != InteractionScreen.None) CloseScreen();
             else if (CursorKind != null || CursorGoods != null) ClearCursor();
-            else if (_camera != null) _released = !_released;
+            else OpenMenu();
+        }
+
+        // The in-game menu (Esc): frees the pointer and suspends gameplay input, like the employee screen, until it closes.
+        public void OpenMenu()
+        {
+            if (Screen != InteractionScreen.None || _camera == null || session.ClientSite == null) return;
+            ClearHover();
+            Screen = InteractionScreen.Menu;
+            _awaitingRelease = true;
+            SuspendGameplayInput(true);
         }
 
         // Each Hotbar binding scales its key press to the slot number (1-9); a release reads 0.

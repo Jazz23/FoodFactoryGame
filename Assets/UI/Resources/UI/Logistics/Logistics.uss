@@ -2,6 +2,9 @@
    Shared pieces come from Theme.uss. */
 
 .logi { padding: 18px 20px 14px 20px; max-width: 100%; max-height: 90%; }
+/* Inside the phone's Trucks app (decision 0047): it fills the page without its own frame or header. */
+.logi--embedded { flex-grow: 1; max-height: 100%; padding: 0; border-width: 0; background-color: rgba(0, 0, 0, 0); }
+.logi--embedded .logi__header { display: none; }
 .logi__header { margin-bottom: 8px; }
 .logi__scroll { flex-shrink: 1; }
 .logi__columns { align-items: flex-start; }

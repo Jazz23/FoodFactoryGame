@@ -13,6 +13,9 @@
 // the draft survives because the screen stays open while hidden. The Hands row shows what the employee holds, one small square per hand slot;
 // clicking one takes that stack into the player's inventory with an ordinary server-checked transfer (decision 0039).
 // The on/off/toggle and whitelist choices stay checkboxes as decision 0037 requires.
+// Rename opens a name box under the header (Save or Enter sends it; the server checks and saves it, EmployeeWorker.RequestRename).
+// Fire asks for a second click, then requests the firing (EquipmentInteraction.Fire); the screen closes once the employee is
+// gone, and a refusal (hands not empty, or busy) is shown under the header.
 // An item search box opens its drop-down as soon as it has focus: with no text it lists the items this player touched most
 // recently (EquipmentInteraction.RecentItemRank), then the rest; typing narrows it by name.
 using System;
@@ -69,6 +72,14 @@ namespace FoodFactoryGame.Session.Employees
         // Caret index at the last blink restart, and when that was: the bar stays lit while the caret moves.
         private int _blinkIndex = -1;
         private float _blinkStart;
+        private VisualElement _renameRow;
+        private TextField _nameField;
+        private Button _fire;
+        private Label _notice;
+        // Fire was pressed once for the shown employee; the next press fires.
+        private bool _confirmFire;
+        // A fire request from this screen is waiting for the server's answer.
+        private bool _fireRequested;
 
         public VisualElement Window => _window;
         public TextField SourceField => _source;
@@ -92,6 +103,22 @@ namespace FoodFactoryGame.Session.Employees
             _statusDot = root.Part("employee-script-dot");
             _status = root.Part<Label>("employee-script-status");
             root.Part<Button>("employee-script-close").clicked += interaction.CloseScreen;
+            _renameRow = root.Part("employee-script-rename-row");
+            _nameField = root.Part<TextField>("employee-script-name");
+            _nameField.maxLength = GoodsWorld.MaxEmployeeNameLength;
+            PrepareTextBox(_nameField);
+            _nameField.RegisterCallback<KeyDownEvent>(evt =>
+            {
+                if (evt.keyCode is not (KeyCode.Return or KeyCode.KeypadEnter)) return;
+                SaveName(_nameField.value);
+                evt.StopPropagation();
+            }, TrickleDown.TrickleDown);
+            root.Part<Button>("employee-script-rename").clicked += ClickRename;
+            root.Part<Button>("employee-script-rename-save").clicked += () => SaveName(_nameField.value);
+            root.Part<Button>("employee-script-rename-cancel").clicked += () => ShowRename(false);
+            _fire = root.Part<Button>("employee-script-fire");
+            _fire.clicked += ClickFire;
+            _notice = root.Part<Label>("employee-script-notice");
             _hands = root.Part("employee-hands");
             _tasksTab = root.Part<Button>("employee-script-tab-tasks");
             _luaTab = root.Part<Button>("employee-script-tab-lua");
@@ -131,9 +158,11 @@ namespace FoodFactoryGame.Session.Employees
             if (employee != _shown)
             {
                 _shown = employee;
+                ShowRename(false);
+                SetConfirmFire(false);
+                _fireRequested = false;
+                _notice.text = "";
                 if (employee == null) return;
-                _title.text = employee.DisplayName;
-                _initial.text = string.IsNullOrEmpty(employee.DisplayName) ? "?" : employee.DisplayName.Substring(0, 1).ToUpperInvariant();
                 _handsKey = null;
                 _draft = EmployeeTaskList.FromJson(employee.Tasks);
                 // A script that does not match its saved list (or one saved before task lists existed) opens detached.
@@ -145,6 +174,14 @@ namespace FoodFactoryGame.Session.Employees
                 ShowLua(false);
             }
             if (employee == null) return;
+            // Every frame, so a rename shows as soon as the server accepts it.
+            _title.SetText(employee.DisplayName);
+            _initial.SetText(string.IsNullOrEmpty(employee.DisplayName) ? "?" : employee.DisplayName.Substring(0, 1).ToUpperInvariant());
+            if (_fireRequested && !interaction.HasPendingRequests)
+            {
+                _fireRequested = false;
+                if (!string.IsNullOrEmpty(interaction.LastRejection)) _notice.text = FireProblem(interaction.LastRejection);
+            }
             if (_source.focusController?.focusedElement == _source)
             {
                 _caret = _source.cursorIndex;
@@ -170,6 +207,69 @@ namespace FoodFactoryGame.Session.Employees
         {
             if (_shown != null) _shown.RequestStop();
         }
+
+        // ---- Rename and fire ----
+
+        // Opens the name box with the current name. Public so tests drive the same path as the button.
+        public void ClickRename()
+        {
+            if (_shown == null) return;
+            ShowRename(true);
+            _nameField.value = _shown.DisplayName;
+            _notice.text = "";
+        }
+
+        private void ShowRename(bool open)
+        {
+            _renameRow.EnableInClassList("emp__rename--open", open);
+            if (!open && _nameField.focusController?.focusedElement == _nameField) _nameField.Blur();
+        }
+
+        // Sends the new name; the title changes once the server has saved it.
+        public void SaveName(string name)
+        {
+            if (_shown == null) return;
+            var trimmed = name?.Trim() ?? "";
+            if (!GoodsWorld.IsValidEmployeeName(trimmed))
+            {
+                _notice.text = $"A name has 1 to {GoodsWorld.MaxEmployeeNameLength} characters.";
+                return;
+            }
+            _notice.text = "";
+            _shown.RequestRename(trimmed);
+            ShowRename(false);
+        }
+
+        // The first press asks for a second; the second asks the server to fire the employee.
+        public void ClickFire()
+        {
+            if (_shown == null) return;
+            if (!_confirmFire)
+            {
+                SetConfirmFire(true);
+                _notice.text = $"Fire {_shown.DisplayName}? Press again to confirm.";
+                return;
+            }
+            SetConfirmFire(false);
+            _notice.text = "";
+            interaction.Fire(_shown.EmployeeId);
+            _fireRequested = true;
+        }
+
+        private void SetConfirmFire(bool confirming)
+        {
+            _confirmFire = confirming;
+            _fire.text = confirming ? "Confirm fire" : "Fire";
+            _fire.EnableInClassList("emp__fire--confirming", confirming);
+        }
+
+        private static string FireProblem(string reason) => reason switch
+        {
+            "holding" => "Can't fire: their hands hold something. Take it first (click a hand slot).",
+            "busy" => "Can't fire while they are in the middle of a job; try again in a moment.",
+            "forbidden" => "You can't fire this employee.",
+            _ => $"Can't fire: {reason}."
+        };
 
         // Switches between the Tasks tab (false) and the Lua source tab (true).
         public void ShowLua(bool lua)
@@ -500,7 +600,8 @@ namespace FoodFactoryGame.Session.Employees
             choice.choices = new List<string> { none }.Concat(recipes.Select(x => names[x.Id])).ToList();
             choice.SetValueWithoutNotify(names.TryGetValue(task.Recipe ?? "", out var current) ? current : none);
             choice.RegisterValueChangedCallback(evt => SetTaskRecipe(index, names.FirstOrDefault(x => x.Value == evt.newValue).Key ?? ""));
-            choice.SetEnabled(kind != null);
+            // A register (also a valid counter for a Work task) has no recipes to choose.
+            choice.SetEnabled(recipes.Count > 0);
         }
 
         // The kind of the placed machine a task names, or null.

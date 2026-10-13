@@ -1,0 +1,30 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <!-- The in-game menu (Esc during a session): the world or server, Resume, Settings, Quit to Main Menu and Quit Game.
+     SessionPanel fills the detail and wires the buttons; the session keeps running behind it. -->
+    <Style src="project://database/Assets/UI/Theme/Theme.uss" />
+    <Style src="MainMenu.uss" />
+    <ui:VisualElement name="main-menu-column" class="menu-main menu-pause">
+        <ui:VisualElement class="menu-main__brand menu-pause__brand" picking-mode="Ignore">
+            <ui:Label text="MENU" class="menu-main__eyebrow" picking-mode="Ignore" />
+            <ui:Label name="menu-pause-detail" class="menu-pause__title" picking-mode="Ignore" />
+        </ui:VisualElement>
+        <ui:Button name="menu-pause-resume" focusable="false" class="menu-button">
+            <ui:VisualElement class="ff-glyph ff-glyph--play menu-button__icon" />
+            <ui:Label text="Resume" class="menu-button__label" picking-mode="Ignore" />
+        </ui:Button>
+        <ui:Button name="menu-pause-settings" focusable="false" class="menu-button">
+            <ui:VisualElement class="ff-glyph ff-glyph--sliders menu-button__icon" />
+            <ui:Label text="Settings" class="menu-button__label" picking-mode="Ignore" />
+            <ui:VisualElement class="ff-glyph ff-glyph--chevron-right menu-button__chevron" />
+        </ui:Button>
+        <ui:VisualElement class="ff-divider menu-main__divider" picking-mode="Ignore" />
+        <ui:Button name="menu-pause-main-menu" focusable="false" class="menu-button">
+            <ui:VisualElement class="ff-glyph ff-glyph--home menu-button__icon" />
+            <ui:Label text="Quit to Main Menu" class="menu-button__label" picking-mode="Ignore" />
+        </ui:Button>
+        <ui:Button name="menu-pause-quit" focusable="false" class="menu-button menu-button--quiet">
+            <ui:VisualElement class="ff-glyph ff-glyph--exit menu-button__icon" />
+            <ui:Label text="Quit Game" class="menu-button__label" picking-mode="Ignore" />
+        </ui:Button>
+    </ui:VisualElement>
+</ui:UXML>

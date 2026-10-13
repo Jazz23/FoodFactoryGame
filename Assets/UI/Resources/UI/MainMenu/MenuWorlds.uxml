@@ -30,6 +30,7 @@
                 <ui:VisualElement name="menu-world-existing" class="menu-details__head">
                     <ui:Label name="menu-world-name" class="menu-details__name" picking-mode="Ignore" />
                     <ui:Label name="menu-world-played" class="ff-small menu-details__sub" picking-mode="Ignore" />
+                    <ui:Button name="menu-delete-world" text="Delete world" focusable="false" class="ff-button ff-button--danger menu-delete" />
                 </ui:VisualElement>
                 <ui:VisualElement name="menu-world-new" class="menu-details__head">
                     <ui:Label text="New world" class="menu-details__name" picking-mode="Ignore" />

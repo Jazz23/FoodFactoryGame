@@ -18,9 +18,14 @@ namespace FoodFactoryGame.Session.Buildings
     {
         // Window sill height of the kit's glazed units (art kit README).
         private const float SillHeight = 0.85f;
-        // Hinge offset of a leaf in a single frame (art kit README) and in each half of a double frame.
+        // Hinge offset of a leaf in a single frame (art kit README) and in each half of a double frame: 5 mm in from the jamb's
+        // inner face (single 0.48 m, double 0.98 m from the centre).
         private const float SingleHinge = 0.475f;
-        private const float DoubleHinge = 0.995f;
+        private const float DoubleHinge = 0.975f;
+        // A kit leaf is 0.95 m from hinge to free end, sized for the single frame. In the double frame each leaf is stretched
+        // along its width so the two free ends meet 3 mm short of the centre instead of leaving a gap between them.
+        private const float LeafWidth = 0.95f;
+        private const float DoubleLeafScale = (DoubleHinge - 0.003f) / LeafWidth;
 
         private static readonly (int X, int Z)[] Directions = { (1, 0), (-1, 0), (0, 1), (0, -1) };
 
@@ -97,8 +102,8 @@ namespace FoodFactoryGame.Session.Buildings
                     Place(catalog.DoubleDoorway, parent, center, yaw);
                     Place(catalog.DoubleFrame, parent, center, yaw);
                     var rotation = Quaternion.Euler(0f, yaw, 0f);
-                    Swing(Place(leaf, parent, center + rotation * new Vector3(DoubleHinge, 0.005f, 0f), yaw), parent, center, service);
-                    Swing(Place(leaf, parent, center + rotation * new Vector3(-DoubleHinge, 0.005f, 0f), yaw + 180f), parent, center, service);
+                    Swing(Widen(Place(leaf, parent, center + rotation * new Vector3(DoubleHinge, 0.005f, 0f), yaw)), parent, center, service);
+                    Swing(Widen(Place(leaf, parent, center + rotation * new Vector3(-DoubleHinge, 0.005f, 0f), yaw + 180f)), parent, center, service);
                 }
                 else
                 {
@@ -120,6 +125,12 @@ namespace FoodFactoryGame.Session.Buildings
                 Place(style.bay, parent, center, yaw);
                 if (style.window != null) Place(style.window, parent, center + Vector3.up * SillHeight, yaw);
             }
+        }
+
+        private static GameObject Widen(GameObject leaf)
+        {
+            if (leaf != null) leaf.transform.localScale = new Vector3(DoubleLeafScale, 1f, 1f);
+            return leaf;
         }
 
         private static void Swing(GameObject leaf, Transform parent, Vector3 doorway, bool service)

@@ -95,11 +95,11 @@ Not yet: buying/selling equipment, other machines, and moving equipment between 
 
 Decisions are in [decision 0007](decisions/0007-player-controls-and-working-oven.md). No new server rule and no schema change.
 
-- Controls (`EquipmentInteraction`, `OrbitCameraRig`): the pointer is locked to a centre crosshair while no screen is open, so `Player/Look` always orbits; the rig pivots 1 m beside the avatar. `Player/Inventory` (E) toggles the inventory screen, `Player/Hotbar` (1–9, one action whose bindings scale to the slot number) puts a held machine kind on the cursor, `Player/ClearCursor` (Q) empties it, `Player/Place` (left mouse) places the cursor item or opens the machine under the crosshair, `Player/Remove` (right mouse) picks the machine up, `Player/Rotate` (R) turns the ghost, `Player/CloseScreen` (Esc) closes a screen or releases the pointer. Aim rays skip player avatars. `Player/Orbit` is gone.
+- Controls (`EquipmentInteraction`, `OrbitCameraRig`): the pointer is locked to a centre crosshair while no screen is open, so `Player/Look` always orbits; the rig pivots 1 m beside the avatar. `Player/Inventory` (E) toggles the inventory screen, `Player/Hotbar` (1–9, one action whose bindings scale to the slot number) puts a held machine kind on the cursor, `Player/ClearCursor` (Q) empties it, `Player/Place` (left mouse) places the cursor item or opens the machine under the crosshair, `Player/Remove` (right mouse) picks the machine up, `Player/Rotate` (R) turns the ghost, `Player/CloseScreen` (Esc) closes a screen, or opens the in-game menu (decision 0045; it used to release the pointer). Aim rays skip player avatars. `Player/Orbit` is gone.
 - HUD (`PlayerHud`, UI Toolkit, its own `UIDocument` on the session panel settings; UXML and USS since decision 0042): crosshair, 9-slot hotbar (kind and held count), the inventory screen (your machines and goods by item/spoiled beside `dev-site-storage`) and the machine screen (recipe picker, Start, progress, input, output). Every click is a request: stack moves use `GoodsNetworkBridge.RequestTransfer` (whole lots up to the destination's previewed free capacity), Start uses the new `RequestStartJob` → `StartJobDurably`, one batch per click.
 - Content: `RecipeAsset` (`Assets/Content/Recipes/Bread.asset`: `oven-bread`, 1 dough → 1 bread, 10 s, bread spoils after 3600 s). `SessionRoot.recipes` lists it; `StartServer` registers every recipe with the world, including a recovered save.
 - Dev ingredients: a new dev world's storage gets 20 dough; `TryGrantDurably(..., starterGoods)` adds 5 dough (`starter:<playerId>:0`) to a player's inventory only in the commit that creates it. Dough spoils after 7200 s. Existing saves and existing inventories get neither.
-- Display: `EquipmentPresenter` sets `EquipmentVisual.Running` from the baseline (a running, not blocked, job on the station), which drives every `IEquipmentRunningDisplay` in the model; `OvenToggle` implements it (glow, light, fans).
+- Display: `EquipmentPresenter` sets `EquipmentVisual.Running` from the baseline (a running, not blocked, job on the station), which drives every `IEquipmentRunningDisplay` in the model; `OvenToggle` implements it (glow, light, fans). It also passes the slots used in the piece's input buffer to every `IEquipmentFillDisplay` (`StorageFillDisplay`: the storage shelf's box stacks, decision 0046).
 
 Prototype, labelled in code or content: the dev recipe, dough stock and spoil times, hotbar slots in content order, the 1 m shoulder offset, and storage as the inventory screen's second panel. Open: any granted player can transfer out of another player's inventory location (a pre-existing transfer rule); no gamepad hotbar or screen navigation; reach is wherever the crosshair meets the floor.
 
@@ -680,7 +680,7 @@ the goods schema (v15) are unchanged. Evidence: [verification record](verificati
 - Player and employee operational rules should be shared; input and AI choose actions through those rules.
 - Visual objects must not become the sole owners of authoritative simulation state.
 
-These remain accepted contracts; only the bounded goods slice, its station jobs, equipment placement, the working oven, conveyor belts, company cash, the sell counter, supplier purchases, equipment purchases, spoilage timing/refrigeration, building shells, factory floors, conveyor lifts, trucks with loading docks, truck routes and fleet, customers, the procedural world layout, restaurant building, trucks on generated roads with city traffic, hiring and wages, and kitchen stations with recipe settings (decision 0043) above have a runtime interface. Customer purchases credit cash inside the clock tick; supplier purchases, floor orders, shell orders, buy-and-place orders and sales are the player payment commands. Trucks move goods between sites only inside the clock tick, through their own cargo locations.
+These remain accepted contracts; only the bounded goods slice, its station jobs, equipment placement, the working oven, conveyor belts, company cash, the sell counter, supplier purchases, equipment purchases, spoilage timing/refrigeration, building shells, factory floors, conveyor lifts, trucks with loading docks, truck routes and fleet, customers, the procedural world layout, restaurant building, trucks on generated roads with city traffic, hiring and wages, kitchen stations with recipe settings (decision 0043), and farm orders and the phone (decision 0047) above have a runtime interface. Customer purchases credit cash inside the clock tick; supplier purchases, floor orders, shell orders, buy-and-place orders and sales are the player payment commands. Trucks move goods between sites only inside the clock tick, through their own cargo locations.
 
 ## Planned / Undecided
 
@@ -892,6 +892,59 @@ Verification: [record](verification/start-rules-20261012.md); the post-merge bas
   restaurant takes 12-216 s. The measured mean first arrival is 89 s over 10 openings on the two P0 seeds (max 221 s), checked
   against a 120 s mean.
 - Planned (P2 and later, not done): supplier depot and delivery orders, the employee in the loop, the P5 and P6 acceptance runs.
+
+## Implemented: owner feedback round 4 (2026-10-12)
+
+Decision: [0045](decisions/0045-owner-feedback-round-4.md). Generator **v8**, layout format and goods schema unchanged.
+
+- Implemented: a new generated world starts in its residential district's largest restaurant (`WorldSettings.StartLargest`,
+  `StartMaxArea` 480); v7's rule stays reproducible for the pins. Stored layouts are unchanged.
+- Implemented: `OrbitCameraRig.ZoomEnabled` (off on every screen except world picks); in the third-person view a wheel step in
+  starts from the wall-limited arm, down to 1 m.
+- Implemented: Esc with nothing open opens `InteractionScreen.Menu`; `SessionPanel` draws it (Resume, Settings, Quit to Main
+  Menu, Quit Game). The old Esc pointer release is gone.
+- Implemented: Select World's Delete world (second click confirms; `SessionRoot.DeleteWorld`).
+- Implemented: employee rename (`EmployeeWorker.RequestRename` → `GoodsWorld.RenameEmployeeDurably`) and Fire on the employee
+  screen.
+- Implemented: employee-task picks tint every valid target through walls (`FoodFactory/XRayTint`, `PickTint.mat`) with a thin
+  outline and a bold one under the pointer, which picks through walls. WorldGen and DevSite now have the hover outline material.
+
+## Implemented: owner feedback round 5 (2026-10-12)
+
+Decision: [0046](decisions/0046-owner-feedback-round-5.md). Layout format and goods schema unchanged.
+
+- Implemented: the employee window is centred by flex (`ff-centering`), not a percentage translate, so the rename row that
+  grows it no longer moves its controls away from where clicks land.
+- Implemented: double-door leaves hinge at +-0.975 m and are stretched to meet at the centre (`RestaurantShellModel`).
+- Implemented: `IEquipmentFillDisplay`, set by `EquipmentPresenter` from the slots used in a piece's input buffer;
+  `StorageFillDisplay` on the storage shelf prefab shows one of eight box stacks per used slot (`RT_StorageShelf_Boxes.fbx`).
+- Implemented: NavMesh agent type 0 radius 0.3 m (was 0.5 m), so single doorways such as the back door are walkable; DevSite
+  (shared with WorldGen) and SampleScene NavMeshes re-baked.
+  "Select counter" accepts registers; `work(register)` assigns the employee to it.
+- Verified: EditMode World/Goods/Session assemblies and `OwnerFeedbackRound4Tests` (PlayMode, WorldGen). Not yet: running-game
+  capture, visual review, two-client rename check.
+
+## Implemented: the phone, farm types and farm orders (2026-10-13)
+
+Decision: [0047](decisions/0047-phone-farms-and-farm-orders.md). Goods snapshot schema **v26**; layout format and generator
+unchanged. Verification: [record](verification/phone-20261013.md).
+
+- Implemented: `FarmCatalog` (Goods): six farm types assigned to farm lots in lot ID order, each selling supplier packs of its
+  raw ingredients. `GoodsWorld.Farms.cs`: `OrderFromFarmDurably` (delivery by a supplier truck, or pickup by a parked fleet
+  truck), `ScheduleFarmOrderDurably`/`CancelFarmScheduleDurably` (every 1-24 game hours, run in the clock step), the farm gate
+  site (`farm-gate:<lot>`), the dock timeout and refunds, `WorkingDockOf`. Ledger kinds `farm-goods`, `farm-delivery`,
+  `farm-refund`. `RenameSiteDurably` (Property). Bridge requests `RequestFarmOrder`, `RequestFarmSchedule`,
+  `RequestCancelFarmSchedule`, `RequestRenameSite`.
+- Implemented: trucks with `OrderId` serve a farm order instead of a route; `Supplier` trucks have refrigerated cargo, are left
+  out of the fleet (logistics screen, truck numbering) and are drawn white. `AssignTruck` refuses a truck on an order
+  (`on-order`). A view carries its company's `FarmOrders`, `FarmSchedules` and the gates their trucks use; the logistics screen
+  watches and lists only company sites.
+- Implemented: `InteractionScreen.Phone`, opened by the `Phone` action (C; the renamed `SwitchCamera`, same ID). The orbit rig
+  lost its manual view switch. `PhonePanel` + `PhoneMapView` (Map, Orders, Staff, Trucks, Places); `LogisticsPanel.Embed`
+  shows the logistics screen in the Trucks app. Installed in WorldGen and DevSite by `AgentScripts/InstallPhonePanel.cs`
+  (sorting order 11, above the HUD).
+- Planned / open: see 0047's Open list; the starting-loop P2 supplier depot is still planned and the instant supplier window
+  is unchanged.
 
 ## Implemented: back doors and the dock rule (2026-10-06)
 

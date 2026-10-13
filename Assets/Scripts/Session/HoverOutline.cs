@@ -1,7 +1,8 @@
 // Local presentation: draws an outline around anything the crosshair can open (employees, machines, the storage) by
 // appending an inverted-hull outline material to each of its renderers while highlighted. Each part grows from its own
 // mesh centre (_OutlineCenter), so flat-shaded parts get a closed hull. The renderers' materials are captured when the
-// highlight turns on, so material changes made while it is off (belt treads, model tints) are kept.
+// highlight turns on, so material changes made while it is off (belt treads, model tints) are kept. An optional tint
+// material (the see-through pick tint) is appended after the outline.
 using System;
 using System.Linq;
 using UnityEngine;
@@ -31,17 +32,20 @@ namespace FoodFactoryGame.Session
         }
 
         private Material _shown;
+        private Material _shownTint;
 
         private void OnDisable() => SetHighlighted(false);
 
-        // Material overrides the target's own outline (the red one used while picking a world position).
-        public void SetHighlighted(bool highlighted, Material material = null)
+        // Material overrides the target's own outline (the red one used while picking a world position); tint, when given, is
+        // drawn too.
+        public void SetHighlighted(bool highlighted, Material material = null, Material tint = null)
         {
             material = material != null ? material : outlineMaterial;
-            if (highlighted && _highlighted && material != _shown) SetHighlighted(false);
+            if (highlighted && _highlighted && (material != _shown || tint != _shownTint)) SetHighlighted(false);
             if (highlighted == _highlighted || (highlighted && material == null)) return;
             _highlighted = highlighted;
             _shown = highlighted ? material : null;
+            _shownTint = highlighted ? tint : null;
             if (!highlighted)
             {
                 for (var index = 0; index < _renderers.Length; index++)
@@ -59,7 +63,8 @@ namespace FoodFactoryGame.Session
                 renderer.GetPropertyBlock(_block);
                 _block.SetVector(OutlineCenter, mesh.bounds.center);
                 renderer.SetPropertyBlock(_block);
-                renderer.sharedMaterials = renderer.sharedMaterials.Append(material).ToArray();
+                var materials = renderer.sharedMaterials.Append(material);
+                renderer.sharedMaterials = (tint != null ? materials.Append(tint) : materials).ToArray();
             }
         }
     }

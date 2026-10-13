@@ -43,6 +43,8 @@ namespace FoodFactoryGame.Session.Logistics
         private MaterialPropertyBlock _block;
 
         private static readonly Color OwnPaint = new(0.18f, 0.62f, 0.26f);
+        private static readonly Color SupplierPaint = new(0.92f, 0.9f, 0.84f);
+        private readonly HashSet<string> _suppliers = new();
         private static readonly Color[] OtherPaints =
         {
             new(0.75f, 0.15f, 0.12f), new(0.15f, 0.35f, 0.75f), new(0.55f, 0.2f, 0.6f), new(0.9f, 0.45f, 0.1f), new(0.2f, 0.55f, 0.6f)
@@ -74,6 +76,8 @@ namespace FoodFactoryGame.Session.Logistics
                 {
                     _ownCompany = current.Companies.FirstOrDefault()?.Id;
                     foreach (var truck in current.Trucks.Concat(current.RoadTrucks)) _companyOf[truck.Id] = truck.CompanyId;
+                    _suppliers.Clear();
+                    foreach (var truck in current.Trucks.Concat(current.RoadTrucks).Where(x => x.Supplier)) _suppliers.Add(truck.Id);
                 }
             }
             var poses = DockPoses(drawn);
@@ -121,8 +125,7 @@ namespace FoodFactoryGame.Session.Logistics
                 var siteId = drawnSite.SiteId;
                 foreach (var truck in site.Trucks.Where(x => x.SiteId == siteId && x.State is TruckState.Loading or TruckState.Unloading))
                 {
-                    var route = GoodsWorld.RouteOf(site, truck);
-                    var dockId = truck.State == TruckState.Loading ? route?.PickupDockId : route?.DropoffDockId;
+                    var dockId = GoodsWorld.WorkingDockOf(site, truck);
                     var dock = site.Equipment.FirstOrDefault(x => x.Id == dockId && x.State == EquipmentState.Placed && x.SiteId == siteId);
                     if (dock == null) continue;
                     var street = RestaurantRules.IsRestaurantSite(site, siteId) ? Customers.SiteStreet.Outward(drawnSite.Layout, site.Buildings) : null;
@@ -219,7 +222,8 @@ namespace FoodFactoryGame.Session.Logistics
         private void Paint(GameObject visual, string truckId)
         {
             var company = _companyOf.GetValueOrDefault(truckId);
-            var colour = company == null || company == _ownCompany ? OwnPaint
+            // A farm order's supplier truck (decision 0047) wears the farm's white, whoever ordered.
+            var colour = _suppliers.Contains(truckId) ? SupplierPaint : company == null || company == _ownCompany ? OwnPaint
                 : OtherPaints[(int)(WorldRandom.Fnv1a(company) % (ulong)OtherPaints.Length)];
             _block ??= new MaterialPropertyBlock();
             foreach (var renderer in visual.GetComponentsInChildren<Renderer>())

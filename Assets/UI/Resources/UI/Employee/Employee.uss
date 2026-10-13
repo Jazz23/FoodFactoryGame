@@ -10,6 +10,15 @@
 .emp--failing .emp__status { color: var(--ff-danger-text); }
 .emp__close { margin-left: 14px; align-self: flex-start; }
 
+/* Rename and Fire beside the close button; the rename row opens under the name. */
+.emp__head-button { margin-left: 8px; align-self: flex-start; }
+.emp__rename { display: none; margin-top: 10px; align-items: center; }
+.emp__rename--open { display: flex; }
+.emp__rename-field { margin-right: 8px; }
+.emp__rename .ff-button { margin-left: 6px; }
+.emp__notice { margin-top: 6px; font-size: 12px; color: var(--ff-warning); }
+.emp__fire--confirming { background-color: var(--ff-danger); border-color: var(--ff-danger); color: var(--ff-text); }
+
 /* On a row of its own under the name, so however many hand slots there are, the close button never covers them. */
 .emp__hands { flex-wrap: wrap; margin-top: 12px; }
 .emp__hands-caption { margin-right: 8px; }

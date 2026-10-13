@@ -195,7 +195,7 @@
                     "initialStateCheck": false
                 },
                 {
-                    "name": "SwitchCamera",
+                    "name": "Phone",
                     "type": "Button",
                     "id": "5d1e8f27-9c3a-4b6e-b0f4-2a7c6e9d1b83",
                     "expectedControlType": "Button",
@@ -759,7 +759,7 @@
                     "interactions": "",
                     "processors": "",
                     "groups": "Keyboard&Mouse",
-                    "action": "SwitchCamera",
+                    "action": "Phone",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },
@@ -770,7 +770,7 @@
                     "interactions": "",
                     "processors": "",
                     "groups": "Keyboard&Mouse",
-                    "action": "SwitchCamera",
+                    "action": "Phone",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },

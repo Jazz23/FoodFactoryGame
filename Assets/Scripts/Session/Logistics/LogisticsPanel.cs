@@ -2,7 +2,8 @@
 // (decision 0042): the company's routes (pickup dock, dropoff dock, cargo, Apply, Delete, and the trucks on each) with a
 // draft for a new route; its trucks with their live status,
 // cargo and a route chooser (a route or Parked) with Assign, and a Buy button per truck offer; and its remote sites with their
-// storage and dock stock and buttons that move one stack at a time between them. Opened with L (EquipmentInteraction). Every
+// storage and dock stock and buttons that move one stack at a time between them. Opened with L (EquipmentInteraction), or shown
+// inside the phone's Trucks app (Embed, decision 0047), where the same window moves into the phone's page. Every
 // button is a request the server checks; nothing changes here until the next baseline. Rows are rebuilt only when the set of
 // routes, trucks, docks, stacks or drafts changes, and their text is refreshed every frame, so a click is never lost to a
 // rebuild. Presentation only: drafts are this client's edits until applied.
@@ -55,6 +56,9 @@ namespace FoodFactoryGame.Session.Logistics
         private string _signature;
 
         public VisualElement Window => _window;
+        // True while the window is shown inside the phone (decision 0047).
+        public bool Embedded { get; private set; }
+        private VisualElement _home;
         public string LastRejection { get; private set; }
         public bool HasPendingRequests => _pending.Count > 0;
 
@@ -77,6 +81,25 @@ namespace FoodFactoryGame.Session.Logistics
             _dim.Show(false);
         }
 
+        // Moves the window into a host element of the same panel (the phone's Trucks page), or back to its own screen with null.
+        public void Embed(VisualElement host)
+        {
+            if (_window == null) return;
+            _home ??= _window.parent;
+            if (host == null)
+            {
+                if (!Embedded) return;
+                _home.Add(_window);
+                Embedded = false;
+            }
+            else
+            {
+                if (_window.parent != host) host.Add(_window);
+                Embedded = true;
+            }
+            _window.EnableInClassList("logi--embedded", Embedded);
+        }
+
         private void Update()
         {
             if (_window == null) return;
@@ -84,10 +107,11 @@ namespace FoodFactoryGame.Session.Logistics
             var site = Primary;
             // Remote sites are watched as soon as the baseline names them, so their stock is there when the screen opens.
             if (site != null)
-                foreach (var remote in site.Sites.Where(x => x.Id != _subscription?.SiteId)) _subscription?.Watch(remote.Id);
-            var open = site != null && Session.IsRunning && interaction.Screen == InteractionScreen.Logistics;
+                foreach (var remote in CompanySites(site).Where(x => x.Id != _subscription?.SiteId)) _subscription?.Watch(remote.Id);
+            var open = site != null && Session.IsRunning
+                && (interaction.Screen == InteractionScreen.Logistics || (Embedded && interaction.Screen == InteractionScreen.Phone));
             _window.Show(open);
-            _dim.Show(open);
+            _dim.Show(open && !Embedded);
             if (!open) return;
             _drafts.TryAdd(NewRouteKey, new RouteDraft());
             foreach (var route in site.Routes.Where(x => !_drafts.ContainsKey(x.Id)))
@@ -96,7 +120,7 @@ namespace FoodFactoryGame.Session.Logistics
                     PickupDockId = route.PickupDockId, DropoffDockId = route.DropoffDockId, ItemId = route.AllowedItemIds.FirstOrDefault()
                 };
             // A truck's choice starts at its route and falls back to it when the chosen route is gone.
-            foreach (var truck in site.Trucks)
+            foreach (var truck in Fleet(site))
                 if (!_truckDrafts.TryGetValue(truck.Id, out var chosen) || (chosen != "" && site.Routes.All(x => x.Id != chosen)))
                     _truckDrafts[truck.Id] = truck.RouteId ?? "";
             var signature = Signature(site);
@@ -239,7 +263,7 @@ namespace FoodFactoryGame.Session.Logistics
             foreach (var route in site.Routes)
                 text.Append(route.Id).Append('/').Append(route.PickupDockId).Append('/').Append(route.DropoffDockId).Append('/')
                     .Append(string.Join(",", route.AllowedItemIds)).Append('|');
-            foreach (var truck in site.Trucks)
+            foreach (var truck in Fleet(site))
                 text.Append(truck.Id).Append('/').Append(truck.RouteId).Append('/').Append(_truckDrafts[truck.Id]).Append('|');
             foreach (var dock in Docks()) text.Append(dock.Id).Append(dock.State).Append('|');
             foreach (var remote in RemoteSites(site))
@@ -255,7 +279,17 @@ namespace FoodFactoryGame.Session.Logistics
         }
 
         private IEnumerable<GoodsSite> RemoteSites(GoodsSnapshot site) =>
-            site.Sites.Where(x => x.Id != GoodsWorld.ViewSiteId(site)).OrderBy(x => x.Id, StringComparer.Ordinal);
+            CompanySites(site).Where(x => x.Id != GoodsWorld.ViewSiteId(site)).OrderBy(x => x.Id, StringComparer.Ordinal);
+
+        // The company's own sites: a baseline also carries the map records of farm gates its orders' trucks drive to (decision 0047).
+        private static IEnumerable<GoodsSite> CompanySites(GoodsSnapshot site)
+        {
+            var owned = site.Companies.FirstOrDefault()?.SiteIds;
+            return owned == null ? site.Sites.Where(x => x.Id == GoodsWorld.ViewSiteId(site)) : site.Sites.Where(x => owned.Contains(x.Id));
+        }
+
+        // The company's fleet: a farm order's supplier truck is not one of its trucks (decision 0047).
+        private static IEnumerable<GoodsTruck> Fleet(GoodsSnapshot site) => site.Trucks.Where(x => !x.Supplier);
 
         private void Build(GoodsSnapshot site)
         {
@@ -267,8 +301,8 @@ namespace FoodFactoryGame.Session.Logistics
             if (routes.Count == 0) _routes.Add(Empty("The company has no routes."));
             foreach (var route in routes) _routes.Add(RouteCard(site, route));
             _routes.Add(NewRouteCard());
-            if (site.Trucks.Count == 0) _trucks.Add(Empty("The company has no trucks."));
-            foreach (var truck in site.Trucks.OrderBy(x => x.Id, StringComparer.Ordinal)) _trucks.Add(TruckCard(truck));
+            if (!Fleet(site).Any()) _trucks.Add(Empty("The company has no trucks."));
+            foreach (var truck in Fleet(site).OrderBy(x => x.Id, StringComparer.Ordinal)) _trucks.Add(TruckCard(truck));
             foreach (var offer in TruckOffers())
             {
                 var id = offer.Id;
@@ -458,11 +492,14 @@ namespace FoodFactoryGame.Session.Logistics
             return truck.State switch
             {
                 TruckState.Parked => $"Parked at {here}: no route",
+                _ when !string.IsNullOrEmpty(truck.OrderId) && truck.State == TruckState.ToPickup => $"Driving to {there} for a farm order: {left}",
+                _ when !string.IsNullOrEmpty(truck.OrderId) && truck.State == TruckState.ToDropoff => $"Bringing a farm order to {there}: {left}",
                 TruckState.ToPickup => $"Driving to {there} to load: {left}",
                 TruckState.ToDropoff => $"Driving to {there} with cargo: {left}",
                 TruckState.ToPark => $"Driving to {there} to park: {left}",
-                TruckState.Loading => $"Loading at {here}" + DockNote(truck, RouteOf(truck)?.PickupDockId),
-                TruckState.Unloading => $"Unloading at {here}" + DockNote(truck, RouteOf(truck)?.DropoffDockId),
+                TruckState.Loading when !string.IsNullOrEmpty(truck.OrderId) => $"Loading a farm order at {here}",
+                TruckState.Loading => $"Loading at {here}" + DockNote(truck, GoodsWorld.WorkingDockOf(Primary, truck)),
+                TruckState.Unloading => $"Unloading at {here}" + DockNote(truck, GoodsWorld.WorkingDockOf(Primary, truck)),
                 _ => ""
             };
         }
@@ -472,7 +509,7 @@ namespace FoodFactoryGame.Session.Logistics
         {
             if (Dock(dockId)?.State != EquipmentState.Placed) return " (dock not placed)";
             var others = Primary?.Trucks.Any(x => x.Id != truck.Id && x.Docked && x.State is TruckState.Loading or TruckState.Unloading
-                && (x.State == TruckState.Loading ? RouteOf(x)?.PickupDockId : RouteOf(x)?.DropoffDockId) == dockId) == true;
+                && GoodsWorld.WorkingDockOf(Primary, x) == dockId) == true;
             return !truck.Docked && others ? " (waiting for the dock)" : "";
         }
 

@@ -34,6 +34,7 @@ namespace FoodFactoryGame.Goods
         public const string EmployeePrefix = "employee-";
         public const int MaxEmployeeScriptLength = 16000;
         public const int MaxEmployeeTasksLength = 16000;
+        public const int MaxEmployeeNameLength = 32;
 
         // Server-only seed/hire path: adds the record, its site grant and its carried inventory (created with handSlots slots,
         // or an existing one reused) in memory. Callers commit. Throws ArgumentException for an invalid or duplicate record.
@@ -111,6 +112,30 @@ namespace FoodFactoryGame.Goods
                 }, () => "persistence-unavailable");
             }
         }
+
+        // Server-only: renames an employee (its trimmed name: 1 to MaxEmployeeNameLength characters, no control characters) and
+        // commits it before returning. Returns null when committed or unchanged, otherwise unknown-employee, invalid-name or
+        // persistence-unavailable (state unchanged). The caller checks that the requester may command the employee.
+        public string RenameEmployeeDurably(string employeeId, string name, string savePath)
+        {
+            lock (_gate)
+            {
+                name = name?.Trim() ?? "";
+                if (_state.Employees.All(x => x.Id != employeeId)) return "unknown-employee";
+                if (!IsValidEmployeeName(name)) return "invalid-name";
+                return Durably(savePath, () =>
+                {
+                    var employee = _state.Employees.First(x => x.Id == employeeId);
+                    if (employee.Name == name) return (string)null;
+                    employee.Name = name;
+                    _state.Revision++;
+                    return null;
+                }, () => "persistence-unavailable");
+            }
+        }
+
+        public static bool IsValidEmployeeName(string name) =>
+            !string.IsNullOrWhiteSpace(name) && name == name.Trim() && name.Length <= MaxEmployeeNameLength && !name.Any(char.IsControl);
 
         private static bool ValidPose(GoodsEmployee employee) => Finite(employee.X) && Finite(employee.Y) && Finite(employee.Z) && Finite(employee.Yaw);
 

@@ -414,6 +414,68 @@ namespace FoodFactoryGame.Goods.Network
             if (result.Accepted) Broadcast();
         }
 
+        // Orders packs of a farm's offer to a dock (decision 0047, OrderFromFarmDurably): delivered by a supplier truck when truckId is
+        // empty, otherwise picked up by that company truck. Accepted orders are broadcast, so the truck appears for everyone.
+        public void RequestFarmOrder(string requestId, string farmLotId, string offerId, int packs, string dockId, string truckId)
+        {
+            if (IsClientStarted) ServerFarmOrder(requestId, farmLotId, offerId, packs, dockId, truckId ?? "");
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        private void ServerFarmOrder(string requestId, string farmLotId, string offerId, int packs, string dockId, string truckId,
+            NetworkConnection sender = null)
+        {
+            if (!TryIdentify(sender, requestId, out var player)) return;
+            var result = _world.OrderFromFarmDurably(player, requestId, farmLotId, offerId, packs, dockId, truckId, _savePath);
+            Reply(sender, result);
+            if (result.Accepted) Broadcast();
+        }
+
+        // Repeats a farm order every few game hours (ScheduleFarmOrderDurably).
+        public void RequestFarmSchedule(string requestId, string farmLotId, string offerId, int packs, string dockId, string truckId, int everyHours)
+        {
+            if (IsClientStarted) ServerFarmSchedule(requestId, farmLotId, offerId, packs, dockId, truckId ?? "", everyHours);
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        private void ServerFarmSchedule(string requestId, string farmLotId, string offerId, int packs, string dockId, string truckId, int everyHours,
+            NetworkConnection sender = null)
+        {
+            if (!TryIdentify(sender, requestId, out var player)) return;
+            var result = _world.ScheduleFarmOrderDurably(player, requestId, farmLotId, offerId, packs, dockId, truckId, everyHours, _savePath);
+            Reply(sender, result);
+            if (result.Accepted) Broadcast();
+        }
+
+        public void RequestCancelFarmSchedule(string requestId, string scheduleId)
+        {
+            if (IsClientStarted) ServerCancelFarmSchedule(requestId, scheduleId);
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        private void ServerCancelFarmSchedule(string requestId, string scheduleId, NetworkConnection sender = null)
+        {
+            if (!TryIdentify(sender, requestId, out var player)) return;
+            var result = _world.CancelFarmScheduleDurably(player, requestId, scheduleId, _savePath);
+            Reply(sender, result);
+            if (result.Accepted) Broadcast();
+        }
+
+        // Renames a site of the requester's company (RenameSiteDurably).
+        public void RequestRenameSite(string requestId, string siteId, string name)
+        {
+            if (IsClientStarted) ServerRenameSite(requestId, siteId, name ?? "");
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        private void ServerRenameSite(string requestId, string siteId, string name, NetworkConnection sender = null)
+        {
+            if (!TryIdentify(sender, requestId, out var player)) return;
+            var result = _world.RenameSiteDurably(player, requestId, siteId, name, _savePath);
+            Reply(sender, result);
+            if (result.Accepted) Broadcast();
+        }
+
         // Restaurant building (decision 0034): a shell order (resize, interior walls, doors, windows, removals, wall finish), sent
         // as the JSON of a ShellOrder; the server plans it again and pays or refunds once (OrderShellDurably).
         public void RequestShellOrder(string requestId, ShellOrder order)
@@ -701,6 +763,16 @@ namespace FoodFactoryGame.Goods.Network
         {
             if (!IsServing) return "persistence-unavailable";
             return _world.SetEmployeeScriptDurably(workerId, script, running, _savePath, tasks);
+        }
+
+        // Server-only: saves a worker's new name and, once committed, sends every client the renamed record. Null when saved,
+        // otherwise the reason (RenameEmployeeDurably).
+        public string RecordWorkerName(string workerId, string name)
+        {
+            if (!IsServing) return "persistence-unavailable";
+            var problem = _world.RenameEmployeeDurably(workerId, name, _savePath);
+            if (problem == null) Broadcast();
+            return problem;
         }
 
         // Server-only: the worker's authorized view of a site (null if it has no grant or the bridge is not serving).

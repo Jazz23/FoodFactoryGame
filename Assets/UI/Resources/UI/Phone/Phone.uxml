@@ -1,0 +1,67 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <!-- The phone (decision 0047): a handset filling most of the screen with a status bar, five apps (Map, Orders, Staff, Trucks, Places)
+         and a status line. PhonePanel fills the pages; the map page holds the PhoneMapView and the selected lot's details. -->
+    <Style src="project://database/Assets/UI/Theme/Theme.uss" />
+    <Style src="Phone.uss" />
+    <!-- Centred by flex, not a percentage translate, so content that grows never moves controls away from the pointer (0046). -->
+    <ui:VisualElement name="phone-root" class="ff-root ff-fill ff-centering" picking-mode="Ignore">
+        <ui:VisualElement name="phone-dim" class="ff-fill ff-dim" picking-mode="Ignore" />
+        <ui:VisualElement name="phone" class="phone">
+            <ui:VisualElement class="phone__screen">
+                <ui:VisualElement class="ff-row phone__statusbar" picking-mode="Ignore">
+                    <ui:Label name="phone-clock" class="phone__clock" picking-mode="Ignore" />
+                    <ui:VisualElement class="phone__notch" picking-mode="Ignore" />
+                    <ui:Label name="phone-cash" class="phone__cash" picking-mode="Ignore" />
+                </ui:VisualElement>
+                <ui:VisualElement class="ff-row phone__header">
+                    <ui:VisualElement name="phone-tabs" class="ff-segmented phone__tabs">
+                        <ui:Button name="phone-tab-map" text="Map" focusable="false" class="ff-segment phone__tab" />
+                        <ui:Button name="phone-tab-orders" text="Orders" focusable="false" class="ff-segment phone__tab" />
+                        <ui:Button name="phone-tab-staff" text="Staff" focusable="false" class="ff-segment phone__tab" />
+                        <ui:Button name="phone-tab-trucks" text="Trucks" focusable="false" class="ff-segment phone__tab" />
+                        <ui:Button name="phone-tab-places" text="Places" focusable="false" class="ff-segment phone__tab" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="ff-grow" picking-mode="Ignore" />
+                    <ui:Button name="phone-close" focusable="false" class="ff-button ff-button--icon">
+                        <ui:VisualElement class="ff-glyph ff-glyph--close ff-glyph--sm" />
+                    </ui:Button>
+                </ui:VisualElement>
+                <ui:VisualElement class="phone__body">
+                    <ui:VisualElement name="phone-page-map" class="ff-row phone__page">
+                        <ui:VisualElement name="phone-map-frame" class="phone__map">
+                            <ui:Label name="phone-map-empty" text="No map: this world was not generated." class="ff-small phone__map-empty" picking-mode="Ignore" />
+                            <ui:VisualElement class="ff-row phone__legend" picking-mode="Ignore">
+                                <ui:VisualElement class="phone__swatch phone__swatch--yours" /><ui:Label text="Yours" class="ff-tiny phone__legend-text" />
+                                <ui:VisualElement class="phone__swatch phone__swatch--sale" /><ui:Label text="For sale" class="ff-tiny phone__legend-text" />
+                                <ui:VisualElement class="phone__swatch phone__swatch--farm" /><ui:Label text="Farm" class="ff-tiny phone__legend-text" />
+                                <ui:VisualElement class="phone__swatch phone__swatch--taken" /><ui:Label text="Not for sale" class="ff-tiny phone__legend-text" />
+                            </ui:VisualElement>
+                        </ui:VisualElement>
+                        <ui:ScrollView name="phone-detail-scroll" mode="Vertical" horizontal-scroller-visibility="Hidden" class="ff-scroll phone__detail">
+                            <ui:VisualElement name="phone-detail" />
+                        </ui:ScrollView>
+                    </ui:VisualElement>
+                    <ui:ScrollView name="phone-page-orders" mode="Vertical" horizontal-scroller-visibility="Hidden" class="ff-scroll phone__page phone__list">
+                        <ui:Label text="OPEN ORDERS" class="ff-eyebrow phone__heading" picking-mode="Ignore" />
+                        <ui:VisualElement name="phone-orders" />
+                        <ui:Label text="REPEATING ORDERS" class="ff-eyebrow phone__heading" picking-mode="Ignore" />
+                        <ui:VisualElement name="phone-schedules" />
+                    </ui:ScrollView>
+                    <ui:ScrollView name="phone-page-staff" mode="Vertical" horizontal-scroller-visibility="Hidden" class="ff-scroll phone__page phone__list">
+                        <ui:Label name="phone-staff-site" class="ff-title" picking-mode="Ignore" />
+                        <ui:Label name="phone-staff-count" class="ff-small phone__line" picking-mode="Ignore" />
+                        <ui:Button name="phone-hire" focusable="false" class="ff-button ff-button--primary phone__hire" />
+                        <ui:VisualElement name="phone-staff" />
+                    </ui:ScrollView>
+                    <!-- The logistics screen moves in here while this app is open (LogisticsPanel.Embed). -->
+                    <ui:VisualElement name="phone-page-trucks" class="phone__page" />
+                    <ui:ScrollView name="phone-page-places" mode="Vertical" horizontal-scroller-visibility="Hidden" class="ff-scroll phone__page phone__list">
+                        <ui:Label text="YOUR PLACES" class="ff-eyebrow phone__heading" picking-mode="Ignore" />
+                        <ui:VisualElement name="phone-places" />
+                    </ui:ScrollView>
+                </ui:VisualElement>
+                <ui:Label name="phone-status" text=" " class="phone__status ff-wrap" picking-mode="Ignore" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

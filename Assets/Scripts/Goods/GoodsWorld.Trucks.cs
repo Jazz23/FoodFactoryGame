@@ -87,6 +87,11 @@ namespace FoodFactoryGame.Goods
         public int NextTo;
         public bool NextFinal;
 
+        // Farm orders (decision 0047, v26): the open order this truck serves (its route is then empty), and whether it is the
+        // order's supplier truck rather than one of the company's fleet.
+        public string OrderId = "";
+        public bool Supplier;
+
         public string CargoLocationId => Id + ":cargo";
         public bool Driving => State is TruckState.ToPickup or TruckState.ToDropoff or TruckState.ToPark;
         public bool OnRoad => !string.IsNullOrEmpty(LegSegmentId);
@@ -176,7 +181,9 @@ namespace FoodFactoryGame.Goods
             _state.Trucks.Add(truck);
             _state.Locations.Add(new GoodsLocation
             {
-                Id = truck.CargoLocationId, SiteId = RoadSiteId, Kind = VehicleLocationKind, Capacity = truck.CargoSlots
+                Id = truck.CargoLocationId, SiteId = RoadSiteId, Kind = VehicleLocationKind, Capacity = truck.CargoSlots,
+                // Supplier goods do not age until unloaded (starting-loop decision 7).
+                Refrigerated = truck.Supplier
             });
         }
 
@@ -339,7 +346,9 @@ namespace FoodFactoryGame.Goods
             return RouteCommand(playerId, requestId, reject =>
             {
                 var truck = _state.Trucks.FirstOrDefault(x => x.Id == truckId);
-                if (truck is null) return reject("forbidden");
+                if (truck is null || truck.Supplier) return reject("forbidden");
+                // A truck serving a farm order finishes it first (decision 0047).
+                if (!string.IsNullOrEmpty(truck.OrderId)) return reject("on-order");
                 if (string.IsNullOrEmpty(routeId))
                 {
                     var company = _state.Companies.FirstOrDefault(x => x.Id == truck.CompanyId);
@@ -548,6 +557,12 @@ namespace FoodFactoryGame.Goods
                             if (!TakeDock(truck, trucks)) continue;
                             if (!(truck.State == TruckState.Loading ? LoadSecond(truck) : UnloadSecond(truck))) waiting.Add(truck);
                         }
+                    }
+                    // A supplier truck back at its farm leaves the world with its order (decision 0047).
+                    foreach (var returned in trucks.Where(x => x.Supplier && x.State == TruckState.Parked).ToList())
+                    {
+                        ReturnSupplierTruck(returned);
+                        trucks.Remove(returned);
                     }
                     left -= step;
                 }
@@ -769,6 +784,7 @@ namespace FoodFactoryGame.Goods
         // buffer, most exposed first. With nothing loaded and cargo aboard it leaves for the dropoff. False when it waits.
         private bool LoadSecond(GoodsTruck truck)
         {
+            if (!string.IsNullOrEmpty(truck.OrderId)) return LoadOrderSecond(truck);
             var route = Route(truck);
             var dock = PlacedDock(route.PickupDockId);
             if (dock is null) return false;
@@ -795,6 +811,7 @@ namespace FoodFactoryGame.Goods
         // site, most exposed first. Once empty it heads back to the pickup. False when it waits (full buffer, no dock).
         private bool UnloadSecond(GoodsTruck truck)
         {
+            if (!string.IsNullOrEmpty(truck.OrderId)) return UnloadOrderSecond(truck);
             var route = Route(truck);
             if (!HasCargo(truck))
             {
@@ -834,8 +851,8 @@ namespace FoodFactoryGame.Goods
         // Street reachability of restaurant docks during one MoveTrucks call.
         private readonly Dictionary<string, bool> _usableDocks = new(StringComparer.Ordinal);
 
-        // The dock a working truck is at: its route's pickup while loading, its dropoff while unloading.
-        private string WorkingDockId(GoodsTruck truck) => truck.State == TruckState.Loading ? Route(truck).PickupDockId : Route(truck).DropoffDockId;
+        // The dock a working truck is at: its route's pickup while loading, its dropoff while unloading, or its order's dock.
+        private string WorkingDockId(GoodsTruck truck) => WorkingDockOf(_state, truck);
 
         // True when the truck may work its dock this second: any dock off a restaurant site, or a restaurant dock it holds or can
         // take because no other truck holds it.
@@ -951,11 +968,11 @@ namespace FoodFactoryGame.Goods
                 var valid = state.Companies.Any(x => x.Id == truck.CompanyId) && truck.Name is not null
                     && truck.CargoSlots >= 1 && truck.SpeedMetresPerSecond >= 1 && truck.LoadUnitsPerSecond >= 1
                     && cargo is not null && cargo.Kind == VehicleLocationKind && cargo.SiteId == RoadSiteId && cargo.Capacity == truck.CargoSlots
-                    && !cargo.Refrigerated
+                    && cargo.Refrigerated == truck.Supplier && truck.OrderId is not null
                     && siteIds.Contains(truck.SiteId)
                     && truck.State is TruckState.Parked or TruckState.ToPickup or TruckState.Loading or TruckState.ToDropoff
                         or TruckState.Unloading or TruckState.ToPark
-                    && (truck.State is TruckState.Parked or TruckState.ToPark
+                    && (!string.IsNullOrEmpty(truck.OrderId) || truck.State is TruckState.Parked or TruckState.ToPark
                         ? string.IsNullOrEmpty(truck.RouteId)
                         : route is not null && route.CompanyId == truck.CompanyId)
                     && truck.LegSegmentId is not null
@@ -972,11 +989,7 @@ namespace FoodFactoryGame.Goods
                 if (!valid) throw new InvalidOperationException($"Truck {truck.Id} is inconsistent.");
             }
             // A restaurant dock is held by at most one truck (decision 0034).
-            if (state.Trucks.Where(x => x.Docked).GroupBy(x =>
-                {
-                    var route = RouteOf(state, x);
-                    return x.State == TruckState.Loading ? route?.PickupDockId : route?.DropoffDockId;
-                }).Any(x => x.Count() != 1))
+            if (state.Trucks.Where(x => x.Docked).GroupBy(x => WorkingDockOf(state, x)).Any(x => x.Count() != 1))
                 throw new InvalidOperationException("Goods snapshot has two trucks holding one dock.");
             // Other companies' trucks reach a view only (ViewLogistics); a world never stores them.
             if (state.RoadTrucks is null || state.RoadTrucks.Count != 0)

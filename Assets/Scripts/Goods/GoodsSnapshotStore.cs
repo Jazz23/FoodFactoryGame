@@ -553,6 +553,18 @@ namespace FoodFactoryGame.Goods
             // v24 districts had no street spawn (starting-loop decision 28): every SpawnWalkMetres reads 0, so their customers keep
             // walking the whole way. The version still changes so an older build refuses a v25 save instead of dropping the setting.
             if (state != null && state.SchemaVersion == 24) state.SchemaVersion = 25;
+            // v25 had no farm orders (decision 0047): no open or recurring orders, and every truck is a fleet truck serving none.
+            if (state != null && state.SchemaVersion == 25)
+            {
+                state.FarmOrders = new List<GoodsFarmOrder>();
+                state.FarmSchedules = new List<GoodsFarmSchedule>();
+                foreach (var truck in (state.Trucks ?? new()).Where(x => x != null))
+                {
+                    truck.OrderId = "";
+                    truck.Supplier = false;
+                }
+                state.SchemaVersion = 26;
+            }
             GoodsWorld.Validate(state);
             return state;
         }

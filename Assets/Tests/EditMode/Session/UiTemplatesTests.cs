@@ -33,7 +33,7 @@ namespace FoodFactoryGame.Session.Tests
         [Test]
         public void ItemTemplatesHaveOneRootAndScreensAnFfRoot()
         {
-            string[] screens = { "MainMenu/MainMenu", "Hud/Hud", "Employee/EmployeeScript", "Build/Build", "Logistics/Logistics", "Property/Property" };
+            string[] screens = { "MainMenu/MainMenu", "Hud/Hud", "Employee/EmployeeScript", "Build/Build", "Logistics/Logistics", "Property/Property", "Phone/Phone" };
             foreach (var screen in screens)
             {
                 var holder = new VisualElement();
@@ -60,7 +60,7 @@ namespace FoodFactoryGame.Session.Tests
             Assert.That(theme, Does.Contain("Theme/Theme.uss"));
             var sheets = AssetDatabase.FindAssets("t:StyleSheet", new[] { "Assets/UI/Resources/UI" }).Select(AssetDatabase.GUIDToAssetPath)
                 .Where(x => x.EndsWith(".uss")).Distinct().ToList();
-            Assert.That(sheets.Count, Is.EqualTo(6), "One sheet per screen.");
+            Assert.That(sheets.Count, Is.EqualTo(7), "One sheet per screen.");
             foreach (var sheet in sheets)
                 Assert.That(theme, Does.Contain(sheet.Substring("Assets/UI/".Length)), sheet);
         }
