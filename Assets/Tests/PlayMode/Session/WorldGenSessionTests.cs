@@ -684,7 +684,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
             .First();
 
         // Listen-server multiplayer: the host buys a restaurant through the buy panel; the remote teammate's baseline shows the
-        // new owner and it gains the new site, and the host's map re-tints the awning and its client watches the new site.
+        // new owner and it gains the new site, and the host's map removes the awning (a player-owned restaurant has none) and its client watches the new site.
         [UnityTest]
         public IEnumerator ABuildingBoughtThroughThePanelReachesBothClients()
         {
@@ -728,7 +728,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
             _remoteSite.Watch(diner.SiteId);
             yield return Until(() => _remoteSite.Remote(diner.SiteId) != null, "remote baseline of the bought site");
             yield return Until(() => _root.ClientSubscription.Remote(diner.SiteId) != null, "buyer watches the bought site");
-            yield return Until(() => _map.AwningColour(diner.BuildingId) == new Color(0.18f, 0.62f, 0.26f), "awning turns the owner's green");
+            yield return Until(() => _map.AwningColour(diner.BuildingId) == null, "awning removed once a player company owns it");
         }
 
         // A whole sale in the pre-equipped starting restaurant (decision 0030), with a listen-server teammate: the host buys an

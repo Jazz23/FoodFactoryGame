@@ -25,6 +25,12 @@
                 <ui:VisualElement name="output-grid" />
             </ui:VisualElement>
         </ui:VisualElement>
+        <!-- A register's sale value: what the goods in its sale grid bring in once customers buy them all (sale recipes'
+             prices; spoiled goods and goods it does not sell count nothing). Removed on every other machine. -->
+        <ui:VisualElement name="hud-sale-value" class="ff-row hud-sale-value" picking-mode="Ignore">
+            <ui:Label text="Value when sold" class="hud-sale-value__label ff-grow" picking-mode="Ignore" />
+            <ui:Label name="hud-sale-value-amount" class="ff-strong hud-sale-value__amount" picking-mode="Ignore" />
+        </ui:VisualElement>
         <ui:VisualElement name="hud-recipe" class="ff-row hud-recipe">
             <ui:Label text="Recipe" class="ff-strong hud-recipe__label" picking-mode="Ignore" />
             <ui:DropdownField name="hud-recipe-choice" focusable="false" class="ff-dropdown ff-grow hud-recipe__choice" />

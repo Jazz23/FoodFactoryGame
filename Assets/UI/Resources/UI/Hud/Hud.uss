@@ -221,6 +221,11 @@
 .hud-register--empty .hud-register__label { color: var(--ff-danger-text); }
 .hud-register__button { margin-left: 8px; }
 
+/* A register's sale value: the goods in its sale grid at their menu prices. */
+.hud-sale-value { margin-top: 14px; align-items: center; }
+.hud-sale-value__label { font-size: 12px; color: var(--ff-muted); }
+.hud-sale-value__amount { font-size: 14px; color: var(--ff-positive); }
+
 /* The recipe chooser (decision 0043). */
 .hud-recipe { margin-top: 14px; align-items: center; }
 .hud-recipe__label { margin-right: 12px; }

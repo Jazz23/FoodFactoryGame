@@ -212,6 +212,25 @@ namespace FoodFactoryGame.Session.PlayModeTests
 
             yield return Key(UnityEngine.InputSystem.Key.Escape);
             yield return Until(() => _interaction.Screen == InteractionScreen.Menu, "the menu again");
+            // Regression (2026-10-14): Settings opened from inside a UI event (as a button click is) must not reset the
+            // sensitivity to its minimum through a queued change event from building the slider.
+            var sensitivity = OrbitCameraRig.LookSensitivity;
+            var opener = new VisualElement();
+            MenuRoot.Add(opener);
+            opener.RegisterCallback<KeyDownEvent>(_ => Menu.ClickInGameSettings());
+            using (var open = KeyDownEvent.GetPooled('a', KeyCode.None, EventModifiers.None))
+            {
+                open.target = opener;
+                opener.SendEvent(open);
+            }
+            opener.RemoveFromHierarchy();
+            yield return Until(() => MenuRoot.Q("menu-sensitivity") != null, "the settings screen opened from an event");
+            yield return Frames(3);
+            Assert.That(OrbitCameraRig.LookSensitivity, Is.EqualTo(sensitivity), "Opening Settings keeps the sensitivity.");
+            Assert.That(MenuRoot.Q<Slider>("menu-sensitivity").value, Is.EqualTo(sensitivity).Within(0.001f));
+            yield return Key(UnityEngine.InputSystem.Key.Escape);
+            yield return Until(() => MenuRoot.Q("menu-pause-resume") != null, "back to the in-game menu once more");
+            Assert.That(OrbitCameraRig.LookSensitivity, Is.EqualTo(sensitivity), "Closing Settings keeps the sensitivity.");
             Menu.ClickQuitToMainMenu();
             yield return Until(() => !_root.IsRunning, "the session ends");
             yield return Frames(2);

@@ -1,14 +1,26 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
-    <!-- A truck (decision 0022): name, live status and cargo, its route chooser and Assign. -->
+    <!-- A truck (decision 0022): name, live status, destination, route and cargo, its route chooser with Assign, and Sell, which
+         asks for confirmation in the confirm row before the request is sent. -->
     <Style src="project://database/Assets/UI/Theme/Theme.uss" />
     <Style src="Logistics.uss" />
     <ui:VisualElement class="ff-card logi-card">
         <ui:Label name="title" class="logi-card__name" picking-mode="Ignore" />
         <ui:Label name="status" class="ff-small ff-wrap" picking-mode="Ignore" />
+        <ui:Label name="destination" class="ff-small ff-wrap logi-card__line" picking-mode="Ignore" />
+        <ui:Label name="route" class="ff-small ff-wrap logi-card__line" picking-mode="Ignore" />
         <ui:Label name="cargo" class="ff-small ff-wrap" picking-mode="Ignore" />
         <ui:VisualElement name="choosers" class="logi-card__choosers" />
         <ui:VisualElement class="ff-row logi-card__buttons">
             <ui:Button name="assign" focusable="false" class="ff-button ff-button--sm" />
+            <ui:Button name="sell" focusable="false" class="ff-button ff-button--sm logi-card__sell" />
+        </ui:VisualElement>
+        <ui:Label name="sell-note" class="ff-small ff-wrap logi-card__sell-note" picking-mode="Ignore" />
+        <ui:VisualElement name="confirm" class="ff-inset logi-card__confirm">
+            <ui:Label name="confirm-text" class="ff-small ff-wrap" picking-mode="Ignore" />
+            <ui:VisualElement class="ff-row logi-card__buttons">
+                <ui:Button name="confirm-sell" text="Sell" focusable="false" class="ff-button ff-button--sm ff-button--danger" />
+                <ui:Button name="confirm-keep" text="Keep it" focusable="false" class="ff-button ff-button--sm logi-card__keep" />
+            </ui:VisualElement>
         </ui:VisualElement>
     </ui:VisualElement>
 </ui:UXML>

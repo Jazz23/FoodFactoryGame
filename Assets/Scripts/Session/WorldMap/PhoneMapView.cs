@@ -1,7 +1,9 @@
 // The phone's world map (decision 0047): draws the stored layout's districts, rivers, roads and every lot from above, coloured by
 // what the lot is and who owns it, with the local player's position. Map x runs right and map z up (north). The wheel zooms about
 // the pointer, dragging pans, and a click without a drag selects the lot under the pointer (LotClicked) or clears the selection.
-// Presentation only: it reads the layout and a colour callback, and never changes state.
+// The company's trucks are small icons (SetTrucks) kept as child elements and only moved in place (a translate, no rebuild or
+// layout pass) as their positions change; hovering one highlights it and shows its name, clicking it raises TruckClicked.
+// Presentation only: it reads the layout, a colour callback and truck positions, and never changes state.
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,6 +15,28 @@ namespace FoodFactoryGame.Session.WorldMap
 {
     public sealed class PhoneMapView : VisualElement
     {
+        // A truck icon: where it is on the map (metres) and its place among trucks standing at the same spot (drawn side by side).
+        public readonly struct MapTruck
+        {
+            public readonly string Id;
+            public readonly string Name;
+            public readonly Vector2 Map;
+            public readonly int Stack;
+
+            public MapTruck(string id, string name, Vector2 map, int stack)
+            {
+                Id = id;
+                Name = name;
+                Map = map;
+                Stack = stack;
+            }
+        }
+
+        public const string TruckClass = "phone-map-truck";
+        public const string TruckHighlightClass = "phone-map-truck--highlighted";
+        // Pixels between icons of trucks standing at the same spot.
+        private const float StackSpacing = 12f;
+
         private const float MinZoom = 1f;
         private const float MaxZoom = 12f;
         // Pointer travel (pixels) beyond which a press is a drag, not a click.
@@ -40,16 +64,128 @@ namespace FoodFactoryGame.Session.WorldMap
         // The local player on the map, or null when unknown.
         public Vector2? Player { get; set; }
         public event Action<string> LotClicked;
+        // A truck icon was clicked (its truck ID).
+        public event Action<string> TruckClicked;
+
+        private readonly VisualElement _truckLayer;
+        private readonly Dictionary<string, (VisualElement Icon, Label Name)> _truckIcons = new();
+        private readonly Dictionary<string, MapTruck> _trucks = new();
+        private string _highlightedTruckId;
 
         public PhoneMapView()
         {
             name = "phone-map";
             style.flexGrow = 1;
+            style.overflow = Overflow.Hidden;
             generateVisualContent += Draw;
             RegisterCallback<WheelEvent>(OnWheel);
             RegisterCallback<PointerDownEvent>(OnPointerDown);
             RegisterCallback<PointerMoveEvent>(OnPointerMove);
             RegisterCallback<PointerUpEvent>(OnPointerUp);
+            RegisterCallback<GeometryChangedEvent>(_ => PlaceTrucks());
+            // Icons are drawn over the map; the layer itself lets the pointer through to the map.
+            _truckLayer = new VisualElement { name = "phone-map-trucks", pickingMode = PickingMode.Ignore };
+            _truckLayer.style.position = Position.Absolute;
+            _truckLayer.style.left = 0;
+            _truckLayer.style.top = 0;
+            _truckLayer.style.right = 0;
+            _truckLayer.style.bottom = 0;
+            Add(_truckLayer);
+        }
+
+        // The truck drawn highlighted (the one chosen in the Trucks app), or null.
+        public string HighlightedTruckId
+        {
+            get => _highlightedTruckId;
+            set
+            {
+                if (value == _highlightedTruckId) return;
+                _highlightedTruckId = value;
+                foreach (var (id, parts) in _truckIcons) parts.Icon.EnableInClassList(TruckHighlightClass, id == value);
+            }
+        }
+
+        // The truck icon under the pointer, or null.
+        public string HoveredTruckId { get; private set; }
+
+        public IReadOnlyCollection<string> TruckIds => _truckIcons.Keys;
+
+        // Shows exactly these trucks. Icons are created or removed only when the set of trucks changes; otherwise they are
+        // moved in place, so calling this every frame costs no rebuild.
+        public void SetTrucks(IReadOnlyList<MapTruck> trucks)
+        {
+            _trucks.Clear();
+            foreach (var truck in trucks ?? Array.Empty<MapTruck>())
+                if (!string.IsNullOrEmpty(truck.Id)) _trucks[truck.Id] = truck;
+            foreach (var gone in _truckIcons.Keys.Where(x => !_trucks.ContainsKey(x)).ToList())
+            {
+                _truckIcons[gone].Icon.RemoveFromHierarchy();
+                _truckIcons.Remove(gone);
+                if (HoveredTruckId == gone) HoveredTruckId = null;
+            }
+            foreach (var truck in _trucks.Values)
+            {
+                if (!_truckIcons.TryGetValue(truck.Id, out var parts))
+                {
+                    parts = CreateTruckIcon(truck.Id);
+                    _truckIcons[truck.Id] = parts;
+                    _truckLayer.Add(parts.Icon);
+                }
+                if (parts.Name.text != truck.Name) parts.Name.text = truck.Name;
+            }
+            PlaceTrucks();
+        }
+
+        private (VisualElement Icon, Label Name) CreateTruckIcon(string truckId)
+        {
+            var icon = new VisualElement { name = "phone-map-truck-" + truckId, pickingMode = PickingMode.Position };
+            icon.AddToClassList(TruckClass);
+            icon.EnableInClassList(TruckHighlightClass, truckId == _highlightedTruckId);
+            var body = new VisualElement { pickingMode = PickingMode.Ignore };
+            body.AddToClassList("phone-map-truck__body");
+            var cab = new VisualElement { pickingMode = PickingMode.Ignore };
+            cab.AddToClassList("phone-map-truck__cab");
+            var label = new Label { pickingMode = PickingMode.Ignore };
+            label.AddToClassList("phone-map-truck__name");
+            icon.Add(body);
+            icon.Add(cab);
+            icon.Add(label);
+            icon.RegisterCallback<PointerEnterEvent>(_ => HoveredTruckId = truckId);
+            icon.RegisterCallback<PointerLeaveEvent>(_ =>
+            {
+                if (HoveredTruckId == truckId) HoveredTruckId = null;
+            });
+            // The press is the icon's, not the start of a map drag or a lot click.
+            icon.RegisterCallback<PointerDownEvent>(evt =>
+            {
+                if (evt.button == 0) evt.StopPropagation();
+            });
+            icon.RegisterCallback<PointerUpEvent>(evt =>
+            {
+                if (evt.button != 0 || _pressed) return;
+                evt.StopPropagation();
+                TruckClicked?.Invoke(truckId);
+            });
+            return (icon, label);
+        }
+
+        // Moves every icon to its truck's place at the current zoom and pan; one off the view is hidden.
+        private void PlaceTrucks()
+        {
+            if (_truckIcons.Count == 0) return;
+            var size = contentRect.size;
+            foreach (var (id, parts) in _truckIcons)
+            {
+                if (_layout == null || !_trucks.TryGetValue(id, out var truck) || size.x < 1f || size.y < 1f)
+                {
+                    parts.Icon.style.visibility = Visibility.Hidden;
+                    continue;
+                }
+                var local = ToLocal(truck.Map) + new Vector2(truck.Stack * StackSpacing, 0f);
+                var inside = local.x >= -8f && local.y >= -8f && local.x <= size.x + 8f && local.y <= size.y + 8f;
+                parts.Icon.style.visibility = inside ? Visibility.Visible : Visibility.Hidden;
+                parts.Icon.style.translate = new Translate(local.x, local.y);
+            }
         }
 
         public WorldLayout Layout
@@ -61,6 +197,7 @@ namespace FoodFactoryGame.Session.WorldMap
                 _layout = value;
                 _zoom = MinZoom;
                 _centre = Vector2.zero;
+                PlaceTrucks();
                 MarkDirtyRepaint();
             }
         }
@@ -70,6 +207,7 @@ namespace FoodFactoryGame.Session.WorldMap
         {
             _centre = map;
             _zoom = Mathf.Max(_zoom, 2.5f);
+            PlaceTrucks();
             MarkDirtyRepaint();
         }
 
@@ -103,6 +241,7 @@ namespace FoodFactoryGame.Session.WorldMap
             // Keep the point under the pointer where it is.
             _centre += before - ToMap(evt.localMousePosition);
             Clamp();
+            PlaceTrucks();
             MarkDirtyRepaint();
             evt.StopPropagation();
         }
@@ -125,6 +264,7 @@ namespace FoodFactoryGame.Session.WorldMap
             {
                 _centre += new Vector2(-(position.x - _lastPointer.x), position.y - _lastPointer.y) / Mathf.Max(0.0001f, Scale);
                 Clamp();
+                PlaceTrucks();
                 MarkDirtyRepaint();
             }
             _lastPointer = position;

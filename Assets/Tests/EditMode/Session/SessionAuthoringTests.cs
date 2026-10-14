@@ -431,7 +431,7 @@ namespace FoodFactoryGame.Session.Tests
             var rig = prefab.GetComponentInChildren<OrbitCameraRig>(true);
             Assert.That(rig, Is.Not.Null);
             Assert.That(rig.gameObject.activeSelf, Is.False, "Only the owning client enables the rig.");
-            AssertAssigned(rig, "target", "cameraTransform", "lookAction", "zoomAction");
+            AssertAssigned(rig, "target", "cameraTransform", "lookAction", "zoomAction", "moveAction", "sprintAction", "tiltAction");
             Assert.That(rig.GetComponentsInChildren<Camera>(true).Length, Is.EqualTo(1));
             Assert.That(prefab.GetComponentsInChildren<Camera>(true).Single().transform.IsChildOf(rig.transform), Is.True);
             Assert.That(prefab.GetComponentsInChildren<AudioListener>(true).All(x => x.transform.IsChildOf(rig.transform)), Is.True);

@@ -599,11 +599,10 @@ namespace FoodFactoryGame.Session
             _page.Part<Label>("menu-sensitivity-min").text = SensitivityText(ClientSettings.MinSensitivity);
             _page.Part<Label>("menu-sensitivity-max").text = SensitivityText(ClientSettings.MaxSensitivity);
             var slider = _page.Part<Slider>("menu-sensitivity");
-            slider.lowValue = ClientSettings.MinSensitivity;
-            slider.highValue = ClientSettings.MaxSensitivity;
-            slider.SetValueWithoutNotify(_settings.LookSensitivity);
+            PrepareSlider(slider, ClientSettings.MinSensitivity, ClientSettings.MaxSensitivity, _settings.LookSensitivity);
             slider.RegisterValueChangedCallback(change =>
             {
+                if (IsStale(slider, change)) return;
                 var snapped = ClientSettings.ClampSensitivity(Mathf.Round(change.newValue * 20f) / 20f);
                 _settings.LookSensitivity = snapped;
                 OrbitCameraRig.LookSensitivity = snapped;
@@ -621,6 +620,30 @@ namespace FoodFactoryGame.Session
 
         private static string SensitivityText(float value) => value.ToString("0.00") + "×";
 
+        // Sets a settings slider's range and value without any change event. The value is set before the range: narrowing the
+        // template's range around a value outside it (the sensitivity slider's 0 below its 0.1 minimum) clamps it through the
+        // value setter, whose ChangeEvent is queued when the screen is built inside a click and so reached the callback
+        // registered just after, saving the minimum (the sensitivity reset bug). The slider is also kept out of keyboard focus:
+        // the UI map's Navigate shares WASD and the arrows with Move, which would otherwise step a focused slider while walking.
+        private static void PrepareSlider(Slider slider, float low, float high, float value)
+        {
+            slider.focusable = false;
+            slider.SetValueWithoutNotify(Mathf.Clamp(value, low, high));
+            slider.lowValue = low;
+            slider.highValue = high;
+            slider.SetValueWithoutNotify(Mathf.Clamp(value, low, high));
+            slider.RegisterCallback<NavigationMoveEvent>(evt =>
+            {
+                slider.focusController?.IgnoreEvent(evt);
+                evt.StopImmediatePropagation();
+            }, TrickleDown.TrickleDown);
+        }
+
+        // A change the slider no longer shows (a queued event from before its value was set, or one delivered after the settings
+        // page was replaced) is ignored, so only the player's own drag changes a setting.
+        private bool IsStale(Slider slider, ChangeEvent<float> change) =>
+            _screen != MenuScreen.Settings || slider.panel == null || !Mathf.Approximately(change.newValue, slider.value);
+
         private static string VolumeText(float value) => Mathf.RoundToInt(value * 100f) + "%";
 
         // One volume row (menu-volume-<key> and its -value label): applies while dragging, in 5% steps, and saves on release
@@ -630,11 +653,10 @@ namespace FoodFactoryGame.Session
             var value = _page.Part<Label>($"menu-volume-{key}-value");
             value.text = VolumeText(get());
             var slider = _page.Part<Slider>($"menu-volume-{key}");
-            slider.lowValue = 0f;
-            slider.highValue = 1f;
-            slider.SetValueWithoutNotify(get());
+            PrepareSlider(slider, 0f, 1f, get());
             slider.RegisterValueChangedCallback(change =>
             {
+                if (IsStale(slider, change)) return;
                 var snapped = ClientSettings.ClampVolume(Mathf.Round(change.newValue * 20f) / 20f);
                 set(snapped);
                 ApplyVolumes();

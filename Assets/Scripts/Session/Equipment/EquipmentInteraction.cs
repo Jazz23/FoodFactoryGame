@@ -10,8 +10,9 @@
 // picks the machine under the crosshair back into the inventory. On a screen the cursor can instead carry a goods stack
 // (CursorGoods), which is only a pointer to lots still in their container until it is dropped on another one. Capacity
 // counts slots (decision 0009): moves are previewed against the destination's free slots with the items' max stacks.
-// Every change is a request through the goods bridge: the ghost, cursor stack and capacity hints are only previews, the
-// server re-checks each request, and nothing changes locally until the next replicated baseline.
+// Every change is a request through the goods bridge: the ghost, cursor stack, capacity hints and the screens' view of a
+// pending goods transfer (EquipmentInteraction.Transfers.cs) are only previews, the server re-checks each request, and no
+// gameplay state changes locally; a rejection reverts the preview and the next replicated baseline is authoritative.
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -198,6 +199,12 @@ namespace FoodFactoryGame.Session.Equipment
 
         // The phone's key (decision 0047): looked up in the project-wide Player map, like every other action here.
         private InputAction PhoneAction => placeAction.action.actionMap?.FindAction("Phone");
+        // Interact opens what the crosshair is on (a machine, dock, shelf, register, employee, the storage or a map building);
+        // Inventory opens the player's own inventory. Both are bound to E by default (KeyBindings), so presses of the two are
+        // gathered during the input update and resolved once per frame (ResolveKeyPresses).
+        private InputAction InteractAction => inventoryAction.action.actionMap?.FindAction("Interact");
+        private bool _interactPressed;
+        private bool _inventoryPressed;
 
         // The cursor's machine kind, or an unspoiled goods stack carried from the inventory.
         private HotbarEntry CursorEntry => CursorKind != null ? HotbarEntry.Machine(CursorKind)
@@ -229,6 +236,11 @@ namespace FoodFactoryGame.Session.Equipment
                 PhoneAction.performed += OnPhone;
                 PhoneAction.Enable();
             }
+            if (InteractAction != null)
+            {
+                InteractAction.performed += OnInteract;
+                InteractAction.Enable();
+            }
             EnableLiftInput();
             ghost.gameObject.SetActive(false);
         }
@@ -250,6 +262,12 @@ namespace FoodFactoryGame.Session.Equipment
                 PhoneAction.performed -= OnPhone;
                 PhoneAction.Disable();
             }
+            if (InteractAction != null)
+            {
+                InteractAction.performed -= OnInteract;
+                InteractAction.Disable();
+            }
+            _interactPressed = _inventoryPressed = false;
             DisableLiftInput();
             CloseEmployeeScreen();
             ClearHover();
@@ -266,6 +284,8 @@ namespace FoodFactoryGame.Session.Equipment
         private void Update()
         {
             Subscribe(session.ClientSubscription);
+            ResolveKeyPresses();
+            ExpireTransferPreviews();
             var site = session.ClientSite;
             var me = LocalPlayerId;
             _avatar = LocalAvatar();
@@ -355,7 +375,7 @@ namespace FoodFactoryGame.Session.Equipment
                     InteractionScreen.Machine => "Machine: put ingredients in the input, take results from the output (shift+click moves a stack); E or Esc closes" + suffix,
                     InteractionScreen.Menu => "Menu: Resume or Esc returns to the game",
                     InteractionScreen.Phone => "Phone: tap the map to see lots and farms, order from farms, manage staff and names; C or Esc closes" + suffix,
-                    _ => ElevatorHint() + HoverHint() + "B: build mode, E: inventory (pick belts or goods to carry them out), L: trucks, 1-9: hotbar, left click: open machine, right click: pick up, R: turn belt, F: take an item off a belt" + suffix
+                    _ => ElevatorHint() + HoverHint() + $"B: build mode, {InventoryKey}: inventory (pick belts or goods to carry them out), L: trucks, 1-9: hotbar, left click: open machine, right click: pick up, R: turn belt, F: take an item off a belt" + suffix
                 };
                 return;
             }
@@ -653,15 +673,17 @@ namespace FoodFactoryGame.Session.Equipment
         }
 
         // Moves units of one stack (lots of one item and spoiled state), most exposed first, until quantity or the room the
-        // destination's slots have for that stack (per the latest baseline) runs out; a lot is split when only part is taken.
-        // Each lot is its own transfer request; the server re-checks capacity, so a stale preview is only a rejection.
+        // destination's slots have for that stack (per the latest baseline with this client's pending transfers applied) runs
+        // out; a lot is split when only part is taken, and units already promised to a pending transfer are not asked for again.
+        // Each lot is its own transfer request, shown at once as a preview (EquipmentInteraction.Transfers.cs); the server
+        // re-checks capacity and quantity, so a stale preview is only a rejection, which reverts it.
         public void MoveGoods(IReadOnlyList<GoodsLot> lots, string destinationId, int quantity)
         {
             var site = session.ClientSite;
             var bridge = _subscription?.Bridge;
             var destination = site?.Locations.FirstOrDefault(x => x.Id == destinationId);
             if (bridge == null || destination == null || lots.Count == 0) return;
-            var free = Math.Min(quantity, GoodsSlots.FreeUnits(site, destinationId, lots[0].ItemId, lots[0].Spoiled, session.MaxStack));
+            var free = Math.Min(quantity, GoodsSlots.FreeUnits(destination, PreviewLots(site, destinationId), lots[0].ItemId, lots[0].Spoiled, session.MaxStack));
             if (free <= 0)
             {
                 LastRejection = "capacity";
@@ -670,9 +692,12 @@ namespace FoodFactoryGame.Session.Equipment
             foreach (var lot in lots.OrderByDescending(x => x.ExposureSeconds).ThenBy(x => x.Id, StringComparer.Ordinal))
             {
                 if (free <= 0) break;
-                var take = (int)Math.Min(free, lot.Quantity);
+                var available = lot.Quantity - PreviewedOut(lot.Id, site);
+                if (available <= 0) continue;
+                var take = (int)Math.Min(free, available);
                 free -= take;
                 var requestId = Track();
+                AddPreview(requestId, lot, destinationId, take);
                 Debug.Log($"[Equipment] Requesting transfer of {take} {lot.ItemId} from {lot.LocationId} to {destinationId}.");
                 bridge.RequestTransfer(requestId, lot.Id, destinationId, take);
             }
@@ -846,7 +871,9 @@ namespace FoodFactoryGame.Session.Equipment
             if (!RotateBelts()) _rotation = (_rotation + 1) % 4;
         }
 
-        private void OnInventory(InputAction.CallbackContext _) => Interact();
+        private void OnInventory(InputAction.CallbackContext _) => _inventoryPressed = true;
+
+        private void OnInteract(InputAction.CallbackContext _) => _interactPressed = true;
 
         private void OnLogistics(InputAction.CallbackContext _) => ToggleLogistics();
 
@@ -909,6 +936,7 @@ namespace FoodFactoryGame.Session.Equipment
         {
             if (!_pending.Remove(outcome.RequestId)) return;
             OnBeltResult(outcome);
+            OnTransferResult(outcome);
             if (outcome.Accepted && _pending.Count == 0) LastRejection = null;
             if (!outcome.Accepted) LastRejection = string.IsNullOrEmpty(outcome.Reason) ? "rejected" : outcome.Reason;
             Debug.Log($"[Equipment] {(outcome.Accepted ? "Accepted" : "Rejected")}: {outcome.Reason} (revision {outcome.Revision}).");
@@ -923,6 +951,7 @@ namespace FoodFactoryGame.Session.Equipment
             _pending.Clear();
             _pendingBelts.Clear();
             _removingBelts.Clear();
+            ClearTransferPreviews();
         }
 
         private void ApplyPointerLock(bool locked)

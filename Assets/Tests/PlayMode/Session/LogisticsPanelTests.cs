@@ -199,7 +199,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
             void AssertReachable(string when)
             {
                 var card = Card();
-                Assert.That(Controls().Length, Is.EqualTo(3), "<, > and Assign.");
+                Assert.That(Controls().Length, Is.EqualTo(4), "<, >, Assign and Sell (2026-10-14: trucks sell from the card).");
                 foreach (var button in Controls())
                 {
                     var bounds = button.worldBound;

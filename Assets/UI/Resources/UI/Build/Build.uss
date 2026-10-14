@@ -40,6 +40,8 @@
 }
 
 .build__heading { margin-top: 10px; }
+/* Catalog filter chips (All, Structure, Kitchen, ...): the chosen one is amber (ff-chip--chosen). */
+.build__filters { margin-bottom: 2px; }
 .build__heading--catalog { margin-top: 14px; }
 .build__catalog { flex-grow: 1; min-height: 0; margin: 6px 0 10px 0; }
 

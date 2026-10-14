@@ -6,11 +6,14 @@
 // front of the lot, level with the dock, the way it arrived.
 // On the roads (generated worlds, decision 0032): every truck driving the network near the camera, the company's own and other
 // companies' (public, from RoadTrucks), is drawn where the simulation has it on its leg, in the right-hand kerb lane, carried
-// on between baselines at the leg's speed; trucks waiting at the same leg end stand nose to tail. A parked truck stands in the
+// on between baselines at the leg's speed; a truck that will wait at its leg's end node pulls up at the stop line before the
+// crosswalk (RoadPose.TruckOffset), not in the junction, and trucks waiting at the same leg end stand nose to tail. A parked truck stands in the
 // service yard beside its drawn restaurant (generator v5; owner, 2026-10-13), lengthwise with its nose to the street on the
 // yard's outer side so the dock by the back door stays clear, the next one behind it; one the yard has no room for, or a
 // parked truck at a site without a yard, stands at the kerb by its drawn site. Visuals ease toward these poses, so turns at
 // junctions and pulling in to a dock are smoothed; a jump too long to ease is snapped. In a dev world (no map) only docked trucks are drawn, as before.
+// Every drawn truck has a solid body (VehicleBody: the local player is blocked by it and bumped aside by VehicleBump) and an
+// engine loop (VehicleEngineAudio).
 using System.Collections.Generic;
 using System.Linq;
 using FoodFactoryGame.Goods;
@@ -28,7 +31,7 @@ namespace FoodFactoryGame.Session.Logistics
         // PROTOTYPE: trucks on the roads are drawn within this distance of the camera (decision 0031's draw radius).
         private const float RoadDrawRadius = DrawnSites.DrawRadius;
         // Bumper-to-bumper spacing of trucks waiting at one leg end, and of parked trucks, in metres.
-        private const float QueueSpacing = 9f;
+        internal const float QueueSpacing = 9f;
         // Easing rate toward the target pose (per second), and the jump beyond which a visual snaps instead.
         private const float EaseRate = 6f;
         private const float SnapDistance = 40f;
@@ -106,6 +109,8 @@ namespace FoodFactoryGame.Session.Logistics
                     visual = Instantiate(truckPrefab, transform);
                     visual.name = $"Truck {truckId}";
                     DistanceCulling.Apply(visual);
+                    foreach (var collider in visual.GetComponentsInChildren<Collider>()) DestroyImmediate(collider);
+                    VehicleBody.AddTo(visual);
                     VehicleEngineAudio.AddTo(visual, 0.4f, 1f, 30f);
                     _visuals.Add(truckId, visual);
                     visual.transform.SetPositionAndRotation(pose.position, pose.rotation);
@@ -181,7 +186,8 @@ namespace FoodFactoryGame.Session.Logistics
                     waiting[key] = ahead + 1;
                     back = ahead * QueueSpacing;
                 }
-                var (map, heading) = RoadPose.Along(network, segment, RoadPose.LegOffset(truck, since), forward, 0, back);
+                var offset = RoadPose.TruckOffset(network, segment, truck, since, TruckHalfLength());
+                var (map, heading) = RoadPose.Along(network, segment, offset, forward, 0, back);
                 if (view.HasValue && (map - view.Value).sqrMagnitude > RoadDrawRadius * RoadDrawRadius) continue;
                 poses[truck.Id] = new Pose(placement.OnGround(map.x, map.y), Quaternion.LookRotation(new Vector3(heading.x, 0f, heading.y)));
             }

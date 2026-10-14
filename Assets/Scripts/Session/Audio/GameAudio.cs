@@ -1,6 +1,7 @@
-// Presentation-only sound for this client: loads the clips in Resources/Audio, plays 2D interface sounds, clicks for every
-// UI Toolkit button on any panel, and the city ambience while this client has a player in the world. Nothing here reads or
-// changes gameplay state, and a missing clip only makes that sound silent.
+// Presentation-only sound for this client: loads the clips in Resources/Audio, plays 2D interface sounds and clicks for every
+// UI Toolkit button on any panel, and hosts the AmbienceDirector (menu music and the area ambience beds). It keeps a fallback
+// AudioListener enabled whenever no other listener is (the menu has no camera rig), so menu sounds are heard and two listeners
+// are never enabled together. Nothing here reads or changes gameplay state, and a missing clip only makes that sound silent.
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -14,7 +15,7 @@ namespace FoodFactoryGame.Session.Audio
         Effects,
         // Button clicks, the till and the phone.
         Interface,
-        // The city ambience bed.
+        // The menu music and the area ambience beds (city, farmland, factory).
         Ambience
     }
 
@@ -25,23 +26,27 @@ namespace FoodFactoryGame.Session.Audio
         public const string OpenClip = "ui_open";
         public const string CashClip = "cash";
         public const string PlaceClip = "place";
-        public const string AmbienceClip = "city";
-        private const float AmbienceVolume = 0.35f;
-        private const float AmbienceFadeRate = 0.5f;
         private const float PanelScanSeconds = 0.5f;
+        private const float ListenerScanSeconds = 0.25f;
 
         private static readonly Dictionary<string, AudioClip> Clips = new();
         private static GameAudio _instance;
 
         private readonly HashSet<IPanel> _hookedPanels = new();
         private AudioSource _ui;
-        private AudioSource _ambience;
+        private AudioListener _fallbackListener;
+        private bool _otherListener;
+        private bool _wasInWorld;
         private float _nextPanelScan;
+        private float _nextListenerScan;
 
         private static readonly float[] Volumes = { 1f, 1f, 1f };
 
         // True while the local player's avatar is in the world; set by PlayerAvatar for its owner only.
         public static bool InWorld { get; set; }
+
+        // The transform of the AudioListener this client hears through (the player's camera rig or the fallback); null when none.
+        public static Transform Listener { get; private set; }
 
         // 0 (silent) to 1; sounds read it when they play, and loops every frame.
         public static float Volume(AudioChannel channel) => Volumes[(int)channel];
@@ -74,16 +79,18 @@ namespace FoodFactoryGame.Session.Audio
         }
 
         // A one-off positional sound that does not follow anything.
-        public static void PlayAt(string clipName, Vector3 position, float volume = 1f)
+        public static void PlayAt(string clipName, Vector3 position, float volume = 1f, float maxDistance = 25f, float pitch = 1f,
+            AudioChannel channel = AudioChannel.Effects)
         {
             var clip = Clip(clipName);
             if (clip == null) return;
             var go = new GameObject("One-shot " + clipName);
             go.transform.position = position;
-            var source = Spatial(go, clip, 25f);
-            source.volume = volume * Volume(AudioChannel.Effects);
+            var source = Spatial(go, clip, maxDistance);
+            source.volume = volume * Volume(channel);
+            source.pitch = pitch;
             source.Play();
-            Destroy(go, clip.length + 0.1f);
+            Destroy(go, clip.length / Mathf.Max(0.1f, pitch) + 0.1f);
         }
 
         // A 3D source on target, heard up to maxDistance metres away; looping sources do not start until played.
@@ -106,12 +113,10 @@ namespace FoodFactoryGame.Session.Audio
             _ui = gameObject.AddComponent<AudioSource>();
             _ui.playOnAwake = false;
             _ui.spatialBlend = 0f;
-            _ambience = gameObject.AddComponent<AudioSource>();
-            _ambience.playOnAwake = false;
-            _ambience.loop = true;
-            _ambience.spatialBlend = 0f;
-            _ambience.volume = 0f;
-            _ambience.clip = Clip(AmbienceClip);
+            // Enabled by UpdateListener only once no other listener is found, so two are never enabled together.
+            _fallbackListener = gameObject.AddComponent<AudioListener>();
+            _fallbackListener.enabled = false;
+            gameObject.AddComponent<AmbienceDirector>();
         }
 
         private void OnDestroy()
@@ -121,16 +126,7 @@ namespace FoodFactoryGame.Session.Audio
 
         private void Update()
         {
-            var target = InWorld ? AmbienceVolume * Volume(AudioChannel.Ambience) : 0f;
-            _ambience.volume = Mathf.MoveTowards(_ambience.volume, target, AmbienceFadeRate * Time.unscaledDeltaTime);
-            if (_ambience.clip != null && _ambience.volume > 0f && !_ambience.isPlaying)
-            {
-                // Start somewhere in the loop so a fresh session does not always open on the same bird.
-                _ambience.time = Random.Range(0f, _ambience.clip.length);
-                _ambience.Play();
-            }
-            else if (_ambience.volume <= 0f && _ambience.isPlaying) _ambience.Stop();
-
+            UpdateListener();
             if (Time.unscaledTime < _nextPanelScan) return;
             _nextPanelScan = Time.unscaledTime + PanelScanSeconds;
             // Documents sharing PanelSettings share one panel; hook each panel's root once.
@@ -141,6 +137,27 @@ namespace FoodFactoryGame.Session.Audio
                 panel.visualTree.RegisterCallback<ClickEvent>(OnClick, TrickleDown.TrickleDown);
             }
             _hookedPanels.RemoveWhere(x => x.visualTree?.panel == null);
+        }
+
+        // The player's camera rig enables its listener in the same call that sets InWorld, so a change of InWorld rescans at
+        // once; the periodic scan covers a listener that appears or goes away on its own.
+        private void UpdateListener()
+        {
+            if (InWorld != _wasInWorld || Time.unscaledTime >= _nextListenerScan)
+            {
+                _wasInWorld = InWorld;
+                _nextListenerScan = Time.unscaledTime + ListenerScanSeconds;
+                Transform other = null;
+                foreach (var listener in FindObjectsByType<AudioListener>())
+                    if (listener != _fallbackListener && listener.isActiveAndEnabled)
+                    {
+                        other = listener.transform;
+                        break;
+                    }
+                _otherListener = other != null;
+                Listener = other != null ? other : transform;
+            }
+            if (_fallbackListener.enabled == _otherListener) _fallbackListener.enabled = !_otherListener;
         }
 
         private static void OnClick(ClickEvent click)

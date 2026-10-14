@@ -1,12 +1,13 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
-    <!-- A loading dock (decision 0022): Outgoing (trucks load) beside Incoming (trucks unload), the trucks serving it, and a
+    <!-- A loading dock (decision 0022), titled with its unique name (as the phone and logistics screens name it): Outgoing (trucks load) beside Incoming (trucks unload), the trucks serving it, and a
          warning when its lot's street cannot reach it (decision 0032), and a
          mark when a restaurant dock is not beside a back door (decision 0037, starting loop). -->
     <Style src="project://database/Assets/UI/Theme/Theme.uss" />
     <Style src="Hud.uss" />
     <ui:VisualElement name="hud-machine" class="ff-panel hud-window">
         <ui:VisualElement class="ff-row hud-window__header" picking-mode="Ignore">
-            <ui:Label text="Loading dock" class="ff-title" picking-mode="Ignore" />
+            <ui:Label name="title" text="Loading dock" class="ff-title" picking-mode="Ignore" />
+            <ui:Label name="subtitle" text="Loading dock" class="hud-window__subtitle" picking-mode="Ignore" />
         </ui:VisualElement>
         <ui:VisualElement class="ff-inset ff-row hud-dock__body">
             <ui:VisualElement class="hud-labelled hud-dock__outgoing">

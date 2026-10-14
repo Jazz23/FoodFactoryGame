@@ -1,7 +1,8 @@
 // What the crosshair is on that has a screen: an employee, a placed machine or the dev storage within interactReach of
 // the avatar on its floor, or a purchasable map building (PropertyMarker) within propertyReach. That target is outlined
-// (HoverOutline; map buildings are not) while no screen is open, and E (or left click with an empty cursor) opens its screen;
-// E on nothing opens the inventory. Local presentation only: opening a screen never changes gameplay state.
+// (HoverOutline; map buildings are not) while no screen is open, and the Interact key (or left click with an empty cursor) opens
+// its screen. The Inventory key always opens the player's own inventory; both default to E, so E on nothing opens the
+// inventory and E on something opens that. Local presentation only: opening a screen never changes gameplay state.
 using System.Linq;
 using FoodFactoryGame.Session.Employees;
 using FoodFactoryGame.Session.Player;
@@ -26,7 +27,31 @@ namespace FoodFactoryGame.Session.Equipment
         public Component Hovered => _hovered;
 
         // The interact key's first binding as the player sees it ("E"), for the HUD prompt.
-        public string InteractKey => UnityEngine.InputSystem.InputActionRebindingExtensions.GetBindingDisplayString(inventoryAction.action, 0);
+        public string InteractKey => KeyText(InteractAction ?? inventoryAction.action);
+
+        // The inventory key's first binding as the player sees it, for the status line.
+        public string InventoryKey => KeyText(inventoryAction.action);
+
+        private static string KeyText(UnityEngine.InputSystem.InputAction action) =>
+            UnityEngine.InputSystem.InputActionRebindingExtensions.GetBindingDisplayString(action, 0);
+
+        // Resolves this frame's Interact and Inventory presses (gathered by their callbacks) once, so a key bound to both (E by
+        // default) acts once: Interact wins over something openable, Inventory opens the inventory otherwise. On an open screen
+        // either key closes it (Interact also picks while picking a target for an employee task).
+        private void ResolveKeyPresses()
+        {
+            var interact = _interactPressed;
+            var inventory = _inventoryPressed;
+            _interactPressed = _inventoryPressed = false;
+            if (!interact && !inventory) return;
+            if (interact || Screen != InteractionScreen.None)
+            {
+                if (interact) Interact(inventory);
+                else if (Screen is not InteractionScreen.PickPosition && !(Screen == InteractionScreen.Employee && ScriptTextFocused)) CloseScreen();
+                return;
+            }
+            ToggleInventory();
+        }
 
         private void UpdateHover()
         {
@@ -90,9 +115,9 @@ namespace FoodFactoryGame.Session.Equipment
             return Vector2.Distance(new Vector2(nearest.x, nearest.z), new Vector2(position.x, position.z)) <= interactReach;
         }
 
-        // E: closes an open screen (not while typing in the script screen's text box; while picking for it, E picks); otherwise
-        // opens the hover target's screen, or the inventory when there is none.
-        private void Interact()
+        // Interact: closes an open screen (not while typing in the script screen's text box; while picking for it, it picks);
+        // otherwise opens the hover target's screen, or the inventory when there is none and the Inventory key was pressed too.
+        private void Interact(bool inventoryToo)
         {
             if (Screen != InteractionScreen.None)
             {
@@ -121,17 +146,17 @@ namespace FoodFactoryGame.Session.Equipment
                     OpenProperty(property.LotId);
                     break;
                 default:
-                    ToggleInventory();
+                    if (inventoryToo) ToggleInventory();
                     break;
             }
         }
 
         private string HoverHint() => _hovered switch
         {
-            EmployeeWorker => (_held == null ? "Left click or " : "") + "E: give this employee a script. ",
-            EquipmentVisual visual => $"E: open the {visual.Kind}. ",
-            SiteLocationMarker => "E: open the storage. ",
-            PropertyMarker property => $"E: {property.BuildingId}: price and owner. ",
+            EmployeeWorker => (_held == null ? "Left click or " : "") + $"{InteractKey}: give this employee a script. ",
+            EquipmentVisual visual => $"{InteractKey}: open the {visual.Kind}. ",
+            SiteLocationMarker => $"{InteractKey}: open the storage. ",
+            PropertyMarker property => $"{InteractKey}: {property.BuildingId}: price and owner. ",
             _ => ""
         };
     }

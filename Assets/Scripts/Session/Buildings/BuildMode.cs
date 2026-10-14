@@ -1,7 +1,8 @@
 // Restaurant build mode (decision 0034, slice 2), local player only. Build (B) opens it as a screen of its own: the camera looks
-// down on the current site, a grid covers the lot and a panel on the right offers tools (sell or remove, walls, doors, back doors
-// (decision 0037), windows, wall finish) and a catalog of furnishings by category, ending with Belts (owner, 2026-10-13): its
-// card leaves build mode with belts on the cursor to lay a line (EquipmentInteraction.LayBelts), buying a pack when none are
+// down on the current site, a grid covers the lot and a panel on the right offers the Sell tool and one catalog (BuildCatalog,
+// owner 2026-10-14) of every wall, door, back door (decision 0037), window and wall finish style beside the furnishings and
+// machines, filtered by category chips (All by default), ending with Belts (owner, 2026-10-13): a belt card
+// leaves build mode with belts on the cursor to lay a line (EquipmentInteraction.LayBelts), buying a pack when none are
 // held. Walls are free (decision 0036): outer and inner walls are drawn and removed alike, anywhere in the lot. The pointer's cell shows a ghost tinted by validity: the same pure rules the server applies
 // (GoodsWorld.PlanShell, FurnishProblem, SiteGrid) plus the company's cash, with the price, refund and net amount, or the reason it
 // would be refused. A click places a single piece, door or window; dragging draws a line of wall, restyles a line of walls or
@@ -10,7 +11,12 @@
 // piece's own colliders, so wall and ceiling decor is aimed at directly) or, with no piece there, removes the door, window or wall
 // the pointer is on (any part of it, not just its base), or sells a piece standing on the floor cell the pointer is on, for its
 // recorded refund; a press on nothing removable shows no wheel; moving the pointer while holding tilts the camera
-// instead (OrbitCameraRig), Move pans it and Zoom zooms it. Cancel and ClearCursor (X) clear the selected
+// instead (OrbitCameraRig), Move pans it (faster with Sprint) and Zoom zooms it. Once a hold has removed something, keeping Remove
+// held sweeps (owner, 2026-10-14): each further thing of the same family (placed pieces, or doors, windows and walls) the pointer
+// moves onto is removed at once, each only once, while the camera's tilt is held still; nothing the preview refuses is sent and
+// the server still validates every removal and its refund. Release ends the sweep. The panel never takes keyboard focus, so
+// Navigate (the UI map shares WASD and the arrows with Move) never scrolls the catalog while the camera moves.
+// Cancel and ClearCursor (X) clear the selected
 // tool or item. Wall decor turns to face away from its wall and a backed piece (a sink) turns its back to a wall when one is
 // behind either way round. Every order is a request; nothing changes here until the next replicated baseline, and the server's
 // reason is shown when it refuses. Controls come from the Player action map (Input System). Leaving build mode remembers its
@@ -58,10 +64,6 @@ namespace FoodFactoryGame.Session.Buildings
     public sealed class BuildMode : MonoBehaviour
     {
         private static readonly int BaseColor = Shader.PropertyToID("_BaseColor");
-        // Catalog sections in palette order; equipment without a category (machines, the supplier's pieces) is listed last.
-        private static readonly string[] Sections = { "Restaurant", "Furniture", "Decor", "Lighting", "Surfaces", "Architecture", "Service" };
-        private const string EquipmentSection = "Equipment";
-        private const string BeltSection = "Belts";
         private const int MaxHighlights = 400;
         // A right press that moves the pointer further than this (pixels) tilts the camera instead of removing.
         private const float ClickSlop = 8f;
@@ -114,11 +116,25 @@ namespace FoodFactoryGame.Session.Buildings
         private Label _preview;
         private Label _status;
         private VisualElement _tools;
-        private VisualElement _styles;
-        private Label _stylesHeading;
+        private VisualElement _filters;
         private VisualElement _catalog;
-        private int _catalogVersion = -1;
+        private List<BuildCatalogEntry> _entries = new();
+        // What the catalog was last filled from (offer count, price percentage, filter); null forces a refill.
+        private string _catalogKey;
         private string _shownTools;
+        // The drag-to-remove sweep after a completed hold; null when none.
+        private RemovalSweep _sweep;
+
+        // What one sweep has removed: the family it started on, the things sent (each once) and, for structure, their cells (a
+        // removed window's or door's wall is not taken next). Last is the thing under the pointer on the previous frame.
+        private sealed class RemovalSweep
+        {
+            public bool Structure;
+            public readonly HashSet<string> Sent = new();
+            public readonly HashSet<(int X, int Z)> Cells = new();
+            public string Last;
+            public Vector2 Pointer;
+        }
         // The build camera when build mode was last left (this client's presentation only, never saved or sent).
         private (string SiteId, Vector3 Focus, float Distance, float Yaw, float Pitch)? _rememberedView;
 
@@ -128,6 +144,12 @@ namespace FoodFactoryGame.Session.Buildings
         public string OfferId { get; private set; }
         public int Rotation { get; private set; }
         public BuildPreview Preview { get; private set; } = new();
+        // The catalog filter chip shown chosen; All lists every card.
+        public BuildCatalogFilter Filter { get; private set; } = BuildCatalogFilter.All;
+        // The catalog cards for the current offers, in display order (All of them, whatever the filter).
+        public IReadOnlyList<BuildCatalogEntry> CatalogEntries => _entries;
+        // True while Remove stays held after a hold removed something, so moving onto more things removes them too.
+        public bool Sweeping => _sweep != null;
         // 0 to 1 while Remove is held still over the lot; the sale or removal is ordered at 1.
         public float RemoveProgress => _removePress.HasValue ? Mathf.Clamp01((Time.unscaledTime - _removeStart) / HoldSeconds) : 0f;
         public string PointedPieceId => _pointed;
@@ -193,6 +215,13 @@ namespace FoodFactoryGame.Session.Buildings
 
         public void Rotate() => Rotation = (Rotation + 1) % 4;
 
+        // Shows only the catalog cards of one category (All shows every card).
+        public void SelectFilter(BuildCatalogFilter filter)
+        {
+            Filter = filter;
+            _catalogKey = null;
+        }
+
         // Cancel and ClearCursor (X): drops a drag in progress and the chosen tool or item, so the pointer carries nothing.
         public void ClearSelection()
         {
@@ -203,7 +232,7 @@ namespace FoodFactoryGame.Session.Buildings
             _shownTools = null;
         }
 
-        private static string DefaultStyle(BuildTool tool) => tool switch
+        public static string DefaultStyle(BuildTool tool) => tool switch
         {
             BuildTool.Wall or BuildTool.Finish => GoodsWorld.WallStyles[0],
             BuildTool.Door => GoodsWorld.DoorStyles[0],
@@ -225,17 +254,17 @@ namespace FoodFactoryGame.Session.Buildings
             if (!active)
             {
                 _removePress = null;
+                _sweep = null;
                 ShowWheel();
                 ShowWorld(false);
                 return;
             }
             var layout = Layout;
             EnsureGrid(layout);
+            ReleasePanelFocus();
             if (rotateAction.action.WasPressedThisFrame()) Rotate();
             _hover = ForcedHover ?? PointerCell(layout);
             var overPanel = PointerOverPanel();
-            var rig = buildings.LocalAvatar != null ? buildings.LocalAvatar.CameraRig : null;
-            if (rig != null) rig.BuildControls = !overPanel;
             var pointer = pointAction.action.ReadValue<Vector2>();
             (int X, int Z)? surface = null;
             _pointed = !overPanel && ForcedHover == null ? PointedPiece(pointer, layout, out surface) : null;
@@ -257,12 +286,29 @@ namespace FoodFactoryGame.Session.Buildings
             if (_removePress.HasValue && (!removeAction.action.IsPressed() || overPanel || removalOrder == null
                     || (pointer - _removePress.Value).magnitude > ClickSlop))
                 _removePress = null;
+            if (_sweep != null && !removeAction.action.IsPressed()) _sweep = null;
             if (_removePress.HasValue && RemoveProgress >= 1f)
             {
                 _removePress = null;
-                if (_removeCell.HasValue || _pointed != null) RemoveAt(_removeCell ?? (0, 0), _pointed, _removeCell.HasValue);
+                // The hold's removal, which starts a sweep of the same family while Remove stays held.
+                if (removalOrder != null && removal.Problem == null)
+                {
+                    var key = RemovalKey(removalOrder, out var structure, out var cells);
+                    _sweep = new RemovalSweep { Structure = structure, Last = key, Pointer = pointer };
+                    _sweep.Sent.Add(key);
+                    _sweep.Cells.UnionWith(cells);
+                }
+                Send(removal, removalOrder);
+            }
+            else if (_sweep != null && !overPanel && ForcedHover == null) SweepOver(removal, removalOrder, pointer);
+            var rig = buildings.LocalAvatar != null ? buildings.LocalAvatar.CameraRig : null;
+            if (rig != null)
+            {
+                rig.BuildControls = !overPanel;
+                rig.BuildTiltEnabled = _sweep == null;
             }
             Preview = _removePress.HasValue ? removal
+                : _sweep != null ? removalOrder != null ? removal : new BuildPreview()
                 : _hover.HasValue ? Plan(_dragStart ?? _hover.Value, _hover.Value, out _) : new BuildPreview();
             ShowWheel();
             ShowWorld(true);
@@ -286,13 +332,18 @@ namespace FoodFactoryGame.Session.Buildings
                 }
                 buildings.EditedSiteId = session.ClientSiteId;
                 LastRejection = null;
-                _catalogVersion = -1;
+                _catalogKey = null;
             }
             else
             {
+                _sweep = null;
                 if (rig != null && rig.BuildFocus.HasValue)
                     _rememberedView = (session.ClientSiteId, rig.BuildFocus.Value, rig.BuildDistance, rig.BuildYaw, rig.BuildPitch);
-                if (rig != null) rig.SetBuildView(null, 0f);
+                if (rig != null)
+                {
+                    rig.SetBuildView(null, 0f);
+                    rig.BuildTiltEnabled = true;
+                }
                 buildings.EditedSiteId = null;
                 CancelPending();
                 _dragStart = null;
@@ -368,6 +419,53 @@ namespace FoodFactoryGame.Session.Buildings
         {
             var preview = RemovalPlan(useCell ? cell : null, pieceId, out var order);
             Send(preview, order);
+        }
+
+        // One sweep frame: the thing under the pointer is removed when the pointer has just moved onto it, it is of the sweep's
+        // family, this sweep has not sent it (or, for structure, touched its cells) and the preview finds no problem. A thing that
+        // only appears under a still pointer (what stood under a piece just sold) waits for the pointer to move onto it again.
+        private void SweepOver(BuildPreview removal, object order, Vector2 pointer)
+        {
+            var moved = (pointer - _sweep.Pointer).sqrMagnitude > 0.01f;
+            _sweep.Pointer = pointer;
+            var key = RemovalKey(order, out var structure, out var cells);
+            if (key == _sweep.Last) return;
+            _sweep.Last = key;
+            if (key == null || !moved || structure != _sweep.Structure || removal.Problem != null || _sweep.Sent.Contains(key)
+                || (structure && cells.Any(_sweep.Cells.Contains)))
+                return;
+            _sweep.Sent.Add(key);
+            _sweep.Cells.UnionWith(cells);
+            Send(removal, order);
+        }
+
+        // A stable name for what a removal order takes (a piece by ID; a window by its anchor, a door or wall by its cell), whether
+        // it is structure, and the cells that structure covers; null for no order.
+        private string RemovalKey(object order, out bool structure, out List<(int X, int Z)> cells)
+        {
+            cells = new List<(int X, int Z)>();
+            structure = order is ShellOrder;
+            if (order is string pieceId) return $"piece:{pieceId}";
+            if (order is not ShellOrder { Cells: { Count: > 0 } } shell) return null;
+            var (x, z) = (shell.Cells[0].X, shell.Cells[0].Z);
+            var restaurant = Restaurant;
+            var window = restaurant != null ? SiteGrid.WindowAt(restaurant, x, z) : null;
+            if (window != null)
+            {
+                cells.Add((window.X, window.Z));
+                cells.Add(window.Axis == 0 ? (window.X + 1, window.Z) : (window.X, window.Z + 1));
+                return $"window:{window.X},{window.Z}";
+            }
+            cells.Add((x, z));
+            return restaurant != null && SiteGrid.IsDoor(restaurant, x, z) ? $"door:{x},{z}" : $"wall:{x},{z}";
+        }
+
+        // The panel never keeps keyboard focus: Navigate (WASD and the arrows, shared with Move) would otherwise step a focused
+        // scroller or card list while the camera pans.
+        private void ReleasePanelFocus()
+        {
+            if (_window?.focusController?.focusedElement is VisualElement focused && (focused == _window || _window.Contains(focused)))
+                focused.Blur();
         }
 
         private void Send(BuildPreview preview, object order)
@@ -735,7 +833,7 @@ namespace FoodFactoryGame.Session.Buildings
                 _highlights[index].transform.position = SiteGridSpace.FootprintCenter(layout, cells[index].X, cells[index].Z, 1, 1) + Vector3.up * 0.04f;
                 Tint(_highlights[index], color);
             }
-            var offer = shown && Tool == BuildTool.Item && !_removePress.HasValue && _hover.HasValue
+            var offer = shown && Tool == BuildTool.Item && !_removePress.HasValue && _sweep == null && _hover.HasValue
                 ? session.Offers.FirstOrDefault(x => x != null && x.Id == OfferId && x.Equipment != null) : null;
             ShowGhost(offer?.Equipment);
             if (_ghost == null || offer == null) return;
@@ -851,8 +949,7 @@ namespace FoodFactoryGame.Session.Buildings
             _cash = root.Part<Label>("build-cash");
             _ambience = root.Part<Label>("build-ambience");
             _tools = root.Part("build-tools");
-            _stylesHeading = root.Part<Label>("build-styles-heading");
-            _styles = root.Part("build-styles");
+            _filters = root.Part("build-filters");
             _catalog = root.Part("build-catalog");
             _preview = root.Part<Label>("build-preview");
             _status = root.Part<Label>("build-status");
@@ -863,13 +960,24 @@ namespace FoodFactoryGame.Session.Buildings
                 var chosen = tool;
                 _tools.Part<Button>(ToolName(tool)).clicked += () => SelectTool(chosen);
             }
+            // The catalog scrolls by the pointer only: no part of it takes keyboard focus, and Navigate (WASD and the arrows, shared
+            // with Move) is stopped before it reaches the panel, so panning the camera never scrolls the list.
+            var scroll = root.Part<ScrollView>("build-catalog-scroll");
+            foreach (var part in new VisualElement[] { scroll, scroll.contentContainer, scroll.verticalScroller, scroll.verticalScroller.slider,
+                         scroll.horizontalScroller, scroll.horizontalScroller.slider })
+                part.focusable = false;
+            _window.RegisterCallback<NavigationMoveEvent>(evt =>
+            {
+                _window.focusController?.IgnoreEvent(evt);
+                evt.StopImmediatePropagation();
+            }, TrickleDown.TrickleDown);
             // The hold-to-remove wheel: a ring that fills clockwise from the top as Remove is held.
             _holdWheel = root.Part("build-hold-wheel");
             _holdWheel.generateVisualContent += DrawWheel;
         }
 
-        // The tool chips in Build.uxml, named build-tool-<tool>.
-        private static readonly BuildTool[] Tools = { BuildTool.Sell, BuildTool.Wall, BuildTool.Door, BuildTool.BackDoor, BuildTool.Window, BuildTool.Finish };
+        // The tool chips in Build.uxml, named build-tool-<tool>; structure is chosen from catalog cards.
+        private static readonly BuildTool[] Tools = { BuildTool.Sell };
 
         private static string ToolName(BuildTool tool) => $"build-tool-{tool.ToString().ToLowerInvariant()}";
 
@@ -920,9 +1028,10 @@ namespace FoodFactoryGame.Session.Buildings
                 _shownTools = key;
                 FillTools();
             }
-            if (_catalogVersion != session.Offers.Count)
+            var catalogKey = $"{session.Offers.Count}|{PricePercent()}|{Filter}";
+            if (_catalogKey != catalogKey)
             {
-                _catalogVersion = session.Offers.Count;
+                _catalogKey = catalogKey;
                 FillCatalog();
             }
             var preview = Preview;
@@ -938,88 +1047,73 @@ namespace FoodFactoryGame.Session.Buildings
 
         // What to do next, while nothing is previewed.
         private string Hint() => Tool == BuildTool.None
-            ? "Pick a tool or an item. Hold right click on something to sell or remove it."
+            ? "Pick an item from the catalog. Hold right click on something to sell or remove it, then keep holding and sweep to remove more."
             : "Click to place, drag to draw. R rotates; X clears.";
 
-        // Lights the chosen tool, lists the chosen tool's styles (amber when chosen) and marks the chosen catalog card.
+        // Lights the chosen tool and marks the chosen catalog card (a structure style or an offer).
         private void FillTools()
         {
             foreach (var tool in Tools) _tools.Part(ToolName(tool)).EnableInClassList("ff-chip--chosen", Tool == tool);
-            _styles.Clear();
-            var styles = Tool switch
-            {
-                BuildTool.Wall or BuildTool.Finish => GoodsWorld.WallStyles,
-                BuildTool.Door or BuildTool.BackDoor => GoodsWorld.DoorStyles,
-                BuildTool.Window => GoodsWorld.WindowStyles,
-                _ => Array.Empty<string>()
-            };
-            _stylesHeading.Show(styles.Any());
-            foreach (var style in styles)
-            {
-                var chosen = style;
-                var chip = new Button(() => SelectTool(Tool, chosen)) { name = $"build-style-{style}", text = Name(style), focusable = false };
-                chip.AddToClassList("ff-button");
-                chip.AddToClassList("ff-chip");
-                chip.EnableInClassList("ff-chip--chosen", Style == style);
-                _styles.Add(chip);
-            }
             foreach (var row in _catalog.Query<VisualElement>(className: "build-item").ToList())
-                row.EnableInClassList("build-item--chosen", (string)row.userData == OfferId);
+                row.EnableInClassList("build-item--chosen", row.userData is BuildCatalogEntry entry && IsChosen(entry));
         }
 
+        private bool IsChosen(BuildCatalogEntry entry) => entry.Tool == BuildTool.Item
+            ? Tool == BuildTool.Item && OfferId == entry.OfferId
+            : entry.Tool != BuildTool.None && Tool == entry.Tool && Style == entry.Style;
+
+        // The filter chips (All, then each category with cards) and the cards of the chosen filter under their headings.
         private void FillCatalog()
         {
-            _catalog.Clear();
-            var offers = session.Offers.Where(x => x != null && x.Equipment != null && x.Truck == null).ToList();
-            foreach (var section in Sections.Append(EquipmentSection))
+            _entries = BuildCatalog.Entries(session.Offers, session.Items, Name, PricePercent());
+            if (Filter != BuildCatalogFilter.All && _entries.All(x => x.Filter != Filter)) Filter = BuildCatalogFilter.All;
+            _filters.Clear();
+            foreach (var filter in BuildCatalog.Filters)
             {
-                var inSection = offers.Where(x => (string.IsNullOrEmpty(x.Equipment.Category) ? EquipmentSection : x.Equipment.Category) == section).ToList();
-                if (inSection.Count == 0) continue;
-                var heading = new Label(section) { pickingMode = PickingMode.Ignore };
-                heading.AddToClassList("build-section");
-                heading.EnableInClassList("build-section--first", _catalog.childCount == 0);
-                _catalog.Add(heading);
-                foreach (var offer in inSection)
-                {
-                    var id = offer.Id;
-                    // The whole card picks the item.
-                    var row = UiTemplates.Clone("Build/BuildCatalogItem");
-                    row.name = $"build-item-{offer.Id}";
-                    row.userData = offer.Id;
-                    var icon = row.Part("icon");
-                    icon.SetIcon(offer.Equipment.Icon, "");
-                    icon.EnableInClassList("ff-icon--empty", offer.Equipment.Icon == null);
-                    row.Part<Label>("title").text = offer.Equipment.DisplayName;
-                    row.Part<Label>("price").text = PlayerHud.FormatCash(offer.PriceCents);
-                    row.RegisterCallback<ClickEvent>(_ => SelectOffer(id));
-                    _catalog.Add(row);
-                }
+                if (filter != BuildCatalogFilter.All && _entries.All(x => x.Filter != filter)) continue;
+                var chosen = filter;
+                var chip = new Button(() => SelectFilter(chosen)) { name = BuildCatalog.FilterElementName(filter), text = BuildCatalog.FilterName(filter), focusable = false };
+                chip.AddToClassList("ff-button");
+                chip.AddToClassList("ff-chip");
+                chip.EnableInClassList("ff-chip--chosen", Filter == filter);
+                _filters.Add(chip);
             }
-            // Belts are goods laid in the world rather than pieces placed here, so their card hands over to the belt cursor.
-            var belts = session.Offers.Where(x => x != null && x.Equipment == null && x.Truck == null && x.ItemId == GoodsWorld.BeltItemId).ToList();
-            if (belts.Count > 0)
+            _catalog.Clear();
+            string section = null;
+            foreach (var entry in _entries.Where(x => BuildCatalog.Matches(x, Filter)))
             {
-                var heading = new Label(BeltSection) { pickingMode = PickingMode.Ignore };
-                heading.AddToClassList("build-section");
-                heading.EnableInClassList("build-section--first", _catalog.childCount == 0);
-                _catalog.Add(heading);
-                var item = session.Items.FirstOrDefault(x => x != null && x.Id == GoodsWorld.BeltItemId);
-                foreach (var offer in belts)
+                if (entry.Section != section)
                 {
-                    var id = offer.Id;
-                    var row = UiTemplates.Clone("Build/BuildCatalogItem");
-                    row.name = $"build-item-{offer.Id}";
-                    row.userData = offer.Id;
-                    var icon = row.Part("icon");
-                    icon.SetIcon(item?.Icon, "");
-                    icon.EnableInClassList("ff-icon--empty", item?.Icon == null);
-                    row.Part<Label>("title").text = $"{item?.DisplayName ?? "Belt"} x{offer.Quantity}";
-                    row.Part<Label>("price").text = PlayerHud.FormatCash(offer.PriceCents);
-                    row.RegisterCallback<ClickEvent>(_ => interaction.LayBelts(id));
-                    _catalog.Add(row);
+                    section = entry.Section;
+                    var heading = new Label(section) { pickingMode = PickingMode.Ignore };
+                    heading.AddToClassList("build-section");
+                    heading.EnableInClassList("build-section--first", _catalog.childCount == 0);
+                    _catalog.Add(heading);
                 }
+                _catalog.Add(Card(entry));
             }
             _shownTools = null;
+        }
+
+        // One catalog card; the whole card picks it. Belts are goods laid in the world rather than pieces placed here, so their
+        // card hands over to the belt cursor.
+        private VisualElement Card(BuildCatalogEntry entry)
+        {
+            var row = UiTemplates.Clone("Build/BuildCatalogItem");
+            row.name = BuildCatalog.CardName(entry.Key);
+            row.userData = entry;
+            var icon = row.Part("icon");
+            icon.SetIcon(entry.Icon, "");
+            icon.EnableInClassList("ff-icon--empty", entry.Icon == null);
+            row.Part<Label>("title").text = entry.Title;
+            row.Part<Label>("price").text = entry.PriceCents == 0 ? "Free" : PlayerHud.FormatCash(entry.PriceCents) + entry.PriceSuffix;
+            row.RegisterCallback<ClickEvent>(_ =>
+            {
+                if (entry.IsBelt) interaction.LayBelts(entry.OfferId);
+                else if (entry.Tool == BuildTool.Item) SelectOffer(entry.OfferId);
+                else SelectTool(entry.Tool, entry.Style);
+            });
+            return row;
         }
     }
 }

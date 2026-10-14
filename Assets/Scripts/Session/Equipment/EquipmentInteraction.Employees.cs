@@ -307,7 +307,11 @@ namespace FoodFactoryGame.Session.Equipment
             if (alsoKeep.Length > 0) keep = keep.Append(placeAction.action).ToArray();
             // E closes the script screen too, unless a text box has focus (Interact checks ScriptTextFocused), and picks the
             // target under the crosshair while picking.
-            if (Screen is InteractionScreen.Employee or InteractionScreen.PickPosition) keep = keep.Append(inventoryAction.action).ToArray();
+            if (Screen is InteractionScreen.Employee or InteractionScreen.PickPosition)
+            {
+                keep = keep.Append(inventoryAction.action).ToArray();
+                if (InteractAction != null) keep = keep.Append(InteractAction).ToArray();
+            }
             foreach (var action in placeAction.action.actionMap.actions
                          .Where(x => x.enabled && !keep.Contains(x) && !alsoKeep.Contains(x.name)))
             {

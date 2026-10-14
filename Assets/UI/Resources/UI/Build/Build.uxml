@@ -1,6 +1,7 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
-    <!-- Restaurant build mode's panel (decision 0034): a window on the right with cash and ambience, the tools, the styles for the
-         chosen tool, the catalog (BuildCatalogItem.uxml per offer), the preview line and Leave; and the hold-to-remove wheel. -->
+    <!-- Restaurant build mode's panel (decision 0034): a window on the right with cash and ambience, the Sell tool, the catalog
+         filter chips (BuildMode fills them, All first) and the one catalog of walls, doors, windows, finishes, equipment and belts
+         (BuildCatalogItem.uxml per card), the preview line and Leave; and the hold-to-remove wheel. -->
     <Style src="project://database/Assets/UI/Theme/Theme.uss" />
     <Style src="Build.uss" />
     <ui:VisualElement name="build-root" class="ff-root ff-fill" picking-mode="Ignore">
@@ -27,16 +28,10 @@
                 <ui:Label text="TOOLS" class="ff-eyebrow" picking-mode="Ignore" />
                 <ui:VisualElement name="build-tools" class="build__chips">
                     <ui:Button name="build-tool-sell" text="Sell / remove" focusable="false" class="ff-button ff-chip" />
-                    <ui:Button name="build-tool-wall" text="Wall" focusable="false" class="ff-button ff-chip" />
-                    <ui:Button name="build-tool-door" text="Door" focusable="false" class="ff-button ff-chip" />
-                    <ui:Button name="build-tool-backdoor" text="Back door" focusable="false" class="ff-button ff-chip" />
-                    <ui:Button name="build-tool-window" text="Window" focusable="false" class="ff-button ff-chip" />
-                    <ui:Button name="build-tool-finish" text="Wall finish" focusable="false" class="ff-button ff-chip" />
                 </ui:VisualElement>
-                <ui:Label name="build-styles-heading" text="STYLE" class="ff-eyebrow build__heading" picking-mode="Ignore" />
-                <ui:VisualElement name="build-styles" class="build__chips" />
                 <ui:Label text="CATALOG" class="ff-eyebrow build__heading build__heading--catalog" picking-mode="Ignore" />
-                <ui:ScrollView name="build-catalog-scroll" mode="Vertical" horizontal-scroller-visibility="Hidden" class="ff-scroll build__catalog">
+                <ui:VisualElement name="build-filters" class="build__chips build__filters" />
+                <ui:ScrollView name="build-catalog-scroll" mode="Vertical" horizontal-scroller-visibility="Hidden" focusable="false" class="ff-scroll build__catalog">
                     <ui:VisualElement name="build-catalog" />
                 </ui:ScrollView>
             </ui:VisualElement>

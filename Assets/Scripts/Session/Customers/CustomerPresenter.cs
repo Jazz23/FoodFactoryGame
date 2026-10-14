@@ -5,7 +5,9 @@
 // to whichever restaurants are nearest the camera. Figures first appear, and figures that lose their place leave, out of the
 // local camera's view. On a drawn site figures walk the site's open cells (SiteWalk), so they come in through a door, queue back
 // from the register's service spot along the way in, and only fall back to the NavMesh where no cell path exists; a figure on
-// the move opens restaurant doors (DoorOpener), one standing or seated does not.
+// the move opens restaurant doors (DoorOpener), one standing or seated does not. Each figure's character model is picked from
+// CharacterFigures by its customer ID. The presenter also drives the ambient street pedestrians (Logistics.AmbientPedestrians),
+// which share its figure prefab and never represent any record.
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -22,7 +24,6 @@ namespace FoodFactoryGame.Session.Customers
     {
         private static readonly int SpeedParameter = Animator.StringToHash("Speed");
         private static readonly int WalkRateParameter = Animator.StringToHash("WalkRate");
-        private static readonly int BaseColor = Shader.PropertyToID("_BaseColor");
         private const float WalkSpeed = 2f;
         // New figures appear only for travelling customers this close to arriving (the server sends crowds on the same rule).
         private const long ArrivalWindowSeconds = GoodsWorld.CrowdTravelSeconds;
@@ -39,6 +40,9 @@ namespace FoodFactoryGame.Session.Customers
         private SitePlacement _frontagePlacement;
         private float _nextRefresh;
         private DrawnSites _bound;
+        private Logistics.AmbientPedestrians _ambient;
+        private GoodsSnapshot _clockBaseline;
+        private float _clockReceivedAt;
 
         private sealed class Visual
         {
@@ -127,6 +131,29 @@ namespace FoodFactoryGame.Session.Customers
                 }
             }
             foreach (var id in _remove) _visuals.Remove(id);
+            _ambient ??= new Logistics.AmbientPedestrians(transform);
+            _ambient.Tick(customerPrefab, Clock(drawn), Belts.BeltPresenter.ViewCamera());
+        }
+
+        // The world clock the drawn city cars run on (the current site's baseline, run on by at most a little over a second),
+        // so ambient pedestrians cross with the same traffic lights; null with no current site.
+        private double? Clock(DrawnSites drawn)
+        {
+            GoodsSnapshot current = null;
+            var sites = drawn.Sites;
+            for (var i = 0; i < sites.Count; i++)
+                if (sites[i].Current)
+                {
+                    current = sites[i].Snapshot;
+                    break;
+                }
+            if (current == null) return null;
+            if (!ReferenceEquals(current, _clockBaseline))
+            {
+                _clockBaseline = current;
+                _clockReceivedAt = Time.time;
+            }
+            return current.ClockSeconds + Mathf.Min(Time.time - _clockReceivedAt, 1.25f);
         }
 
         private void Refresh(DrawnSites drawn)
@@ -302,10 +329,11 @@ namespace FoodFactoryGame.Session.Customers
                 if (!TryStreet(candidate.Frontage, camera, candidate.Id, out spawn)) return null;
             }
             else if (!TryEdge(candidate.Site.Layout, candidate.Site.Snapshot, camera, candidate.Id, out spawn)) return null;
-            var root = Instantiate(customerPrefab, spawn, Quaternion.identity, transform);
+            // The character model is a pure function of the customer ID, so every client draws the same person.
+            var variant = CharacterFigures.Pick((uint)StableHash(candidate.Id));
+            var root = CharacterFigures.Create(customerPrefab, variant, transform, spawn, Quaternion.identity, out var animator);
             root.name = $"Customer {candidate.Id}";
             Logistics.Pedestrians.Add(root.transform);
-            var animator = root.GetComponentInChildren<Animator>();
             animator.cullingMode = AnimatorCullingMode.CullUpdateTransforms;
             Tint(root, candidate.DistrictId, candidate.Appearance);
             DistanceCulling.Apply(root);
@@ -505,16 +533,14 @@ namespace FoodFactoryGame.Session.Customers
         private static void Tint(GameObject root, string districtId, int appearance)
         {
             var hue = ((StableHash(districtId ?? "") % 100) / 100f + appearance * 0.17f) % 1f;
-            var color = Color.HSVToRGB(hue, 0.5f, 0.85f);
-            var block = new MaterialPropertyBlock();
-            block.SetColor(BaseColor, color);
-            foreach (var renderer in root.GetComponentsInChildren<Renderer>(true))
-                if (renderer.name.Contains("Torso") || renderer.name.Contains("UpperArm") || renderer.name.Contains("Thigh")
-                    || renderer.name.Contains("Shin") || renderer.name.Contains("Pelvis"))
-                    renderer.SetPropertyBlock(block);
+            CharacterFigures.Tint(CharacterFigures.Tinted(root), Color.HSVToRGB(hue, 0.5f, 0.85f));
         }
 
-        private void OnDisable() => Clear();
+        private void OnDisable()
+        {
+            Clear();
+            _ambient?.Clear();
+        }
 
         private void Clear()
         {

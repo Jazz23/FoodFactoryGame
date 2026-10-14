@@ -110,3 +110,20 @@
 .phone-recipe__time { margin-left: 8px; color: var(--ff-accent); -unity-font-style: bold; }
 .phone-recipe__line { margin-top: 6px; white-space: normal; }
 
+/* Order form: the "Repeat order" checkbox (PhonePanel.BuildFarm). */
+.phone-form__repeat { margin-top: 10px; }
+/* Staff app: an employee running its task loop (EmployeeScriptPanel.IsRunning). */
+.phone-staff__running { align-self: flex-start; margin-top: 4px; padding: 1px 8px; border-radius: 9px; background-color: var(--ff-positive); color: #12301B; font-size: 11px; -unity-font-style: bold; }
+/* Recipes app: a machine recipe whose output sells at a register. */
+.phone-recipe__result--sells { color: var(--ff-positive); }
+
+/* Map app: the company's trucks (PhoneMapView.SetTrucks), moved by translate; the icon's centre is the truck's place. Hover or
+   the truck chosen in the Trucks app enlarges it and shows its name. */
+.phone-map-truck { position: absolute; left: 0; top: 0; width: 16px; height: 10px; margin-left: -8px; margin-top: -5px; flex-direction: row; transition-property: scale; transition-duration: 0.08s; }
+.phone-map-truck__body { width: 10px; height: 10px; background-color: #4FC46A; border-width: 1px; border-color: #FFFFFF; border-radius: 2px; }
+.phone-map-truck__cab { width: 5px; height: 7px; margin-left: 1px; align-self: flex-end; background-color: #4FC46A; border-width: 1px; border-color: #FFFFFF; border-radius: 1px; }
+.phone-map-truck__name { display: none; position: absolute; left: 18px; top: -5px; padding: 1px 5px; border-radius: 4px; background-color: var(--ff-overlay); color: var(--ff-text); font-size: 8px; white-space: nowrap; }
+.phone-map-truck:hover, .phone-map-truck--highlighted { scale: 1.5 1.5; }
+.phone-map-truck:hover > .phone-map-truck__body, .phone-map-truck:hover > .phone-map-truck__cab,
+.phone-map-truck--highlighted > .phone-map-truck__body, .phone-map-truck--highlighted > .phone-map-truck__cab { background-color: var(--ff-accent); }
+.phone-map-truck:hover > .phone-map-truck__name, .phone-map-truck--highlighted > .phone-map-truck__name { display: flex; }

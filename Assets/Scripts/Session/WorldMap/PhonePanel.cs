@@ -3,16 +3,21 @@
 // - Map: the world from above (PhoneMapView) with every lot coloured by what it is and who owns it. Tapping a lot shows its
 //   price, owner and a Buy button (the same server request as PropertyPanel), a rename box for the company's own places and,
 //   for a farm, its type and the goods it sells: choose one, how many packs, delivery (flat fee) or pickup by a parked company
-//   truck, and the dock it goes to, then Order, or Repeat every few game hours. Owning the farm halves the goods price.
+//   truck, and the dock it goes to, then Order now. Owning the farm halves the goods price. A "Repeat order" checkbox
+//   (unchecked by default) shows the "Repeat every N game h" stepper; checked, Order now asks the server for a repeating
+//   order (RequestFarmSchedule) instead of a one-off, keeping the schedule's own rule: its first order is placed at the start
+//   of the next game hour, not at once.
 // - Orders: the company's open farm orders with their trucks' progress, and its repeating orders with Cancel.
-// - Staff: this site's employees with Hire, Fire and Tasks (the employee screen, which returns to the phone on Esc).
+// - Staff: this site's employees with Hire, Fire and Tasks (the employee screen, which returns to the phone on Esc), and a
+//   "Running tasks" badge on each employee whose server record says it runs its task loop (EmployeeScriptPanel.IsRunning).
 // - Trucks: the logistics screen (routes, the fleet, buying trucks, stock at other sites), moved into the phone while this app
 //   is open (LogisticsPanel.Embed), so it is the same screen L opens.
 // - Places: every site of the company with a rename box.
 // - Ledger: the company's latest cash changes (decision 0038), newest first, with its opening and current cash (owner,
 //   2026-10-13: the ledger lives in the phone, not beside the Supplier).
 // - Recipes: every recipe in the game, grouped by the machine that makes it, with its inputs, output and time, then the menu
-//   items registers sell with their price and serving time. Content only, so it is built once.
+//   items registers sell with their price and serving time. A machine recipe's card shows what its output sells for at a
+//   register (a menu item selling that item alone), or that it is not sold there. Content only, so it is built once.
 // Every button is a request the server checks; nothing changes here until the next baseline. The farm types and prices come from
 // the replicated layout (FarmCatalog) and the session's supplier offers, the same content the server uses, so nothing extra is
 // sent. Pages are rebuilt only when what they list changes; their live text and button states refresh every frame, so a click
@@ -96,6 +101,8 @@ namespace FoodFactoryGame.Session.WorldMap
         public string TruckId { get; private set; }
         public string DockId { get; private set; }
         public int EveryHours { get; private set; } = 4;
+        // "Repeat order" is checked: Order now creates a repeating order instead of a one-off.
+        public bool Repeat { get; private set; }
         public string LastRejection { get; private set; }
         public string LastAccepted { get; private set; }
         public bool HasPendingRequests => _pending.Count > 0;
@@ -219,6 +226,7 @@ namespace FoodFactoryGame.Session.WorldMap
             _mapView.SelectedLotId = lotId;
             GoodOfferId = null;
             Packs = 1;
+            Repeat = false;
             LastRejection = null;
             LastAccepted = null;
             _mapView.MarkDirtyRepaint();
@@ -243,6 +251,7 @@ namespace FoodFactoryGame.Session.WorldMap
 
         public void SetPacks(int packs) => Packs = Mathf.Clamp(packs, 1, GoodsWorld.MaxFarmOrderPacks);
         public void SetEveryHours(int hours) => EveryHours = Mathf.Clamp(hours, 1, GoodsWorld.MaxFarmScheduleHours);
+        public void SetRepeat(bool repeat) => Repeat = repeat;
 
         public void SetPickup(bool pickup)
         {
@@ -273,21 +282,17 @@ namespace FoodFactoryGame.Session.WorldMap
             bridge.RequestBuyProperty(request, _subscription.SiteId, offer.LotId);
         }
 
-        // Orders the form's packs from the selected farm (decision 0047).
+        // Orders the form's packs from the selected farm (decision 0047): once, or, with "Repeat order" checked, as a repeating
+        // order every EveryHours game hours whose first order the server places at the start of the next game hour.
         public void Order()
         {
             var bridge = _subscription?.Bridge;
             var offer = SelectedOffer;
             if (bridge == null || offer == null || GoodOfferId == null || DockId == null || (Pickup && TruckId == null)) return;
-            bridge.RequestFarmOrder(Track($"Ordered {Packs} x {GoodName(GoodOfferId)}."), offer.LotId, GoodOfferId, Packs, DockId, Pickup ? TruckId : "");
-        }
-
-        public void Schedule()
-        {
-            var bridge = _subscription?.Bridge;
-            var offer = SelectedOffer;
-            if (bridge == null || offer == null || GoodOfferId == null || DockId == null || (Pickup && TruckId == null)) return;
-            bridge.RequestFarmSchedule(Track($"Repeating every {EveryHours} h."), offer.LotId, GoodOfferId, Packs, DockId, Pickup ? TruckId : "", EveryHours);
+            if (Repeat)
+                bridge.RequestFarmSchedule(Track($"Repeating {Packs} x {GoodName(GoodOfferId)} every {EveryHours} h; the first order comes at the next game hour."),
+                    offer.LotId, GoodOfferId, Packs, DockId, Pickup ? TruckId : "", EveryHours);
+            else bridge.RequestFarmOrder(Track($"Ordered {Packs} x {GoodName(GoodOfferId)}."), offer.LotId, GoodOfferId, Packs, DockId, Pickup ? TruckId : "");
         }
 
         public void CancelSchedule(string scheduleId) => _subscription?.Bridge?.RequestCancelFarmSchedule(Track("Repeating order cancelled."), scheduleId);
@@ -473,7 +478,7 @@ namespace FoodFactoryGame.Session.WorldMap
         {
             var text = new StringBuilder(SelectedLotId ?? "-");
             text.Append('|').Append(Primary.Properties.FirstOrDefault(x => x.LotId == SelectedLotId)?.CompanyId);
-            text.Append('|').Append(GoodOfferId).Append('|').Append(Pickup).Append('|').Append(_farmKinds.Count);
+            text.Append('|').Append(GoodOfferId).Append('|').Append(Pickup).Append('|').Append(Repeat).Append('|').Append(_farmKinds.Count);
             if (SelectedOffer is { } offer) text.Append('|').Append(SiteName(offer.SiteId));
             return text.ToString();
         }
@@ -562,22 +567,28 @@ namespace FoodFactoryGame.Session.WorldMap
             form.Add(mode);
             if (Pickup) form.Add(Stepper("Truck", () => TruckName(TruckId), CycleTruck, "truck"));
             form.Add(Stepper("Deliver to", () => DockName(DockId), CycleDock, "dock"));
-            form.Add(Live(Text("", "phone-form__total"), () => $"Total {PlayerHud.FormatCash(OrderCents())}"
-                + (Pickup ? "  ·  your truck drives to the farm" : "  ·  a farm truck brings it")));
+            var repeat = new Toggle("Repeat order") { name = "phone-repeat", focusable = false };
+            repeat.AddToClassList("ff-toggle");
+            repeat.AddToClassList("phone-form__repeat");
+            repeat.SetValueWithoutNotify(Repeat);
+            repeat.RegisterValueChangedCallback(evt => SetRepeat(evt.newValue));
+            form.Add(repeat);
+            if (Repeat) form.Add(Stepper("Repeat every", () => $"{EveryHours} game h", step => SetEveryHours(EveryHours + step), "hours"));
+            form.Add(Live(Text("", "phone-form__total"), () => (Repeat ? "Each order " : "Total ") + PlayerHud.FormatCash(OrderCents())
+                + (Pickup ? "  ·  your truck drives to the farm" : "  ·  a farm truck brings it")
+                + (Repeat ? $"  ·  every {EveryHours} game h from the next game hour" : "")));
             var order = Button("Order now", Order, "ff-button--primary", "phone-form__submit");
             order.name = "phone-order";
             Enabled(order, CanOrder);
             form.Add(order);
-            form.Add(Stepper("Repeat every", () => $"{EveryHours} game h", step => SetEveryHours(EveryHours + step), "hours"));
-            var schedule = Button("Repeat this order", Schedule, "phone-form__submit");
-            schedule.name = "phone-schedule";
-            Enabled(schedule, () => !HasPendingRequests && Docks().Any(x => x.Id == DockId) && (!Pickup || TruckId != null));
-            form.Add(schedule);
             _detail.Add(form);
         }
 
+        // A one-off order needs the cash now; a repeating one is paid as each order is placed, so it needs only a valid dock and,
+        // for a pickup, a chosen truck (the server checks both).
         public bool CanOrder() => !HasPendingRequests && Company != null && Docks().Any(x => x.Id == DockId)
-            && (!Pickup || ParkedTrucks().Any(x => x.Id == TruckId)) && Company.Cash >= OrderCents();
+            && (Repeat ? !Pickup || TruckId != null
+                : (!Pickup || ParkedTrucks().Any(x => x.Id == TruckId)) && Company.Cash >= OrderCents());
 
         private string OrdersSignature(GoodsSnapshot site) =>
             string.Join("|", site.FarmOrders.Select(x => x.Id)) + "#" + string.Join("|", site.FarmSchedules.Select(x => x.Id));
@@ -637,8 +648,10 @@ namespace FoodFactoryGame.Session.WorldMap
                 + (string.IsNullOrEmpty(schedule.LastProblem) ? "" : $"  ·  last time: {schedule.LastProblem}");
         }
 
+        // Includes each employee's running state, so its badge appears or goes as soon as the server's record changes.
         private string StaffSignature(GoodsSnapshot site) =>
-            Session.ClientSiteId + "#" + string.Join("|", site.Employees.Select(x => x.Id + "/" + x.Name)) + "#" + Company?.Id;
+            Session.ClientSiteId + "#" + string.Join("|", site.Employees.Select(x => x.Id + "/" + x.Name + "/" + EmployeeScriptPanel.IsRunning(site, x.Id)))
+            + "#" + Company?.Id;
 
         private void BuildStaff()
         {
@@ -663,6 +676,12 @@ namespace FoodFactoryGame.Session.WorldMap
                 fire.name = "phone-fire-" + id;
                 Enabled(fire, () => !interaction.HasPendingRequests && !Holding(id));
                 var row = Row(employee.Name, () => EmployeeStatus(id), tasks);
+                if (EmployeeScriptPanel.IsRunning(site, id))
+                {
+                    var running = Text("Running tasks", "phone-staff__running");
+                    running.name = "phone-running-" + id;
+                    row.Q(className: "phone-row__text").Add(running);
+                }
                 row.Add(fire);
                 _staff.Add(row);
             }
@@ -747,6 +766,7 @@ namespace FoodFactoryGame.Session.WorldMap
         {
             _recipes.Clear();
             var recipes = Session.Recipes.Where(x => x != null).ToList();
+            var sales = SaleValues(recipes);
             foreach (var machine in recipes.Where(x => !x.IsSale).GroupBy(x => x.StationKind).OrderBy(x => MachineName(x.Key)))
             {
                 _recipes.Add(Text(MachineName(machine.Key).ToUpperInvariant(), "ff-eyebrow", "phone__heading"));
@@ -754,8 +774,12 @@ namespace FoodFactoryGame.Session.WorldMap
                 grid.AddToClassList("phone-recipes__grid");
                 foreach (var recipe in machine.OrderBy(x => x.DisplayName))
                 {
-                    var made = recipe.OutputQuantity > 1 ? $"{recipe.OutputQuantity} x {ItemName(recipe.OutputItemId)}" : ItemName(recipe.OutputItemId);
-                    grid.Add(RecipeCard(recipe, recipe.OutputItemId, "Makes " + made));
+                    var sells = sales.TryGetValue(recipe.OutputItemId ?? "", out var cents);
+                    var value = sells ? $"Sells for {PlayerHud.FormatCash(cents)}{(recipe.OutputQuantity > 1 ? " each" : "")} at a register"
+                        : "Not sold at a register";
+                    var card = RecipeCard(recipe, recipe.OutputItemId, value + (recipe.OutputQuantity > 1 ? $"  ·  makes {recipe.OutputQuantity}" : ""));
+                    card.Q<Label>(className: "phone-recipe__result").EnableInClassList("phone-recipe__result--sells", sells);
+                    grid.Add(card);
                 }
                 _recipes.Add(grid);
             }
@@ -769,7 +793,21 @@ namespace FoodFactoryGame.Session.WorldMap
             _recipes.Add(menuGrid);
         }
 
-        // One recipe: its icon, name and time, what goes in, and what comes out (or what it sells for).
+        // What one unit of an item sells for at a register: the menu items that sell that item alone (one input), per unit,
+        // the best price when several do. Items sold only as part of a combo are left out.
+        private static Dictionary<string, long> SaleValues(IEnumerable<RecipeAsset> recipes)
+        {
+            var values = new Dictionary<string, long>();
+            foreach (var sale in recipes.Where(x => x.IsSale && x.Inputs.Count == 1 && !string.IsNullOrEmpty(x.Inputs[0].itemId)))
+            {
+                var input = sale.Inputs[0];
+                var each = sale.SaleCents / Math.Max(1, input.quantity);
+                if (!values.TryGetValue(input.itemId, out var best) || each > best) values[input.itemId] = each;
+            }
+            return values;
+        }
+
+        // One recipe: its icon, name and time, what goes in, and what its output sells for (or what the menu item sells for).
         private VisualElement RecipeCard(RecipeAsset recipe, string iconItemId, string result)
         {
             var card = new VisualElement { name = "phone-recipe-" + recipe.Id, pickingMode = PickingMode.Ignore };
@@ -792,7 +830,7 @@ namespace FoodFactoryGame.Session.WorldMap
             var inputs = recipe.Inputs.Count == 0 ? "Nothing"
                 : string.Join(" + ", recipe.Inputs.Select(x => x.quantity > 1 ? $"{x.quantity} x {ItemName(x.itemId)}" : ItemName(x.itemId)));
             card.Add(Text("Needs " + inputs, "ff-small", "phone-recipe__line"));
-            card.Add(Text(result, "ff-small", "ff-muted", "phone-recipe__line"));
+            card.Add(Text(result, "ff-small", "ff-muted", "phone-recipe__line", "phone-recipe__result"));
             return card;
         }
 

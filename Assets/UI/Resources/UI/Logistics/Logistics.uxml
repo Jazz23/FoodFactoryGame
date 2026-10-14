@@ -14,7 +14,7 @@
                     <ui:VisualElement class="ff-glyph ff-glyph--close ff-glyph--sm" />
                 </ui:Button>
             </ui:VisualElement>
-            <ui:ScrollView mode="Vertical" horizontal-scroller-visibility="Hidden" class="ff-scroll logi__scroll">
+            <ui:ScrollView name="logistics-scroll" mode="Vertical" horizontal-scroller-visibility="Hidden" class="ff-scroll logi__scroll">
                 <ui:VisualElement class="ff-row logi__columns">
                     <ui:VisualElement class="logi__column logi__column--routes">
                         <ui:Label text="ROUTES" class="ff-eyebrow logi__heading" picking-mode="Ignore" />

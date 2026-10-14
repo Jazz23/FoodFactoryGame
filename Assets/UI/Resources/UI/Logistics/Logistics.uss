@@ -37,3 +37,11 @@
 .logi-stock__label { font-size: 12px; }
 .logi-stock__move { min-width: 64px; height: 26px; }
 .logi-stock__none { font-size: 12px; color: var(--ff-muted); }
+
+/* Trucks: what each truck is doing, where it goes, its route; the one chosen on the phone map is outlined. */
+.logi-card--selected { border-color: var(--ff-accent); border-width: 2px; }
+.logi-card__line { color: var(--ff-text-soft); }
+.logi-card__sell { margin-left: 6px; }
+.logi-card__sell-note { color: var(--ff-muted); }
+.logi-card__confirm { margin-top: 6px; padding: 6px 8px; }
+.logi-card__keep { margin-left: 6px; }

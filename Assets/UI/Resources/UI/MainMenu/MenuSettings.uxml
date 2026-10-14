@@ -24,7 +24,7 @@
                         <ui:Label text="Sensitivity" class="ff-grow menu-sensitivity__caption" picking-mode="Ignore" />
                         <ui:Label name="menu-sensitivity-value" class="menu-sensitivity__value" picking-mode="Ignore" />
                     </ui:VisualElement>
-                    <ui:Slider name="menu-sensitivity" class="ff-slider menu-sensitivity__slider" />
+                    <ui:Slider name="menu-sensitivity" low-value="0.1" high-value="3" value="1" focusable="false" class="ff-slider menu-sensitivity__slider" />
                     <ui:VisualElement class="ff-row menu-sensitivity__scale" picking-mode="Ignore">
                         <ui:Label name="menu-sensitivity-min" class="ff-tiny ff-grow" picking-mode="Ignore" />
                         <ui:Label name="menu-sensitivity-max" class="ff-tiny" picking-mode="Ignore" />
@@ -34,22 +34,22 @@
                     <ui:Label text="SOUND" class="ff-eyebrow" picking-mode="Ignore" />
                     <ui:VisualElement class="ff-row menu-volume__row">
                         <ui:Label text="Master" class="menu-sensitivity__caption menu-volume__caption" picking-mode="Ignore" />
-                        <ui:Slider name="menu-volume-master" class="ff-slider ff-grow menu-volume__slider" />
+                        <ui:Slider name="menu-volume-master" low-value="0" high-value="1" value="1" focusable="false" class="ff-slider ff-grow menu-volume__slider" />
                         <ui:Label name="menu-volume-master-value" class="menu-sensitivity__value menu-volume__value" picking-mode="Ignore" />
                     </ui:VisualElement>
                     <ui:VisualElement class="ff-row menu-volume__row">
                         <ui:Label text="Effects" class="menu-sensitivity__caption menu-volume__caption" picking-mode="Ignore" />
-                        <ui:Slider name="menu-volume-effects" class="ff-slider ff-grow menu-volume__slider" />
+                        <ui:Slider name="menu-volume-effects" low-value="0" high-value="1" value="1" focusable="false" class="ff-slider ff-grow menu-volume__slider" />
                         <ui:Label name="menu-volume-effects-value" class="menu-sensitivity__value menu-volume__value" picking-mode="Ignore" />
                     </ui:VisualElement>
                     <ui:VisualElement class="ff-row menu-volume__row">
                         <ui:Label text="Interface" class="menu-sensitivity__caption menu-volume__caption" picking-mode="Ignore" />
-                        <ui:Slider name="menu-volume-interface" class="ff-slider ff-grow menu-volume__slider" />
+                        <ui:Slider name="menu-volume-interface" low-value="0" high-value="1" value="1" focusable="false" class="ff-slider ff-grow menu-volume__slider" />
                         <ui:Label name="menu-volume-interface-value" class="menu-sensitivity__value menu-volume__value" picking-mode="Ignore" />
                     </ui:VisualElement>
                     <ui:VisualElement class="ff-row menu-volume__row">
                         <ui:Label text="Ambience" class="menu-sensitivity__caption menu-volume__caption" picking-mode="Ignore" />
-                        <ui:Slider name="menu-volume-ambience" class="ff-slider ff-grow menu-volume__slider" />
+                        <ui:Slider name="menu-volume-ambience" low-value="0" high-value="1" value="1" focusable="false" class="ff-slider ff-grow menu-volume__slider" />
                         <ui:Label name="menu-volume-ambience-value" class="menu-sensitivity__value menu-volume__value" picking-mode="Ignore" />
                     </ui:VisualElement>
                 </ui:VisualElement>

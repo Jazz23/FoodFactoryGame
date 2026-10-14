@@ -20,6 +20,8 @@
 // Docked; others wait their turn in ID order; a truck with nothing it can load or unload lets go of it) and is usable only while a walkable path reaches it from the lot's street edge
 // (PROTOTYPE dock rule). The truck arrives from the street after the abstract trip time and goods move at its LoadUnitsPerSecond
 // (PROTOTYPE transfer rate). Docks on other sites (warehouses, factories) keep the rules above.
+// Selling (PROTOTYPE proposal, SellTruck): an empty fleet truck that serves no farm order is sold back for TruckResalePercent of
+// its model's list price; a truck with cargo is refused, so goods are never deleted.
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -372,6 +374,67 @@ namespace FoodFactoryGame.Goods
         public GoodsOutcome AssignTruckDurably(string playerId, string requestId, string truckId, string routeId, string savePath)
         {
             return Commit(playerId, requestId, savePath, () => AssignTruck(playerId, requestId, truckId, routeId));
+        }
+
+        // PROTOTYPE (proposal; the GDD states no truck resale rule): a fleet truck sells back for this share of its model's list
+        // price. Restaurant equipment refunds in full (decision 0034), but a vehicle is not part of a restaurant.
+        public const int TruckResalePercent = 50;
+
+        // The truck offer a truck was bought from: the same stats and its name "<offer name> <n>" (a bought truck keeps copies of
+        // its offer's stats, not the offer's ID; snapshot schema unchanged). The longest matching name wins, then the lowest ID.
+        // Null when none matches (e.g. a seeded truck of a model that is no longer offered). Shared by the server and screens.
+        public static TruckOffer TruckOfferOf(GoodsTruck truck, IEnumerable<TruckOffer> offers)
+        {
+            if (truck?.Name is null || offers is null) return null;
+            return offers.Where(x => x is not null && !string.IsNullOrEmpty(x.Name) && x.CargoSlots == truck.CargoSlots
+                    && x.SpeedMetresPerSecond == truck.SpeedMetresPerSecond && x.LoadUnitsPerSecond == truck.LoadUnitsPerSecond
+                    && (truck.Name == x.Name || truck.Name.StartsWith(x.Name + " ", StringComparison.Ordinal)))
+                .OrderByDescending(x => x.Name.Length).ThenBy(x => x.Id, StringComparer.Ordinal).FirstOrDefault();
+        }
+
+        // What selling a truck pays: TruckResalePercent of its offer's price, rounded down to whole cents; 0 without an offer.
+        public static long TruckResaleCents(GoodsTruck truck, IEnumerable<TruckOffer> offers) =>
+            TruckOfferOf(truck, offers) is { } offer ? offer.PriceCents * TruckResalePercent / 100 : 0;
+
+        // Null when a truck may be sold now; otherwise why not, in SellTruck's order after the ownership checks. Shared with screens.
+        public static string TruckSaleProblem(GoodsSnapshot state, GoodsTruck truck)
+        {
+            if (truck is null || truck.Supplier) return "forbidden";
+            if (!string.IsNullOrEmpty(truck.OrderId)) return "on-order";
+            return state?.Lots?.Any(x => x.LocationId == truck.CargoLocationId) == true ? "has-cargo" : null;
+        }
+
+        // Volatile primitive for tests. Live request handlers must call SellTruckDurably.
+        // Sells a fleet truck of the requester's company back to the supplier (PROTOTYPE rules, proposal). Checks, in order: identity
+        // and replay; the truck exists, is a fleet truck and the player holds a grant on any site of its company (forbidden); it
+        // serves no farm order (on-order: it finishes the order first); its cargo is empty (has-cargo: goods are never deleted; park
+        // it or let it unload first). An empty truck may be sold wherever it is, parked, on a route or driving: in one mutation it
+        // and its cargo location leave the world, a held restaurant dock is freed, repeating farm orders that name it as their pickup
+        // truck are cancelled, and its company is credited TruckResaleCents. Routes are their own records and stay.
+        public GoodsOutcome SellTruck(string playerId, string requestId, string truckId)
+        {
+            return RouteCommand(playerId, requestId, reject =>
+            {
+                var truck = _state.Trucks.FirstOrDefault(x => x.Id == truckId);
+                if (truck is null || truck.Supplier) return reject("forbidden");
+                var company = _state.Companies.FirstOrDefault(x => x.Id == truck.CompanyId);
+                if (company is null || !company.SiteIds.Any(x => CanView(playerId, x))) return reject("forbidden");
+                var problem = TruckSaleProblem(_state, truck);
+                if (problem is not null) return reject(problem);
+                var offer = TruckOfferOf(truck, _truckOffers.Values);
+                var cents = TruckResaleCents(truck, _truckOffers.Values);
+                _state.FarmSchedules.RemoveAll(x => x.TruckId == truck.Id);
+                _state.Trucks.Remove(truck);
+                _state.Locations.RemoveAll(x => x.Id == truck.CargoLocationId);
+                var siteId = company.SiteIds.Contains(truck.SiteId) ? truck.SiteId : company.SiteIds.FirstOrDefault() ?? "";
+                if (cents > 0) TryCredit(company.Id, cents, new CashNote(LedgerSellBack, siteId, requestId, truck.Id, offerId: offer?.Id));
+                return RecordCents(requestId, playerId, "truck-sold", -cents, truck.Id);
+            });
+        }
+
+        public GoodsOutcome SellTruckDurably(string playerId, string requestId, string truckId, string savePath)
+        {
+            return Commit(playerId, requestId, savePath, () => SellTruck(playerId, requestId, truckId));
         }
 
         // Shared frame of the route commands: identity and replay first. Like purchases, rejections change nothing and are not

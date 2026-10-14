@@ -18,6 +18,9 @@
 // gone, and a refusal (hands not empty, or busy) is shown under the header.
 // An item search box opens its drop-down as soon as it has focus: with no text it lists the items this player touched most
 // recently (EquipmentInteraction.RecentItemRank), then the rest; typing narrows it by name.
+// A "Running tasks" badge beside the status shows while the employee runs its task loop. It reads the server's employee
+// record in the replicated site view (GoodsEmployee.ScriptRunning, not unpaid; IsRunning), never this client's draft, so
+// it is the same running state the phone's Staff app shows.
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -51,6 +54,7 @@ namespace FoodFactoryGame.Session.Employees
         private TextField _source;
         private Label _status;
         private VisualElement _statusDot;
+        private Label _running;
         private VisualElement _hands;
         private string _handsKey;
         private EmployeeWorker _shown;
@@ -90,6 +94,13 @@ namespace FoodFactoryGame.Session.Employees
         public bool Detached => _source != null && (_source.value ?? "") != _draft.ToLua();
         public ScrollView TaskList => _list;
         public VisualElement Hands => _hands;
+        // The running badge; shown while the server's record says the employee runs its task loop.
+        public VisualElement RunningBadge => _running;
+
+        // Whether the server's record says the employee runs its tasks now: its script is set to run and it is not waiting
+        // outside unpaid (an unpaid employee keeps ScriptRunning so the script restarts once paid, but does no work).
+        public static bool IsRunning(GoodsSnapshot site, string employeeId) =>
+            site?.Employees.FirstOrDefault(x => x.Id == employeeId) is { } record && record.ScriptRunning && !record.Unpaid;
 
         private void Start()
         {
@@ -102,6 +113,7 @@ namespace FoodFactoryGame.Session.Employees
             _title = root.Part<Label>("employee-script-title");
             _statusDot = root.Part("employee-script-dot");
             _status = root.Part<Label>("employee-script-status");
+            _running = root.Part<Label>("employee-script-running");
             root.Part<Button>("employee-script-close").clicked += interaction.CloseScreen;
             _renameRow = root.Part("employee-script-rename-row");
             _nameField = root.Part<TextField>("employee-script-name");
@@ -195,6 +207,9 @@ namespace FoodFactoryGame.Session.Employees
             _window.EnableInClassList("emp--failing", failing);
             _statusDot.EnableInClassList("ff-dot--danger", failing);
             _statusDot.EnableInClassList("ff-dot--positive", !failing && status.Length > 0);
+            var running = IsRunning(interaction.Session.ClientSite, employee.EmployeeId);
+            _running.Show(running);
+            _window.EnableInClassList("emp--running", running);
         }
 
         // Sends the Lua draft to the server with the task list it came from. Public so tests drive the same path as the button.

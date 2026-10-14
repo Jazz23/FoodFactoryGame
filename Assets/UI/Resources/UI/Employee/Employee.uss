@@ -8,6 +8,18 @@
 .emp__state { margin-top: 4px; }
 .emp__status { margin-left: 6px; flex-shrink: 1; font-size: 12px; color: var(--ff-text-soft); }
 .emp--failing .emp__status { color: var(--ff-danger-text); }
+/* The running badge beside the status, shown while the employee runs its task loop. */
+.emp__running {
+    display: none;
+    margin-left: 10px;
+    padding: 1px 8px;
+    flex-shrink: 0;
+    border-radius: 9px;
+    background-color: var(--ff-positive);
+    color: #12301B;
+    font-size: 11px;
+    -unity-font-style: bold;
+}
 .emp__close { margin-left: 14px; align-self: flex-start; }
 
 /* Rename and Fire beside the close button; the rename row opens under the name. */

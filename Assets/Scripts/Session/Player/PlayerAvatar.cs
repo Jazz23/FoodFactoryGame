@@ -52,6 +52,9 @@ namespace FoodFactoryGame.Session.Player
             if (IsOwner)
             {
                 Audio.GameAudio.InWorld = true;
+                // Drawn vehicles shove this client's own player aside when they drive into it (presentation only).
+                if (!TryGetComponent<Logistics.VehicleBump>(out var bump)) bump = gameObject.AddComponent<Logistics.VehicleBump>();
+                bump.Bind(controller);
                 moveAction.action.Enable();
                 jumpAction.action.Enable();
                 sprintAction.action.Enable();

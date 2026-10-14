@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading.Tasks;
 using FishNet.Connection;
 using FishNet.Object;
 using FoodFactoryGame.Goods;
@@ -30,6 +31,11 @@ namespace FoodFactoryGame.Goods.Network
         private float _statsRemainder;
         private string _savePath;
         private bool _persistenceFailed;
+        // The periodic clock-tick commit runs on a worker thread (it serializes and writes the whole world, tens of ms, which
+        // stalled a frame every ten seconds). The world's own lock still orders it against every command, so at most one is
+        // in flight and a command that saves first turns it into a no-op. Null when none is pending.
+        private Task<bool> _pendingCommit;
+        private long _pendingCommitSeconds;
 
         // TEST-ONLY: simulated seconds per real second on the server (1 in the game). Tests that only wait on the clock (bakes,
         // customers, trucks) raise it to finish sooner; the rules are unchanged because a step of several seconds equals that
@@ -127,6 +133,7 @@ namespace FoodFactoryGame.Goods.Network
         // A clean stop saves ticks not yet committed; only a crash loses them.
         private void CloseSave()
         {
+            FinishPendingCommit(true);
             if (_world != null && _savePath != null && !_world.TryCommitDurably(_savePath))
                 Debug.LogWarning("[Goods] Could not save the last clock ticks while stopping; the save keeps its previous revision.");
             GoodsSnapshotStore.Release(_savePath);
@@ -135,6 +142,7 @@ namespace FoodFactoryGame.Goods.Network
         private void Update()
         {
             if (!IsServerStarted || _world == null) return;
+            FinishPendingCommit(false);
             // Decision 0012 measurement: one summary line a minute of what world commits cost.
             _statsRemainder += Time.unscaledDeltaTime;
             if (_statsRemainder >= StatsIntervalSeconds)
@@ -162,9 +170,38 @@ namespace FoodFactoryGame.Goods.Network
             }
             _clockRemainder -= seconds;
             _uncommittedSeconds += seconds;
-            if (_uncommittedSeconds >= CommitIntervalSeconds) TryCommit();
+            // Clients are told first, so this frame's views do not wait on the world lock the background commit holds.
             Broadcast();
             SendCrowds();
+            if (_uncommittedSeconds >= CommitIntervalSeconds) BeginCommit();
+        }
+
+        // Starts the periodic commit on a worker thread unless one is still running.
+        private void BeginCommit()
+        {
+            if (_pendingCommit != null) return;
+            var world = _world;
+            var path = _savePath;
+            _pendingCommitSeconds = _uncommittedSeconds;
+            _pendingCommit = Task.Run(() => world.TryCommitDurably(path));
+        }
+
+        // Collects a finished background commit (or waits for it when wait is true): a failure pauses the clock and commands
+        // exactly as a failed foreground commit does.
+        private void FinishPendingCommit(bool wait)
+        {
+            var pending = _pendingCommit;
+            if (pending == null || (!wait && !pending.IsCompleted)) return;
+            _pendingCommit = null;
+            bool saved;
+            try { saved = pending.Result; }
+            catch (AggregateException error)
+            {
+                Debug.LogError($"[Goods] Background commit failed: {error.InnerException}");
+                saved = false;
+            }
+            _persistenceFailed = !saved;
+            if (saved) _uncommittedSeconds = Math.Max(0, _uncommittedSeconds - _pendingCommitSeconds);
         }
 
         // Once per clock step (at most once a second): each subscribed connection gets the customers at competitors within
@@ -189,6 +226,7 @@ namespace FoodFactoryGame.Goods.Network
         // Also a no-op when a player command has already saved the pending ticks.
         private bool TryCommit()
         {
+            FinishPendingCommit(true);
             _persistenceFailed = !_world.TryCommitDurably(_savePath);
             if (!_persistenceFailed) _uncommittedSeconds = 0;
             return !_persistenceFailed;
@@ -631,6 +669,21 @@ namespace FoodFactoryGame.Goods.Network
             if (result.Accepted) Broadcast();
         }
 
+        // Sells an empty fleet truck back for part of its list price (SellTruckDurably); the server checks ownership and cargo.
+        public void RequestSellTruck(string requestId, string truckId)
+        {
+            if (IsClientStarted) ServerSellTruck(requestId, truckId ?? "");
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        private void ServerSellTruck(string requestId, string truckId, NetworkConnection sender = null)
+        {
+            if (!TryIdentify(sender, requestId, out var player)) return;
+            var result = _world.SellTruckDurably(player, requestId, truckId, _savePath);
+            Reply(sender, result);
+            if (result.Accepted) Broadcast();
+        }
+
         [ServerRpc(RequireOwnership = false)]
         private void ServerPlaceBelt(string requestId, string siteId, int cellX, int cellZ, int direction, int level, NetworkConnection sender = null)
         {
@@ -734,7 +787,19 @@ namespace FoodFactoryGame.Goods.Network
                 Quantity = quantity, ReservationId = reservationId
             }, _savePath);
             Reply(sender, result);
-            if (result.Accepted) Broadcast();
+            // A dropped or shift-clicked stack arrives as one request per lot in the same tick: one baseline follows them all
+            // (LateUpdate) instead of a full site baseline per lot. The reply above is sent first either way.
+            if (result.Accepted) _transferBroadcastPending = true;
+        }
+
+        private bool _transferBroadcastPending;
+
+        // Sends the baseline owed to accepted player transfers, at most once a frame.
+        private void LateUpdate()
+        {
+            if (!_transferBroadcastPending) return;
+            _transferBroadcastPending = false;
+            if (IsServerStarted && _world != null) Broadcast();
         }
 
         // Server-only: true once InitializeServer has handed this bridge its world and commands are not paused by a failing save.
@@ -762,7 +827,10 @@ namespace FoodFactoryGame.Goods.Network
         public string RecordWorkerScript(string workerId, string script, bool running, string tasks = null)
         {
             if (!IsServing) return "persistence-unavailable";
-            return _world.SetEmployeeScriptDurably(workerId, script, running, _savePath, tasks);
+            var problem = _world.SetEmployeeScriptDurably(workerId, script, running, _savePath, tasks);
+            // Clients show whether the task loop runs (GoodsEmployee.ScriptRunning), so send it now rather than on the next clock step.
+            if (problem == null) _transferBroadcastPending = true;
+            return problem;
         }
 
         // Server-only: saves a worker's new name and, once committed, sends every client the renamed record. Null when saved,

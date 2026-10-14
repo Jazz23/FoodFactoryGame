@@ -13,8 +13,9 @@
 // SetIndoors only keeps the camera under the room's ceiling. The top-down view is used by build mode alone. There is no
 // manual switch: C opens the phone instead (decision 0047).
 // Build mode (decision 0034) frames a whole lot: while BuildFocus is set the camera looks at that point from BuildDistance instead
-// of following the avatar, and the previous view returns when it is cleared. While BuildControls is on, Move pans the focus,
-// Zoom changes the distance and holding CameraTilt turns Look into tilt (pitch) and turn (yaw).
+// of following the avatar, and the previous view returns when it is cleared. While BuildControls is on, Move pans the focus
+// (BuildSprintFactor times faster while Sprint is held), Zoom changes the distance and holding CameraTilt turns Look into tilt
+// (pitch) and turn (yaw) unless BuildTiltEnabled is off (build mode's drag-to-remove sweep uses the same button).
 // Zoom is ignored while ZoomEnabled is off (a screen is open, so the wheel scrolls its lists). When a wall or ceiling holds the
 // third-person arm shorter than its distance, zooming in starts from where the camera actually is, so indoors the first step
 // already moves it.
@@ -41,8 +42,9 @@ namespace FoodFactoryGame.Session.Player
         [SerializeField] private Transform cameraTransform;
         [SerializeField] private InputActionReference lookAction;
         [SerializeField] private InputActionReference zoomAction;
-        // Build mode camera controls (Player/Move pans, Player/CameraTilt held tilts).
+        // Build mode camera controls (Player/Move pans, Player/Sprint held pans faster, Player/CameraTilt held tilts).
         [SerializeField] private InputActionReference moveAction;
+        [SerializeField] private InputActionReference sprintAction;
         [SerializeField] private InputActionReference tiltAction;
         [SerializeField] private float focusHeight = 1f;
         [SerializeField] private float shoulderOffset = 1f;
@@ -63,6 +65,8 @@ namespace FoodFactoryGame.Session.Player
         [SerializeField] private float transitionSeconds = 0.4f;
         // Build mode pan speed in metres per second at a 20 m distance (it scales with the distance).
         [SerializeField] private float buildPanSpeed = 12f;
+        // Pan speed multiplier while Sprint is held in build mode.
+        [SerializeField, Min(1f)] private float buildSprintFactor = 2.5f;
         // Seconds the arm takes to ease back out after a wall stops blocking it (pulling in is immediate).
         [SerializeField] private float armReturnSeconds = 0.25f;
 
@@ -95,6 +99,9 @@ namespace FoodFactoryGame.Session.Player
         public float BuildYaw => _buildYaw;
         // Set by build mode: false while the pointer is over its panel, so scrolling the catalog does not zoom.
         public bool BuildControls { get; set; } = true;
+        // Set by build mode: false while a drag-to-remove sweep holds the tilt button, so the camera stays still.
+        public bool BuildTiltEnabled { get; set; } = true;
+        public float BuildSprintFactor => buildSprintFactor;
         // How far the third-person camera currently stands from its pivot (shortened by walls and ceilings).
         public float CurrentArm { get; private set; }
         private bool _topDownBeforeBuild;
@@ -122,6 +129,7 @@ namespace FoodFactoryGame.Session.Player
             lookAction.action.Enable();
             zoomAction.action.Enable();
             moveAction.action.Enable();
+            sprintAction.action.Enable();
             tiltAction.action.Enable();
         }
 
@@ -192,7 +200,7 @@ namespace FoodFactoryGame.Session.Player
             cameraTransform.SetLocalPositionAndRotation(new Vector3(0f, 0f, -Mathf.Lerp(orbitDistance, downDistance, eased)), Quaternion.identity);
         }
 
-        // Pan with Move, zoom with Zoom, and while CameraTilt is held tilt and turn with Look.
+        // Pan with Move (faster with Sprint), zoom with Zoom, and while CameraTilt is held tilt and turn with Look.
         private void UpdateBuildControls()
         {
             if (!BuildControls) return;
@@ -200,12 +208,13 @@ namespace FoodFactoryGame.Session.Player
             if (move.sqrMagnitude > 0.0001f)
             {
                 var pan = Quaternion.Euler(0f, _buildYaw, 0f) * new Vector3(move.x, 0f, move.y);
-                BuildFocus += pan * (buildPanSpeed * Mathf.Max(0.5f, BuildDistance / 20f) * Time.unscaledDeltaTime);
+                var speed = buildPanSpeed * (sprintAction.action.IsPressed() ? buildSprintFactor : 1f);
+                BuildFocus += pan * (speed * Mathf.Max(0.5f, BuildDistance / 20f) * Time.unscaledDeltaTime);
             }
             var scroll = zoomAction.action.ReadValue<Vector2>().y;
             if (!Mathf.Approximately(scroll, 0f))
                 BuildDistance = Mathf.Clamp(BuildDistance * (scroll > 0f ? 0.88f : 1f / 0.88f), MinBuildDistance, MaxBuildDistance);
-            if (tiltAction.action.IsPressed())
+            if (BuildTiltEnabled && tiltAction.action.IsPressed())
             {
                 var delta = lookAction.action.ReadValue<Vector2>();
                 _buildYaw = Mathf.Repeat(_buildYaw + delta.x * orbitDegreesPerUnit * LookSensitivity, 360f);

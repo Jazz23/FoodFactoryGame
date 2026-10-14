@@ -16,6 +16,8 @@
                         <ui:VisualElement class="ff-row emp__state" picking-mode="Ignore">
                             <ui:VisualElement name="employee-script-dot" class="ff-dot ff-dot--sm" picking-mode="Ignore" />
                             <ui:Label name="employee-script-status" class="emp__status ff-wrap" picking-mode="Ignore" />
+                            <!-- Shown while the server's record says the employee runs its task loop (EmployeeScriptPanel.IsRunning). -->
+                            <ui:Label name="employee-script-running" text="Running tasks" class="emp__running" picking-mode="Ignore" />
                         </ui:VisualElement>
                     </ui:VisualElement>
                     <ui:Button name="employee-script-rename" text="Rename" focusable="false" class="ff-button emp__head-button" />

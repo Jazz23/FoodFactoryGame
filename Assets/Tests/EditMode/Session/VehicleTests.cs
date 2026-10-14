@@ -1,6 +1,7 @@
 // Checks the road vehicles (decision 0032): the Blender vehicles are installed in every session scene (the box truck on the
-// truck presenter, city cars and paints on the city traffic presenter, no colliders, a paintable body), and the city cars are a
-// deterministic function of the clock that is busier at rush hour, queues at red lights and behind trucks, and keeps the cap.
+// truck presenter, city cars and paints on the city traffic presenter, no colliders in the prefabs (bodies are added at
+// runtime), a paintable body), and the city cars are a deterministic function of the clock that is busier at rush hour, queues
+// at red lights (behind the crosswalk, like waiting trucks) and behind trucks, and keeps the cap.
 using System.Linq;
 using FoodFactoryGame.Goods;
 using FoodFactoryGame.Session.Logistics;
@@ -121,6 +122,38 @@ namespace FoodFactoryGame.Session.Tests
                     Assert.That(positions[i - 1] - positions[i], Is.GreaterThanOrEqualTo(CityCars.Gap - 0.01f), "A gap between cars.");
             }
             Assert.That(cars.Count(x => x.Along > stopLine - 3 * CityCars.Gap), Is.GreaterThanOrEqualTo(2), "A queue forms at the light.");
+        }
+
+        [Test]
+        public void CarsAndTrucksHaltBeforeTheCrosswalk()
+        {
+            var network = Street();
+            var main = network.Segments.Single(x => x.Id == "main");
+            var node = network.Nodes.Single(x => x.Id == "east");
+            // The crossing local street is 10 m wide; its crosswalk ends 4.5 m (scaled with the tile) beyond its kerb.
+            var crosswalkEnd = main.Length - (10 / 2f + 4.5f * 0.98f);
+            Assert.That(main.Length - RoadPose.StopBack(network, main.Index, true), Is.LessThan(crosswalkEnd), "The stop line lies before the crosswalk.");
+            var red = Enumerable.Range(0, RoadTraffic.LightCycleSeconds).Select(x => At(8, 600 + x))
+                .First(x => !RoadTraffic.IsGreen(node, true, x) && !RoadTraffic.IsGreen(node, true, x - 10));
+            var cars = CityCars.Compute(network, red, new Vector2(350, 0), 500, NoTrucks, 0, 1000)
+                .Where(x => x.Segment == main.Index && x.Forward).ToList();
+            Assert.That(cars, Is.Not.Empty);
+            Assert.That(cars.Max(x => x.Along) + CityCars.CarHalfLength, Is.LessThan(crosswalkEnd), "No car front stands in the crosswalk on red.");
+
+            // A truck whose leg ends with a wait at the light pulls up at the stop line; one passing through drives to the node.
+            var waiting = new GoodsTruck
+            {
+                Id = "truck", State = TruckState.ToDropoff, LegSegmentId = "main", LegFrom = 0, LegTo = 400, LegDriveSeconds = 40,
+                LegSeconds = 50, RemainingSeconds = 10
+            };
+            var front = RoadPose.TruckOffset(network, main.Index, waiting, 0f, CityCars.TruckHalfLength) + CityCars.TruckHalfLength;
+            Assert.That(front, Is.LessThan(crosswalkEnd).And.GreaterThan(crosswalkEnd - 2f), "The waiting truck's front is at the stop line.");
+            var through = new GoodsTruck
+            {
+                Id = "through", State = TruckState.ToDropoff, LegSegmentId = "main", LegFrom = 0, LegTo = 400, LegDriveSeconds = 40,
+                LegSeconds = 40, RemainingSeconds = 1
+            };
+            Assert.That(RoadPose.TruckOffset(network, main.Index, through, 1f, CityCars.TruckHalfLength), Is.EqualTo(400f).Within(0.01f));
         }
 
         [Test]

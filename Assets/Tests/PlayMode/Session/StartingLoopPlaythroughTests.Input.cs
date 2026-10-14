@@ -643,12 +643,15 @@ namespace FoodFactoryGame.Session.PlayModeTests
 
         private IEnumerator SelectBuildOffer(string offerId)
         {
-            yield return ClickElement(Build.Window.Q($"build-pick-{offerId}"), $"Place {offerId}", () => Build.OfferId == offerId);
+            yield return ClickElement(Build.Window.Q(BuildCatalog.CardName(offerId)), $"Place {offerId}", () => Build.OfferId == offerId);
         }
 
+        // Sell is a tool chip; walls, doors, windows and finishes are catalog cards (owner, 2026-10-14), picked in their default style.
         private IEnumerator SelectBuildTool(BuildTool tool)
         {
-            yield return ClickElement(Build.Window.Q($"build-tool-{tool.ToString().ToLowerInvariant()}"), $"{tool} tool", () => Build.Tool == tool);
+            var element = tool == BuildTool.Sell ? Build.Window.Q($"build-tool-{tool.ToString().ToLowerInvariant()}")
+                : Build.Window.Q(BuildCatalog.CardName(BuildCatalog.ShellKey(tool, BuildMode.DefaultStyle(tool))));
+            yield return ClickElement(element, $"{tool} tool", () => Build.Tool == tool);
         }
 
         private IEnumerator AwaitBuild(string what)

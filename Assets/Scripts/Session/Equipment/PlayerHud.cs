@@ -20,7 +20,10 @@
 // with a screen a prompt under it names the interact key. While Remove is held on a belt a wheel at the crosshair (or the free
 // pointer) fills until the belt is taken up (EquipmentInteraction.BeltRemoveProgress).
 // Presentation only: slot positions are this client's arrangement of the replicated stacks, never saved or sent, and
-// progress is interpolated for at most one clock step past the latest baseline and eased so it never jumps backwards.
+// progress is interpolated for at most one clock step past the latest baseline and eased so it never jumps backwards. Grids
+// show this client's pending transfers already applied (EquipmentInteraction.PreviewLots), so a drop or shift+click shows at
+// once and a rejection puts the goods back. A screen is rebuilt only when its layout changes (Signature); a change of what the
+// slots hold refreshes the existing slot elements and live labels in place (RefreshSlots), and the hotbar is rebuilt on its own.
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -106,8 +109,16 @@ namespace FoodFactoryGame.Session.Equipment
         // Spoil timers on goods slots (location, item), and the goods slot under the pointer, refreshed every frame from the
         // latest baseline without rebuilding the screen.
         private readonly List<(Label Label, string LocationId, string ItemId)> _timers = new();
-        private (string LocationId, SlotContent Content)? _hovered;
+        // The grid slot under the pointer (its grid and element; the element's userData is its current content).
+        private (string Grid, VisualElement Slot)? _hovered;
+        // Slot elements of the open screen per grid, refreshed in place when only their contents change.
+        private readonly Dictionary<string, List<Button>> _slotViews = new();
+        // Texts and states on the open screen that follow the slots' contents or pending requests (captions, slot counts, the
+        // register's sale value, buttons disabled while a request is out); re-applied by RefreshSlots.
+        private readonly List<Action<GoodsSnapshot>> _live = new();
         private string _signature;
+        private string _hotbarSignature;
+        private string _contentsSignature;
         private GoodsSnapshot _site;
         private float _siteSeenAt;
         // Slot (element name) where the current left press began, recorded only once screen clicks were armed; releasing on
@@ -194,12 +205,25 @@ namespace FoodFactoryGame.Session.Equipment
             }
             if (!interaction.HasPendingRequests) _claimed.Clear();
             BuildGrids(site);
+            var hotbar = HotbarSignature();
+            if (hotbar != _hotbarSignature)
+            {
+                _hotbarSignature = hotbar;
+                BuildHotbar();
+            }
             var signature = Signature();
+            var contents = ContentsSignature();
             if (signature != _signature)
             {
                 _signature = signature;
-                BuildHotbar();
+                _contentsSignature = contents;
                 BuildScreen(site);
+                BuildCursor();
+            }
+            else if (contents != _contentsSignature)
+            {
+                _contentsSignature = contents;
+                RefreshSlots(site);
                 BuildCursor();
             }
             UpdateCursor(screenOpen);
@@ -481,7 +505,7 @@ namespace FoodFactoryGame.Session.Equipment
             var location = LocationOf(grid);
             var minimumSlots = site.Locations.FirstOrDefault(x => x.Id == location)?.Capacity ?? 0;
             var stacks = new List<SlotContent>();
-            foreach (var group in site.Lots.Where(x => x.LocationId == location).GroupBy(x => (x.ItemId, x.Spoiled)))
+            foreach (var group in PreviewedLots(site, location).GroupBy(x => (x.ItemId, x.Spoiled)))
             {
                 var stackKey = GoodsKey(group.Key.ItemId, group.Key.Spoiled);
                 var maxStack = interaction.Session.MaxStack(group.Key.ItemId);
@@ -539,39 +563,57 @@ namespace FoodFactoryGame.Session.Equipment
             if (from >= 0 && from != index) keys[from] = other;
         }
 
-        // Rebuild only when something shown changes, so a click is not lost to a rebuild every clock tick.
-        private string Signature()
+        // The hotbar: its entries, their counts and the selected slot.
+        private string HotbarSignature()
         {
             var text = new StringBuilder();
-            text.Append(interaction.Screen).Append('|').Append(interaction.StorageOpen).Append('|').Append(interaction.OpenMachineId).Append('|').Append(interaction.SelectedSlot)
-                .Append('|').Append(interaction.CursorKind).Append('|').Append(interaction.CursorGoods?.ItemId);
+            text.Append(interaction.SelectedSlot);
             foreach (var entry in interaction.Hotbar)
                 text.Append('|').Append(entry?.MachineKind).Append('/').Append(entry?.ItemId).Append(interaction.HotbarCount(entry));
+            return text.ToString();
+        }
+
+        // What the slots hold, the cursor and whether a request is out: a change refreshes the open screen in place.
+        private string ContentsSignature()
+        {
+            var text = new StringBuilder();
+            text.Append(interaction.CursorKind).Append('|').Append(interaction.CursorGoods?.ItemId).Append('|').Append(interaction.HasPendingRequests);
             // The cursor stack stays on the pointer outside screens, so its count is shown there too.
             if (interaction.CursorGoods != null) text.Append('|').Append(interaction.CursorLots(_site).Sum(x => x.Quantity));
-            if (interaction.Screen == InteractionScreen.None) return text.ToString();
-            var building = interaction.Buildings.LocalBuilding;
-            text.Append('|').Append(building?.Id).Append(building?.Floors);
+            if (interaction.CursorKind != null) text.Append('|').Append(interaction.HeldCount(interaction.CursorKind));
             foreach (var grid in _grids.OrderBy(x => x.Key, StringComparer.Ordinal))
             {
                 text.Append('#').Append(grid.Key);
                 foreach (var slot in grid.Value) text.Append('|').Append(slot == null ? "" : $"{slot.Key}:{slot.Count}:{slot.Carried}");
             }
+            return text.ToString();
+        }
+
+        // The open screen's layout: rebuild only when it changes, so a click is not lost to a rebuild every clock tick. What the
+        // slots hold is ContentsSignature's; each grid's slot count is here.
+        private string Signature()
+        {
+            var text = new StringBuilder();
+            text.Append(interaction.Screen).Append('|').Append(interaction.StorageOpen).Append('|').Append(interaction.OpenMachineId);
+            if (interaction.Screen == InteractionScreen.None) return text.ToString();
+            var building = interaction.Buildings.LocalBuilding;
+            text.Append('|').Append(building?.Id).Append(building?.Floors);
+            foreach (var grid in _grids.OrderBy(x => x.Key, StringComparer.Ordinal)) text.Append('#').Append(grid.Key).Append(grid.Value.Count);
             foreach (var location in _site.Locations) text.Append('|').Append(location.Id).Append(location.Capacity);
             // The Staff window (decision 0039): who works here, who is unpaid or holding goods, the cap and the warning setting.
             if (interaction.Screen == InteractionScreen.Inventory)
             {
-                text.Append("|staff:").Append(interaction.HasPendingRequests).Append('/').Append(interaction.WageWarningHours)
+                text.Append("|staff:").Append(interaction.WageWarningHours)
                     .Append('/').Append(GoodsWorld.EmployeeCap(_site, GoodsWorld.ViewSiteId(_site)));
                 foreach (var employee in _site.Employees)
                     text.Append('|').Append(employee.Id).Append(employee.Unpaid).Append(Holding(_site, employee.Id));
             }
             // An open register shows who works it and who could (decision 0034).
             var open = _site.Equipment.FirstOrDefault(x => x.Id == interaction.OpenMachineId);
-            if (open != null) text.Append("|recipe:").Append(open.RecipeId).Append(interaction.HasPendingRequests);
+            if (open != null) text.Append("|recipe:").Append(open.RecipeId);
             if (open?.Kind == GoodsWorld.CounterKind || (open != null && interaction.IsWorkerBound(open.Kind)))
             {
-                text.Append("|staff:").Append(open.StaffId).Append('|').Append(interaction.HasPendingRequests);
+                text.Append("|staff:").Append(open.StaffId);
                 foreach (var employee in _site.Employees) text.Append('|').Append(employee.Id);
             }
             // An open table shows its seats and the restaurant's standing, which change with customers.
@@ -644,11 +686,14 @@ namespace FoodFactoryGame.Session.Equipment
             _hoverLabel = null;
             _timers.Clear();
             _hovered = null;
+            _slotViews.Clear();
+            _live.Clear();
             var inventoryId = interaction.InventoryId;
             if (interaction.Screen is InteractionScreen.None or InteractionScreen.Employee or InteractionScreen.PickPosition or InteractionScreen.Logistics
                     or InteractionScreen.Build or InteractionScreen.Menu
                 || inventoryId == null) return;
-            var inventory = Window("hud-inventory", "Inventory", SlotsUsed(site, inventoryId));
+            var inventory = Window("hud-inventory", "Inventory", null);
+            LiveSubtitle(inventory, site, x => SlotsUsed(x, inventoryId));
             inventory.Add(GridView(InventoryGrid));
             // One line at the grid's width: a longer hover line must never resize the centred screen under the pointer.
             _hoverLabel = new Label(" ") { pickingMode = PickingMode.Ignore };
@@ -660,7 +705,8 @@ namespace FoodFactoryGame.Session.Equipment
             {
                 if (interaction.StorageOpen)
                 {
-                    var storage = Window("hud-storage", "Storage", SlotsUsed(site, DevWorld.StorageId));
+                    var storage = Window("hud-storage", "Storage", null);
+                    LiveSubtitle(storage, site, x => SlotsUsed(x, DevWorld.StorageId));
                     storage.Add(GridView(StorageGrid));
                     _screen.Add(storage);
                 }
@@ -720,7 +766,6 @@ namespace FoodFactoryGame.Session.Equipment
             var siteId = GoodsWorld.ViewSiteId(site);
             var cap = GoodsWorld.EmployeeCap(site, siteId);
             var count = site.Employees.Count;
-            var pending = interaction.HasPendingRequests;
             window.Part<Label>("hud-staff-count").text =
                 $"Employees: {count} of {cap}  ·  {FormatCash(GoodsWorld.WageCentsPerHour)} per game hour each";
             // Hired, the hourly wage bill and how many game hours of it the cash covers.
@@ -748,7 +793,7 @@ namespace FoodFactoryGame.Session.Equipment
                 var fire = row.Part<Button>("fire");
                 fire.name = $"hud-fire-{id}";
                 fire.clicked += () => ClickFire(id);
-                fire.SetEnabled(!pending && !holding);
+                Live(site, _ => fire.SetEnabled(!interaction.HasPendingRequests && !holding));
                 row.Part("hint").Show(holding);
                 employees.Add(row);
             }
@@ -756,7 +801,7 @@ namespace FoodFactoryGame.Session.Equipment
             var hire = window.Part<Button>("hud-hire");
             hire.text = count >= cap ? "Site is full" : $"Hire  ·  {FormatCash(GoodsWorld.WageCentsPerHour)} / h";
             hire.clicked += ClickHire;
-            hire.SetEnabled(!pending && count < cap);
+            Live(site, _ => hire.SetEnabled(!interaction.HasPendingRequests && count < cap));
             var hours = interaction.WageWarningHours;
             var less = window.Part<Button>("hud-wage-warning-less");
             var more = window.Part<Button>("hud-wage-warning-more");
@@ -824,14 +869,22 @@ namespace FoodFactoryGame.Session.Equipment
             var window = UiTemplates.Clone(Templates + "HudMachineWindow");
             Header(window, MachineName(equipment.Kind), null);
             // A sale station (decision 0013) turns its input into company cash: a 5 x 5 grid of what it sells, no output grid.
-            var sales = SaleRecipes(equipment.Kind).Count > 0;
-            window.Part<Label>("input-caption").text = $"{(sales ? "TO SELL" : "IN")}  {Units(site, equipment.InputLocationId)}";
+            var saleRecipes = SaleRecipes(equipment.Kind);
+            var sales = saleRecipes.Count > 0;
+            var input = equipment.InputLocationId;
+            var output = equipment.OutputLocationId;
+            Live(window.Part<Label>("input-caption"), site, x => $"{(sales ? "TO SELL" : "IN")}  {Units(x, input)}");
             window.Part("input-grid").Add(GridView(InputGrid, sales ? SaleGridColumns : GridColumns));
             _progressFill = window.Part("hud-progress-fill");
-            if (sales) window.Part("output-column").RemoveFromHierarchy();
+            if (sales)
+            {
+                window.Part("output-column").RemoveFromHierarchy();
+                Live(window.Part<Label>("hud-sale-value-amount"), site, x => FormatCash(SaleValueCents(PreviewedLots(x, input), saleRecipes)));
+            }
             else
             {
-                window.Part<Label>("output-caption").text = $"OUT  {Units(site, equipment.OutputLocationId)}";
+                window.Part("hud-sale-value").RemoveFromHierarchy();
+                Live(window.Part<Label>("output-caption"), site, x => $"OUT  {Units(x, output)}");
                 window.Part("output-grid").Add(GridView(OutputGrid));
             }
             if (makes.Count > 1) FillRecipe(window.Part("hud-recipe"), equipment, makes);
@@ -860,7 +913,7 @@ namespace FoodFactoryGame.Session.Equipment
                 var picked = makes.FirstOrDefault(x => labels[x.Id] == evt.newValue);
                 ClickRecipe(equipmentId, picked?.Id ?? "");
             });
-            choice.SetEnabled(!interaction.HasPendingRequests);
+            Live(_site, _ => choice.SetEnabled(!interaction.HasPendingRequests));
         }
 
         // Sets what a machine makes ("" for automatic), like the chooser. Public so tests drive the same path.
@@ -875,8 +928,8 @@ namespace FoodFactoryGame.Session.Equipment
             var station = interaction.IsWorkerBound(register.Kind);
             var who = string.IsNullOrEmpty(register.StaffId) ? (station ? "nobody, nothing is made" : "nobody, customers are not served")
                 : register.StaffId == me ? "you" : site.Employees.FirstOrDefault(x => x.Id == register.StaffId)?.Name ?? "a teammate";
-            // While a request is out the row says so, and it is rebuilt when the server's answer arrives (Signature).
-            row.Part<Label>("hud-staff-label").text = interaction.HasPendingRequests ? "Updating..." : $"{(station ? "Worked" : "Staffed")} by {who}";
+            // While a request is out the row says so; the answer refreshes it (RefreshSlots), a new staff member rebuilds it.
+            Live(row.Part<Label>("hud-staff-label"), site, _ => interaction.HasPendingRequests ? "Updating..." : $"{(station ? "Worked" : "Staffed")} by {who}");
             row.EnableInClassList("hud-register--empty", string.IsNullOrEmpty(register.StaffId));
             var mine = register.StaffId == me;
             var registerId = register.Id;
@@ -884,7 +937,7 @@ namespace FoodFactoryGame.Session.Equipment
             button.text = mine ? "Leave" : station ? "Work this counter" : "Work this register";
             button.EnableInClassList("ff-button--primary", !mine);
             button.clicked += () => ClickStaff(registerId, !mine);
-            button.SetEnabled(!interaction.HasPendingRequests);
+            Live(site, _ => button.SetEnabled(!interaction.HasPendingRequests));
             if (station) return;
             foreach (var employee in site.Employees.Where(x => x.Id != register.StaffId))
             {
@@ -904,9 +957,12 @@ namespace FoodFactoryGame.Session.Equipment
         private VisualElement DockWindow(GoodsSnapshot site, GoodsEquipment equipment)
         {
             var window = UiTemplates.Clone(Templates + "HudDockWindow");
-            window.Part<Label>("input-caption").text = $"OUTGOING: TRUCKS LOAD {Units(site, equipment.InputLocationId)}";
+            Header(window, DockName(site, equipment), "Loading dock");
+            var input = equipment.InputLocationId;
+            var output = equipment.OutputLocationId;
+            Live(window.Part<Label>("input-caption"), site, x => $"OUTGOING: TRUCKS LOAD {Units(x, input)}");
             window.Part("input-grid").Add(GridView(InputGrid));
-            window.Part<Label>("output-caption").text = $"INCOMING: TRUCKS UNLOAD {Units(site, equipment.OutputLocationId)}";
+            Live(window.Part<Label>("output-caption"), site, x => $"INCOMING: TRUCKS UNLOAD {Units(x, output)}");
             window.Part("output-grid").Add(GridView(OutputGrid));
             var trucks = site.Trucks.Select(x => (Truck: x, Route: GoodsWorld.RouteOf(site, x)))
                 .Where(x => x.Route?.PickupDockId == equipment.Id || x.Route?.DropoffDockId == equipment.Id).ToList();
@@ -944,7 +1000,9 @@ namespace FoodFactoryGame.Session.Equipment
         {
             var refrigerated = site.Locations.FirstOrDefault(x => x.Id == equipment.InputLocationId)?.Refrigerated ?? false;
             var window = UiTemplates.Clone(Templates + "HudStorageWindow");
-            Header(window, MachineName(equipment.Kind), SlotsUsed(site, equipment.InputLocationId));
+            var input = equipment.InputLocationId;
+            Header(window, MachineName(equipment.Kind), null);
+            LiveSubtitle(window, site, x => SlotsUsed(x, input));
             window.Part<Label>("input-caption").text = refrigerated ? "REFRIGERATED" : "STORAGE";
             window.Part("input-grid").Add(GridView(InputGrid));
             if (!refrigerated) window.Part("hud-refrigerated-note").RemoveFromHierarchy();
@@ -958,6 +1016,8 @@ namespace FoodFactoryGame.Session.Equipment
             var view = new VisualElement { name = $"hud-{grid}-grid" };
             view.AddToClassList("hud-grid");
             var slots = _grids.TryGetValue(grid, out var list) ? list : new List<SlotContent>();
+            var views = new List<Button>();
+            _slotViews[grid] = views;
             VisualElement row = null;
             for (var index = 0; index < slots.Count; index++)
             {
@@ -968,12 +1028,9 @@ namespace FoodFactoryGame.Session.Equipment
                     view.Add(row);
                 }
                 var slotIndex = index;
-                var content = slots[index];
                 var slot = Slot($"hud-{grid}-slot-{index}");
-                slot.EnableInClassList("ff-slot--filled", content != null);
-                slot.EnableInClassList("ff-slot--spoiled", content is { Spoiled: true });
-                // Read by HoveredEntry to find the stack under the pointer when a hotbar key is pressed.
-                slot.userData = content;
+                FillSlot(slot, grid, slots[index]);
+                views.Add(slot);
                 // Presses are read here rather than through Button.clicked, whose activator ignores any press with a
                 // modifier held and so would never report a shift+click. Trickle-down runs before the button's own handler.
                 slot.RegisterCallback<PointerDownEvent>(evt =>
@@ -986,28 +1043,7 @@ namespace FoodFactoryGame.Session.Equipment
                     _pressedSlot = null;
                     OnSlotClicked(grid, slotIndex);
                 }, TrickleDown.TrickleDown);
-                if (content != null)
-                {
-                    var name = content.MachineKind != null ? Title(content.MachineKind) : ItemName(content.ItemId);
-                    var sprite = content.MachineKind != null ? MachineIcon(content.MachineKind) : ItemIcon(content.ItemId);
-                    var icon = slot.Part("hud-icon");
-                    icon.Show(true);
-                    icon.SetIcon(sprite, name);
-                    icon.EnableInClassList("ff-icon--faded", content.Carried);
-                    icon.EnableInClassList("ff-icon--spoiled", content.Spoiled);
-                    var count = slot.Part<Label>("hud-count");
-                    count.Show(true);
-                    count.text = content.Count.ToString(CultureInfo.InvariantCulture);
-                    var location = LocationOf(grid);
-                    // Edible goods show when they spoil; UpdateSpoilage fills the text in (empty for goods that do not spoil).
-                    if (content.MachineKind == null && !content.Spoiled)
-                    {
-                        var timer = slot.Part<Label>("hud-spoil-timer");
-                        timer.Show(true);
-                        _timers.Add((timer, location, content.ItemId));
-                    }
-                    slot.RegisterCallback<PointerEnterEvent>(_ => _hovered = (location, content));
-                }
+                slot.RegisterCallback<PointerEnterEvent>(_ => _hovered = (grid, slot));
                 slot.RegisterCallback<PointerLeaveEvent>(_ =>
                 {
                     _hovered = null;
@@ -1016,6 +1052,68 @@ namespace FoodFactoryGame.Session.Equipment
                 row.Add(slot);
             }
             return view;
+        }
+
+        // Shows one stack (or nothing) in a slot element, whether new or refreshed in place.
+        private void FillSlot(VisualElement slot, string grid, SlotContent content)
+        {
+            slot.EnableInClassList("ff-slot--filled", content != null);
+            slot.EnableInClassList("ff-slot--spoiled", content is { Spoiled: true });
+            // Read by HoveredEntry to find the stack under the pointer when a hotbar key is pressed, and by the hover line.
+            slot.userData = content;
+            var icon = slot.Part("hud-icon");
+            var count = slot.Part<Label>("hud-count");
+            var timer = slot.Part<Label>("hud-spoil-timer");
+            icon.Show(content != null);
+            count.Show(content != null);
+            timer.Show(false);
+            if (content == null) return;
+            var name = content.MachineKind != null ? Title(content.MachineKind) : ItemName(content.ItemId);
+            var sprite = content.MachineKind != null ? MachineIcon(content.MachineKind) : ItemIcon(content.ItemId);
+            icon.SetIcon(sprite, name);
+            icon.EnableInClassList("ff-icon--faded", content.Carried);
+            icon.EnableInClassList("ff-icon--spoiled", content.Spoiled);
+            count.SetText(content.Count.ToString(CultureInfo.InvariantCulture));
+            // Edible goods show when they spoil; UpdateSpoilage fills the text in (empty for goods that do not spoil).
+            if (content.MachineKind == null && !content.Spoiled)
+            {
+                timer.Show(true);
+                _timers.Add((timer, LocationOf(grid), content.ItemId));
+            }
+        }
+
+        // The slots' contents changed but the layout did not: refill the existing slot elements and live labels, so a transfer
+        // never clones the screen again and a press in progress keeps its slot.
+        private void RefreshSlots(GoodsSnapshot site)
+        {
+            _timers.Clear();
+            foreach (var pair in _slotViews)
+            {
+                if (!_grids.TryGetValue(pair.Key, out var slots)) continue;
+                for (var index = 0; index < pair.Value.Count && index < slots.Count; index++) FillSlot(pair.Value[index], pair.Key, slots[index]);
+            }
+            foreach (var apply in _live) apply(site);
+        }
+
+        // Sets a label from the baseline now and again on every in-place refresh.
+        private void Live(Label label, GoodsSnapshot site, Func<GoodsSnapshot, string> text) => Live(site, x => label.SetText(text(x)));
+
+        private void Live(GoodsSnapshot site, Action<GoodsSnapshot> apply)
+        {
+            apply(site);
+            _live.Add(apply);
+        }
+
+        // A window subtitle that follows the slots (hidden while it has no text).
+        private void LiveSubtitle(VisualElement window, GoodsSnapshot site, Func<GoodsSnapshot, string> text)
+        {
+            var label = window.Part<Label>("subtitle");
+            Live(site, x =>
+            {
+                var value = text(x) ?? "";
+                label.SetText(value);
+                label.Show(value.Length > 0);
+            });
         }
 
         private void OnSlotClicked(string grid, int index)
@@ -1114,11 +1212,16 @@ namespace FoodFactoryGame.Session.Equipment
                 label.EnableInClassList("ff-chilled-text", time is { Soon: false, Refrigerated: true });
             }
             if (_hoverLabel == null || _hovered is not { } hovered) return;
-            var content = hovered.Content;
+            if (hovered.Slot.userData is not SlotContent content)
+            {
+                _hoverLabel.SetText(" ");
+                return;
+            }
+            var location = LocationOf(hovered.Grid);
             var name = content.MachineKind != null ? Title(content.MachineKind) : ItemName(content.ItemId);
             var text = $"{name} ×{content.Count}";
             if (content.Spoiled) text += " (spoiled)";
-            else if (content.MachineKind == null && SpoilTime(site, hovered.LocationId, content.ItemId) is { } spoil)
+            else if (content.MachineKind == null && SpoilTime(site, location, content.ItemId) is { } spoil)
                 text += spoil.Refrigerated
                     ? $"  ·  refrigerated: not spoiling ({FormatDuration(spoil.Seconds, false)} left out of the cold)"
                     : $"  ·  spoils in {FormatDuration(spoil.Seconds, false)}";
@@ -1162,7 +1265,7 @@ namespace FoodFactoryGame.Session.Equipment
         {
             var location = site.Locations.FirstOrDefault(x => x.Id == locationId);
             return location == null ? ""
-                : $"{GoodsSlots.SlotsUsed(site.Lots.Where(x => x.LocationId == locationId), interaction.Session.MaxStack)}/{location.Capacity}";
+                : $"{GoodsSlots.SlotsUsed(PreviewedLots(site, locationId), interaction.Session.MaxStack)}/{location.Capacity}";
         }
 
         // "3/40 slots" for a window's subtitle; null when the location is unknown.
@@ -1170,6 +1273,39 @@ namespace FoodFactoryGame.Session.Equipment
         {
             var units = Units(site, locationId);
             return units.Length == 0 ? null : $"{units} slots";
+        }
+
+        // A location's goods as this client shows them: the baseline with its own pending transfers applied.
+        private List<GoodsLot> PreviewedLots(GoodsSnapshot site, string locationId) => interaction.PreviewLots(site, locationId);
+
+        // What goods bring in at a register once customers buy them all: each unspoiled stack at the price of the first sale
+        // recipe (by ID) that takes its item, per whole serving (a recipe's input quantity); goods it does not sell count
+        // nothing. Display only: the server prices each sale when it happens. Public so tests check the rule directly.
+        public static long SaleValueCents(IEnumerable<GoodsLot> lots, IEnumerable<RecipeAsset> saleRecipes)
+        {
+            var prices = new Dictionary<string, (long Cents, int Per)>();
+            foreach (var recipe in saleRecipes.Where(x => x != null && x.IsSale && x.Inputs.Count > 0).OrderBy(x => x.Id, StringComparer.Ordinal))
+            {
+                var ingredient = recipe.Inputs[0];
+                if (!string.IsNullOrEmpty(ingredient.itemId) && !prices.ContainsKey(ingredient.itemId))
+                    prices[ingredient.itemId] = (recipe.SaleCents, Math.Max(1, ingredient.quantity));
+            }
+            var total = 0L;
+            foreach (var stack in lots.Where(x => !x.Spoiled).GroupBy(x => x.ItemId))
+                if (prices.TryGetValue(stack.Key, out var price))
+                    total += stack.Sum(x => (long)x.Quantity) / price.Per * price.Cents;
+            return total;
+        }
+
+        // A dock's unique name, as the phone and logistics screens give it: "<site> dock", numbered when the site has several
+        // (by equipment ID).
+        private static string DockName(GoodsSnapshot site, GoodsEquipment dock)
+        {
+            var siteName = site.Sites.FirstOrDefault(x => x.Id == dock.SiteId)?.Name;
+            if (string.IsNullOrEmpty(siteName)) siteName = dock.SiteId ?? "";
+            var siblings = site.Equipment.Where(x => x.Kind == GoodsWorld.DockKind && x.SiteId == dock.SiteId)
+                .OrderBy(x => x.Id, StringComparer.Ordinal).ToList();
+            return $"{siteName} dock{(siblings.Count > 1 ? $" {siblings.IndexOf(dock) + 1}" : "")}";
         }
 
         private List<RecipeAsset> SaleRecipes(string kind) =>

@@ -13,7 +13,9 @@
 // its site's shell (DrawnSites), and shown again when that site stops being drawn.
 // Every lot gets a pavement surface and every purchasable building a PropertyMarker, and restaurant awnings are tinted by the
 // replicated ownership records (GoodsProperty) before the layout's own for-sale or competitor state. A restaurant's awning is
-// its own object beside the model, so it stays up while the model steps aside for a drawn site's shell (owner, 2026-10-13). Older formats keep the
+// its own object beside the model, so it stays up while the model steps aside for a drawn site's shell (owner, 2026-10-13).
+// A restaurant a player company owns (bought, or the layout's own player restaurant) shows no awning (owner, 2026-10-14);
+// restaurants for sale and competitors keep theirs. Older formats keep the
 // PROTOTYPE placement beside the dev site, whose floor and NavMesh (devSiteOnly) are shown only then.
 using System.Collections.Generic;
 using System.Linq;
@@ -81,8 +83,7 @@ namespace FoodFactoryGame.Session.WorldMap
         private const float TextureMetres = 8f;
         private const float FieldMetres = 12f;
         private static readonly int BaseColor = Shader.PropertyToID("_BaseColor");
-        // Awning colours: the player's restaurant, restaurants for sale, then competitors by ID.
-        private static readonly Color PlayerAwning = new(0.18f, 0.62f, 0.26f);
+        // Awning colours: restaurants for sale, then competitors by ID (a player-owned restaurant has none).
         private static readonly Color ForSaleAwning = new(0.95f, 0.75f, 0.15f);
         private static readonly Color[] CompetitorAwnings =
         {
@@ -152,7 +153,7 @@ namespace FoodFactoryGame.Session.WorldMap
         // The scene position of a layout point (metres) at the given layout-local height.
         public Vector3 ScenePoint(float x, float z, float height = 0f) => _layoutOrigin + new Vector3(x, height, z);
 
-        // The awning colour currently applied to a restaurant's model; null when it has none drawn.
+        // The awning colour currently applied to a restaurant's model; null when it has none drawn (a player-owned restaurant).
         public Color? AwningColour(string buildingId) => _awningColours.TryGetValue(buildingId, out var colour) ? colour : null;
 
         private void Update()
@@ -1061,23 +1062,25 @@ namespace FoodFactoryGame.Session.WorldMap
             collider.size = new Vector3(size.x, height, size.y);
         }
 
-        // Ownership records first (decision 0028): this client's company green, any other company a competitor colour; a lot
-        // nobody has bought shows the layout's own state.
+        // Ownership records first (decision 0028): a restaurant a company has bought (only purchases make ownership records) or
+        // the layout's own player restaurant has its awning hidden (owner, 2026-10-14); a lot nobody has bought shows the layout's
+        // own for-sale or competitor colour.
         private void TintAwning(MeshRenderer renderer, int index, WorldBuilding building, GoodsSnapshot site)
         {
             if (renderer == null) return;
             var competitor = CompetitorAwnings[(int)(WorldRandom.Fnv1a(building.Id) % (ulong)CompetitorAwnings.Length)];
             var lotId = WorldLot.IdFor(building.Id);
             var owner = site?.Properties.FirstOrDefault(x => x.LotId == lotId)?.CompanyId;
-            var mine = site?.Companies.FirstOrDefault(x => x.SiteIds.Contains(session.ClientSiteId))?.Id;
-            var colour = owner != null ? (owner == mine ? PlayerAwning : competitor) : building.Ownership switch
+            var playerOwned = owner != null || building.Ownership == Ownership.Player;
+            if (renderer.gameObject.activeSelf == playerOwned) renderer.gameObject.SetActive(!playerOwned);
+            if (playerOwned)
             {
-                Ownership.Player => PlayerAwning,
-                Ownership.ForSale => ForSaleAwning,
-                _ => competitor
-            };
+                if (_awningColours.Remove(building.Id)) Debug.Log($"[World] {building.Id} awning removed: owned by a player company.");
+                return;
+            }
+            var colour = building.Ownership == Ownership.ForSale ? ForSaleAwning : competitor;
             if (_awningColours.TryGetValue(building.Id, out var shown) && shown != colour)
-                Debug.Log($"[World] {building.Id} awning re-tinted: {(owner == null ? "unowned" : owner == mine ? "owned by this company" : "owned by another company")}.");
+                Debug.Log($"[World] {building.Id} awning re-tinted: unowned.");
             _awningColours[building.Id] = colour;
             _block.Clear();
             _block.SetColor(BaseColor, colour);

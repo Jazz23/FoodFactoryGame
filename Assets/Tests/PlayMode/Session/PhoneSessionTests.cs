@@ -1,6 +1,7 @@
 // The phone (decision 0047) in the real WorldGen scene on a new generated world in a unique temporary directory: it opens and closes
 // as a screen that suspends walking and shows the generated map; buying a farm from the map and ordering from it sends a supplier
-// truck that delivers to the starting dock at the owner's price; places are renamed from it; and its staff app hires, opens the
+// truck that delivers to the starting dock at the owner's price, and with Repeat order checked the same Order now creates a
+// repeating order; places are renamed from it; and its staff app hires, opens the
 // employee's task screen, and Esc there returns to the phone; and its Trucks app is the logistics screen, where trucks are bought. The application's saves are never opened.
 using System;
 using System.Collections;
@@ -142,6 +143,12 @@ namespace FoodFactoryGame.Session.PlayModeTests
             Assert.That(_phone.DockId, Is.EqualTo(dockId), "The order goes to the starting dock by default.");
             Assert.That(_phone.OrderCents(), Is.EqualTo(milk.PriceCents + GoodsWorld.FarmDeliveryFeeCents), "Owner's price: half the goods, the whole fee.");
             Assert.That(_phone.CanOrder(), Is.True);
+            yield return null;
+            var repeat = _phone.Window.Q<Toggle>("phone-repeat");
+            Assert.That(repeat, Is.Not.Null, "The order form has a Repeat order checkbox.");
+            Assert.That((repeat.value, _phone.Repeat), Is.EqualTo((false, false)), "Repeat order starts unchecked.");
+            Assert.That(_phone.Window.Q("phone-hours-next"), Is.Null, "The interval shows only while Repeat order is checked.");
+            Assert.That(_phone.Window.Q("phone-schedule"), Is.Null, "There is no separate repeat button; Order now places both.");
             var cash = _root.ClientSite.Companies.Single().Cash;
             _phone.Order();
             yield return Until(() => _root.ClientSite.FarmOrders.Count == 1, "the order", 30f);
@@ -159,6 +166,19 @@ namespace FoodFactoryGame.Session.PlayModeTests
             Assert.That(_root.ClientSite.Lots.Where(x => x.LocationId == incoming && x.ItemId == "milk").Sum(x => x.Quantity), Is.EqualTo(2 * milk.Quantity),
                 "The milk is in the dock's incoming buffer.");
             Assert.That(_root.ClientSite.Trucks.Any(x => x.Supplier), Is.False, "The farm truck left.");
+
+            // With Repeat order checked, Order now creates a repeating order (its first order comes at the next game hour).
+            _phone.ShowTab(PhonePanel.MapTab);
+            _phone.SetRepeat(true);
+            yield return null;
+            Assert.That(_phone.Window.Q("phone-hours-next"), Is.Not.Null, "Checking Repeat order shows the interval.");
+            _phone.SetEveryHours(3);
+            Assert.That(_phone.CanOrder(), Is.True);
+            _phone.Order();
+            yield return Until(() => _root.ClientSite.FarmSchedules.Count == 1, "the repeating order", 30f);
+            Assert.That(_phone.LastRejection, Is.Null);
+            var schedule = _root.ClientSite.FarmSchedules.Single();
+            Assert.That((schedule.OfferId, schedule.Packs, schedule.EveryHours, schedule.DockId), Is.EqualTo((milk.Id, 2, 3, dockId)));
         }
 
         [UnityTest]
