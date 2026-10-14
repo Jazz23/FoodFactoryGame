@@ -9,8 +9,9 @@
 // collider at least WallHeight tall that is not an avatar, a machine, furniture, an employee or the dev storage (colliders the
 // cast starts inside are ignored), and indoors it also stays under the room's ceiling,
 // so in a small room the camera squeezes in beside the avatar instead of looking in from outside.
-// Indoors uses the top-down view (GDD section 3): SetIndoors switches views when the avatar crosses a building's threshold
-// (decision 0019). There is no manual switch: C opens the phone instead (owner, 2026-10-13, decision 0047).
+// Indoors keeps the third-person view (owner, 2026-10-13: entering a building no longer switches to the top-down view);
+// SetIndoors only keeps the camera under the room's ceiling. The top-down view is used by build mode alone. There is no
+// manual switch: C opens the phone instead (decision 0047).
 // Build mode (decision 0034) frames a whole lot: while BuildFocus is set the camera looks at that point from BuildDistance instead
 // of following the avatar, and the previous view returns when it is cleared. While BuildControls is on, Move pans the focus,
 // Zoom changes the distance and holding CameraTilt turns Look into tilt (pitch) and turn (yaw).
@@ -68,7 +69,6 @@ namespace FoodFactoryGame.Session.Player
         // 0 is the third-person view and 1 the top-down view; eased when applied.
         private float _blend;
         private float _topDownYaw;
-        private bool _indoors;
         private float? _ceiling;
         private float _arm = float.MaxValue;
         private float _buildYaw;
@@ -109,7 +109,7 @@ namespace FoodFactoryGame.Session.Player
                 _buildYaw = buildYaw ?? Mathf.Round(yaw / 90f) * 90f;
                 _buildPitch = Mathf.Clamp(buildPitch ?? 90f, MinBuildPitch, 90f);
             }
-            if (!focus.HasValue && BuildFocus.HasValue) SetTopDown(_topDownBeforeBuild || _indoors);
+            if (!focus.HasValue && BuildFocus.HasValue) SetTopDown(_topDownBeforeBuild);
             BuildFocus = focus;
             BuildDistance = distance;
             if (focus.HasValue) SetTopDown(true);
@@ -133,14 +133,8 @@ namespace FoodFactoryGame.Session.Player
         }
 
         // Presentation state from the local building presenter: true while the avatar stands inside a building, with the height
-        // of its ceiling (null when the presenter knows none).
-        public void SetIndoors(bool indoors, float? ceiling = null)
-        {
-            _ceiling = indoors ? ceiling : null;
-            if (indoors == _indoors) return;
-            _indoors = indoors;
-            if (!BuildFocus.HasValue) SetTopDown(indoors);
-        }
+        // of its ceiling (null when the presenter knows none). It does not change the view.
+        public void SetIndoors(bool indoors, float? ceiling = null) => _ceiling = indoors ? ceiling : null;
 
         private void SetTopDown(bool topDown)
         {

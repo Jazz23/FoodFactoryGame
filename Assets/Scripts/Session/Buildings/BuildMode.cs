@@ -1,7 +1,8 @@
 // Restaurant build mode (decision 0034, slice 2), local player only. Build (B) opens it as a screen of its own: the camera looks
 // down on the current site, a grid covers the lot and a panel on the right offers tools (sell or remove, walls, doors, back doors
-// (decision 0037), windows, wall finish) and a catalog of furnishings by category. Walls are free (decision 0036): outer and inner walls are drawn and
-// removed alike, anywhere in the lot. The pointer's cell shows a ghost tinted by validity: the same pure rules the server applies
+// (decision 0037), windows, wall finish) and a catalog of furnishings by category, ending with Belts (owner, 2026-10-13): its
+// card leaves build mode with belts on the cursor to lay a line (EquipmentInteraction.LayBelts), buying a pack when none are
+// held. Walls are free (decision 0036): outer and inner walls are drawn and removed alike, anywhere in the lot. The pointer's cell shows a ghost tinted by validity: the same pure rules the server applies
 // (GoodsWorld.PlanShell, FurnishProblem, SiteGrid) plus the company's cash, with the price, refund and net amount, or the reason it
 // would be refused. A click places a single piece, door or window; dragging draws a line of wall, restyles a line of walls or
 // fills an area with a piece, ordered as soon as the button is released (owner feedback 0038: no Confirm); Esc during a drag drops
@@ -60,6 +61,7 @@ namespace FoodFactoryGame.Session.Buildings
         // Catalog sections in palette order; equipment without a category (machines, the supplier's pieces) is listed last.
         private static readonly string[] Sections = { "Restaurant", "Furniture", "Decor", "Lighting", "Surfaces", "Architecture", "Service" };
         private const string EquipmentSection = "Equipment";
+        private const string BeltSection = "Belts";
         private const int MaxHighlights = 400;
         // A right press that moves the pointer further than this (pixels) tilts the camera instead of removing.
         private const float ClickSlop = 8f;
@@ -990,6 +992,30 @@ namespace FoodFactoryGame.Session.Buildings
                     row.Part<Label>("title").text = offer.Equipment.DisplayName;
                     row.Part<Label>("price").text = PlayerHud.FormatCash(offer.PriceCents);
                     row.RegisterCallback<ClickEvent>(_ => SelectOffer(id));
+                    _catalog.Add(row);
+                }
+            }
+            // Belts are goods laid in the world rather than pieces placed here, so their card hands over to the belt cursor.
+            var belts = session.Offers.Where(x => x != null && x.Equipment == null && x.Truck == null && x.ItemId == GoodsWorld.BeltItemId).ToList();
+            if (belts.Count > 0)
+            {
+                var heading = new Label(BeltSection) { pickingMode = PickingMode.Ignore };
+                heading.AddToClassList("build-section");
+                heading.EnableInClassList("build-section--first", _catalog.childCount == 0);
+                _catalog.Add(heading);
+                var item = session.Items.FirstOrDefault(x => x != null && x.Id == GoodsWorld.BeltItemId);
+                foreach (var offer in belts)
+                {
+                    var id = offer.Id;
+                    var row = UiTemplates.Clone("Build/BuildCatalogItem");
+                    row.name = $"build-item-{offer.Id}";
+                    row.userData = offer.Id;
+                    var icon = row.Part("icon");
+                    icon.SetIcon(item?.Icon, "");
+                    icon.EnableInClassList("ff-icon--empty", item?.Icon == null);
+                    row.Part<Label>("title").text = $"{item?.DisplayName ?? "Belt"} x{offer.Quantity}";
+                    row.Part<Label>("price").text = PlayerHud.FormatCash(offer.PriceCents);
+                    row.RegisterCallback<ClickEvent>(_ => interaction.LayBelts(id));
                     _catalog.Add(row);
                 }
             }

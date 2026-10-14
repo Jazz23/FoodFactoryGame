@@ -266,7 +266,7 @@
 /* Settings. */
 .menu-settings__reset { margin-right: 12px; }
 .menu-settings__side { width: 340px; flex-shrink: 0; margin-right: 24px; }
-.menu-settings__card { padding: 22px; margin-bottom: 16px; }
+.menu-settings__card { padding: 22px; margin-bottom: 16px; flex-shrink: 0; }
 .menu-settings__tip { margin-top: 10px; font-size: 13px; }
 
 .menu-sensitivity__head { margin-top: 16px; }
@@ -274,6 +274,12 @@
 .menu-sensitivity__value { font-size: 16px; -unity-font-style: bold; color: var(--ff-accent); }
 .menu-sensitivity__slider { margin-top: 10px; }
 .menu-sensitivity__scale { margin-top: 4px; }
+
+/* Sound: one line per volume (name, slider, percentage). */
+.menu-volume__row { margin-top: 12px; align-items: center; }
+.menu-volume__caption { width: 84px; flex-shrink: 0; }
+.menu-volume__slider { margin: 0 12px 0 0; }
+.menu-volume__value { width: 46px; flex-shrink: 0; -unity-text-align: middle-right; }
 
 .menu-keys { flex-grow: 1; flex-shrink: 1; }
 

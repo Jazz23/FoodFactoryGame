@@ -1,5 +1,5 @@
 // Local player's phone (owner request 2026-10-13, decision 0047), drawn from the Phone UXML and USS under Assets/UI/Resources/UI
-// and opened with C (EquipmentInteraction.TogglePhone). It has five apps:
+// and opened with C (EquipmentInteraction.TogglePhone). It has seven apps:
 // - Map: the world from above (PhoneMapView) with every lot coloured by what it is and who owns it. Tapping a lot shows its
 //   price, owner and a Buy button (the same server request as PropertyPanel), a rename box for the company's own places and,
 //   for a farm, its type and the goods it sells: choose one, how many packs, delivery (flat fee) or pickup by a parked company
@@ -9,6 +9,10 @@
 // - Trucks: the logistics screen (routes, the fleet, buying trucks, stock at other sites), moved into the phone while this app
 //   is open (LogisticsPanel.Embed), so it is the same screen L opens.
 // - Places: every site of the company with a rename box.
+// - Ledger: the company's latest cash changes (decision 0038), newest first, with its opening and current cash (owner,
+//   2026-10-13: the ledger lives in the phone, not beside the Supplier).
+// - Recipes: every recipe in the game, grouped by the machine that makes it, with its inputs, output and time, then the menu
+//   items registers sell with their price and serving time. Content only, so it is built once.
 // Every button is a request the server checks; nothing changes here until the next baseline. The farm types and prices come from
 // the replicated layout (FarmCatalog) and the session's supplier offers, the same content the server uses, so nothing extra is
 // sent. Pages are rebuilt only when what they list changes; their live text and button states refresh every frame, so a click
@@ -34,7 +38,9 @@ namespace FoodFactoryGame.Session.WorldMap
         public const string StaffTab = "staff";
         public const string TrucksTab = "trucks";
         public const string PlacesTab = "places";
-        private static readonly string[] Tabs = { MapTab, OrdersTab, StaffTab, TrucksTab, PlacesTab };
+        public const string LedgerTab = "ledger";
+        public const string RecipesTab = "recipes";
+        private static readonly string[] Tabs = { MapTab, OrdersTab, StaffTab, TrucksTab, PlacesTab, LedgerTab, RecipesTab };
 
         private static readonly Color Yours = new(0.31f, 0.77f, 0.42f);
         private static readonly Color ForSale = new(0.95f, 0.64f, 0.23f);
@@ -71,6 +77,8 @@ namespace FoodFactoryGame.Session.WorldMap
         private VisualElement _schedules;
         private VisualElement _staff;
         private VisualElement _places;
+        private VisualElement _ledger;
+        private VisualElement _recipes;
         private Label _staffSite;
         private Label _staffCount;
         private Button _hire;
@@ -115,6 +123,8 @@ namespace FoodFactoryGame.Session.WorldMap
             _schedules = root.Part("phone-schedules");
             _staff = root.Part("phone-staff");
             _places = root.Part("phone-places");
+            _ledger = root.Part("phone-ledger");
+            _recipes = root.Part("phone-recipes");
             _staffSite = root.Part<Label>("phone-staff-site");
             _staffCount = root.Part<Label>("phone-staff-count");
             _hire = root.Part<Button>("phone-hire");
@@ -161,6 +171,7 @@ namespace FoodFactoryGame.Session.WorldMap
             if (!_wasOpen)
             {
                 _wasOpen = true;
+                Audio.GameAudio.PlayUi(Audio.GameAudio.OpenClip, 0.5f);
                 if (SelectedLotId == null && _mapView.Player is { } player) _mapView.Focus(player);
             }
             _mapView.MarkDirtyRepaint();
@@ -179,6 +190,8 @@ namespace FoodFactoryGame.Session.WorldMap
                 if (Tab == OrdersTab) Rebuild("orders", OrdersSignature(site), BuildOrders);
                 if (Tab == StaffTab) Rebuild("staff", StaffSignature(site), BuildStaff);
                 if (Tab == PlacesTab) Rebuild("places", PlacesSignature(site), BuildPlaces);
+                if (Tab == LedgerTab) Rebuild("ledger", LedgerSignature(site), () => BuildLedger(site));
+                if (Tab == RecipesTab) Rebuild("recipes", Session.Recipes.Count.ToString(), BuildRecipes);
             }
             foreach (var (element, text) in _live) element.SetText(text());
             foreach (var (element, enabled) in _liveEnabled) element.SetEnabled(enabled());
@@ -695,6 +708,99 @@ namespace FoodFactoryGame.Session.WorldMap
                 }
                 _places.Add(card);
             }
+        }
+
+        // ---------- Ledger ----------
+
+        private string LedgerSignature(GoodsSnapshot site) =>
+            $"{Company?.Id}|{site.Ledger.LastOrDefault()?.Id}|{Company?.Cash}|{site.Sites.Count}";
+
+        private void BuildLedger(GoodsSnapshot site)
+        {
+            _ledger.Clear();
+            var company = Company;
+            var entries = company == null ? new List<GoodsLedgerEntry>()
+                : GoodsWorld.LedgerOf(site, company.Id).Take(PlayerHud.LedgerRowsShown).ToList();
+            if (entries.Count == 0) _ledger.Add(Text("No cash changes recorded yet.", "ff-small"));
+            foreach (var entry in entries)
+            {
+                var row = new VisualElement { name = "phone-ledger-row-" + entry.Id, pickingMode = PickingMode.Ignore };
+                row.AddToClassList("ff-card");
+                row.AddToClassList("ff-row");
+                row.AddToClassList("phone-ledger__row");
+                row.Add(Text(PlayerHud.FormatDuration(entry.ClockSeconds, false), "phone-ledger__time", "ff-muted"));
+                row.Add(Text(PlayerHud.LedgerKind(entry.Kind), "phone-ledger__kind"));
+                row.Add(Text(SiteName(entry.SiteId), "phone-ledger__site", "ff-muted", "ff-nowrap"));
+                var amount = Text((entry.Cents > 0 ? "+" : "-") + PlayerHud.FormatCash(Math.Abs(entry.Cents)), "phone-ledger__amount");
+                amount.EnableInClassList("ff-positive-text", entry.Cents > 0);
+                row.Add(amount);
+                _ledger.Add(row);
+            }
+            if (company != null)
+                _ledger.Add(Text($"Opening {PlayerHud.FormatCash(company.OpeningCents)}, earlier entries {PlayerHud.FormatCash(company.LedgerCarriedCents)}, "
+                    + $"now {PlayerHud.FormatCash(company.Cash)}", "ff-small", "ff-muted", "phone-ledger__totals"));
+        }
+
+        // ---------- Recipes ----------
+
+        private void BuildRecipes()
+        {
+            _recipes.Clear();
+            var recipes = Session.Recipes.Where(x => x != null).ToList();
+            foreach (var machine in recipes.Where(x => !x.IsSale).GroupBy(x => x.StationKind).OrderBy(x => MachineName(x.Key)))
+            {
+                _recipes.Add(Text(MachineName(machine.Key).ToUpperInvariant(), "ff-eyebrow", "phone__heading"));
+                var grid = new VisualElement { pickingMode = PickingMode.Ignore };
+                grid.AddToClassList("phone-recipes__grid");
+                foreach (var recipe in machine.OrderBy(x => x.DisplayName))
+                {
+                    var made = recipe.OutputQuantity > 1 ? $"{recipe.OutputQuantity} x {ItemName(recipe.OutputItemId)}" : ItemName(recipe.OutputItemId);
+                    grid.Add(RecipeCard(recipe, recipe.OutputItemId, "Makes " + made));
+                }
+                _recipes.Add(grid);
+            }
+            var menu = recipes.Where(x => x.IsSale).OrderBy(x => x.Tier).ThenBy(x => x.DisplayName).ToList();
+            if (menu.Count == 0) return;
+            _recipes.Add(Text("MENU: SOLD AT THE REGISTER", "ff-eyebrow", "phone__heading"));
+            var menuGrid = new VisualElement { pickingMode = PickingMode.Ignore };
+            menuGrid.AddToClassList("phone-recipes__grid");
+            foreach (var recipe in menu)
+                menuGrid.Add(RecipeCard(recipe, recipe.Inputs.FirstOrDefault()?.itemId, "Sells for " + PlayerHud.FormatCash(recipe.SaleCents)));
+            _recipes.Add(menuGrid);
+        }
+
+        // One recipe: its icon, name and time, what goes in, and what comes out (or what it sells for).
+        private VisualElement RecipeCard(RecipeAsset recipe, string iconItemId, string result)
+        {
+            var card = new VisualElement { name = "phone-recipe-" + recipe.Id, pickingMode = PickingMode.Ignore };
+            card.AddToClassList("ff-card");
+            card.AddToClassList("phone-recipe");
+            var head = new VisualElement { pickingMode = PickingMode.Ignore };
+            head.AddToClassList("ff-row");
+            head.AddToClassList("phone-recipe__head");
+            var icon = Session.Items.FirstOrDefault(x => x != null && x.Id == iconItemId)?.Icon;
+            if (icon != null)
+            {
+                var image = new VisualElement { pickingMode = PickingMode.Ignore };
+                image.AddToClassList("phone-recipe__icon");
+                image.style.backgroundImage = new StyleBackground(icon);
+                head.Add(image);
+            }
+            head.Add(Text(recipe.DisplayName, "phone-recipe__name"));
+            head.Add(Text(PlayerHud.FormatDuration(recipe.DurationSeconds, true), "phone-recipe__time", "ff-small", "ff-nowrap"));
+            card.Add(head);
+            var inputs = recipe.Inputs.Count == 0 ? "Nothing"
+                : string.Join(" + ", recipe.Inputs.Select(x => x.quantity > 1 ? $"{x.quantity} x {ItemName(x.itemId)}" : ItemName(x.itemId)));
+            card.Add(Text("Needs " + inputs, "ff-small", "phone-recipe__line"));
+            card.Add(Text(result, "ff-small", "ff-muted", "phone-recipe__line"));
+            return card;
+        }
+
+        private string MachineName(string kind)
+        {
+            var name = Session.EquipmentDefinitions.FirstOrDefault(x => x != null && x.Kind == kind)?.DisplayName;
+            if (string.IsNullOrEmpty(name)) name = kind ?? "";
+            return name.Length == 0 ? name : char.ToUpperInvariant(name[0]) + name.Substring(1);
         }
 
         // ---------- Elements ----------

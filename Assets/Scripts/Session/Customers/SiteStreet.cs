@@ -14,6 +14,9 @@ namespace FoodFactoryGame.Session.Customers
         // Metres of street in front of the lot that customer figures walk on, and how far past the lot's sides it reaches.
         public const float Band = 6f;
         public const float Reach = 12f;
+        // Metres out from the lot's street edge of the line figures walk: a generated lot ends at the road's edge, so this keeps
+        // them on the sidewalk instead of in the kerb lane (owner, 2026-10-13).
+        public const float Sidewalk = 0.6f;
 
         // The outward unit direction (site axes) of the lot's street edge, or null when the site is not a generated lot.
         public static Vector2Int? Outward(SiteLayout layout, IEnumerable<GoodsBuilding> buildings)
@@ -38,8 +41,8 @@ namespace FoodFactoryGame.Session.Customers
             return null;
         }
 
-        // Scene points on the street in front of the lot (around the site's origin, SiteGridSpace), from past one side of
-        // the lot to past the other, Band / 2 out from its street edge.
+        // Scene points on the sidewalk in front of the lot (around the site's origin, SiteGridSpace), from past one side of
+        // the lot to past the other, Sidewalk out from its street edge.
         public static List<Vector3> Points(SiteLayout layout, Vector2Int outward, int count = 9) =>
             Points(SiteGridSpace.Origin(layout), layout.Width, layout.Depth, outward, count);
 
@@ -49,7 +52,7 @@ namespace FoodFactoryGame.Session.Customers
             var halfX = width * 0.5f * SiteGrid.CellSize;
             var halfZ = depth * 0.5f * SiteGrid.CellSize;
             var along = outward.x == 0 ? new Vector3(1, 0, 0) : new Vector3(0, 0, 1);
-            var edge = origin + new Vector3(outward.x * (halfX + Band * 0.5f), 0, outward.y * (halfZ + Band * 0.5f));
+            var edge = origin + new Vector3(outward.x * (halfX + Sidewalk), 0, outward.y * (halfZ + Sidewalk));
             var reach = (outward.x == 0 ? halfX : halfZ) + Reach - 1f;
             return Enumerable.Range(0, count).Select(i => edge + along * Mathf.Lerp(-reach, reach, i / (count - 1f))).ToList();
         }

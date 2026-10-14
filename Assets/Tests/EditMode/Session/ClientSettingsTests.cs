@@ -67,6 +67,20 @@ namespace FoodFactoryGame.Session.Tests
         }
 
         [Test]
+        public void VolumesDefaultRoundTripAndClamp()
+        {
+            var defaults = ClientSettings.Load(Path_);
+            Assert.That((defaults.Volume, defaults.EffectsVolume, defaults.InterfaceVolume, defaults.AmbienceVolume),
+                Is.EqualTo((ClientSettings.DefaultVolume, 1f, 1f, 1f)));
+
+            new ClientSettings { Volume = 0.35f, EffectsVolume = 0f, InterfaceVolume = 0.5f, AmbienceVolume = 7f }.Save(Path_);
+            var loaded = ClientSettings.Load(Path_);
+
+            Assert.That((loaded.Volume, loaded.EffectsVolume, loaded.InterfaceVolume, loaded.AmbienceVolume),
+                Is.EqualTo((0.35f, 0f, 0.5f, 1f)), "Each volume is kept apart; out-of-range values are clamped to 0..1.");
+        }
+
+        [Test]
         public void SavingAgainReplacesValuesAndClampsSensitivity()
         {
             new ClientSettings { LastKind = LastSessionKind.World, LastWorld = "a" }.Save(Path_);

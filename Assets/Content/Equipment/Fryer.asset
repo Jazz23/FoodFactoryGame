@@ -30,5 +30,5 @@ MonoBehaviour:
   mountHeight: 1.5
   hideFromAbove: 0
   opensScreen: 1
-  manualPower: 1
+  manualPower: 0
   workerBound: 0

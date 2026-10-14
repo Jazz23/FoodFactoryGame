@@ -21,7 +21,7 @@ namespace FoodFactoryGame.Session.Customers
         public Vector3 Door { get; private set; }
         // On the lot's street edge, in line with the door.
         public Vector3 Apron { get; private set; }
-        // On the street band, in line with the door.
+        // On the sidewalk, in line with the door.
         public Vector3 Kerb { get; private set; }
         public Vector3 Outward { get; private set; }
         // Along the facade, toward the side of the door with more room.
@@ -52,7 +52,7 @@ namespace FoodFactoryGame.Session.Customers
                 LotId = lotId, Anchor = anchor, Outward = out3, Along = along,
                 Door = cell + out3 * (0.5f * SiteGrid.CellSize + 0.3f),
                 Apron = cell + out3 * Mathf.Max(0.5f * SiteGrid.CellSize + 0.3f, edge - 0.3f),
-                Kerb = cell + out3 * (edge + SiteStreet.Band * 0.5f),
+                Kerb = cell + out3 * (edge + SiteStreet.Sidewalk),
                 Street = SiteStreet.Points(anchor, offer.Width, offer.Depth, outward),
                 _perRow = Mathf.Max(1, Mathf.FloorToInt((Mathf.Max(low, high) * SiteGrid.CellSize - 0.4f) / Spacing))
             };

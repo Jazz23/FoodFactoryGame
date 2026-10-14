@@ -1,6 +1,6 @@
 // The main menu, hidden during a session (decision 0041): Resume repeats the last session this menu started (a hosted world or
 // a server address), Select World hosts a saved or new world as singleplayer or for others, Connect to Server joins by
-// address, Settings holds the name, mouse sensitivity and key bindings, and Quit exits. A saved world is deleted from Select
+// address, Settings holds the name, mouse sensitivity, volumes and key bindings, and Quit exits. A saved world is deleted from Select
 // World after a second click confirms it. During a session the same overlay is the in-game menu while EquipmentInteraction's
 // Menu screen is open (Esc): Resume, Settings, Quit to Main Menu (ends the session) and Quit Game; nothing pauses. Its look is the MainMenu UXML and USS
 // under Assets/UI/Resources/UI (decision 0042); this class clones a screen, fills it in and wires its buttons.
@@ -156,6 +156,7 @@ namespace FoodFactoryGame.Session
                 _settings = new ClientSettings();
             }
             OrbitCameraRig.LookSensitivity = _settings.LookSensitivity;
+            ApplyVolumes();
             _visibility = _settings.LastVisibility;
             if (_actions != null)
             {
@@ -610,16 +611,58 @@ namespace FoodFactoryGame.Session
             });
             // Saved when the drag ends (and when leaving the screen), not on every step.
             slider.RegisterCallback<PointerCaptureOutEvent>(_ => SaveSettings());
+
+            FillVolume("master", () => _settings.Volume, x => _settings.Volume = x);
+            FillVolume("effects", () => _settings.EffectsVolume, x => _settings.EffectsVolume = x);
+            FillVolume("interface", () => _settings.InterfaceVolume, x => _settings.InterfaceVolume = x);
+            FillVolume("ambience", () => _settings.AmbienceVolume, x => _settings.AmbienceVolume = x);
             RefreshKeybinds();
         }
 
         private static string SensitivityText(float value) => value.ToString("0.00") + "×";
+
+        private static string VolumeText(float value) => Mathf.RoundToInt(value * 100f) + "%";
+
+        // One volume row (menu-volume-<key> and its -value label): applies while dragging, in 5% steps, and saves on release
+        // with a click at the new level so the player hears what they chose.
+        private void FillVolume(string key, Func<float> get, Action<float> set)
+        {
+            var value = _page.Part<Label>($"menu-volume-{key}-value");
+            value.text = VolumeText(get());
+            var slider = _page.Part<Slider>($"menu-volume-{key}");
+            slider.lowValue = 0f;
+            slider.highValue = 1f;
+            slider.SetValueWithoutNotify(get());
+            slider.RegisterValueChangedCallback(change =>
+            {
+                var snapped = ClientSettings.ClampVolume(Mathf.Round(change.newValue * 20f) / 20f);
+                set(snapped);
+                ApplyVolumes();
+                value.text = VolumeText(snapped);
+            });
+            slider.RegisterCallback<PointerCaptureOutEvent>(_ =>
+            {
+                Audio.GameAudio.PlayUi(Audio.GameAudio.ClickClip);
+                SaveSettings();
+            });
+        }
+
+        private void ApplyVolumes()
+        {
+            AudioListener.volume = _settings.Volume;
+            Audio.GameAudio.SetVolume(Audio.AudioChannel.Effects, _settings.EffectsVolume);
+            Audio.GameAudio.SetVolume(Audio.AudioChannel.Interface, _settings.InterfaceVolume);
+            Audio.GameAudio.SetVolume(Audio.AudioChannel.Ambience, _settings.AmbienceVolume);
+        }
 
         private void ResetSettings()
         {
             _rebinding?.Cancel();
             _settings.LookSensitivity = 1f;
             OrbitCameraRig.LookSensitivity = 1f;
+            _settings.Volume = ClientSettings.DefaultVolume;
+            _settings.EffectsVolume = _settings.InterfaceVolume = _settings.AmbienceVolume = 1f;
+            ApplyVolumes();
             _actions?.RemoveAllBindingOverrides();
             _settings.BindingOverrides = "";
             SaveSettings();

@@ -13,14 +13,14 @@
 // the hover line gives the full time; a machine with no recipes (the fridge) opens as plain storage, and a loading dock as its
 // outgoing and incoming grids (decision 0022), marked when a restaurant dock is not beside a back door (decision 0037, starting
 // loop). Inside a factory the inventory screen also offers its next floor (decision 0020).
-// A machine with a power switch (decision 0037, the oven) shows it under its grids; it bakes only while switched on.
+// Machines have no power switch and their screens no description text (owner, 2026-10-13); a register sells from a 5 x 5 grid.
 // Under the cash are the game clock and, when the company's cash is running short of its wages or employees are unpaid, a
 // warning whose threshold each player sets; the inventory screen has a Staff window to hire and fire (decision 0039).
 // Below those an alert names the edible stack closest to spoiling outside the cold, and while the crosshair is on something
 // with a screen a prompt under it names the interact key. While Remove is held on a belt a wheel at the crosshair (or the free
 // pointer) fills until the belt is taken up (EquipmentInteraction.BeltRemoveProgress).
 // Presentation only: slot positions are this client's arrangement of the replicated stacks, never saved or sent, and
-// progress is interpolated for at most one clock step past the latest baseline.
+// progress is interpolated for at most one clock step past the latest baseline and eased so it never jumps backwards.
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -40,6 +40,8 @@ namespace FoodFactoryGame.Session.Equipment
         public const string InputGrid = "input";
         public const string OutputGrid = "output";
         public const int GridColumns = 10;
+        // A register's sale grid is square (owner, 2026-10-13: 5 x 5); Counter.asset's input capacity matches it.
+        public const int SaleGridColumns = 5;
 
         private const string Templates = "Hud/";
         // Grid slots are 44 px plus 2 px margin each side (Theme.uss ff-slot); the hover line is sized to the grid's width.
@@ -75,6 +77,8 @@ namespace FoodFactoryGame.Session.Equipment
         private Label _cash;
         // Balance the cash label shows, so the text is rebuilt only when it changes (never a real balance before the first).
         private long _shownCash = long.MinValue;
+        // The company whose cash is shown, so switching sites does not count as earning.
+        private string _cashCompany;
         private VisualElement _cashBlock;
         // Cash, clock and warnings, top right; hidden in build mode, whose panel stands there and shows the cash.
         private VisualElement _statusColumn;
@@ -98,7 +102,6 @@ namespace FoodFactoryGame.Session.Equipment
         private Label _cursorCount;
         private VisualElement _removeWheel;
         private VisualElement _progressFill;
-        private Label _progressLabel;
         private Label _hoverLabel;
         // Spoil timers on goods slots (location, item), and the goods slot under the pointer, refreshed every frame from the
         // latest baseline without rebuilding the screen.
@@ -169,6 +172,10 @@ namespace FoodFactoryGame.Session.Equipment
             _cashBlock.Show(hasCompany);
             if (hasCompany && site.Companies[0].Cash != _shownCash)
             {
+                // Money coming in (a sale) rings the till; spending and wages are silent.
+                if (_cashCompany == site.Companies[0].Id && _shownCash != long.MinValue && site.Companies[0].Cash > _shownCash)
+                    Audio.GameAudio.PlayUi(Audio.GameAudio.CashClip, 0.55f);
+                _cashCompany = site.Companies[0].Id;
                 _shownCash = site.Companies[0].Cash;
                 _cash.text = FormatCash(_shownCash);
             }
@@ -225,7 +232,7 @@ namespace FoodFactoryGame.Session.Equipment
             _removeWheel.Show(progress > 0f);
             if (progress <= 0f || _removeWheel.panel == null) return;
             var pointer = interaction.PointerLocked
-                ? new Vector2(UnityEngine.Screen.width * 0.5f, UnityEngine.Screen.height * 0.5f)
+                ? EquipmentInteraction.CrosshairScreenPoint
                 : interaction.PointerPosition;
             var position = RuntimePanelUtils.ScreenToPanel(_removeWheel.panel, new Vector2(pointer.x, UnityEngine.Screen.height - pointer.y));
             _removeWheel.style.left = position.x - WheelSize * 0.5f;
@@ -543,9 +550,6 @@ namespace FoodFactoryGame.Session.Equipment
             // The cursor stack stays on the pointer outside screens, so its count is shown there too.
             if (interaction.CursorGoods != null) text.Append('|').Append(interaction.CursorLots(_site).Sum(x => x.Quantity));
             if (interaction.Screen == InteractionScreen.None) return text.ToString();
-            // The ledger tab, and while it shows, each new entry (decision 0038).
-            text.Append("|ledger:").Append(_ledgerShown);
-            if (_ledgerShown) text.Append('/').Append(_site.Ledger.LastOrDefault()?.Id).Append('/').Append(_site.Companies.FirstOrDefault()?.Cash);
             var building = interaction.Buildings.LocalBuilding;
             text.Append('|').Append(building?.Id).Append(building?.Floors);
             foreach (var grid in _grids.OrderBy(x => x.Key, StringComparer.Ordinal))
@@ -564,8 +568,6 @@ namespace FoodFactoryGame.Session.Equipment
             }
             // An open register shows who works it and who could (decision 0034).
             var open = _site.Equipment.FirstOrDefault(x => x.Id == interaction.OpenMachineId);
-            // The power switch (decision 0037) shows the server's state, and waits while a request is out.
-            if (open != null && HasPowerSwitch(open.Kind)) text.Append("|power:").Append(open.PoweredOn).Append(interaction.HasPendingRequests);
             if (open != null) text.Append("|recipe:").Append(open.RecipeId).Append(interaction.HasPendingRequests);
             if (open?.Kind == GoodsWorld.CounterKind || (open != null && interaction.IsWorkerBound(open.Kind)))
             {
@@ -639,11 +641,9 @@ namespace FoodFactoryGame.Session.Equipment
         {
             _screen.Clear();
             _progressFill = null;
-            _progressLabel = null;
             _hoverLabel = null;
             _timers.Clear();
             _hovered = null;
-            _registerReadiness = null;
             var inventoryId = interaction.InventoryId;
             if (interaction.Screen is InteractionScreen.None or InteractionScreen.Employee or InteractionScreen.PickPosition or InteractionScreen.Logistics
                     or InteractionScreen.Build or InteractionScreen.Menu
@@ -670,8 +670,8 @@ namespace FoodFactoryGame.Session.Equipment
                 side.AddToClassList("hud-side");
                 var room = _screenArea.resolvedStyle.height;
                 if (room > 0f) side.style.maxHeight = room;
-                // The Supplier and the company ledger (decision 0038) share a window, one tab each.
-                if (interaction.Session.Offers.Count > 0) side.Add(_ledgerShown ? LedgerWindow(site) : SupplierWindow());
+                // The company ledger (decision 0038) is in the phone (PhonePanel's Ledger app).
+                if (interaction.Session.Offers.Count > 0) side.Add(SupplierWindow());
                 if (site.Companies is { Count: > 0 })
                 {
                     var staff = StaffWindow(site);
@@ -692,7 +692,6 @@ namespace FoodFactoryGame.Session.Equipment
         private VisualElement SupplierWindow()
         {
             var window = Window("hud-supplier", "Supplier");
-            AddTabs(window);
             // Truck offers are bought on the logistics screen (decision 0023); restaurant furnishings in build mode (decision 0034).
             foreach (var offer in interaction.Session.Offers.Where(x => x != null && x.Truck == null && (x.Equipment == null || string.IsNullOrEmpty(x.Equipment.Category))))
             {
@@ -812,64 +811,45 @@ namespace FoodFactoryGame.Session.Equipment
         // Orders the next floor, like the Build button. Public so tests can drive the same path as the button.
         public void ClickAddFloor() => interaction.AddFloor();
 
-        // Input slot -> progress arrow -> output slot, like a Factorio furnace; the machine runs by itself (decision 0008).
-        // A machine with no recipes is storage (the fridge, decision 0018): just its input grid.
+        // Input slot -> progress arrow -> output slot, like a Factorio furnace; the machine runs by itself as soon as its inputs
+        // are in (decision 0008; owner, 2026-10-13: no power switches). A machine with no recipes is storage (the fridge, decision
+        // 0018): just its input grid. The window carries no description text (owner, 2026-10-13): the grids, the progress bar,
+        // the recipe chooser and, for a register or counter, who works it. Recipes and their times are in the phone.
         private VisualElement MachineWindow(GoodsSnapshot site, GoodsEquipment equipment)
         {
             if (equipment.Kind == GoodsWorld.DockKind) return DockWindow(site, equipment);
             if (GoodsWorld.IsTable(equipment)) return TableWindow(site, equipment);
             if (!interaction.Session.Recipes.Any(x => x != null && x.StationKind == equipment.Kind)) return StorageMachineWindow(site, equipment);
             var makes = interaction.Session.Recipes.Where(x => x != null && !x.IsSale && x.StationKind == equipment.Kind).ToList();
-            // Decision 0043: a machine set to one recipe shows only that one; on automatic, one recipe or a count.
-            var chosen = makes.FirstOrDefault(x => x.Id == equipment.RecipeId);
-            var recipeLine = chosen != null ? RecipeLine(chosen)
-                : makes.Count == 1 ? RecipeLine(makes[0])
-                : makes.Count > 1 ? $"Automatic: makes the first of {makes.Count} recipes whose inputs are in" : "";
             var window = UiTemplates.Clone(Templates + "HudMachineWindow");
-            Header(window, MachineName(equipment.Kind), recipeLine);
-            window.Part<Label>("input-caption").text = $"IN  {Units(site, equipment.InputLocationId)}";
-            window.Part("input-grid").Add(GridView(InputGrid));
+            Header(window, MachineName(equipment.Kind), null);
+            // A sale station (decision 0013) turns its input into company cash: a 5 x 5 grid of what it sells, no output grid.
+            var sales = SaleRecipes(equipment.Kind).Count > 0;
+            window.Part<Label>("input-caption").text = $"{(sales ? "TO SELL" : "IN")}  {Units(site, equipment.InputLocationId)}";
+            window.Part("input-grid").Add(GridView(InputGrid, sales ? SaleGridColumns : GridColumns));
             _progressFill = window.Part("hud-progress-fill");
-            // A sale station (decision 0013) turns its input into company cash, so it shows prices instead of an output grid.
-            var sales = SaleRecipes(equipment.Kind);
-            var prices = window.Part("hud-sale-prices");
-            if (sales.Count == 0)
+            if (sales) window.Part("output-column").RemoveFromHierarchy();
+            else
             {
-                prices.RemoveFromHierarchy();
                 window.Part<Label>("output-caption").text = $"OUT  {Units(site, equipment.OutputLocationId)}";
                 window.Part("output-grid").Add(GridView(OutputGrid));
             }
-            else
-            {
-                window.Part("output-column").RemoveFromHierarchy();
-                foreach (var sale in sales)
-                {
-                    var line = new Label($"{string.Join(" + ", sale.Inputs.Select(x => $"{x.quantity} {ItemName(x.itemId)}"))}  {FormatCash(sale.SaleCents)}")
-                        { pickingMode = PickingMode.Ignore };
-                    line.AddToClassList("hud-machine__price");
-                    prices.Add(line);
-                }
-            }
-            _progressLabel = window.Part<Label>("hud-progress-label");
             if (makes.Count > 1) FillRecipe(window.Part("hud-recipe"), equipment, makes);
             else window.Part("hud-recipe").RemoveFromHierarchy();
             if (equipment.Kind == GoodsWorld.CounterKind || interaction.IsWorkerBound(equipment.Kind)) FillRegister(window.Part("hud-staff"), site, equipment);
             else window.Part("hud-staff").RemoveFromHierarchy();
-            FillRegisterReadiness(window, equipment.Kind == GoodsWorld.CounterKind);
-            if (HasPowerSwitch(equipment.Kind)) FillPower(window.Part("hud-power"), equipment);
-            else window.Part("hud-power").RemoveFromHierarchy();
             return window;
         }
 
+        // Short name of a recipe for the chooser: its output, with the batch size when it makes more than one.
         private string RecipeLine(RecipeAsset recipe) =>
-            $"{string.Join(" + ", recipe.Inputs.Select(x => (x.quantity > 1 ? $"{x.quantity} " : "") + ItemName(x.itemId)))} → "
-            + $"{(recipe.OutputQuantity > 1 ? $"{recipe.OutputQuantity} " : "")}{ItemName(recipe.OutputItemId)}  ·  {recipe.DurationSeconds} s";
+            $"{(recipe.OutputQuantity > 1 ? $"{recipe.OutputQuantity} x " : "")}{ItemName(recipe.OutputItemId)}";
 
         // Decision 0043: what a machine with several recipes makes. Automatic starts the first recipe (by ID) whose inputs are in;
         // choosing one makes only that. Rebuilt with the server's answer (Signature).
         private void FillRecipe(VisualElement row, GoodsEquipment equipment, List<RecipeAsset> makes)
         {
-            const string automatic = "Automatic (first ready recipe)";
+            const string automatic = "Automatic";
             var labels = makes.ToDictionary(x => x.Id, RecipeLine);
             var choice = row.Part<DropdownField>("hud-recipe-choice");
             choice.choices = new List<string> { automatic }.Concat(makes.Select(x => labels[x.Id])).ToList();
@@ -886,29 +866,6 @@ namespace FoodFactoryGame.Session.Equipment
         // Sets what a machine makes ("" for automatic), like the chooser. Public so tests drive the same path.
         public void ClickRecipe(string equipmentId, string recipeId) => interaction.SelectRecipe(equipmentId, recipeId);
 
-        private bool HasPowerSwitch(string kind) =>
-            interaction.Session.EquipmentDefinitions.Any(x => x != null && x.Kind == kind && x.ManualPower);
-
-        // A machine with a power switch (decision 0037, the oven) bakes only while it is on: a sliding switch that asks the
-        // server to flip it. Rebuilt with the server's answer (Signature).
-        private void FillPower(VisualElement row, GoodsEquipment equipment)
-        {
-            var on = equipment.PoweredOn;
-            row.Part("hud-power-label").Show(interaction.HasPendingRequests);
-            var track = row.Part("hud-power-switch");
-            track.EnableInClassList("hud-power__switch--on", on);
-            row.Part<Label>("hud-power-state").text = on ? "ON" : "OFF";
-            var equipmentId = equipment.Id;
-            track.RegisterCallback<ClickEvent>(_ =>
-            {
-                if (!interaction.HasPendingRequests) ClickPower(equipmentId, !on);
-            });
-            track.SetEnabled(!interaction.HasPendingRequests);
-        }
-
-        // Flips a machine's power switch, like the switch. Public so tests drive the same path.
-        public void ClickPower(string equipmentId, bool on) => interaction.SetPower(equipmentId, on);
-
         // A register (decision 0034) sells only while someone works it: who does, and a button to work it or leave it. A
         // worker-bound station (decision 0043, the kitchen counter) works the same way, except that it is worked by whoever stands
         // at it: the player leaves by walking away, and employees work it from their task list, so it has no Assign buttons.
@@ -916,7 +873,7 @@ namespace FoodFactoryGame.Session.Equipment
         {
             var me = interaction.LocalPlayerId;
             var station = interaction.IsWorkerBound(register.Kind);
-            var who = string.IsNullOrEmpty(register.StaffId) ? (station ? "nobody: nothing is made" : "nobody: customers are not served")
+            var who = string.IsNullOrEmpty(register.StaffId) ? (station ? "nobody, nothing is made" : "nobody, customers are not served")
                 : register.StaffId == me ? "you" : site.Employees.FirstOrDefault(x => x.Id == register.StaffId)?.Name ?? "a teammate";
             // While a request is out the row says so, and it is rebuilt when the server's answer arrives (Signature).
             row.Part<Label>("hud-staff-label").text = interaction.HasPendingRequests ? "Updating..." : $"{(station ? "Worked" : "Staffed")} by {who}";
@@ -994,9 +951,9 @@ namespace FoodFactoryGame.Session.Equipment
             return window;
         }
 
-        private VisualElement GridView(string grid)
+        private VisualElement GridView(string grid, int columns = GridColumns)
         {
-            // Explicit rows of GridColumns slots: a wrapping row of fixed width can lose its last column to device-pixel
+            // Explicit rows of `columns` slots: a wrapping row of fixed width can lose its last column to device-pixel
             // rounding on a scaled panel.
             var view = new VisualElement { name = $"hud-{grid}-grid" };
             view.AddToClassList("hud-grid");
@@ -1004,7 +961,7 @@ namespace FoodFactoryGame.Session.Equipment
             VisualElement row = null;
             for (var index = 0; index < slots.Count; index++)
             {
-                if (index % GridColumns == 0)
+                if (index % columns == 0)
                 {
                     row = new VisualElement();
                     row.AddToClassList("hud-grid__row");
@@ -1093,7 +1050,7 @@ namespace FoodFactoryGame.Session.Equipment
             _cursor.style.display = carrying ? DisplayStyle.Flex : DisplayStyle.None;
             if (!carrying || _cursor.panel == null) return;
             var pointer = interaction.PointerLocked
-                ? new Vector2(UnityEngine.Screen.width * 0.5f + IconSize * 0.6f, UnityEngine.Screen.height * 0.5f - IconSize * 0.6f)
+                ? EquipmentInteraction.CrosshairScreenPoint + new Vector2(IconSize * 0.6f, -IconSize * 0.6f)
                 : interaction.PointerPosition;
             var position = RuntimePanelUtils.ScreenToPanel(_cursor.panel, new Vector2(pointer.x, UnityEngine.Screen.height - pointer.y));
             _cursor.style.left = position.x - IconSize * 0.3f;
@@ -1103,91 +1060,48 @@ namespace FoodFactoryGame.Session.Equipment
         private void UpdateProgress(GoodsSnapshot site)
         {
             if (_progressFill == null) return;
-            var equipment = site.Equipment.FirstOrDefault(x => x.Id == interaction.OpenMachineId);
             var job = site.Jobs.FirstOrDefault(x => x.StationId == interaction.OpenMachineId);
-            // Customers (decision 0024) buy at a counter: one being served there, or how many wait in the site's queue.
+            // Customers (decision 0024) buy at a counter: the one being served there fills the bar.
             var serving = site.Customers.FirstOrDefault(x => x.CounterId == interaction.OpenMachineId);
-            var waiting = site.Customers.Count(x => x.State == CustomerState.Queued);
-            var fraction = 0f;
+            var since = Mathf.Min(Time.unscaledTime - _siteSeenAt, 1f);
+            var target = 0f;
+            var running = false;
             if (job == null && serving != null)
             {
                 var item = interaction.Session.Recipes.FirstOrDefault(x => x != null && x.Id == serving.RecipeId);
                 var duration = Math.Max(1, item?.DurationSeconds ?? 1);
-                var elapsed = duration - serving.RemainingSeconds + Mathf.Min(Time.unscaledTime - _siteSeenAt, 1f);
-                fraction = Mathf.Clamp01((float)(elapsed / duration));
-                var food = item == null ? "" : string.Join(" + ", item.Inputs.Select(x => ItemName(x.itemId)).Distinct()) + " ";
-                _progressLabel.text = $"Serving a customer: {food}for {FormatCash(serving.PaidCents)}"
-                    + (waiting > 0 ? $"; {waiting} waiting" : "");
+                target = Mathf.Clamp01((float)((duration - serving.RemainingSeconds + since) / duration));
+                running = true;
             }
-            else if (job == null && equipment != null && HasPowerSwitch(equipment.Kind) && !equipment.PoweredOn)
-                _progressLabel.text = "Off: switch it on to start";
-            else if (job == null && equipment != null && interaction.IsWorkerBound(equipment.Kind) && string.IsNullOrEmpty(equipment.StaffId))
-                _progressLabel.text = "Idle: nothing is made until someone works this counter";
-            else if (job == null)
+            else if (job != null && job.State == StationJobState.Blocked) target = 1f;
+            else if (job != null)
             {
-                // Decision 0043: a machine set to one recipe waits only for that recipe's ingredients.
-                var recipes = interaction.Session.Recipes.Where(x => x != null && x.StationKind == equipment?.Kind
-                    && (string.IsNullOrEmpty(equipment.RecipeId) || x.IsSale || x.Id == equipment.RecipeId)).ToList();
-                var ingredients = recipes.SelectMany(x => x.Inputs).Select(x => ItemName(x.itemId)).Distinct().ToList();
-                var output = site.Locations.FirstOrDefault(x => x.Id == equipment?.OutputLocationId);
-                var makes = recipes.Where(x => !x.IsSale).ToList();
-                // The server starts nothing while the output cannot take a batch (decision 0008), so say why it waits.
-                if (output != null && makes.Count > 0 && makes.Count == recipes.Count
-                    && makes.All(x => GoodsSlots.FreeUnits(site, output.Id, x.OutputItemId, false, interaction.Session.MaxStack) < x.OutputQuantity))
-                    _progressLabel.text = "Stopped: output full, take the results out";
-                // A sale needs a company to pay (decision 0013); the baseline carries the site's company, if any.
-                else if (recipes.Count > 0 && recipes.All(x => x.IsSale) && site.Companies is not { Count: > 0 })
-                    _progressLabel.text = "Idle: this site has no company to sell for";
-                else if (recipes.Count > 0 && recipes.All(x => x.IsSale))
-                    _progressLabel.text = WaitingText(site, equipment, recipes, ingredients, waiting);
-                else _progressLabel.text = ingredients.Count == 0 ? "Idle: no recipes for this machine" : $"Idle: put {string.Join(" or ", ingredients)} in the input";
+                var equipment = site.Equipment.FirstOrDefault(x => x.Id == interaction.OpenMachineId);
+                // A worker-bound station nobody works (decision 0043) holds its batch where it is.
+                var paused = equipment != null && interaction.IsWorkerBound(equipment.Kind) && string.IsNullOrEmpty(equipment.StaffId);
+                var elapsed = job.DurationSeconds - job.RemainingSeconds + (paused ? 0f : since);
+                target = Mathf.Clamp01((float)(elapsed / Math.Max(1, job.DurationSeconds)));
+                running = !paused;
             }
-            else if (job.State == StationJobState.Blocked)
+            // The bar follows the target smoothly every frame. It only moves back when a new batch starts (the target drops
+            // to near empty), so a late baseline never makes it flicker backwards.
+            var key = job?.Id ?? serving?.Id ?? "";
+            if (key != _progressKey || target < _progressShown - 0.5f)
             {
-                fraction = 1f;
-                _progressLabel.text = $"Done, waiting: output full ({ItemName(job.OutputItemId)})";
-            }
-            else if (equipment != null && interaction.IsWorkerBound(equipment.Kind) && string.IsNullOrEmpty(equipment.StaffId))
-            {
-                // Nobody works the station (decision 0043): the batch waits where it is.
-                fraction = Mathf.Clamp01((float)(job.DurationSeconds - job.RemainingSeconds) / job.DurationSeconds);
-                _progressLabel.text = $"Paused (nobody working): {ItemName(job.OutputItemId)} {job.DurationSeconds - job.RemainingSeconds}/{job.DurationSeconds} s";
-            }
-            else if (equipment != null && HasPowerSwitch(equipment.Kind) && !equipment.PoweredOn)
-            {
-                // Switched off mid-batch (decision 0037): the batch waits where it is.
-                fraction = Mathf.Clamp01((float)(job.DurationSeconds - job.RemainingSeconds) / job.DurationSeconds);
-                _progressLabel.text = $"Paused (off): {ItemName(job.OutputItemId)} {job.DurationSeconds - job.RemainingSeconds}/{job.DurationSeconds} s";
+                _progressKey = key;
+                _progressShown = target;
             }
             else
             {
-                var elapsed = job.DurationSeconds - job.RemainingSeconds + Mathf.Min(Time.unscaledTime - _siteSeenAt, 1f);
-                fraction = Mathf.Clamp01((float)(elapsed / job.DurationSeconds));
-                var what = job.IsSale
-                    ? $"Serving a customer: {string.Join(" + ", job.Inputs.Select(x => ItemName(x.ItemId)).Distinct())} for {FormatCash(job.SaleCents)}"
-                    : $"Making {ItemName(job.OutputItemId)}";
-                _progressLabel.text = $"{what}: {job.DurationSeconds - job.RemainingSeconds}/{job.DurationSeconds} s";
+                var eased = Mathf.Lerp(_progressShown, target, 1f - Mathf.Exp(-12f * Time.unscaledDeltaTime));
+                _progressShown = running ? Mathf.Max(_progressShown, eased) : eased;
             }
-            _progressFill.style.width = new Length(fraction * 100f, LengthUnit.Percent);
+            _progressFill.style.width = new Length(_progressShown * 100f, LengthUnit.Percent);
         }
 
-        // Why customers at an idle counter wait (decision 0024), naming the first blocker: no edible menu item in this counter,
-        // or every table seat taken while a dine-in customer queues. Otherwise they are on their way to being served. With nobody
-        // waiting it says whether the input holds anything to sell (P0-05: it used to say "keep ... in the input" when it was empty).
-        private static string WaitingText(GoodsSnapshot site, GoodsEquipment counter, List<RecipeAsset> menu, List<string> ingredients, int waiting)
-        {
-            var food = string.Join(" or ", ingredients);
-            var items = new HashSet<string>(menu.SelectMany(x => x.Inputs).Select(x => x.itemId));
-            var edible = site.Lots.Where(x => x.LocationId == counter.InputLocationId && !x.Spoiled && items.Contains(x.ItemId)).Sum(x => x.Quantity);
-            if (waiting == 0) return edible == 0 ? $"Nothing to sell: put edible {food} in the input" : $"No customers waiting; {edible} {food} ready to sell";
-            var who = $"{waiting} customer{(waiting == 1 ? "" : "s")} waiting";
-            if (edible == 0) return $"{who}: put edible {food} in the input";
-            var tables = site.Equipment.Where(x => GoodsWorld.IsTable(x) && x.State == EquipmentState.Placed).ToList();
-            var freeSeats = tables.Sum(x => x.Seats) - site.Customers.Count(x => tables.Any(y => y.Id == x.TableId));
-            if (freeSeats <= 0 && site.Customers.Any(x => x.State == CustomerState.Queued && x.DineIn))
-                return $"{who}: every table seat is taken; place more tables";
-            return who;
-        }
+        // The open machine's progress bar as last drawn, and the batch (or customer) it shows.
+        private float _progressShown;
+        private string _progressKey = "";
 
         // Spoil timers and the hover line follow each baseline (the server ages goods every clock step); display only.
         private void UpdateSpoilage(GoodsSnapshot site)

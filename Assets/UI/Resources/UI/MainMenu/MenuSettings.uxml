@@ -1,5 +1,5 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
-    <!-- Settings: name, mouse sensitivity, and the keybinds (MenuKeybindGroup/Row templates fill the two columns). -->
+    <!-- Settings: name, mouse sensitivity, sound volumes, and the keybinds (MenuKeybindGroup/Row templates fill the two columns). -->
     <Style src="project://database/Assets/UI/Theme/Theme.uss" />
     <Style src="MainMenu.uss" />
     <ui:VisualElement name="main-menu-page" class="menu-page">
@@ -13,7 +13,7 @@
             <ui:Button name="menu-settings-done" text="Done" focusable="false" class="ff-button ff-button--primary ff-button--lg" />
         </ui:VisualElement>
         <ui:VisualElement class="ff-row menu-page__body">
-            <ui:VisualElement class="menu-settings__side">
+            <ui:ScrollView mode="Vertical" horizontal-scroller-visibility="Hidden" class="ff-scroll menu-settings__side">
                 <ui:VisualElement class="menu-card menu-settings__card">
                     <ui:Label text="YOUR NAME" class="ff-eyebrow ff-field__caption" picking-mode="Ignore" />
                     <ui:TextField name="menu-settings-name" class="ff-text-field" />
@@ -30,11 +30,34 @@
                         <ui:Label name="menu-sensitivity-max" class="ff-tiny" picking-mode="Ignore" />
                     </ui:VisualElement>
                 </ui:VisualElement>
+                <ui:VisualElement class="menu-card menu-settings__card">
+                    <ui:Label text="SOUND" class="ff-eyebrow" picking-mode="Ignore" />
+                    <ui:VisualElement class="ff-row menu-volume__row">
+                        <ui:Label text="Master" class="menu-sensitivity__caption menu-volume__caption" picking-mode="Ignore" />
+                        <ui:Slider name="menu-volume-master" class="ff-slider ff-grow menu-volume__slider" />
+                        <ui:Label name="menu-volume-master-value" class="menu-sensitivity__value menu-volume__value" picking-mode="Ignore" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="ff-row menu-volume__row">
+                        <ui:Label text="Effects" class="menu-sensitivity__caption menu-volume__caption" picking-mode="Ignore" />
+                        <ui:Slider name="menu-volume-effects" class="ff-slider ff-grow menu-volume__slider" />
+                        <ui:Label name="menu-volume-effects-value" class="menu-sensitivity__value menu-volume__value" picking-mode="Ignore" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="ff-row menu-volume__row">
+                        <ui:Label text="Interface" class="menu-sensitivity__caption menu-volume__caption" picking-mode="Ignore" />
+                        <ui:Slider name="menu-volume-interface" class="ff-slider ff-grow menu-volume__slider" />
+                        <ui:Label name="menu-volume-interface-value" class="menu-sensitivity__value menu-volume__value" picking-mode="Ignore" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="ff-row menu-volume__row">
+                        <ui:Label text="Ambience" class="menu-sensitivity__caption menu-volume__caption" picking-mode="Ignore" />
+                        <ui:Slider name="menu-volume-ambience" class="ff-slider ff-grow menu-volume__slider" />
+                        <ui:Label name="menu-volume-ambience-value" class="menu-sensitivity__value menu-volume__value" picking-mode="Ignore" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
                 <ui:VisualElement class="menu-card menu-card--quiet menu-settings__card">
                     <ui:Label text="REBINDING" class="ff-eyebrow" picking-mode="Ignore" />
                     <ui:Label text="Click a key, then press the new key or mouse button. Esc cancels; Backspace unbinds." class="ff-soft ff-wrap menu-settings__tip" picking-mode="Ignore" />
                 </ui:VisualElement>
-            </ui:VisualElement>
+            </ui:ScrollView>
             <ui:VisualElement class="menu-card menu-keys">
                 <ui:VisualElement class="ff-row menu-keys__header" picking-mode="Ignore">
                     <ui:Label text="KEYBINDS" class="ff-eyebrow ff-grow" picking-mode="Ignore" />

@@ -48,19 +48,25 @@ namespace FoodFactoryGame.Session.Player
             cameraRig.gameObject.SetActive(IsOwner);
             // Every player's figure opens restaurant doors it comes near (presentation only).
             if (!TryGetComponent<Buildings.DoorOpener>(out _)) gameObject.AddComponent<Buildings.DoorOpener>();
+            if (!TryGetComponent<FootstepAudio>(out _)) gameObject.AddComponent<FootstepAudio>();
             if (IsOwner)
             {
+                Audio.GameAudio.InWorld = true;
                 moveAction.action.Enable();
                 jumpAction.action.Enable();
                 sprintAction.action.Enable();
             }
             Tint(_displayName.Value);
+            // City cars stop for every player's figure (presentation only).
+            Logistics.Pedestrians.Add(transform);
         }
 
         public override void OnStopClient()
         {
+            Logistics.Pedestrians.Remove(transform);
             if (IsOwner)
             {
+                Audio.GameAudio.InWorld = false;
                 moveAction.action.Disable();
                 jumpAction.action.Disable();
                 sprintAction.action.Disable();

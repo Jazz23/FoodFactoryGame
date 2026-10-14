@@ -281,18 +281,11 @@ namespace FoodFactoryGame.Session.PlayModeTests
             Assert.That(hud.CursorIcon.resolvedStyle.display, Is.EqualTo(DisplayStyle.Flex), "The stack's icon follows the pointer.");
             Assert.That(Count(_root.ServerWorld.Snapshot(), GoodsWorld.InventoryLocationId(hostId), "dough"), Is.EqualTo(DevWorld.StarterDough));
 
-            // Drop it on the input slot: the dough moves in, but the oven bakes only once switched on (decision 0037).
+            // Drop it on the input slot: the dough moves in and the oven starts a batch by itself (decision 0048: no power
+            // switch; a machine runs as soon as its inputs are in).
             hud.ClickSlot(PlayerHud.InputGrid, 0);
             Assert.That(interaction.CursorGoods, Is.Null);
-            yield return Until(() => Count(_root.ClientSite, input, "dough") == DevWorld.StarterDough && !interaction.HasPendingRequests, "dough in the input");
-            yield return null;
-            Assert.That(_root.ClientSite.Jobs.Any(x => x.StationId == DevWorld.OvenId), Is.False, "An oven that is off does not bake.");
-            Assert.That(hud.ScreenRoot.Q<Label>("hud-progress-label").text, Is.EqualTo("Off: switch it on to start"));
-            Assert.That(hud.ScreenRoot.Q("hud-power-switch"), Is.Not.Null);
-            Assert.That(_presenter.Visuals[DevWorld.OvenId].Running, Is.False);
-
-            // The switch on its screen turns it on, and it starts a batch by itself in the same command.
-            hud.ClickPower(DevWorld.OvenId, true);
+            Assert.That(hud.ScreenRoot.Q("hud-power-switch"), Is.Null, "The machine screen has no power switch.");
             yield return Until(() => { _remoteSite.Tick(); return _remoteSite.Latest.Jobs.Any(x => x.StationId == DevWorld.OvenId && x.StartedBy == GoodsWorld.AutomaticStarter); },
                 "remote sees the automatic batch");
             Assert.That(interaction.LastRejection, Is.Null);
@@ -490,11 +483,9 @@ namespace FoodFactoryGame.Session.PlayModeTests
             }
             Assert.That(Count(inventory), Is.EqualTo(full + 5), "One full stack per oven input slot and a stack of 5.");
 
-            // Machine screen: once switched on, the oven's empty input takes a full stack, and a batch takes one dough straight
-            // away; each later full stack still fits whole, until the input is one dough short of full in every slot.
+            // Machine screen: the oven's empty input takes a full stack, and a batch takes one dough straight away; each later
+            // full stack still fits whole, until the input is one dough short of full in every slot.
             yield return Until(() => { interaction.OpenMachine(DevWorld.OvenId); return interaction.Screen == InteractionScreen.Machine; }, "oven screen");
-            hud.ClickPower(DevWorld.OvenId, true);
-            yield return Until(() => _root.ClientSite.Equipment.Single(x => x.Id == DevWorld.OvenId).PoweredOn && !interaction.HasPendingRequests, "oven switched on");
             yield return null;
             for (var slot = 0; slot < slots; slot++)
             {

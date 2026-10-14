@@ -26,6 +26,9 @@ namespace FoodFactoryGame.Session.Equipment
         private readonly Dictionary<string, GoodsEquipment> _placed = new();
         // Renderers of pieces hidden from above, by equipment ID.
         private readonly Dictionary<string, Renderer[]> _fromAbove = new();
+        // Sites drawn at the last refresh: a piece that appears at one of them was just placed and is heard landing, while
+        // a site coming into view appears silently.
+        private readonly HashSet<string> _drawnSites = new();
         private int _shown = -1;
 
         public IReadOnlyDictionary<string, EquipmentVisual> Visuals => _visuals;
@@ -71,6 +74,7 @@ namespace FoodFactoryGame.Session.Equipment
                 _fromAbove.Remove(id);
             }
             var lotsBySite = new Dictionary<DrawnSite, ILookup<string, GoodsLot>>();
+            var placedNow = new List<EquipmentVisual>();
             foreach (var (site, equipment) in placed.OrderBy(x => x.Equipment.Layer == SiteGrid.TabletopLayer))
             {
                 if (!_visuals.TryGetValue(equipment.Id, out var visual))
@@ -78,6 +82,7 @@ namespace FoodFactoryGame.Session.Equipment
                     visual = Create(equipment);
                     if (visual == null) continue;
                     _visuals.Add(equipment.Id, visual);
+                    placedNow.Add(visual);
                 }
                 _placed[equipment.Id] = equipment;
                 var rotation = SiteGridSpace.Rotation(equipment.Rotation);
@@ -93,6 +98,11 @@ namespace FoodFactoryGame.Session.Equipment
                 if (!lotsBySite.TryGetValue(site, out var lots)) lotsBySite[site] = lots = site.Snapshot.Lots.ToLookup(x => x.LocationId);
                 visual.SetFill(input == null ? 0 : GoodsSlots.SlotsUsed(lots[input.Id], session.MaxStack), input?.Capacity ?? 0);
             }
+            foreach (var visual in placedNow)
+                if (_drawnSites.Contains(_placed[visual.EquipmentId].SiteId))
+                    Audio.GameAudio.PlayAt(Audio.GameAudio.PlaceClip, visual.transform.position, 0.8f);
+            _drawnSites.Clear();
+            foreach (var site in drawn.Sites.Where(x => x.Layout != null)) _drawnSites.Add(site.SiteId);
         }
 
         private void OnDisable() => Clear();
@@ -104,6 +114,7 @@ namespace FoodFactoryGame.Session.Equipment
             _visuals.Clear();
             _placed.Clear();
             _fromAbove.Clear();
+            _drawnSites.Clear();
             _shown = -1;
         }
 
@@ -141,6 +152,7 @@ namespace FoodFactoryGame.Session.Equipment
                 obstacle.center = Vector3.up;
                 obstacle.carving = true;
             }
+            EquipmentRunningAudio.AddTo(root, equipment.Kind);
             var visual = root.AddComponent<EquipmentVisual>();
             visual.Bind(equipment.Id, equipment.Kind);
             // Far away it is not drawn; the machine keeps running on the server.

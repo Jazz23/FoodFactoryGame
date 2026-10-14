@@ -6,7 +6,7 @@
 .hud-crosshair {
     position: absolute;
     left: 50%;
-    top: 50%;
+    top: 40%;
     width: 6px;
     height: 6px;
     margin-left: -3px;
@@ -21,7 +21,7 @@
 .hud-prompt {
     position: absolute;
     left: 50%;
-    top: 50%;
+    top: 40%;
     translate: -50% 28px;
     flex-direction: row;
     align-items: center;
@@ -214,9 +214,6 @@
 }
 
 .hud-machine__arrow { width: 40px; height: 20px; align-self: center; margin-bottom: 6px; color: var(--ff-disabled); }
-.hud-machine__prices { min-width: 120px; }
-.hud-machine__price { margin-top: 6px; font-size: 13px; }
-.hud-machine__progress-label { margin-top: 10px; font-size: 12px; color: var(--ff-text-soft); }
 
 /* A register's staff (decision 0034). */
 .hud-register { margin-top: 14px; flex-wrap: wrap; }
@@ -229,48 +226,9 @@
 .hud-recipe__label { margin-right: 12px; }
 .hud-recipe__choice { max-width: 520px; }
 
-/* The power switch (decision 0037). */
-.hud-power { margin-top: 16px; }
-.hud-power__label { margin-top: 2px; }
-
-.hud-power__switch {
-    width: 88px;
-    height: 44px;
-    flex-direction: row;
-    align-items: center;
-    justify-content: flex-start;
-    padding: 4px;
-    background-color: var(--ff-edge);
-    border-radius: 22px;
-}
-
-.hud-power__switch:hover { background-color: var(--ff-edge-strong); }
-.hud-power__switch--on { justify-content: flex-end; background-color: var(--ff-power-on); }
-.hud-power__switch--on:hover { background-color: #47AA62; }
-.hud-power__switch:disabled { opacity: 0.6; }
-
-.hud-power__knob {
-    width: 36px;
-    height: 36px;
-    border-radius: 18px;
-    background-color: var(--ff-knob);
-    align-items: center;
-    justify-content: center;
-}
-
-.hud-power__state { font-size: 10px; -unity-font-style: bold; color: var(--ff-ink); }
-
 /* Docks and storage machines. */
 .hud-dock__body { align-items: flex-start; }
 .hud-dock__outgoing { margin-right: 16px; }
 .hud-dock__warning { color: #FFBF4D; }
 
-/* Supplier and Ledger tabs (decision 0038, starting loop) and the ledger's rows. */
-.hud-tabs { margin-bottom: 8px; }
-.hud-ledger__row { margin-top: 2px; }
-.hud-ledger__cell { font-size: 12px; }
-.hud-ledger__time { width: 60px; }
-.hud-ledger__kind { width: 110px; }
-.hud-ledger__site { flex-grow: 1; flex-shrink: 1; min-width: 0; }
-.hud-ledger__amount { width: 80px; -unity-text-align: middle-right; }
 .hud-storage__body { align-items: center; }

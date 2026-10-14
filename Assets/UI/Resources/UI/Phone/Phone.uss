@@ -92,3 +92,21 @@
 .phone-row__sub { margin-top: 2px; white-space: normal; }
 .phone-row__button { margin-left: 6px; }
 .phone-row__field { flex-grow: 1; flex-shrink: 1; margin-right: 8px; }
+
+/* Ledger app: one row per cash change, newest first. */
+.phone-ledger__row { align-items: center; padding: 6px 10px; margin-top: 4px; }
+.phone-ledger__time { width: 90px; font-size: 13px; }
+.phone-ledger__kind { width: 180px; font-size: 13px; }
+.phone-ledger__site { flex-grow: 1; flex-shrink: 1; min-width: 0; font-size: 13px; }
+.phone-ledger__amount { width: 110px; font-size: 13px; -unity-font-style: bold; -unity-text-align: middle-right; }
+.phone-ledger__totals { margin-top: 10px; }
+
+/* Recipes app: a card per recipe, grouped under the machine that makes it. */
+.phone-recipes__grid { flex-direction: row; flex-wrap: wrap; }
+.phone-recipe { width: 300px; margin: 0 8px 8px 0; padding: 10px 12px; }
+.phone-recipe__head { align-items: center; }
+.phone-recipe__icon { width: 32px; height: 32px; margin-right: 10px; flex-shrink: 0; }
+.phone-recipe__name { font-size: 15px; -unity-font-style: bold; flex-grow: 1; flex-shrink: 1; white-space: normal; }
+.phone-recipe__time { margin-left: 8px; color: var(--ff-accent); -unity-font-style: bold; }
+.phone-recipe__line { margin-top: 6px; white-space: normal; }
+

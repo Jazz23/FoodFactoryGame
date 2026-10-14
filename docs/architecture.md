@@ -946,6 +946,21 @@ unchanged. Verification: [record](verification/phone-20261013.md).
 - Planned / open: see 0047's Open list; the starting-loop P2 supplier depot is still planned and the instant supplier window
   is unchanged.
 
+## Implemented, unverified: owner feedback round 6 (2026-10-13)
+
+Decision: [0048](decisions/0048-owner-feedback-round-6.md). Layout format and goods schema unchanged. Not compiled or tested
+(owner's instruction for this round).
+
+- Implemented: indoors keeps the third-person view; the crosshair and aim rays sit at 60% of the screen height.
+- Implemented: a truck that cannot load or unload lets go of its restaurant dock (`MoveTrucks`), so farm deliveries are no
+  longer blocked by a waiting route truck. Parked trucks are drawn in a restaurant's service yard.
+- Implemented: double-sided awnings, kept as separate objects so they stay when a bought restaurant's shell is drawn.
+- Implemented: city cars stop for people on foot in their lane (`Pedestrians`); customers walk 0.6 m out from the lot edge.
+- Implemented: phone Ledger and Recipes apps (the HUD ledger tab is gone); Belts in the build catalog; an empty starting hotbar.
+- Implemented: machine and register screens without description text or power switches; registers have 25 input slots in a
+  5 x 5 grid; eased progress bars; a themed dropdown. No kind is manually powered (`manualPower` off in content).
+- Not yet: any verification (see 0048's Open list).
+
 ## Implemented: back doors and the dock rule (2026-10-06)
 
 Merged from the starting-loop branch on 2026-10-12. Its schema numbers below are as recorded on that branch; on main they are v21 (back-door roles), v22 (free back doors), v23 (ledger) and v24 (game-hour rates). The branch's decisions 0037-0039 share numbers with main's 0037-0039 (different files). Main's wages are recorded in the ledger (`LedgerWage`) and count the same game hour (`GoodsWorld.GameHourSeconds` = `GameClock.HourSeconds`).
@@ -1013,6 +1028,20 @@ Goods snapshot schema **v21**, layout format **5**, generator **v6**. Verificati
 - Planned / undecided: the first-customer target (about a minute) is limited by walking distance; options are with the owner.
   The owner chose a street spawn (0044), which removes the walk but not the wait for the first decision.
   Demand does not follow the time-of-day traffic curve.
+
+## Implemented, unverified: placeholder audio (2026-10-13)
+
+Presentation only; no sound reads or changes gameplay state, and a missing clip is silent.
+
+- Clips are synthesized by `ArtSource/Audio/synth_sounds.py` (Python standard library, fixed seed; original and license-free) into `Assets/Audio/Resources/Audio` (22.05 kHz mono WAV) and loaded by name with `Resources.Load`. Loops crossfade their tail into their head.
+- `GameAudio` (`Assets/Scripts/Session/Audio`) installs itself after the first scene load (`RuntimeInitializeOnLoadMethod`, `DontDestroyOnLoad`): 2D interface sounds, a click for every enabled UI Toolkit `Button` (one trickle-down `ClickEvent` hook per panel), and the city ambience loop, which fades in while the local `PlayerAvatar` owner is in the world (`GameAudio.InWorld`).
+- `FootstepAudio` (added at runtime to every player figure, like `DoorOpener`) steps from `PlayerAnimation`'s observed `GroundSpeed`/`Grounded`, so remote players are heard too.
+- `EquipmentRunningAudio` is an `IEquipmentRunningDisplay`: fryer/grill/stove sizzle, oven hum, mixer motor, fading with the replicated running state. `EquipmentPresenter` plays a placement thud when a piece appears at a site that was already drawn (not when a site comes into view).
+- `VehicleEngineAudio` on trucks and pooled city cars: an engine loop whose pitch and level follow the drawn model's speed.
+- `PlayerHud` rings the till when the shown company's cash rises (spending and wages are silent); the phone chimes when it opens.
+- Volumes are client settings (SQLite keys `volume`, `effects_volume`, `interface_volume`, `ambience_volume`): Master (default 0.8) sets `AudioListener.volume`; Effects (machines, footsteps, vehicles, placement), Interface (clicks, till, phone) and Ambience (default 1) scale the `GameAudio.AudioChannel` groups. The Settings screen (main menu and in-game Esc menu) has a SOUND card with one row per volume (5% steps, saved on release with a click at the new level); its left column now scrolls on short screens. Reset restores the defaults. `ClientSettingsTests.VolumesDefaultRoundTripAndClamp` covers storage; the layout was checked in a running-game capture at 1440x697.
+
+The sounds themselves have not been listened to in a running game. No music; clips are placeholders for owned audio.
 
 ## Baseline Test Evolution
 

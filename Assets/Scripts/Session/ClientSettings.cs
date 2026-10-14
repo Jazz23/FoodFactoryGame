@@ -1,4 +1,4 @@
-// Client-local preferences kept in one SQLite key/value table (decision 0011): display name, mouse sensitivity, key binding
+// Client-local preferences kept in one SQLite key/value table (decision 0011): display name, mouse sensitivity, volume, key binding
 // overrides and the last session the menu started, which Resume repeats (decision 0041). Loading never creates the database,
 // so reading settings (and tests that pass no path) leave application data untouched; only Save writes.
 using System;
@@ -23,10 +23,17 @@ namespace FoodFactoryGame.Session
         public const int SchemaVersion = 1;
         public const float MinSensitivity = 0.1f;
         public const float MaxSensitivity = 3f;
+        public const float DefaultVolume = 0.8f;
 
         // Null until the player sets one; the menu then falls back to the session's default name.
         public string DisplayName;
         public float LookSensitivity = 1f;
+        // Master volume, 0 (muted) to 1; applied to the AudioListener.
+        public float Volume = DefaultVolume;
+        // Each group's share of the master volume, 0 to 1 (GameAudio channels).
+        public float EffectsVolume = 1f;
+        public float InterfaceVolume = 1f;
+        public float AmbienceVolume = 1f;
         // InputActionAsset.SaveBindingOverridesAsJson output; empty means the authored bindings.
         public string BindingOverrides = "";
         public LastSessionKind LastKind;
@@ -51,6 +58,10 @@ namespace FoodFactoryGame.Session
             if (values.TryGetValue("look_sensitivity", out var sensitivity)
                 && float.TryParse(sensitivity, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed))
                 settings.LookSensitivity = ClampSensitivity(parsed);
+            settings.Volume = ReadVolume(values, "volume", DefaultVolume);
+            settings.EffectsVolume = ReadVolume(values, "effects_volume", 1f);
+            settings.InterfaceVolume = ReadVolume(values, "interface_volume", 1f);
+            settings.AmbienceVolume = ReadVolume(values, "ambience_volume", 1f);
             settings.BindingOverrides = values.TryGetValue("binding_overrides", out var bindings) ? bindings ?? "" : "";
             if (values.TryGetValue("last_kind", out var kind) && Enum.TryParse(kind, out LastSessionKind lastKind)) settings.LastKind = lastKind;
             settings.LastWorld = values.TryGetValue("last_world", out var world) ? world ?? "" : "";
@@ -82,6 +93,10 @@ namespace FoodFactoryGame.Session
                 }
                 Put(db, "display_name", DisplayName ?? "");
                 Put(db, "look_sensitivity", ClampSensitivity(LookSensitivity).ToString("R", CultureInfo.InvariantCulture));
+                Put(db, "volume", ClampVolume(Volume).ToString("R", CultureInfo.InvariantCulture));
+                Put(db, "effects_volume", ClampVolume(EffectsVolume).ToString("R", CultureInfo.InvariantCulture));
+                Put(db, "interface_volume", ClampVolume(InterfaceVolume).ToString("R", CultureInfo.InvariantCulture));
+                Put(db, "ambience_volume", ClampVolume(AmbienceVolume).ToString("R", CultureInfo.InvariantCulture));
                 Put(db, "binding_overrides", BindingOverrides ?? "");
                 Put(db, "last_kind", LastKind.ToString());
                 Put(db, "last_world", LastWorld ?? "");
@@ -93,6 +108,13 @@ namespace FoodFactoryGame.Session
 
         public static float ClampSensitivity(float value) =>
             float.IsNaN(value) ? 1f : Math.Min(MaxSensitivity, Math.Max(MinSensitivity, value));
+
+        public static float ClampVolume(float value) =>
+            float.IsNaN(value) ? DefaultVolume : Math.Min(1f, Math.Max(0f, value));
+
+        private static float ReadVolume(Dictionary<string, string> values, string key, float fallback) =>
+            values.TryGetValue(key, out var text) && float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed)
+                ? ClampVolume(parsed) : fallback;
 
         private static void Put(SQLiteConnection db, string key, string value) =>
             db.Execute("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", key, value);

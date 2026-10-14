@@ -39,7 +39,7 @@ Other declared dependencies remain in `Packages/manifest.json`; declaration alon
 | Target PC CPU / GPU / RAM | TBD; owner requested mid-range PC |
 | Target resolution / quality settings | TBD |
 | Subscriptions, quotas, reset windows, and provider routing | TBD; do not infer subscription consumption from model catalog API prices |
-| Owned art, animation, audio, UI, and tooling assets | Inventory and usage/license constraints TBD |
+| Owned art, animation, audio, UI, and tooling assets | Inventory and usage/license constraints TBD. Audio: only code-synthesized placeholders (`ArtSource/Audio/synth_sounds.py`), no third-party clips |
 | Hosting/service budget | TBD after multiplayer hosting decision |
 
 ## Agent Configuration and Usage Policy

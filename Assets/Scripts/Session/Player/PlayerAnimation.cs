@@ -25,6 +25,10 @@ namespace FoodFactoryGame.Session.Player
         private Vector3 _velocity;
         private bool _hasLastPosition;
 
+        // Smoothed ground-plane speed (m/s) and whether ground is underfoot, as last animated; footsteps follow these.
+        public float GroundSpeed { get; private set; }
+        public bool Grounded { get; private set; }
+
         private void OnEnable() => _hasLastPosition = false;
 
         private void LateUpdate()
@@ -42,7 +46,9 @@ namespace FoodFactoryGame.Session.Player
             // The ray starts inside the avatar's own controller capsule, which a raycast does not report.
             var grounded = Physics.Raycast(position + Vector3.up * 0.1f, Vector3.down, 0.1f + groundProbe, groundLayers,
                 QueryTriggerInteraction.Ignore);
-            animator.SetFloat(SpeedId, new Vector2(_velocity.x, _velocity.z).magnitude, speedDampSeconds, deltaTime);
+            GroundSpeed = new Vector2(_velocity.x, _velocity.z).magnitude;
+            Grounded = grounded;
+            animator.SetFloat(SpeedId, GroundSpeed, speedDampSeconds, deltaTime);
             animator.SetBool(GroundedId, grounded);
             animator.SetFloat(VerticalSpeedId, _velocity.y);
         }

@@ -304,6 +304,7 @@ namespace FoodFactoryGame.Session.Customers
             else if (!TryEdge(candidate.Site.Layout, candidate.Site.Snapshot, camera, candidate.Id, out spawn)) return null;
             var root = Instantiate(customerPrefab, spawn, Quaternion.identity, transform);
             root.name = $"Customer {candidate.Id}";
+            Logistics.Pedestrians.Add(root.transform);
             var animator = root.GetComponentInChildren<Animator>();
             animator.cullingMode = AnimatorCullingMode.CullUpdateTransforms;
             Tint(root, candidate.DistrictId, candidate.Appearance);

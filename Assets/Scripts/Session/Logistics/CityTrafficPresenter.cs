@@ -1,6 +1,8 @@
 // Presentation only (decision 0032, piece 4b): draws the city cars CityCars places near the camera in a generated world, with
 // pooled models picked and tinted per car, easing between frames so lane changes of the stream (a new hour's headway) glide
-// instead of jumping. Cars have no colliders and never touch the simulation; with no map shown nothing is drawn.
+// instead of jumping. Cars stop for people on foot in their lane (Pedestrians); a car let go after such a stop catches up with
+// its place in the stream at a capped speed instead of jumping there. Cars have no colliders and never touch the simulation;
+// with no map shown nothing is drawn.
 using System.Collections.Generic;
 using System.Linq;
 using FoodFactoryGame.Goods;
@@ -15,7 +17,9 @@ namespace FoodFactoryGame.Session.Logistics
         public const int MaxCars = 150;
         private const float Radius = DrawnSites.DrawRadius;
         private const float EaseRate = 8f;
-        private const float SnapDistance = 25f;
+        // Beyond this a car is snapped to its place; closer, it eases there no faster than CatchUpSpeed (metres per second).
+        private const float SnapDistance = 200f;
+        private const float CatchUpSpeed = 35f;
 
         [SerializeField] private SessionRoot session;
         [SerializeField] private GameObject[] carPrefabs = new GameObject[0];
@@ -26,6 +30,8 @@ namespace FoodFactoryGame.Session.Logistics
         private MaterialPropertyBlock _block;
         private GoodsSnapshot _baseline;
         private float _receivedAt;
+        private readonly List<Vector3> _people = new();
+        private readonly List<Vector2> _peopleOnMap = new();
 
         public int Shown => _cars.Count;
         public IReadOnlyDictionary<uint, GameObject> Cars => _cars;
@@ -47,8 +53,11 @@ namespace FoodFactoryGame.Session.Logistics
             }
             var since = Mathf.Min(Time.time - _receivedAt, RoadPose.MaxExtrapolationSeconds);
             var network = placement.Roads;
+            Pedestrians.Positions(_people);
+            _peopleOnMap.Clear();
+            foreach (var person in _people) _peopleOnMap.Add(placement.ToMap(person));
             var cars = CityCars.Compute(network, current.ClockSeconds + since, placement.ToMap(camera.transform.position), Radius,
-                current.Trucks.Concat(current.RoadTrucks), since, MaxCars);
+                current.Trucks.Concat(current.RoadTrucks), since, MaxCars, _peopleOnMap);
             var keep = new HashSet<uint>();
             var k = 1f - Mathf.Exp(-EaseRate * Time.deltaTime);
             foreach (var car in cars)
@@ -68,7 +77,12 @@ namespace FoodFactoryGame.Session.Logistics
                 }
                 var shown = visual.transform;
                 if ((shown.position - position).sqrMagnitude > SnapDistance * SnapDistance) shown.SetPositionAndRotation(position, rotation);
-                else shown.SetPositionAndRotation(Vector3.Lerp(shown.position, position, k), Quaternion.Slerp(shown.rotation, rotation, k));
+                else
+                {
+                    var eased = Vector3.Lerp(shown.position, position, k);
+                    shown.SetPositionAndRotation(Vector3.MoveTowards(shown.position, eased, CatchUpSpeed * Time.deltaTime),
+                        Quaternion.Slerp(shown.rotation, rotation, k));
+                }
             }
             foreach (var key in _cars.Keys.Where(x => !keep.Contains(x)).ToList())
             {
@@ -90,6 +104,7 @@ namespace FoodFactoryGame.Session.Logistics
             {
                 visual = Instantiate(carPrefabs[variant], transform);
                 foreach (var collider in visual.GetComponentsInChildren<Collider>()) Destroy(collider);
+                VehicleEngineAudio.AddTo(visual, 0.18f, Random.Range(1.2f, 1.5f), 22f);
             }
             visual.name = $"Car {key:x8}";
             visual.SetActive(true);

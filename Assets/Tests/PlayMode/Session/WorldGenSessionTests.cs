@@ -861,25 +861,25 @@ namespace FoodFactoryGame.Session.PlayModeTests
             yield return Until(() => hud.Readiness?.Blocker == RestaurantReadiness.NoEdibleMenuItem, "the empty-register blocker");
             Assert.That(hud.ReadinessText, Does.StartWith("Not selling: no menu food in a worked register"));
             interaction.OpenMachine(GeneratedWorld.StartCounterId);
-            yield return Until(() => hud.ScreenRoot.Q<Label>("hud-register-readiness") != null, "the register screen");
-            Assert.That(hud.ScreenRoot.Q<Label>("hud-register-readiness").text, Does.StartWith("Restaurant not selling: no menu food in a worked register"));
-            Assert.That(hud.ScreenRoot.Q<Label>("hud-progress-label").text, Does.StartWith("Nothing to sell: put edible "),
-                "P0-05: an empty register says so.");
+            // Decision 0048: the register screen carries no readiness or progress text; the world line says it.
+            yield return Until(() => interaction.Screen == InteractionScreen.Machine && hud.ScreenRoot.Q<Button>("hud-input-slot-0") != null, "the register screen");
+            Assert.That(hud.ScreenRoot.Q("hud-register-readiness"), Is.Null);
             yield return null;
             Assert.That(line.resolvedStyle.display, Is.EqualTo(DisplayStyle.None), "The world line hides while a screen is open.");
             interaction.CloseScreen();
 
-            // A purchase reaches the ledger tab.
+            // A purchase reaches the phone's Ledger app (decision 0048).
             bridge.RequestPurchase("buy-dough", Start.SiteId, "supplier-dough-5");
             yield return Until(() => results.ContainsKey("buy-dough"), "the purchase");
             Assert.That(results["buy-dough"].Accepted, Is.True, results["buy-dough"].Reason);
             yield return Until(() => _root.ClientSite.Ledger.Any(x => x.Kind == GoodsWorld.LedgerSupplierGoods && x.RequestId == "buy-dough"), "the purchase in the ledger");
             var purchase = _root.ClientSite.Ledger.Single(x => x.RequestId == "buy-dough");
             Assert.That(purchase.Cents, Is.EqualTo(-250));
-            interaction.ToggleInventory();
-            yield return Until(() => hud.ScreenRoot.Q<Button>("hud-tab-ledger") != null, "the inventory screen with its tabs");
-            hud.ShowLedger(true);
-            yield return Until(() => hud.ScreenRoot.Q($"hud-ledger-row-{purchase.Id}") != null, "the purchase row");
+            var phone = UnityEngine.Object.FindAnyObjectByType<PhonePanel>();
+            interaction.TogglePhone();
+            yield return Until(() => interaction.Screen == InteractionScreen.Phone && phone.Window.resolvedStyle.display == DisplayStyle.Flex, "the phone");
+            phone.ShowTab(PhonePanel.LedgerTab);
+            yield return Until(() => phone.Window.Q($"phone-ledger-row-{purchase.Id}") != null, "the purchase row");
 
             // TEST-ONLY: bread in the register and a busy district on the starting site, so a customer buys within seconds.
             _root.ServerWorld.Bootstrap(new GoodsLot
@@ -897,7 +897,7 @@ namespace FoodFactoryGame.Session.PlayModeTests
             yield return Until(() => _root.ClientSite.Ledger.Any(x => x.Kind == GoodsWorld.LedgerSale), "a sale in the ledger", 60f);
             var sale = _root.ClientSite.Ledger.First(x => x.Kind == GoodsWorld.LedgerSale);
             Assert.That((sale.Cents, sale.SiteId, sale.EquipmentId), Is.EqualTo((250L, Start.SiteId, GeneratedWorld.StartCounterId)));
-            yield return Until(() => hud.ScreenRoot.Q($"hud-ledger-row-{sale.Id}") != null, "the sale row");
+            yield return Until(() => phone.Window.Q($"phone-ledger-row-{sale.Id}") != null, "the sale row");
             Assert.That(hud.Readiness.RecentSales, Is.GreaterThanOrEqualTo(1));
             var server = _root.ServerWorld.Snapshot();
             Assert.That(server.Companies.All(x => GoodsWorld.LedgerBalances(server, x)), Is.True, "Opening + carried + entries == cash.");

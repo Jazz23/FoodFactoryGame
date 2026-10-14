@@ -443,9 +443,11 @@ namespace FoodFactoryGame.Session.Employees
             type.name = $"employee-task-{index}-type";
             var labels = new Dictionary<EmployeeTaskType, string>
             {
-                [EmployeeTaskType.Move] = EmployeeTaskList.MoveLabel, [EmployeeTaskType.Power] = EmployeeTaskList.PowerLabel,
+                [EmployeeTaskType.Move] = EmployeeTaskList.MoveLabel,
                 [EmployeeTaskType.Work] = EmployeeTaskList.WorkLabel, [EmployeeTaskType.Recipe] = EmployeeTaskList.RecipeLabel
             };
+            // Machines run by themselves (owner, 2026-10-13), so a power task is no longer offered; one saved earlier still shows.
+            if (task.Type == EmployeeTaskType.Power) labels[EmployeeTaskType.Power] = EmployeeTaskList.PowerLabel;
             type.choices = labels.Values.ToList();
             type.SetValueWithoutNotify(labels[task.Type]);
             type.RegisterValueChangedCallback(evt => SetTaskType(index, labels.First(x => x.Value == evt.newValue).Key));

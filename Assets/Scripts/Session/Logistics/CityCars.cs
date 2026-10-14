@@ -3,7 +3,8 @@
 // lane of each direction of a segment is a stream of cars entering at its start node with the headway the server's background
 // flow implies for the hour (RoadTraffic), at the speed that load allows. Where the segment ends at a stop sign each car halts
 // at the stop line; at a traffic light cars arriving on red queue nose to tail and leave one by one on green. Cars also queue
-// behind trucks in the kerb lane. Cars never affect the simulation; they only show the traffic it already counts.
+// behind trucks in the kerb lane, and stop short of anyone on foot standing in their lane (players and drawn customers, given as
+// map points). Cars never affect the simulation; they only show the traffic it already counts.
 using System;
 using System.Collections.Generic;
 using FoodFactoryGame.Goods;
@@ -45,11 +46,14 @@ namespace FoodFactoryGame.Session.Logistics
         private const int MinLength = 15;
         // Headways longer than this draw no cars at all on the lane.
         private const float MaxHeadwaySeconds = 600f;
+        // A person on foot this close to a lane's centre (metres, sideways) is in that lane; cars stop this far short of them.
+        private const float PedestrianReach = RoadNetwork.LaneWidth / 2f + 0.1f;
+        private const float PedestrianStop = 4.5f;
 
         // Every car on segments within `radius` metres of `view` at clock time `seconds`, nearest first, at most `cap`.
         // `trucks` are the trucks on the road with the seconds since their baseline, so cars wait behind them.
         public static List<CityCar> Compute(RoadNetwork network, double seconds, Vector2 view, float radius, IEnumerable<GoodsTruck> trucks,
-            float since, int cap)
+            float since, int cap, IReadOnlyList<Vector2> pedestrians = null)
         {
             var obstacles = new Dictionary<(int, bool), List<float>>();
             foreach (var truck in trucks)
@@ -78,6 +82,7 @@ namespace FoodFactoryGame.Session.Logistics
                 {
                     Lane(network, segment, forward, l, seconds, speed, headway, lane);
                     if (l == 0 && obstacles.TryGetValue((segment.Index, forward), out var blocking)) BehindTrucks(lane, blocking);
+                    if (pedestrians != null && pedestrians.Count > 0) BeforePedestrians(network, segment, forward, l, lane, pedestrians);
                     foreach (var (along, key) in lane)
                     {
                         var (position, _) = RoadPose.Along(network, segment.Index, forward ? along : segment.Length - along, forward, l);
@@ -159,6 +164,35 @@ namespace FoodFactoryGame.Session.Logistics
                 foreach (var truck in trucks)
                     if (lane[i].Along > truck - Gap * 1.5f && lane[i].Along <= truck + Gap)
                         lane[i] = (truck - Gap * 1.5f, lane[i].Key);
+            lane.Sort((a, b) => b.Along.CompareTo(a.Along));
+            KeepGaps(lane);
+        }
+
+        // Cars that would reach a person standing in their lane stop short of them; cars already past drive on.
+        private static void BeforePedestrians(RoadNetwork network, RoadNetwork.Segment segment, bool forward, int laneIndex,
+            List<(float Along, uint Key)> lane, IReadOnlyList<Vector2> pedestrians)
+        {
+            if (lane.Count == 0) return;
+            var start = network.Nodes[segment.From];
+            var direction = new Vector2(segment.Dx, segment.Dz);
+            var right = new Vector2(segment.Dz, -segment.Dx);
+            // The lane's centre, sideways from the centreline along `right` (driving back puts it on the other side).
+            var centre = RoadPose.LaneOffset(segment, laneIndex) * (forward ? 1f : -1f);
+            var moved = false;
+            foreach (var person in pedestrians)
+            {
+                var relative = person - new Vector2(start.X, start.Z);
+                var offset = Vector2.Dot(relative, direction);
+                if (offset < 0f || offset > segment.Length || Mathf.Abs(Vector2.Dot(relative, right) - centre) > PedestrianReach) continue;
+                var at = forward ? offset : segment.Length - offset;
+                for (var i = 0; i < lane.Count; i++)
+                    if (lane[i].Along > at - PedestrianStop && lane[i].Along <= at + 1f)
+                    {
+                        lane[i] = (at - PedestrianStop, lane[i].Key);
+                        moved = true;
+                    }
+            }
+            if (!moved) return;
             lane.Sort((a, b) => b.Along.CompareTo(a.Along));
             KeepGaps(lane);
         }

@@ -448,6 +448,40 @@
 
 .ff-root .ff-dropdown .unity-base-popup-field__text { color: var(--ff-text); }
 
+/* The field's arrow in the accent, and a lit edge on hover. */
+.ff-dropdown .unity-base-popup-field__arrow {
+    -unity-background-image-tint-color: var(--ff-accent);
+    width: 14px;
+    margin-right: 8px;
+}
+.ff-dropdown .unity-base-popup-field__input:hover {
+    background-color: var(--ff-control);
+    border-color: var(--ff-accent);
+}
+.ff-root .ff-dropdown .unity-base-popup-field__text { -unity-font-style: bold; }
+
+/* The list a dropdown opens (Unity's GenericDropdownMenu, added at the panel root): a dark rounded card instead of the
+   default white menu, with amber hover and the chosen entry marked. */
+.unity-base-dropdown .unity-base-dropdown__container-outer {
+    background-color: var(--ff-panel);
+    border-width: 1px;
+    border-color: var(--ff-accent);
+    border-radius: 10px;
+    padding: 4px;
+}
+.unity-base-dropdown .unity-base-dropdown__container-inner { background-color: var(--ff-panel); }
+.unity-base-dropdown .unity-base-dropdown__item {
+    height: 32px;
+    padding: 0 10px;
+    border-radius: 6px;
+    background-color: rgba(0, 0, 0, 0);
+}
+.unity-base-dropdown .unity-base-dropdown__item:hover { background-color: var(--ff-control-hover); }
+.unity-base-dropdown .unity-base-dropdown__item:hover .unity-base-dropdown__label { color: var(--ff-accent-hover); }
+.unity-base-dropdown .unity-base-dropdown__label { color: var(--ff-text); font-size: 14px; -unity-text-align: middle-left; }
+.unity-base-dropdown .unity-base-dropdown__checkmark { -unity-background-image-tint-color: var(--ff-accent); }
+.unity-base-dropdown .unity-base-dropdown__separator-line { background-color: var(--ff-edge); }
+
 .ff-slider { margin: 0; }
 
 .ff-slider .unity-base-slider__tracker {

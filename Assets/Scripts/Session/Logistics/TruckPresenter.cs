@@ -6,9 +6,11 @@
 // front of the lot, level with the dock, the way it arrived.
 // On the roads (generated worlds, decision 0032): every truck driving the network near the camera, the company's own and other
 // companies' (public, from RoadTrucks), is drawn where the simulation has it on its leg, in the right-hand kerb lane, carried
-// on between baselines at the leg's speed; trucks waiting at the same leg end stand nose to tail. A parked truck stands at the
-// kerb by its drawn site. Visuals ease toward these poses, so turns at junctions and pulling in to a dock are smoothed; a jump
-// too long to ease is snapped. In a dev world (no map) only docked trucks are drawn, as before.
+// on between baselines at the leg's speed; trucks waiting at the same leg end stand nose to tail. A parked truck stands in the
+// service yard beside its drawn restaurant (generator v5; owner, 2026-10-13), lengthwise with its nose to the street on the
+// yard's outer side so the dock by the back door stays clear, the next one behind it; one the yard has no room for, or a
+// parked truck at a site without a yard, stands at the kerb by its drawn site. Visuals ease toward these poses, so turns at
+// junctions and pulling in to a dock are smoothed; a jump too long to ease is snapped. In a dev world (no map) only docked trucks are drawn, as before.
 using System.Collections.Generic;
 using System.Linq;
 using FoodFactoryGame.Goods;
@@ -30,6 +32,8 @@ namespace FoodFactoryGame.Session.Logistics
         // Easing rate toward the target pose (per second), and the jump beyond which a visual snaps instead.
         private const float EaseRate = 6f;
         private const float SnapDistance = 40f;
+        // Gap kept between a truck parked in a service yard and the yard's edges, in metres.
+        private const float YardMargin = 0.4f;
 
         [SerializeField] private SessionRoot session;
         [SerializeField] private GameObject truckPrefab;
@@ -102,6 +106,7 @@ namespace FoodFactoryGame.Session.Logistics
                     visual = Instantiate(truckPrefab, transform);
                     visual.name = $"Truck {truckId}";
                     DistanceCulling.Apply(visual);
+                    VehicleEngineAudio.AddTo(visual, 0.4f, 1f, 30f);
                     _visuals.Add(truckId, visual);
                     visual.transform.SetPositionAndRotation(pose.position, pose.rotation);
                     Paint(visual, truckId);
@@ -187,9 +192,16 @@ namespace FoodFactoryGame.Session.Logistics
                 var point = site == null ? null : network.Locate(site.MapX, site.MapZ);
                 if (point == null) continue;
                 var index = 0;
+                var inYard = 0;
                 foreach (var truck in current.Trucks.Where(x => x.State == TruckState.Parked && x.SiteId == drawnSite.SiteId)
                              .OrderBy(x => x.Id, System.StringComparer.Ordinal))
                 {
+                    if (YardPose(placement, drawnSite.SiteId, inYard) is { } parked)
+                    {
+                        inYard++;
+                        poses[truck.Id] = parked;
+                        continue;
+                    }
                     var (map, heading) = RoadPose.Along(network, point.Value.Segment, point.Value.Offset, true, 0, index++ * QueueSpacing);
                     var segment = network.Segments[point.Value.Segment];
                     var right = new Vector2(heading.y, -heading.x);
@@ -199,11 +211,60 @@ namespace FoodFactoryGame.Session.Logistics
             }
         }
 
+        // The index-th parked truck's place in the restaurant's service yard (from the street inward), or null when the site
+        // has no yard or the yard has no room left for it.
+        private Pose? YardPose(SitePlacement placement, string siteId, int index)
+        {
+            var lot = placement.LotOf(siteId);
+            var building = lot == null ? null : placement.Layout.Buildings.FirstOrDefault(x => x.Id == lot.BuildingId);
+            var yard = building?.ServiceYard;
+            if (yard == null) return null;
+            var (fx, fz) = building.Facing switch { Facing.North => (0, 1), Facing.South => (0, -1), Facing.East => (1, 0), _ => (-1, 0) };
+            var halfWidth = TruckHalfWidth();
+            var halfLength = TruckHalfLength();
+            var yardLength = fz != 0 ? yard.Depth : yard.Width;
+            var yardWidth = fz != 0 ? yard.Width : yard.Depth;
+            // Distance of the truck's centre in from the street edge.
+            var inward = YardMargin + halfLength + index * QueueSpacing;
+            if (inward + halfLength + YardMargin > yardLength) return null;
+            // The yard lies on the shell's low or high side; the truck keeps to the side away from the shell (and the dock).
+            var low = fz != 0 ? yard.X + yard.Width <= building.X : yard.Z + yard.Depth <= building.Z;
+            var shellEdge = fz != 0 ? (low ? yard.X + yard.Width : yard.X) : (low ? yard.Z + yard.Depth : yard.Z);
+            var across = shellEdge + (low ? -1f : 1f) * Mathf.Max(yardWidth * 0.5f, yardWidth - halfWidth - YardMargin);
+            float mapX, mapZ;
+            if (fz != 0)
+            {
+                var street = fz > 0 ? yard.Z + yard.Depth : yard.Z;
+                mapX = across;
+                mapZ = street - fz * inward;
+            }
+            else
+            {
+                var street = fx > 0 ? yard.X + yard.Width : yard.X;
+                mapX = street - fx * inward;
+                mapZ = across;
+            }
+            return new Pose(placement.OnGround(mapX, mapZ), Quaternion.LookRotation(new Vector3(fx, 0f, fz)));
+        }
+
         // Half the truck model's width (its local X), measured once on a spare instance, so it parks clear of the dock
         // whatever the model's size.
         private float TruckHalfWidth()
         {
-            if (_halfWidth > 0f || truckPrefab == null) return _halfWidth > 0f ? _halfWidth : 1f;
+            MeasureTruck();
+            return _halfWidth > 0f ? _halfWidth : 1f;
+        }
+
+        // Half the truck model's length (its local Z), measured like its width.
+        private float TruckHalfLength()
+        {
+            MeasureTruck();
+            return _halfLength > 0f ? _halfLength : 3.5f;
+        }
+
+        private void MeasureTruck()
+        {
+            if (_halfWidth > 0f || truckPrefab == null) return;
             var probe = Instantiate(truckPrefab);
             probe.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
             var renderers = probe.GetComponentsInChildren<Renderer>();
@@ -212,12 +273,13 @@ namespace FoodFactoryGame.Session.Logistics
                 var bounds = renderers[0].bounds;
                 foreach (var renderer in renderers.Skip(1)) bounds.Encapsulate(renderer.bounds);
                 _halfWidth = bounds.extents.x;
+                _halfLength = bounds.extents.z;
             }
             Destroy(probe);
-            return _halfWidth > 0f ? _halfWidth : 1f;
         }
 
         private float _halfWidth;
+        private float _halfLength;
 
         private void Paint(GameObject visual, string truckId)
         {

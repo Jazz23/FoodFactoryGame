@@ -15,7 +15,7 @@ MonoBehaviour:
   kind: counter
   width: 2
   depth: 1
-  inputCapacity: 2
+  inputCapacity: 25
   outputCapacity: 1
   inputRefrigerated: 0
   outputRefrigerated: 0

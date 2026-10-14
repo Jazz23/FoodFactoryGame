@@ -17,7 +17,7 @@
 // reroutes; parking a driving truck sends it on to the nearer of its route's two sites. Sites off the network (dev worlds)
 // keep the abstract Manhattan trip above.
 // Restaurant docks (decision 0034, slice 5): a dock on a restaurant's site serves one truck at a time (the truck holding it is
-// Docked; others wait their turn in ID order) and is usable only while a walkable path reaches it from the lot's street edge
+// Docked; others wait their turn in ID order; a truck with nothing it can load or unload lets go of it) and is usable only while a walkable path reaches it from the lot's street edge
 // (PROTOTYPE dock rule). The truck arrives from the street after the abstract trip time and goods move at its LoadUnitsPerSecond
 // (PROTOTYPE transfer rate). Docks on other sites (warehouses, factories) keep the rules above.
 using System;
@@ -555,7 +555,13 @@ namespace FoodFactoryGame.Goods
                         {
                             // A restaurant dock serves one truck at a time: wait (rechecked every second) while another holds it.
                             if (!TakeDock(truck, trucks)) continue;
-                            if (!(truck.State == TruckState.Loading ? LoadSecond(truck) : UnloadSecond(truck))) waiting.Add(truck);
+                            if (!(truck.State == TruckState.Loading ? LoadSecond(truck) : UnloadSecond(truck)))
+                            {
+                                // A truck that cannot work lets go of the dock, so a farm order's truck (or another route's)
+                                // is not kept waiting behind it forever; it takes the dock again when it is free.
+                                truck.Docked = false;
+                                waiting.Add(truck);
+                            }
                         }
                     }
                     // A supplier truck back at its farm leaves the world with its order (decision 0047).

@@ -1,5 +1,5 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
-    <!-- The phone (decision 0047): a handset filling most of the screen with a status bar, five apps (Map, Orders, Staff, Trucks, Places)
+    <!-- The phone (decision 0047): a handset filling most of the screen with a status bar, seven apps (Map, Orders, Staff, Trucks, Places, Ledger, Recipes)
          and a status line. PhonePanel fills the pages; the map page holds the PhoneMapView and the selected lot's details. -->
     <Style src="project://database/Assets/UI/Theme/Theme.uss" />
     <Style src="Phone.uss" />
@@ -20,6 +20,8 @@
                         <ui:Button name="phone-tab-staff" text="Staff" focusable="false" class="ff-segment phone__tab" />
                         <ui:Button name="phone-tab-trucks" text="Trucks" focusable="false" class="ff-segment phone__tab" />
                         <ui:Button name="phone-tab-places" text="Places" focusable="false" class="ff-segment phone__tab" />
+                        <ui:Button name="phone-tab-ledger" text="Ledger" focusable="false" class="ff-segment phone__tab" />
+                        <ui:Button name="phone-tab-recipes" text="Recipes" focusable="false" class="ff-segment phone__tab" />
                     </ui:VisualElement>
                     <ui:VisualElement class="ff-grow" picking-mode="Ignore" />
                     <ui:Button name="phone-close" focusable="false" class="ff-button ff-button--icon">
@@ -58,6 +60,13 @@
                     <ui:ScrollView name="phone-page-places" mode="Vertical" horizontal-scroller-visibility="Hidden" class="ff-scroll phone__page phone__list">
                         <ui:Label text="YOUR PLACES" class="ff-eyebrow phone__heading" picking-mode="Ignore" />
                         <ui:VisualElement name="phone-places" />
+                    </ui:ScrollView>
+                    <ui:ScrollView name="phone-page-ledger" mode="Vertical" horizontal-scroller-visibility="Hidden" class="ff-scroll phone__page phone__list">
+                        <ui:Label text="COMPANY LEDGER" class="ff-eyebrow phone__heading" picking-mode="Ignore" />
+                        <ui:VisualElement name="phone-ledger" />
+                    </ui:ScrollView>
+                    <ui:ScrollView name="phone-page-recipes" mode="Vertical" horizontal-scroller-visibility="Hidden" class="ff-scroll phone__page phone__list">
+                        <ui:VisualElement name="phone-recipes" />
                     </ui:ScrollView>
                 </ui:VisualElement>
                 <ui:Label name="phone-status" text=" " class="phone__status ff-wrap" picking-mode="Ignore" />

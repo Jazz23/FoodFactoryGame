@@ -12,7 +12,8 @@
 // from site data without terrain showing through, and a restaurant or factory model is hidden while BuildingPresenter draws
 // its site's shell (DrawnSites), and shown again when that site stops being drawn.
 // Every lot gets a pavement surface and every purchasable building a PropertyMarker, and restaurant awnings are tinted by the
-// replicated ownership records (GoodsProperty) before the layout's own for-sale or competitor state. Older formats keep the
+// replicated ownership records (GoodsProperty) before the layout's own for-sale or competitor state. A restaurant's awning is
+// its own object beside the model, so it stays up while the model steps aside for a drawn site's shell (owner, 2026-10-13). Older formats keep the
 // PROTOTYPE placement beside the dev site, whose floor and NavMesh (devSiteOnly) are shown only then.
 using System.Collections.Generic;
 using System.Linq;
@@ -136,6 +137,8 @@ namespace FoodFactoryGame.Session.WorldMap
         private readonly List<Mesh> _meshes = new();
         private readonly Dictionary<(Material Material, int X, int Z, bool Collide), MeshBuffer> _buffers = new();
         private readonly Dictionary<Mesh, PieceData> _pieceData = new();
+        // A restaurant piece split into the model without its awning and the awning alone, per source mesh.
+        private readonly Dictionary<Mesh, (Mesh Body, Mesh Awning)> _awningSplits = new();
 
         public WorldLayout Shown { get; private set; }
         // Where the layout's origin (the city centre, at land height) stands in the scene while a layout is shown.
@@ -200,6 +203,7 @@ namespace FoodFactoryGame.Session.WorldMap
             _meshes.Clear();
             _buffers.Clear();
             _pieceData.Clear();
+            _awningSplits.Clear();
             _awnings.Clear();
             _awningColours.Clear();
             _tintedFrom = null;
@@ -962,15 +966,41 @@ namespace FoodFactoryGame.Session.WorldMap
             var size = Footprints[sizeKey];
             var holder = Holder(building, centre, yaw, new Vector3(along / size.x, 1f, deep / size.y));
             var piece = art.Get(pieceName);
-            var visual = Place(pieceName, piece.mesh, piece.materials, holder, Vector3.zero, Quaternion.identity, Vector3.one);
+            var awning = building.Category == BuildingCategory.Restaurant
+                ? System.Array.FindIndex(piece.materials, x => x != null && x.name == "WG_Awning") : -1;
+            var (body, awningMesh) = awning >= 0 ? SplitAwning(piece.mesh, awning) : (piece.mesh, (Mesh)null);
+            Place(pieceName, body, piece.materials, holder, Vector3.zero, Quaternion.identity, Vector3.one);
             AddCollider(holder, size, Heights[sizeKey]);
             if (building.HasLot) Mark(holder.gameObject, building);
             if (_generated && building.IsShell) _shellModels[building.Id] = holder.gameObject;
-            var awning = System.Array.FindIndex(piece.materials, x => x != null && x.name == "WG_Awning");
-            if (building.Category != BuildingCategory.Restaurant || awning < 0) return;
-            var renderer = visual.GetComponent<MeshRenderer>();
-            _awnings[building.Id] = (renderer, awning, building);
-            TintAwning(renderer, awning, building, session.ClientSite);
+            if (awningMesh == null) return;
+            // Beside the model rather than in it, so hiding the model for a drawn shell leaves the awning up.
+            var awningHolder = Holder(building, centre, yaw, holder.localScale);
+            awningHolder.name = $"Awning {building.Id}";
+            var renderer = Place("Awning", awningMesh, new[] { piece.materials[awning] }, awningHolder, Vector3.zero, Quaternion.identity, Vector3.one)
+                .GetComponent<MeshRenderer>();
+            _awnings[building.Id] = (renderer, 0, building);
+            TintAwning(renderer, 0, building, session.ClientSite);
+        }
+
+        // The piece without its awning submesh (left empty, so material indices hold) and the awning submesh as its own mesh.
+        private (Mesh Body, Mesh Awning) SplitAwning(Mesh mesh, int index)
+        {
+            if (_awningSplits.TryGetValue(mesh, out var split)) return split;
+            var body = Instantiate(mesh);
+            body.name = mesh.name + " Body";
+            body.SetTriangles(System.Array.Empty<int>(), index);
+            var awning = Instantiate(mesh);
+            awning.name = mesh.name + " Awning";
+            var triangles = mesh.GetTriangles(index);
+            awning.subMeshCount = 1;
+            awning.SetTriangles(triangles, 0);
+            awning.RecalculateBounds();
+            _meshes.Add(body);
+            _meshes.Add(awning);
+            split = (body, awning);
+            _awningSplits[mesh] = split;
+            return split;
         }
 
         // Purchasable buildings carry their lot so aiming at one can open the buy panel (EquipmentInteraction).

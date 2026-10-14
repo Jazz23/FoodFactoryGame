@@ -120,7 +120,6 @@ namespace FoodFactoryGame.Session.Equipment
         private readonly List<string> _recentItems = new();
         private const int MaxRecentItems = 32;
         private readonly HotbarEntry[] _hotbar = new HotbarEntry[HotbarSize];
-        private bool _hotbarSeeded;
         private ClientSiteSubscription _subscription;
         // The current site when this frame's screens and cursor were last valid.
         private string _screenSiteId;
@@ -178,21 +177,9 @@ namespace FoodFactoryGame.Session.Equipment
         public BuildingPresenter Buildings => buildings;
         public string InventoryId => LocalPlayerId == null ? null : GoodsWorld.InventoryLocationId(LocalPlayerId);
 
-        // Hotbar slots (null when empty). Machine kinds fill them in the order of the session's equipment content once that is
-        // loaded, and the player reassigns them from there.
-        public IReadOnlyList<HotbarEntry> Hotbar
-        {
-            get
-            {
-                if (!_hotbarSeeded && session.EquipmentDefinitions.Any(x => x != null))
-                {
-                    _hotbarSeeded = true;
-                    var kinds = session.EquipmentDefinitions.Where(x => x != null).Take(HotbarSize).Select(x => x.Kind).ToList();
-                    for (var index = 0; index < kinds.Count; index++) _hotbar[index] = HotbarEntry.Machine(kinds[index]);
-                }
-                return _hotbar;
-            }
-        }
+        // Hotbar slots (null when empty). They start empty, with no machines or items preset (owner, 2026-10-13); the player
+        // assigns them.
+        public IReadOnlyList<HotbarEntry> Hotbar => _hotbar;
 
         // Set by the HUD: the machine or item of the stack under the pointer on an open screen (null when none), so a hotbar
         // key there assigns it to that slot instead of selecting the slot.
@@ -305,6 +292,11 @@ namespace FoodFactoryGame.Session.Equipment
                 _releasedFrame = Time.frameCount;
             }
 
+            // Belts bought from build mode go on the cursor once they reach the inventory; a refused purchase or another screen
+            // or cursor choice drops the wish.
+            if (_beltsWanted && (Screen != InteractionScreen.None || CursorKind != null || CursorGoods != null || (!HasPendingRequests && LastRejection != null)))
+                _beltsWanted = false;
+            else if (_beltsWanted && PickUpInventoryBelts()) _beltsWanted = false;
             // The cursor keeps its kind until none of that kind is held (after the last one is placed or before any arrives).
             _held = CursorKind == null ? null : site?.Equipment
                 .Where(x => x.State == EquipmentState.Held && x.HolderId == me && x.Kind == CursorKind)
@@ -461,6 +453,29 @@ namespace FoodFactoryGame.Session.Equipment
             NoteItem(itemId);
             MoveGoods(session.ClientSite.Lots.Where(x => x.LocationId == sourceId && x.ItemId == itemId && x.Spoiled == spoiled).ToList(),
                 destinationId, quantity);
+        }
+
+        // Build mode's Belts card (owner, 2026-10-13): leaves build mode with the inventory's belts on the cursor, ready to lay a
+        // line. With none in the inventory it buys one pack of the offer, and the belts go on the cursor when they arrive.
+        public void LayBelts(string offerId)
+        {
+            if (Screen == InteractionScreen.Build) CloseScreen();
+            ClearCursor();
+            _beltsWanted = !PickUpInventoryBelts();
+            if (_beltsWanted) Buy(offerId);
+        }
+
+        // True while belts bought from build mode are on their way to the cursor.
+        private bool _beltsWanted;
+
+        private bool PickUpInventoryBelts()
+        {
+            var site = session.ClientSite;
+            var units = site == null || InventoryId == null ? 0
+                : site.Lots.Where(x => x.LocationId == InventoryId && x.ItemId == GoodsWorld.BeltItemId && !x.Spoiled).Sum(x => x.Quantity);
+            if (units == 0) return false;
+            PickUpGoods(InventoryId, GoodsWorld.BeltItemId, false, units);
+            return CursorGoods != null;
         }
 
         // Puts a held machine kind on the cursor, as the hotbar does; used when a machine is picked out of the inventory grid.
@@ -918,10 +933,15 @@ namespace FoodFactoryGame.Session.Equipment
             UnityEngine.Cursor.visible = !locked;
         }
 
-        // A locked pointer aims through the crosshair at the screen centre; a released one uses the pointer position.
-        private Ray AimRay() => _camera.ScreenPointToRay(PointerLocked
-            ? new Vector2(UnityEngine.Screen.width * 0.5f, UnityEngine.Screen.height * 0.5f)
-            : pointAction.action.ReadValue<Vector2>());
+        // Height of the crosshair as a fraction of the screen from its bottom; above centre so it aims further ahead of the
+        // avatar. Hud.uss places hud-crosshair and hud-prompt at the same height (top: 40%).
+        public const float CrosshairViewportY = 0.6f;
+
+        // Screen position (pixels, origin bottom left) of the crosshair.
+        public static Vector2 CrosshairScreenPoint => new(UnityEngine.Screen.width * 0.5f, UnityEngine.Screen.height * CrosshairViewportY);
+
+        // A locked pointer aims through the crosshair; a released one uses the pointer position.
+        private Ray AimRay() => _camera.ScreenPointToRay(PointerLocked ? CrosshairScreenPoint : pointAction.action.ReadValue<Vector2>());
 
         // The nearest hit that is not a player avatar (the local CharacterController sits right beside the aim ray).
         private Collider UnderCrosshair() => Physics.RaycastAll(AimRay(), maximumRayDistance, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)
