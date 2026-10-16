@@ -1,0 +1,1162 @@
+{
+ "WG_Awning": {
+  "baseColor": [
+   0.75,
+   0.15,
+   0.12,
+   1.0
+  ],
+  "baseMap": null,
+  "normalMap": "",
+  "metallic": 0.0,
+  "smoothness": 0.25,
+  "smoothnessFromAlbedo": false,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Bark": {
+  "baseColor": [
+   1.0,
+   1.0,
+   1.0,
+   1.0
+  ],
+  "baseMap": {
+   "path": "Art/World/Textures/Bark.png",
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "offset": [
+    0.0,
+    0.0
+   ]
+  },
+  "normalMap": "Art/World/Textures/Bark_Normal.png",
+  "metallic": 0.0,
+  "smoothness": 1.0,
+  "smoothnessFromAlbedo": true,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Concrete": {
+  "baseColor": [
+   1.0,
+   1.0,
+   1.0,
+   1.0
+  ],
+  "baseMap": {
+   "path": "Art/World/Textures/Concrete.png",
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "offset": [
+    0.0,
+    0.0
+   ]
+  },
+  "normalMap": "Art/World/Textures/Concrete_Normal.png",
+  "metallic": 0.0,
+  "smoothness": 1.0,
+  "smoothnessFromAlbedo": true,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Door_Glass": {
+  "baseColor": [
+   1.0,
+   1.0,
+   1.0,
+   1.0
+  ],
+  "baseMap": {
+   "path": "Art/World/Textures/Door_Glass.png",
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "offset": [
+    0.0,
+    0.0
+   ]
+  },
+  "normalMap": "Art/World/Textures/Door_Glass_Normal.png",
+  "metallic": 0.1,
+  "smoothness": 1.0,
+  "smoothnessFromAlbedo": true,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Door_Roller": {
+  "baseColor": [
+   1.0,
+   1.0,
+   1.0,
+   1.0
+  ],
+  "baseMap": {
+   "path": "Art/World/Textures/Door_Roller.png",
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "offset": [
+    0.0,
+    0.0
+   ]
+  },
+  "normalMap": "Art/World/Textures/Door_Roller_Normal.png",
+  "metallic": 0.3,
+  "smoothness": 1.0,
+  "smoothnessFromAlbedo": true,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Door_Wood": {
+  "baseColor": [
+   1.0,
+   1.0,
+   1.0,
+   1.0
+  ],
+  "baseMap": {
+   "path": "Art/World/Textures/Door_Wood.png",
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "offset": [
+    0.0,
+    0.0
+   ]
+  },
+  "normalMap": "Art/World/Textures/Door_Wood_Normal.png",
+  "metallic": 0.0,
+  "smoothness": 1.0,
+  "smoothnessFromAlbedo": true,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Facade_Apartment": {
+  "baseColor": [
+   1.0,
+   1.0,
+   1.0,
+   1.0
+  ],
+  "baseMap": {
+   "path": "Art/World/Textures/Facade_Apartment.png",
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "offset": [
+    0.0,
+    0.0
+   ]
+  },
+  "normalMap": "Art/World/Textures/Facade_Apartment_Normal.png",
+  "metallic": 0.0,
+  "smoothness": 1.0,
+  "smoothnessFromAlbedo": true,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Facade_Brick": {
+  "baseColor": [
+   1.0,
+   1.0,
+   1.0,
+   1.0
+  ],
+  "baseMap": {
+   "path": "Art/World/Textures/Facade_Brick.png",
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "offset": [
+    0.0,
+    0.0
+   ]
+  },
+  "normalMap": "Art/World/Textures/Facade_Brick_Normal.png",
+  "metallic": 0.0,
+  "smoothness": 1.0,
+  "smoothnessFromAlbedo": true,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Facade_Office": {
+  "baseColor": [
+   1.0,
+   1.0,
+   1.0,
+   1.0
+  ],
+  "baseMap": {
+   "path": "Art/World/Textures/Facade_Office.png",
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "offset": [
+    0.0,
+    0.0
+   ]
+  },
+  "normalMap": "Art/World/Textures/Facade_Office_Normal.png",
+  "metallic": 0.2,
+  "smoothness": 1.0,
+  "smoothnessFromAlbedo": true,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Facade_OfficeDark": {
+  "baseColor": [
+   0.6,
+   0.62,
+   0.66,
+   1.0
+  ],
+  "baseMap": {
+   "path": "Art/World/Textures/Facade_Office.png",
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "offset": [
+    0.0,
+    0.0
+   ]
+  },
+  "normalMap": "Art/World/Textures/Facade_Office_Normal.png",
+  "metallic": 0.3,
+  "smoothness": 1.0,
+  "smoothnessFromAlbedo": true,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Facade_Plaster": {
+  "baseColor": [
+   1.0,
+   1.0,
+   1.0,
+   1.0
+  ],
+  "baseMap": {
+   "path": "Art/World/Textures/Facade_Plaster.png",
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "offset": [
+    0.0,
+    0.0
+   ]
+  },
+  "normalMap": "Art/World/Textures/Facade_Plaster_Normal.png",
+  "metallic": 0.0,
+  "smoothness": 1.0,
+  "smoothnessFromAlbedo": true,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Facade_Siding": {
+  "baseColor": [
+   1.0,
+   1.0,
+   1.0,
+   1.0
+  ],
+  "baseMap": {
+   "path": "Art/World/Textures/Facade_Siding.png",
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "offset": [
+    0.0,
+    0.0
+   ]
+  },
+  "normalMap": "Art/World/Textures/Facade_Siding_Normal.png",
+  "metallic": 0.0,
+  "smoothness": 1.0,
+  "smoothnessFromAlbedo": true,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Facade_Storefront": {
+  "baseColor": [
+   1.0,
+   1.0,
+   1.0,
+   1.0
+  ],
+  "baseMap": {
+   "path": "Art/World/Textures/Facade_Storefront.png",
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "offset": [
+    0.0,
+    0.0
+   ]
+  },
+  "normalMap": "Art/World/Textures/Facade_Storefront_Normal.png",
+  "metallic": 0.0,
+  "smoothness": 1.0,
+  "smoothnessFromAlbedo": true,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Field_Greens": {
+  "baseColor": [
+   1.0,
+   1.0,
+   1.0,
+   1.0
+  ],
+  "baseMap": {
+   "path": "Art/World/Textures/Field_Greens.png",
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "offset": [
+    0.0,
+    0.0
+   ]
+  },
+  "normalMap": "Art/World/Textures/Field_Greens_Normal.png",
+  "metallic": 0.0,
+  "smoothness": 1.0,
+  "smoothnessFromAlbedo": true,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Field_Wheat": {
+  "baseColor": [
+   1.0,
+   1.0,
+   1.0,
+   1.0
+  ],
+  "baseMap": {
+   "path": "Art/World/Textures/Field_Wheat.png",
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "offset": [
+    0.0,
+    0.0
+   ]
+  },
+  "normalMap": "Art/World/Textures/Field_Wheat_Normal.png",
+  "metallic": 0.0,
+  "smoothness": 1.0,
+  "smoothnessFromAlbedo": true,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Foliage": {
+  "baseColor": [
+   1.0,
+   1.0,
+   1.0,
+   1.0
+  ],
+  "baseMap": {
+   "path": "Art/World/Textures/Foliage.png",
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "offset": [
+    0.0,
+    0.0
+   ]
+  },
+  "normalMap": "Art/World/Textures/Foliage_Normal.png",
+  "metallic": 0.0,
+  "smoothness": 1.0,
+  "smoothnessFromAlbedo": true,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Foliage_Dark": {
+  "baseColor": [
+   0.55,
+   0.75,
+   0.6,
+   1.0
+  ],
+  "baseMap": {
+   "path": "Art/World/Textures/Foliage.png",
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "offset": [
+    0.0,
+    0.0
+   ]
+  },
+  "normalMap": "Art/World/Textures/Foliage_Normal.png",
+  "metallic": 0.0,
+  "smoothness": 1.0,
+  "smoothnessFromAlbedo": true,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Foliage_Light": {
+  "baseColor": [
+   1.0,
+   1.0,
+   0.7,
+   1.0
+  ],
+  "baseMap": {
+   "path": "Art/World/Textures/Foliage.png",
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "offset": [
+    0.0,
+    0.0
+   ]
+  },
+  "normalMap": "Art/World/Textures/Foliage_Normal.png",
+  "metallic": 0.0,
+  "smoothness": 1.0,
+  "smoothnessFromAlbedo": true,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Ground": {
+  "baseColor": [
+   1.0,
+   1.0,
+   1.0,
+   1.0
+  ],
+  "baseMap": {
+   "path": "Art/World/Textures/Ground_Grass.png",
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "offset": [
+    0.0,
+    0.0
+   ]
+  },
+  "normalMap": "Art/World/Textures/Ground_Grass_Normal.png",
+  "metallic": 0.0,
+  "smoothness": 1.0,
+  "smoothnessFromAlbedo": true,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Ground_Bank": {
+  "baseColor": [
+   1.0,
+   1.0,
+   1.0,
+   1.0
+  ],
+  "baseMap": {
+   "path": "Art/World/Textures/Ground_Bank.png",
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "offset": [
+    0.0,
+    0.0
+   ]
+  },
+  "normalMap": "Art/World/Textures/Ground_Bank_Normal.png",
+  "metallic": 0.0,
+  "smoothness": 1.0,
+  "smoothnessFromAlbedo": true,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Ground_Grass": {
+  "baseColor": [
+   1.0,
+   1.0,
+   1.0,
+   1.0
+  ],
+  "baseMap": {
+   "path": "Art/World/Textures/Ground_Grass.png",
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "offset": [
+    0.0,
+    0.0
+   ]
+  },
+  "normalMap": "Art/World/Textures/Ground_Grass_Normal.png",
+  "metallic": 0.0,
+  "smoothness": 1.0,
+  "smoothnessFromAlbedo": true,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Ground_Paving": {
+  "baseColor": [
+   1.0,
+   1.0,
+   1.0,
+   1.0
+  ],
+  "baseMap": {
+   "path": "Art/World/Textures/Ground_Paving.png",
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "offset": [
+    0.0,
+    0.0
+   ]
+  },
+  "normalMap": "Art/World/Textures/Ground_Paving_Normal.png",
+  "metallic": 0.0,
+  "smoothness": 1.0,
+  "smoothnessFromAlbedo": true,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Ground_Yard": {
+  "baseColor": [
+   1.0,
+   1.0,
+   1.0,
+   1.0
+  ],
+  "baseMap": {
+   "path": "Art/World/Textures/Ground_Yard.png",
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "offset": [
+    0.0,
+    0.0
+   ]
+  },
+  "normalMap": "Art/World/Textures/Ground_Yard_Normal.png",
+  "metallic": 0.0,
+  "smoothness": 1.0,
+  "smoothnessFromAlbedo": true,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Lamp_Amber": {
+  "baseColor": [
+   0.45,
+   0.28,
+   0.03,
+   1.0
+  ],
+  "baseMap": null,
+  "normalMap": "",
+  "metallic": 0.0,
+  "smoothness": 0.8,
+  "smoothnessFromAlbedo": false,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Lamp_Green": {
+  "baseColor": [
+   0.05,
+   0.4,
+   0.18,
+   1.0
+  ],
+  "baseMap": null,
+  "normalMap": "",
+  "metallic": 0.0,
+  "smoothness": 0.8,
+  "smoothnessFromAlbedo": false,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Lamp_Red": {
+  "baseColor": [
+   0.85,
+   0.08,
+   0.05,
+   1.0
+  ],
+  "baseMap": null,
+  "normalMap": "",
+  "metallic": 0.0,
+  "smoothness": 0.8,
+  "smoothnessFromAlbedo": false,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Metal_Dark": {
+  "baseColor": [
+   0.2,
+   0.21,
+   0.22,
+   1.0
+  ],
+  "baseMap": null,
+  "normalMap": "",
+  "metallic": 0.6,
+  "smoothness": 0.5,
+  "smoothnessFromAlbedo": false,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Metal_Roof": {
+  "baseColor": [
+   0.4,
+   0.42,
+   0.45,
+   1.0
+  ],
+  "baseMap": {
+   "path": "Art/World/Textures/Metal_Corrugated.png",
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "offset": [
+    0.0,
+    0.0
+   ]
+  },
+  "normalMap": "Art/World/Textures/Metal_Corrugated_Normal.png",
+  "metallic": 0.4,
+  "smoothness": 1.0,
+  "smoothnessFromAlbedo": true,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Metal_Wall": {
+  "baseColor": [
+   0.62,
+   0.7,
+   0.78,
+   1.0
+  ],
+  "baseMap": {
+   "path": "Art/World/Textures/Metal_Corrugated.png",
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "offset": [
+    0.0,
+    0.0
+   ]
+  },
+  "normalMap": "Art/World/Textures/Metal_Corrugated_Normal.png",
+  "metallic": 0.3,
+  "smoothness": 1.0,
+  "smoothnessFromAlbedo": true,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Paint_Red": {
+  "baseColor": [
+   0.75,
+   0.06,
+   0.05,
+   1.0
+  ],
+  "baseMap": null,
+  "normalMap": "",
+  "metallic": 0.0,
+  "smoothness": 0.3,
+  "smoothnessFromAlbedo": false,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Paint_Yellow": {
+  "baseColor": [
+   0.9,
+   0.72,
+   0.1,
+   1.0
+  ],
+  "baseMap": null,
+  "normalMap": "",
+  "metallic": 0.0,
+  "smoothness": 0.3,
+  "smoothnessFromAlbedo": false,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Rail_Ballast": {
+  "baseColor": [
+   1.0,
+   1.0,
+   1.0,
+   1.0
+  ],
+  "baseMap": {
+   "path": "Art/World/Textures/Rail_Ballast.png",
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "offset": [
+    0.0,
+    0.0
+   ]
+  },
+  "normalMap": "Art/World/Textures/Rail_Ballast_Normal.png",
+  "metallic": 0.0,
+  "smoothness": 1.0,
+  "smoothnessFromAlbedo": true,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Road_Arterial": {
+  "baseColor": [
+   1.0,
+   1.0,
+   1.0,
+   1.0
+  ],
+  "baseMap": {
+   "path": "Art/World/Textures/Road_Arterial.png",
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "offset": [
+    0.0,
+    0.0
+   ]
+  },
+  "normalMap": "Art/World/Textures/Road_Arterial_Normal.png",
+  "metallic": 0.0,
+  "smoothness": 1.0,
+  "smoothnessFromAlbedo": true,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Road_Arterial_Crosswalk": {
+  "baseColor": [
+   1.0,
+   1.0,
+   1.0,
+   1.0
+  ],
+  "baseMap": {
+   "path": "Art/World/Textures/Road_Arterial_Crosswalk.png",
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "offset": [
+    0.0,
+    0.0
+   ]
+  },
+  "normalMap": "Art/World/Textures/Road_Arterial_Crosswalk_Normal.png",
+  "metallic": 0.0,
+  "smoothness": 1.0,
+  "smoothnessFromAlbedo": true,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Road_Junction": {
+  "baseColor": [
+   1.0,
+   1.0,
+   1.0,
+   1.0
+  ],
+  "baseMap": {
+   "path": "Art/World/Textures/Road_Junction.png",
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "offset": [
+    0.0,
+    0.0
+   ]
+  },
+  "normalMap": "Art/World/Textures/Road_Junction_Normal.png",
+  "metallic": 0.0,
+  "smoothness": 1.0,
+  "smoothnessFromAlbedo": true,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Road_Local": {
+  "baseColor": [
+   1.0,
+   1.0,
+   1.0,
+   1.0
+  ],
+  "baseMap": {
+   "path": "Art/World/Textures/Road_Local.png",
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "offset": [
+    0.0,
+    0.0
+   ]
+  },
+  "normalMap": "Art/World/Textures/Road_Local_Normal.png",
+  "metallic": 0.0,
+  "smoothness": 1.0,
+  "smoothnessFromAlbedo": true,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Road_Local_Crosswalk": {
+  "baseColor": [
+   1.0,
+   1.0,
+   1.0,
+   1.0
+  ],
+  "baseMap": {
+   "path": "Art/World/Textures/Road_Local_Crosswalk.png",
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "offset": [
+    0.0,
+    0.0
+   ]
+  },
+  "normalMap": "Art/World/Textures/Road_Local_Crosswalk_Normal.png",
+  "metallic": 0.0,
+  "smoothness": 1.0,
+  "smoothnessFromAlbedo": true,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Road_Rural": {
+  "baseColor": [
+   1.0,
+   1.0,
+   1.0,
+   1.0
+  ],
+  "baseMap": {
+   "path": "Art/World/Textures/Road_Rural.png",
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "offset": [
+    0.0,
+    0.0
+   ]
+  },
+  "normalMap": "Art/World/Textures/Road_Rural_Normal.png",
+  "metallic": 0.0,
+  "smoothness": 1.0,
+  "smoothnessFromAlbedo": true,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Roof_ClayTiles": {
+  "baseColor": [
+   1.0,
+   1.0,
+   1.0,
+   1.0
+  ],
+  "baseMap": {
+   "path": "Art/World/Textures/Roof_ClayTiles.png",
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "offset": [
+    0.0,
+    0.0
+   ]
+  },
+  "normalMap": "Art/World/Textures/Roof_ClayTiles_Normal.png",
+  "metallic": 0.0,
+  "smoothness": 1.0,
+  "smoothnessFromAlbedo": true,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Roof_Flat": {
+  "baseColor": [
+   1.0,
+   1.0,
+   1.0,
+   1.0
+  ],
+  "baseMap": {
+   "path": "Art/World/Textures/Roof_Flat.png",
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "offset": [
+    0.0,
+    0.0
+   ]
+  },
+  "normalMap": "Art/World/Textures/Roof_Flat_Normal.png",
+  "metallic": 0.0,
+  "smoothness": 1.0,
+  "smoothnessFromAlbedo": true,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Roof_Shingles": {
+  "baseColor": [
+   1.0,
+   1.0,
+   1.0,
+   1.0
+  ],
+  "baseMap": {
+   "path": "Art/World/Textures/Roof_Shingles.png",
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "offset": [
+    0.0,
+    0.0
+   ]
+  },
+  "normalMap": "Art/World/Textures/Roof_Shingles_Normal.png",
+  "metallic": 0.0,
+  "smoothness": 1.0,
+  "smoothnessFromAlbedo": true,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Sign": {
+  "baseColor": [
+   0.1,
+   0.1,
+   0.12,
+   1.0
+  ],
+  "baseMap": null,
+  "normalMap": "",
+  "metallic": 0.0,
+  "smoothness": 0.5,
+  "smoothnessFromAlbedo": false,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Sign_Crossbuck": {
+  "baseColor": [
+   1.0,
+   1.0,
+   1.0,
+   1.0
+  ],
+  "baseMap": {
+   "path": "Art/World/Textures/Sign_Crossbuck.png",
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "offset": [
+    0.0,
+    0.0
+   ]
+  },
+  "normalMap": "Art/World/Textures/Sign_Crossbuck_Normal.png",
+  "metallic": 0.0,
+  "smoothness": 1.0,
+  "smoothnessFromAlbedo": true,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Sign_Stop": {
+  "baseColor": [
+   1.0,
+   1.0,
+   1.0,
+   1.0
+  ],
+  "baseMap": {
+   "path": "Art/World/Textures/Sign_Stop.png",
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "offset": [
+    0.0,
+    0.0
+   ]
+  },
+  "normalMap": "Art/World/Textures/Sign_Stop_Normal.png",
+  "metallic": 0.0,
+  "smoothness": 1.0,
+  "smoothnessFromAlbedo": true,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Steel": {
+  "baseColor": [
+   0.55,
+   0.56,
+   0.58,
+   1.0
+  ],
+  "baseMap": null,
+  "normalMap": "",
+  "metallic": 0.9,
+  "smoothness": 0.7,
+  "smoothnessFromAlbedo": false,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Stucco": {
+  "baseColor": [
+   0.95,
+   0.88,
+   0.74,
+   1.0
+  ],
+  "baseMap": {
+   "path": "Art/World/Textures/Concrete.png",
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "offset": [
+    0.0,
+    0.0
+   ]
+  },
+  "normalMap": "Art/World/Textures/Concrete_Normal.png",
+  "metallic": 0.0,
+  "smoothness": 1.0,
+  "smoothnessFromAlbedo": true,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Trim": {
+  "baseColor": [
+   0.92,
+   0.92,
+   0.9,
+   1.0
+  ],
+  "baseMap": {
+   "path": "Art/World/Textures/Concrete.png",
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "offset": [
+    0.0,
+    0.0
+   ]
+  },
+  "normalMap": "Art/World/Textures/Concrete_Normal.png",
+  "metallic": 0.0,
+  "smoothness": 1.0,
+  "smoothnessFromAlbedo": true,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Water": {
+  "baseColor": [
+   1.0,
+   1.0,
+   1.0,
+   1.0
+  ],
+  "baseMap": {
+   "path": "Art/World/Textures/Water.png",
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "offset": [
+    0.0,
+    0.0
+   ]
+  },
+  "normalMap": "Art/World/Textures/Water_Normal.png",
+  "metallic": 0.0,
+  "smoothness": 1.0,
+  "smoothnessFromAlbedo": true,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Window_Industrial": {
+  "baseColor": [
+   1.0,
+   1.0,
+   1.0,
+   1.0
+  ],
+  "baseMap": {
+   "path": "Art/World/Textures/Window_Industrial.png",
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "offset": [
+    0.0,
+    0.0
+   ]
+  },
+  "normalMap": "Art/World/Textures/Window_Industrial_Normal.png",
+  "metallic": 0.1,
+  "smoothness": 1.0,
+  "smoothnessFromAlbedo": true,
+  "transparent": false,
+  "emission": null
+ },
+ "WG_Wood_Barn": {
+  "baseColor": [
+   1.0,
+   1.0,
+   1.0,
+   1.0
+  ],
+  "baseMap": {
+   "path": "Art/World/Textures/Wood_BarnPlanks.png",
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "offset": [
+    0.0,
+    0.0
+   ]
+  },
+  "normalMap": "Art/World/Textures/Wood_BarnPlanks_Normal.png",
+  "metallic": 0.0,
+  "smoothness": 1.0,
+  "smoothnessFromAlbedo": true,
+  "transparent": false,
+  "emission": null
+ }
+}

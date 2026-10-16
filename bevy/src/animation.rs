@@ -40,10 +40,15 @@ const SPEED_DAMP_SECONDS: f32 = 0.1;
 // Shirt colour; Unity picks a stable hue per player name, and this sandbox has a single player.
 const SHIRT_COLOR: Color = Color::srgb(0.25, 0.52, 0.80);
 
+/// The scene height of the ground under a character, set by whatever moves it (the animator reads it for Fall and Land).
+#[derive(Component, Default)]
+pub struct GroundHeight(pub f32);
+
 #[derive(Component)]
 pub struct CharacterModel {
     gltf: Handle<Gltf>,
     spawned: bool,
+    shirt: Color,
 }
 
 impl CharacterModel {
@@ -51,7 +56,14 @@ impl CharacterModel {
         Self {
             gltf,
             spawned: false,
+            shirt: SHIRT_COLOR,
         }
+    }
+
+    /// Unity tinted each player's shirt with a stable hue from their name.
+    pub fn with_shirt(mut self, shirt: Color) -> Self {
+        self.shirt = shirt;
+        self
     }
 }
 
@@ -145,7 +157,7 @@ impl Animator {
         }
     }
 
-    fn advance(&mut self, delta: f32, position: Vec3) {
+    fn advance(&mut self, delta: f32, position: Vec3, ground: f32) {
         // Animator parameters, measured from motion.
         match self.last_position {
             Some(last)
@@ -167,7 +179,7 @@ impl Animator {
             SPEED_DAMP_SECONDS,
             delta,
         );
-        let grounded = position.y <= GROUND_PROBE;
+        let grounded = position.y <= ground + GROUND_PROBE;
 
         if let Some((state, duration)) = self.next_transition(grounded, self.velocity.y) {
             self.enter(state, duration);
@@ -277,7 +289,7 @@ fn spawn_models(
         let nodes: [AnimationNodeIndex; 6] = nodes.try_into().expect("one node per clip");
         let graph = AnimationGraphHandle(graphs.add(graph));
         let shirt = materials.add(StandardMaterial {
-            base_color: SHIRT_COLOR,
+            base_color: model.shirt,
             perceptual_roughness: 0.8,
             double_sided: true,
             cull_mode: None,
@@ -325,15 +337,15 @@ fn spawn_models(
 
 fn drive_animator(
     time: Res<Time>,
-    mut animators: Query<(&mut Animator, &Transform)>,
+    mut animators: Query<(&mut Animator, &Transform, Option<&GroundHeight>)>,
     mut players: Query<&mut AnimationPlayer>,
 ) {
     let delta = time.delta_secs();
     if delta <= 0.0 {
         return;
     }
-    for (mut animator, transform) in &mut animators {
-        animator.advance(delta, transform.translation);
+    for (mut animator, transform, ground) in &mut animators {
+        animator.advance(delta, transform.translation, ground.map_or(0.0, |g| g.0));
         let Ok(mut player) = players.get_mut(animator.animation_player) else {
             continue;
         };
@@ -385,7 +397,7 @@ mod tests {
         for _ in 0..240 {
             vertical += gravity * delta;
             y = (y + vertical * delta).max(0.0);
-            animator.advance(delta, Vec3::new(0.0, y, 0.0));
+            animator.advance(delta, Vec3::new(0.0, y, 0.0), 0.0);
             if visited.last() != Some(&animator.state) {
                 visited.push(animator.state);
             }

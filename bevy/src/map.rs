@@ -7,12 +7,11 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use bevy::gltf::{Gltf, GltfMaterial, GltfMesh, GltfNode};
-use bevy::image::{ImageAddressMode, ImageLoaderSettings, ImageSampler, ImageSamplerDescriptor};
 use bevy::prelude::*;
 
 use food_factory_bevy::world::{geometry, layout::*, random};
 
-use crate::models::{Bounds, Library, MergeBuffer};
+use crate::models::{repeat_texture, Bounds, Library, MergeBuffer};
 use crate::session::{Session, SessionEvent};
 use crate::space::Space;
 
@@ -83,16 +82,6 @@ pub struct Covers {
     pub water: Handle<StandardMaterial>,
     pub wheat: Handle<StandardMaterial>,
     pub greens: Handle<StandardMaterial>,
-}
-
-fn repeat_texture(assets: &AssetServer, path: &str) -> Handle<Image> {
-    assets.load_with_settings(path.to_string(), |settings: &mut ImageLoaderSettings| {
-        settings.sampler = ImageSampler::Descriptor(ImageSamplerDescriptor {
-            address_mode_u: ImageAddressMode::Repeat,
-            address_mode_v: ImageAddressMode::Repeat,
-            ..ImageSamplerDescriptor::linear()
-        });
-    })
 }
 
 fn textured(assets: &AssetServer, materials: &mut Assets<StandardMaterial>, name: &str, roughness: f32) -> Handle<StandardMaterial> {
@@ -618,6 +607,7 @@ fn build_map(
     // ------------------------------------------------------------------ buildings
     let mut shells: HashMap<String, Vec<Entity>> = HashMap::new();
     let mut awnings = HashMap::new();
+    let mut pending: Vec<(String, MergeBuffer, Handle<StandardMaterial>, bool)> = vec![];
     let foundation = |buffers: &mut Buffers, x: f32, z: f32, width: f32, depth: f32, floor: f32| {
         let lowest = [land.height(x, z), land.height(x + width, z), land.height(x, z + depth), land.height(x + width, z + depth), land.height(x + width / 2.0, z + depth / 2.0)].into_iter().fold(f32::MAX, f32::min);
         let drop = floor - lowest + 0.4;
@@ -686,35 +676,24 @@ fn build_map(
                 // A shell is its own entities, so a drawn site hides it; a restaurant's awning is tinted separately.
                 let Some(parts) = library.parts.get(&path) else { continue };
                 let mut body = MergeBuffer::default();
-                let mut body_material = None;
-                let mut entities = vec![];
+                let mut body_material: Option<Handle<StandardMaterial>> = None;
                 for part in parts {
                     let Some(mesh) = meshes_ref.get(&part.mesh) else { continue };
                     if part.material_name == "WG_Awning" {
                         let mut awning = MergeBuffer::default();
                         awning.append(mesh, matrix * part.transform, &|_| 0.0);
-                        let material = materials.get(&part.material).cloned().unwrap_or_default();
-                        let tinted = materials.add(material);
-                        let entity = commands.spawn((Mesh3d(meshes.add(awning.build())), MeshMaterial3d(tinted.clone()), Transform::default(), Name::new(format!("Awning {}", building.id)))).id();
-                        commands.entity(root).add_child(entity);
-                        awnings.insert(building.id.clone(), (entity, tinted));
+                        pending.push((building.id.clone(), awning, part.material.clone(), true));
                         continue;
                     }
-                    if body_material.as_ref().is_some_and(|m: &Handle<StandardMaterial>| m.id() != part.material.id()) {
-                        let mesh = meshes.add(std::mem::take(&mut body).build());
-                        let entity = commands.spawn((Mesh3d(mesh), MeshMaterial3d(body_material.clone().unwrap()), Transform::default())).id();
-                        commands.entity(root).add_child(entity);
-                        entities.push(entity);
+                    if body_material.as_ref().is_some_and(|m| m.id() != part.material.id()) {
+                        pending.push((building.id.clone(), std::mem::take(&mut body), body_material.clone().unwrap(), false));
                     }
                     body_material = Some(part.material.clone());
                     body.append(mesh, matrix * part.transform, &|_| 0.0);
                 }
                 if let Some(material) = body_material.filter(|_| !body.is_empty()) {
-                    let entity = commands.spawn((Mesh3d(meshes.add(body.build())), MeshMaterial3d(material), Transform::default())).id();
-                    commands.entity(root).add_child(entity);
-                    entities.push(entity);
+                    pending.push((building.id.clone(), body, material, false));
                 }
-                shells.insert(building.id.clone(), entities);
             }
         }
     }
@@ -742,6 +721,24 @@ fn build_map(
     }
 
     // ------------------------------------------------------------------ flush
+    // A shell is its own entities, so a drawn site hides it; a restaurant's awning is tinted separately.
+    for (building_id, buffer, material, awning) in pending {
+        let material = if awning {
+            let copy = materials.get(&material).cloned().unwrap_or_default();
+            materials.add(copy)
+        } else {
+            material
+        };
+        let entity = commands.spawn((Mesh3d(meshes.add(buffer.build())), MeshMaterial3d(material.clone()), Transform::default(), Name::new(format!("Shell {building_id}")))).id();
+        commands.entity(root).add_child(entity);
+        if awning {
+            awnings.insert(building_id, (entity, material));
+        } else {
+            shells.entry(building_id).or_insert_with(Vec::new).push(entity);
+        }
+    }
+    let total: usize = buffers.buffers.values().map(|(_, b)| b.vertex_count()).sum();
+    info!("[Map] {} merged meshes, {total} vertices, map half size {half} m.", buffers.buffers.len());
     for (_, (material, buffer)) in buffers.buffers {
         if buffer.is_empty() {
             continue;
@@ -784,7 +781,7 @@ fn tint_awnings(session: Res<Session>, state: Res<MapState>, mut materials: ResM
             *shown = if owned { Visibility::Hidden } else { Visibility::Inherited };
         }
         let colour = if building.ownership == Ownership::ForSale { FOR_SALE_AWNING } else { COMPETITOR_AWNINGS[(random::fnv1a(building_id) % COMPETITOR_AWNINGS.len() as u64) as usize] };
-        if let Some(m) = materials.get_mut(material) {
+        if let Some(mut m) = materials.get_mut(material) {
             m.base_color = colour;
         }
     }
@@ -797,7 +794,7 @@ fn hide_drawn_shells(state: Res<MapState>, drawn: Res<DrawnSites>, session: Res<
     }
     let Some(world) = session.joined() else { return };
     for (building_id, entities) in &state.shells {
-        let site = WorldLot::site_id_for(building_id);
+        let Some(site) = world.layout.lots.iter().find(|l| &l.building_id == building_id).map(|l| l.site_id.clone()) else { continue };
         let hidden = drawn.sites.iter().any(|s| *s == site) && world.views.contains_key(&site);
         for entity in entities {
             if let Ok(mut shown) = visibility.get_mut(*entity) {

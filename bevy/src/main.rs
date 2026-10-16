@@ -1,28 +1,34 @@
-// Food Factory Bevy application: render and input composition over the authoritative game runtime.
-// Release builds on Windows run without a console window.
+// Food Factory Bevy application: the client (menus, the drawn city and sites, the avatar, panels) over the authoritative
+// server in the library, which a hosting client runs on its own thread. Release builds on Windows run without a console.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 mod actions;
 mod animation;
+#[cfg(feature = "audio")]
+mod audio;
+mod belt_controls;
+mod build;
 mod camera;
+mod characters;
 mod dev_capture;
+mod hud;
+mod interaction;
+mod map;
+mod models;
+mod panels;
+mod phone_map;
 mod player;
-mod presentation;
+mod screens;
+mod session;
+mod settings;
+mod sites;
+mod space;
 mod ui;
-mod game;
+mod vehicles;
 
-use bevy::asset::RenderAssetUsages;
 use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin};
-use bevy::image::{ImageAddressMode, ImageSampler, ImageSamplerDescriptor};
 use bevy::light::CascadeShadowConfigBuilder;
-use bevy::math::Affine2;
 use bevy::prelude::*;
-use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy::window::{PresentMode, PrimaryWindow};
-
-// Floor half-extent in metres; large enough that the edge is never reached in casual play.
-const FLOOR_SIZE: f32 = 400.0;
-// Floor checker tile size in metres, so ground motion stays readable on an otherwise blank floor.
-const TILE_SIZE: f32 = 2.0;
 
 fn main() {
     App::new()
@@ -30,10 +36,10 @@ fn main() {
             DefaultPlugins
                 .set(WindowPlugin {
                     primary_window: Some(Window {
-                        title: "Food Factory - Bevy".into(),
-                        // Uncapped frame rate: no vsync, falling back to vsync where the platform cannot present
-                        // without it.
-                        present_mode: PresentMode::AutoNoVsync,
+                        title: "Food Factory".into(),
+                        // Uncapped frame rate: no vsync, falling back to vsync where the platform cannot present without it.
+                        // Capture runs (dev_capture) keep vsync so automated checks never drive the GPU flat out.
+                        present_mode: if std::env::var_os("FF_CAPTURE_DIR").is_some() { PresentMode::AutoVsync } else { PresentMode::AutoNoVsync },
                         ..default()
                     }),
                     ..default()
@@ -41,25 +47,39 @@ fn main() {
                 .set(asset_plugin()),
         )
         .insert_resource(ClearColor(Color::srgb(0.62, 0.74, 0.86)))
-        .insert_resource(GlobalAmbientLight {
-            color: Color::WHITE,
-            brightness: 400.0,
-            ..default()
-        })
+        .insert_resource(GlobalAmbientLight { color: Color::srgb(0.85, 0.9, 1.0), brightness: 350.0, ..default() })
         .add_plugins((
+            session::SessionPlugin,
+            models::ModelsPlugin,
+            map::MapPlugin,
+            sites::SitesPlugin,
             actions::ActionsPlugin,
             camera::OrbitCameraPlugin,
             player::PlayerPlugin,
             animation::CharacterAnimationPlugin,
             dev_capture::DevCapturePlugin,
-            presentation::PresentationPlugin,
             ui::GameUiPlugin,
-            game::GamePlugin,
+            panels::PanelsPlugin,
+            interaction::InteractionPlugin,
+            characters::CharactersPlugin,
+            hud::HudPlugin,
+            screens::ScreensPlugin,
         ))
-        .add_plugins(FrameTimeDiagnosticsPlugin::default())
-        .add_systems(Startup, spawn_world)
+        .add_plugins(SoundPlugin)
+        .add_plugins((belt_controls::BeltControlsPlugin, build::BuildPlugin, vehicles::VehiclesPlugin, settings::SettingsPlugin, phone_map::PhoneMapPlugin, FrameTimeDiagnosticsPlugin::default()))
+        .add_systems(Startup, spawn_sun)
         .add_systems(Update, show_fps)
         .run();
+}
+
+/// Sound, when built with the `audio` feature.
+struct SoundPlugin;
+
+impl Plugin for SoundPlugin {
+    fn build(&self, _app: &mut App) {
+        #[cfg(feature = "audio")]
+        _app.add_plugins(audio::GameAudioPlugin);
+    }
 }
 
 // dx launches the game from target/dx/.../app, whose assets folder is empty, so hot-patch builds read the project's
@@ -69,88 +89,26 @@ fn asset_plugin() -> AssetPlugin {
     let file_path = concat!(env!("CARGO_MANIFEST_DIR"), "/assets").to_string();
     #[cfg(not(feature = "hotpatch"))]
     let file_path = AssetPlugin::default().file_path;
-    AssetPlugin {
-        file_path,
-        ..default()
-    }
+    AssetPlugin { file_path, ..default() }
 }
 
-fn spawn_world(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    mut images: ResMut<Assets<Image>>,
-) {
+fn spawn_sun(mut commands: Commands) {
     commands.spawn((
-        Mesh3d(meshes.add(Plane3d::default().mesh().size(FLOOR_SIZE, FLOOR_SIZE))),
-        MeshMaterial3d(materials.add(StandardMaterial {
-            base_color_texture: Some(images.add(checker_image())),
-            perceptual_roughness: 0.9,
-            // The checker texture holds two tiles per repeat.
-            uv_transform: Affine2::from_scale(Vec2::splat(FLOOR_SIZE / (TILE_SIZE * 2.0))),
-            ..default()
-        })),
-    ));
-
-    commands.spawn((
-        DirectionalLight {
-            illuminance: 9_000.0,
-            shadow_maps_enabled: true,
-            ..default()
-        },
-        Transform::from_xyz(4.0, 10.0, 6.0).looking_at(Vec3::ZERO, Vec3::Y),
-        CascadeShadowConfigBuilder {
-            maximum_distance: 60.0,
-            first_cascade_far_bound: 12.0,
-            ..default()
-        }
-        .build(),
+        DirectionalLight { illuminance: 7_000.0, shadow_maps_enabled: true, color: Color::srgb(1.0, 0.97, 0.9), ..default() },
+        Transform::from_xyz(40.0, 80.0, 30.0).looking_at(Vec3::ZERO, Vec3::Y),
+        CascadeShadowConfigBuilder { maximum_distance: 120.0, first_cascade_far_bound: 15.0, ..default() }.build(),
     ));
 }
 
 // Shows the smoothed frame rate in the window title, refreshed twice a second.
-fn show_fps(
-    time: Res<Time>,
-    diagnostics: Res<DiagnosticsStore>,
-    mut window: Query<&mut Window, With<PrimaryWindow>>,
-    mut since_update: Local<f32>,
-) {
+fn show_fps(time: Res<Time>, diagnostics: Res<DiagnosticsStore>, mut window: Query<&mut Window, With<PrimaryWindow>>, mut since_update: Local<f32>) {
     *since_update += time.delta_secs();
     if *since_update < 0.5 {
         return;
     }
     *since_update = 0.0;
-    let Some(fps) = diagnostics
-        .get(&FrameTimeDiagnosticsPlugin::FPS)
-        .and_then(|fps| fps.smoothed())
-    else {
-        return;
-    };
+    let Some(fps) = diagnostics.get(&FrameTimeDiagnosticsPlugin::FPS).and_then(|fps| fps.smoothed()) else { return };
     if let Ok(mut window) = window.single_mut() {
-        window.title = format!("Food Factory - Bevy ({fps:.0} FPS)");
+        window.title = format!("Food Factory ({fps:.0} FPS)");
     }
-}
-
-// A 2x2 checker of two close greys, repeated across the floor.
-fn checker_image() -> Image {
-    let light = [196, 198, 200, 255];
-    let dark = [176, 178, 181, 255];
-    let data = [light, dark, dark, light].concat();
-    let mut image = Image::new(
-        Extent3d {
-            width: 2,
-            height: 2,
-            depth_or_array_layers: 1,
-        },
-        TextureDimension::D2,
-        data,
-        TextureFormat::Rgba8UnormSrgb,
-        RenderAssetUsages::RENDER_WORLD,
-    );
-    image.sampler = ImageSampler::Descriptor(ImageSamplerDescriptor {
-        address_mode_u: ImageAddressMode::Repeat,
-        address_mode_v: ImageAddressMode::Repeat,
-        ..ImageSamplerDescriptor::nearest()
-    });
-    image
 }

@@ -1,21 +1,45 @@
 # Food Factory — Bevy port (in progress)
 
-An independent Bevy application alongside the original Unity project. The original character sandbox is being expanded
-with a Rust authoritative simulation, SQLite persistence, native UI and Blender-exported game art. **This is not yet
-an entire-game or visual-parity port.** The Unity project and its application saves remain intact.
+A Rust and Bevy port of the Unity game, living alongside it. The Unity project and its saves are untouched. The headless
+simulation (world generation, goods, cash, machines, buildings, employees with Luau programs, trucks, farms, customers),
+SQLite saving and the client/server protocol are ported; the client draws the generated city, the sites, people and
+vehicles and has the menus, panels, placement, belts and build mode. **It is not yet at parity with the Unity game**:
+see [architecture and status](docs/architecture.md) for what is simplified or missing.
 
-Controls: WASD/arrows move, Left Shift sprint, Space jump, mouse orbit, scroll zoom, C overhead camera,
-E inventory, P company screen, B equipment, R rotate held equipment, Q clear placement, and Esc menu.
+## Playing
 
-The development menu starts or resumes a **separate Bevy world**. Use an explicit isolated database for verification:
+`cargo run` opens the main menu: create a singleplayer world (optionally named and seeded), host one for others, play or
+host a saved world, join a server by address, change settings, or resume the last session.
+
+Controls (rebindable in Settings): WASD/arrows move, Space jump, Left Shift sprint, mouse look, scroll zoom, E inventory
+or the aimed machine/employee, 1-9 hotbar, left click place or open, R rotate, X clear the cursor, F take an item off a
+belt, Z put one on, V flip a lift, C phone, L logistics, B build mode (left click place/draw, hold right click remove,
+PgUp/PgDn floors, middle click pick), Esc close or pause.
+
+## Saves and settings
+
+Worlds, the client identity and settings are SQLite databases under `%APPDATA%\FoodFactoryBevy` (Windows) or the
+platform data directory, or under `FF_DATA_ROOT` when that is set. A Unity save cannot be opened: the Rust snapshot format
+is different and no importer exists.
+
+## Tests and captures
 
 ```powershell
-cargo run -- --play --save ./verification/manual/world.db
+cargo test --test world --test server
 ```
 
-The default database is `bevy/saves/bevy-world.db`. Do not use an existing Unity database: its snapshot format is not
-the Rust format, and a verified Unity-save importer has not been implemented. See [port contracts](docs/architecture.md),
-[core interface and gaps](docs/core-interface.md), and [Blender CLI asset pipeline](docs/assets.md).
+The tests use their own temporary directories. `tools/capture.sh OUT_DIR "SCRIPT"` runs the client in capture mode
+(`src/dev_capture.rs`): it hosts an isolated world under `OUT_DIR/../capture-data`, waits for the city, runs the script
+(`shot NAME`, `wait S`, `walk X Y S`, `tp X Z`, `yaw`, `pitch`, `zoom`, `key ACTION`, `hotbar N`, `intent ACTION`,
+`bcell X Z`, `where`) and saves screenshots. Capture runs keep vsync on.
+
+## Regenerating content
+
+- `python tools/export_content.py` — items, recipes, machines, offers and styles from the Unity assets into
+  `assets/content/catalog.json`.
+- `python tools/export_world_materials.py` — the world materials (`assets/catalog/world_materials.json`).
+- `python tools/model_bounds.py` — model bounds (`assets/catalog/bounds.json`).
+- `python tools/convert_assets.py` — FBX to GLB through Blender (see [assets](docs/assets.md)).
 
 ## Windows setup (with hot reloading)
 
@@ -51,7 +75,7 @@ Run every command in PowerShell from this `bevy` folder.
 ### 2. Run with hot patching
 
 ```powershell
-dx serve --hot-patch --no-default-features --features hotpatch
+dx serve --hot-patch --no-default-features --features hotpatch,audio
 ```
 
 The first run compiles all of Bevy and takes about 7 minutes; the progress bar shows how far along it is. Later
@@ -119,14 +143,15 @@ depends only on Windows system DLLs, and release builds open without a console w
 ## Fast compiles
 
 - `dev` feature (on by default): Bevy is dynamically linked, and asset files hot-reload. Turn it off for a
-  standalone build: `cargo build --release --no-default-features`.
+  standalone build: `cargo build --release --no-default-features --features audio`.
 - `.cargo/config.toml`: links with LLD through clang on Linux. Native Windows keeps MSVC's `link.exe`, because
   `dx serve --hot-patch` fails with `rust-lld.exe` ("lld is a generic driver").
 - `[profile.dev]`: `opt-level = 1` for this crate and `3` for dependencies.
 - `rust-toolchain.toml` pins Rust 1.99.1, because Bevy 0.20 needs 1.97.1 or newer.
 
-Audio, gamepad and Wayland support are left out because their system dev libraries (ALSA, udev, wayland-client) are
-not installed. After `sudo apt install libudev-dev`, `cargo run --features gamepad` adds gamepad support.
+Sound is the `audio` feature (on by default). On Linux it needs ALSA (`sudo apt install libasound2-dev`); without it,
+build with `--no-default-features --features dev`. Gamepad and Wayland support are left out; after
+`sudo apt install libudev-dev`, `cargo run --features gamepad` adds gamepad support.
 
 ## Character asset
 
@@ -145,8 +170,3 @@ blender -b ArtSource/Player/Player_Asset.blend --python bevy/tools/export_player
   0.25 m of the floor.
 - Locomotion is a phase-synced 1D blend of Idle, Walk and Run at 0 / 1.6 / 6 m/s.
 - Jump, Fall and Land use Unity's transition conditions and crossfade times.
-
-## Verification capture
-
-`FF_CAPTURE_DIR=/some/dir cargo run` drives the character through idle, walk, run and jump, saves a screenshot of each
-phase into that directory, and exits.

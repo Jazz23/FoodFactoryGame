@@ -1,5 +1,8 @@
-// Action map: gameplay reads named actions from `PlayerActions`, never raw devices. Bindings mirror the Unity
-// project's Player map (WASD/arrows move, Space jump, Left Shift sprint, mouse delta look, scroll zoom).
+// Action map: gameplay reads named actions from `PlayerActions`, never raw devices. Bindings mirror the Unity project's
+// Player map (InputSystem_Actions): WASD/arrows move, Space jump, Left Shift sprint (and quick transfer), mouse look, scroll
+// zoom, E inventory/interact, C phone, M map, L logistics, B build, X clear cursor, R rotate, F take item, Z place item,
+// V flip lift, PgUp/PgDn floors, Enter confirm, left click place, right click remove (and camera tilt in build mode),
+// middle click pick block, 1-9 hotbar, Esc close.
 use bevy::input::mouse::{AccumulatedMouseMotion, AccumulatedMouseScroll};
 use bevy::prelude::*;
 use bevy::window::{CursorGrabMode, CursorOptions, PrimaryWindow};
@@ -39,11 +42,18 @@ pub struct UiTyping(pub bool);
 #[derive(Resource)]
 pub struct Bindings {
     pub inventory: KeyCode,
-    pub camera: KeyCode,
     pub rotate: KeyCode,
     pub clear: KeyCode,
     pub phone: KeyCode,
+    pub map: KeyCode,
+    pub logistics: KeyCode,
     pub build: KeyCode,
+    pub take_item: KeyCode,
+    pub place_item: KeyCode,
+    pub flip_lift: KeyCode,
+    pub floor_up: KeyCode,
+    pub floor_down: KeyCode,
+    pub confirm: Vec<KeyCode>,
     pub up: Vec<KeyCode>,
     pub down: Vec<KeyCode>,
     pub left: Vec<KeyCode>,
@@ -52,17 +62,26 @@ pub struct Bindings {
     pub sprint: Vec<KeyCode>,
     pub release_cursor: Vec<KeyCode>,
     pub capture_cursor: MouseButton,
+    /// Look speed multiplier (Settings).
+    pub sensitivity: f32,
 }
 
 impl Default for Bindings {
     fn default() -> Self {
         Self {
             inventory: KeyCode::KeyE,
-            camera: KeyCode::KeyC,
             rotate: KeyCode::KeyR,
-            clear: KeyCode::KeyQ,
-            phone: KeyCode::KeyP,
+            clear: KeyCode::KeyX,
+            phone: KeyCode::KeyC,
+            map: KeyCode::KeyM,
+            logistics: KeyCode::KeyL,
             build: KeyCode::KeyB,
+            take_item: KeyCode::KeyF,
+            place_item: KeyCode::KeyZ,
+            flip_lift: KeyCode::KeyV,
+            floor_up: KeyCode::PageUp,
+            floor_down: KeyCode::PageDown,
+            confirm: vec![KeyCode::Enter, KeyCode::NumpadEnter],
             up: vec![KeyCode::KeyW, KeyCode::ArrowUp],
             down: vec![KeyCode::KeyS, KeyCode::ArrowDown],
             left: vec![KeyCode::KeyA, KeyCode::ArrowLeft],
@@ -71,6 +90,7 @@ impl Default for Bindings {
             sprint: vec![KeyCode::ShiftLeft],
             release_cursor: vec![KeyCode::Escape],
             capture_cursor: MouseButton::Left,
+            sensitivity: 1.0,
         }
     }
 }
@@ -79,11 +99,22 @@ impl Default for Bindings {
 #[derive(Resource, Default)]
 pub struct PlayerActions {
     pub inventory_pressed: bool,
-    pub camera_pressed: bool,
     pub rotate_pressed: bool,
     pub clear_pressed: bool,
     pub phone_pressed: bool,
+    pub map_pressed: bool,
+    pub logistics_pressed: bool,
     pub build_pressed: bool,
+    pub take_item_pressed: bool,
+    pub place_item_pressed: bool,
+    pub flip_lift_pressed: bool,
+    pub floor_up_pressed: bool,
+    pub floor_down_pressed: bool,
+    pub confirm_pressed: bool,
+    pub pick_block_pressed: bool,
+    /// Left and right button held (build mode drags and camera tilt).
+    pub place_held: bool,
+    pub remove_held: bool,
     pub close_pressed: bool,
     pub place_pressed: bool,
     pub remove_pressed: bool,
@@ -147,11 +178,21 @@ fn read_actions(
         .is_ok_and(|cursor| cursor.grab_mode != CursorGrabMode::None);
     *actions = PlayerActions {
         inventory_pressed: keys.just_pressed(bindings.inventory),
-        camera_pressed: keys.just_pressed(bindings.camera),
         rotate_pressed: keys.just_pressed(bindings.rotate),
         clear_pressed: keys.just_pressed(bindings.clear),
         phone_pressed: keys.just_pressed(bindings.phone),
+        map_pressed: keys.just_pressed(bindings.map),
+        logistics_pressed: keys.just_pressed(bindings.logistics),
         build_pressed: keys.just_pressed(bindings.build),
+        take_item_pressed: keys.just_pressed(bindings.take_item),
+        place_item_pressed: keys.just_pressed(bindings.place_item),
+        flip_lift_pressed: keys.just_pressed(bindings.flip_lift),
+        floor_up_pressed: keys.just_pressed(bindings.floor_up),
+        floor_down_pressed: keys.just_pressed(bindings.floor_down),
+        confirm_pressed: keys.any_just_pressed(bindings.confirm.iter().copied()),
+        pick_block_pressed: mouse.just_pressed(MouseButton::Middle),
+        place_held: mouse.pressed(MouseButton::Left),
+        remove_held: mouse.pressed(MouseButton::Right),
         close_pressed: keys.any_just_pressed(bindings.release_cursor.iter().copied()),
         place_pressed: mouse.just_pressed(MouseButton::Left),
         remove_pressed: mouse.just_pressed(MouseButton::Right),
@@ -166,7 +207,7 @@ fn read_actions(
         .clamp_length_max(1.0),
         jump_pressed: keys.any_just_pressed(bindings.jump.iter().copied()),
         sprint: keys.any_pressed(bindings.sprint.iter().copied()),
-        look: if captured { motion.delta } else { Vec2::ZERO },
+        look: if captured { motion.delta * bindings.sensitivity } else { Vec2::ZERO },
         zoom: if captured { scroll.delta.y } else { 0.0 },
     };
     if focus.0 {

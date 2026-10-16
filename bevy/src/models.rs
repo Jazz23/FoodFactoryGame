@@ -6,6 +6,7 @@ use std::collections::HashMap;
 
 use bevy::asset::RenderAssetUsages;
 use bevy::gltf::{Gltf, GltfMaterial, GltfMesh, GltfNode};
+use bevy::image::{ImageAddressMode, ImageLoaderSettings, ImageSampler, ImageSamplerDescriptor};
 use bevy::mesh::{Indices, PrimitiveTopology, VertexAttributeValues};
 use bevy::prelude::*;
 use bevy::world_serialization::WorldAssetRoot;
@@ -87,12 +88,66 @@ pub struct Part {
     pub transform: Mat4,
 }
 
+/// A texture that repeats across UVs beyond 0..1 (tiled world surfaces).
+pub fn repeat_texture(assets: &AssetServer, path: &str) -> Handle<Image> {
+    assets.load_builder().with_settings(|settings: &mut ImageLoaderSettings| {
+        settings.sampler = ImageSampler::Descriptor(ImageSamplerDescriptor {
+            address_mode_u: ImageAddressMode::Repeat,
+            address_mode_v: ImageAddressMode::Repeat,
+            ..ImageSamplerDescriptor::linear()
+        });
+    }).load(path.to_string())
+}
+
+/// A Unity world material (tools/export_world_materials.py): the world models carry only its name.
+#[derive(serde::Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct WorldMaterial {
+    base_color: [f32; 4],
+    base_map: Option<WorldTexture>,
+    normal_map: String,
+    metallic: f32,
+    smoothness: f32,
+    smoothness_from_albedo: bool,
+    transparent: bool,
+    emission: Option<[f32; 4]>,
+}
+
+#[derive(serde::Deserialize, Clone)]
+struct WorldTexture {
+    path: String,
+    scale: [f32; 2],
+    offset: [f32; 2],
+}
+
+fn world_materials() -> HashMap<String, WorldMaterial> { serde_json::from_str(include_str!("../assets/catalog/world_materials.json")).unwrap_or_default() }
+
+fn world_material(material: &WorldMaterial, assets: &AssetServer) -> StandardMaterial {
+    let [r, g, b, a] = material.base_color;
+    let texture = material.base_map.as_ref().filter(|t| !t.path.is_empty());
+    StandardMaterial {
+        base_color: Color::srgba(r, g, b, a),
+        base_color_texture: texture.map(|t| repeat_texture(assets, &t.path)),
+        normal_map_texture: (!material.normal_map.is_empty()).then(|| repeat_texture(assets, &material.normal_map)),
+        uv_transform: texture.map_or(bevy::math::Affine2::IDENTITY, |t| bevy::math::Affine2::from_scale_angle_translation(Vec2::from_array(t.scale), 0.0, Vec2::from_array(t.offset))),
+        metallic: material.metallic,
+        // Unity read smoothness from the albedo alpha for these; the slider alone would make them glossy.
+        perceptual_roughness: if material.smoothness_from_albedo { 0.78 } else { (1.0 - material.smoothness).clamp(0.05, 1.0) },
+        alpha_mode: if material.transparent { AlphaMode::Blend } else { AlphaMode::Opaque },
+        emissive: material.emission.map_or(LinearRgba::BLACK, |[r, g, b, _]| LinearRgba::rgb(r, g, b) * 4.0),
+        ..default()
+    }
+}
+
 /// Loaded models' parts, for merging.
 #[derive(Resource, Default)]
 pub struct Library {
     pub gltfs: HashMap<String, Handle<Gltf>>,
     pub parts: HashMap<String, Vec<Part>>,
+    /// Parts under each named root node, relative to the root's position (a model file holding several models, such as the vehicles).
+    pub roots: HashMap<(String, String), Vec<Part>>,
     materials: HashMap<AssetId<GltfMaterial>, Handle<StandardMaterial>>,
+    world: Option<HashMap<String, WorldMaterial>>,
 }
 
 impl Library {
@@ -118,21 +173,33 @@ impl Library {
                     let children: std::collections::HashSet<AssetId<GltfNode>> = gltf.nodes.iter().filter_map(|n| nodes.get(n)).flat_map(|n| n.children.iter().map(|c| c.id())).collect();
                     gltf.nodes.iter().filter(|n| !children.contains(&n.id())).cloned().collect()
                 };
-                let mut stack: Vec<(Handle<GltfNode>, Mat4)> = roots.into_iter().map(|r| (r, Mat4::IDENTITY)).collect();
+                let root_names: HashMap<AssetId<GltfNode>, String> = gltf.named_nodes.iter().filter(|(_, h)| roots.iter().any(|r| r.id() == h.id())).map(|(n, h)| (h.id(), n.to_string())).collect();
+                let mut stack: Vec<(Handle<GltfNode>, Mat4, Option<(String, Option<Mat4>)>)> = roots.into_iter().map(|r| {
+                    let name = root_names.get(&r.id()).cloned();
+                    (r, Mat4::IDENTITY, name.map(|n| (n, None)))
+                }).collect();
+                let mut named: HashMap<String, Vec<Part>> = HashMap::new();
                 let mut complete = true;
-                while let Some((node, parent)) = stack.pop() {
+                while let Some((node_handle, parent, root)) = stack.pop() {
+                    let node = node_handle;
                     let Some(node) = nodes.get(&node) else {
                         complete = false;
                         continue;
                     };
                     let matrix = parent * node.transform.to_matrix();
+                    // Within a named root, parts are kept relative to the root's own transform.
+                    let root = root.map(|(name, base)| (name, Some(base.unwrap_or_else(|| Mat4::from_translation(-matrix.w_axis.truncate())))));
                     if let Some(mesh) = node.mesh.as_ref().and_then(|m| meshes.get(m)) {
                         for primitive in &mesh.primitives {
                             let (material, name) = match &primitive.material {
                                 Some(handle) => match gltf_materials.get(handle) {
                                     Some(source) => {
-                                        let standard = self.materials.entry(handle.id()).or_insert_with(|| materials.add(bevy::pbr::gltf::standard_material_from_gltf_material(source))).clone();
                                         let name = gltf.named_materials.iter().find(|(_, h)| h.id() == handle.id()).map(|(n, _)| n.to_string()).unwrap_or_default();
+                                        let world = self.world.get_or_insert_with(world_materials).get(&name).cloned();
+                                        let standard = self.materials.entry(handle.id()).or_insert_with(|| materials.add(match &world {
+                                            Some(world) => world_material(world, assets),
+                                            None => bevy::pbr::gltf::standard_material_from_gltf_material(source),
+                                        })).clone();
                                         (standard, name)
                                     }
                                     None => {
@@ -142,14 +209,21 @@ impl Library {
                                 },
                                 None => (materials.add(StandardMaterial::default()), String::new()),
                             };
-                            parts.push(Part { mesh: primitive.mesh.clone(), material, material_name: name, transform: matrix });
+                            let part = Part { mesh: primitive.mesh.clone(), material, material_name: name, transform: matrix };
+                            if let Some((root_name, base)) = &root {
+                                named.entry(root_name.clone()).or_default().push(Part { transform: base.unwrap_or(Mat4::IDENTITY) * matrix, ..part.clone() });
+                            }
+                            parts.push(part);
                         }
                     }
                     for child in &node.children {
-                        stack.push((child.clone(), matrix));
+                        stack.push((child.clone(), matrix, root.clone()));
                     }
                 }
                 if complete {
+                    for (name, parts) in named {
+                        self.roots.insert((path.clone(), name), parts);
+                    }
                     self.parts.insert(path, parts);
                 } else {
                     ready = false;

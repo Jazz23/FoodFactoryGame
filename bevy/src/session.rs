@@ -3,7 +3,7 @@
 // flight. Presentation reads this resource; nothing here mutates the simulation, which only the server owns.
 use std::collections::{BTreeMap, HashMap};
 use std::sync::mpsc::{Receiver, Sender, TryRecvError};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use bevy::prelude::*;
 
@@ -22,7 +22,7 @@ impl Plugin for SessionPlugin {
         let content = Arc::new(GameContent::bundled().expect("bundled content"));
         let settings = ClientSettings::open(&persistence::data_root().join("Settings").join("settings.db"));
         app.insert_resource(Content(content))
-            .insert_resource(Settings(settings))
+            .insert_resource(Settings(Mutex::new(settings)))
             .init_resource::<Session>()
             .add_message::<SessionEvent>()
             .add_systems(PreUpdate, poll);
@@ -33,7 +33,7 @@ impl Plugin for SessionPlugin {
 pub struct Content(pub Arc<GameContent>);
 
 #[derive(Resource)]
-pub struct Settings(pub ClientSettings);
+pub struct Settings(pub Mutex<ClientSettings>);
 
 /// Something the client reacts to once (presentation rebuilds, notices, sounds).
 #[derive(Message, Clone, Debug)]
@@ -93,8 +93,8 @@ impl Joined {
 
 pub enum Link {
     None,
-    Connecting { to: Sender<ClientMessage>, from: Receiver<ServerMessage>, host: Option<Hosted> },
-    Joined { to: Sender<ClientMessage>, from: Receiver<ServerMessage>, host: Option<Hosted>, world: Box<Joined> },
+    Connecting { to: Sender<ClientMessage>, from: Mutex<Receiver<ServerMessage>>, host: Option<Hosted> },
+    Joined { to: Sender<ClientMessage>, from: Mutex<Receiver<ServerMessage>>, host: Option<Hosted>, world: Box<Joined> },
 }
 
 /// A world this game hosts: the server thread and, unless singleplayer, its listener.
@@ -187,7 +187,7 @@ impl Session {
             Some(l) => format!("Hosting {world_name} on {}", l.address),
             None => format!("Loading {world_name}..."),
         };
-        self.link = Link::Connecting { to, from, host: Some(Hosted { server, listener, world_name: world_name.to_string() }) };
+        self.link = Link::Connecting { to, from: Mutex::new(from), host: Some(Hosted { server, listener, world_name: world_name.to_string() }) };
         Ok(())
     }
 
@@ -197,7 +197,7 @@ impl Session {
         let (to, from) = net::connect(address);
         let _ = to.send(ClientMessage::Hello { version: PROTOCOL_VERSION, name: self.display_name.clone(), secret: self.secret.clone() });
         self.status = format!("Connecting to {address}...");
-        self.link = Link::Connecting { to, from, host: None };
+        self.link = Link::Connecting { to, from: Mutex::new(from), host: None };
     }
 
     /// Leaves the session; a hosted world saves and stops.
@@ -222,6 +222,7 @@ fn poll(time: Res<Time>, mut session: ResMut<Session>, content: Res<Content>, mu
     let mut messages = vec![];
     let mut disconnected = false;
     if let Link::Connecting { from, .. } | Link::Joined { from, .. } = &session.link {
+        let from = from.lock().unwrap_or_else(|e| e.into_inner());
         loop {
             match from.try_recv() {
                 Ok(message) => messages.push(message),
