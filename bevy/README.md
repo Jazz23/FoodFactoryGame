@@ -1,10 +1,21 @@
-# Food Factory — Bevy character sandbox
+# Food Factory — Bevy port (in progress)
 
-A flat floor and the Food Factory player character, nothing else. Movement, orbit camera and animator behaviour are
-ported from the Unity project (`PlayerAvatar`, `OrbitCameraRig`, `PlayerAnimation`, `Player.controller`).
+An independent Bevy application alongside the original Unity project. The original character sandbox is being expanded
+with a Rust authoritative simulation, SQLite persistence, native UI and Blender-exported game art. **This is not yet
+an entire-game or visual-parity port.** The Unity project and its application saves remain intact.
 
-Controls: WASD/arrows to move, Left Shift to sprint, Space to jump, mouse to orbit, scroll to zoom. Esc frees the
-cursor, and left click captures it again.
+Controls: WASD/arrows move, Left Shift sprint, Space jump, mouse orbit, scroll zoom, C overhead camera,
+E inventory, P company screen, B equipment, R rotate held equipment, Q clear placement, and Esc menu.
+
+The development menu starts or resumes a **separate Bevy world**. Use an explicit isolated database for verification:
+
+```powershell
+cargo run -- --play --save ./verification/manual/world.db
+```
+
+The default database is `bevy/saves/bevy-world.db`. Do not use an existing Unity database: its snapshot format is not
+the Rust format, and a verified Unity-save importer has not been implemented. See [port contracts](docs/architecture.md),
+[core interface and gaps](docs/core-interface.md), and [Blender CLI asset pipeline](docs/assets.md).
 
 ## Windows setup (with hot reloading)
 

@@ -1,0 +1,1934 @@
+{
+ "models/catalog/equipment/counter.glb": {
+  "min": [
+   -1.0,
+   -0.0,
+   -0.45
+  ],
+  "max": [
+   1.0,
+   1.34,
+   0.45
+  ]
+ },
+ "models/catalog/equipment/Cube.glb": {
+  "min": [
+   -1,
+   -1,
+   -1
+  ],
+  "max": [
+   1,
+   1,
+   1
+  ]
+ },
+ "models/catalog/equipment/dock.glb": {
+  "min": [
+   -1.0,
+   -0.0,
+   -0.5
+  ],
+  "max": [
+   1.0,
+   2.4,
+   0.55
+  ]
+ },
+ "models/catalog/equipment/fridge.glb": {
+  "min": [
+   -0.45,
+   -0.0,
+   -0.455
+  ],
+  "max": [
+   0.45,
+   1.9,
+   0.4
+  ]
+ },
+ "models/catalog/equipment/fryer.glb": {
+  "min": [
+   -0.42,
+   -0.0,
+   -0.4
+  ],
+  "max": [
+   0.42,
+   1.5,
+   0.46
+  ]
+ },
+ "models/catalog/equipment/grill.glb": {
+  "min": [
+   -0.98,
+   -0.0,
+   -0.44
+  ],
+  "max": [
+   0.98,
+   1.78,
+   0.48
+  ]
+ },
+ "models/catalog/equipment/kitchen-counter.glb": {
+  "min": [
+   -0.98,
+   -0.0,
+   -0.44
+  ],
+  "max": [
+   0.98,
+   1.39,
+   0.45
+  ]
+ },
+ "models/catalog/equipment/Kitchen_Counter.glb": {
+  "min": [
+   -0.98,
+   -0.0,
+   -0.44
+  ],
+  "max": [
+   0.98,
+   1.39,
+   0.45
+  ]
+ },
+ "models/catalog/equipment/Kitchen_Fryer.glb": {
+  "min": [
+   -0.42,
+   -0.0,
+   -0.4
+  ],
+  "max": [
+   0.42,
+   1.5,
+   0.46
+  ]
+ },
+ "models/catalog/equipment/Kitchen_Grill.glb": {
+  "min": [
+   -0.98,
+   -0.0,
+   -0.44
+  ],
+  "max": [
+   0.98,
+   1.78,
+   0.48
+  ]
+ },
+ "models/catalog/equipment/Kitchen_Mixer.glb": {
+  "min": [
+   -0.44,
+   -0.0,
+   -0.4
+  ],
+  "max": [
+   0.44,
+   1.52,
+   0.4
+  ]
+ },
+ "models/catalog/equipment/Kitchen_Stove.glb": {
+  "min": [
+   -0.96,
+   -0.0,
+   -0.42
+  ],
+  "max": [
+   0.96,
+   1.55,
+   0.48
+  ]
+ },
+ "models/catalog/equipment/mixer.glb": {
+  "min": [
+   -0.44,
+   -0.0,
+   -0.4
+  ],
+  "max": [
+   0.44,
+   1.52,
+   0.4
+  ]
+ },
+ "models/catalog/equipment/oven.glb": {
+  "min": [
+   -1.245,
+   0.03,
+   -0.945
+  ],
+  "max": [
+   1.3395,
+   2.9225,
+   1.28
+  ]
+ },
+ "models/catalog/equipment/stove.glb": {
+  "min": [
+   -0.96,
+   -0.0,
+   -0.42
+  ],
+  "max": [
+   0.96,
+   1.55,
+   0.48
+  ]
+ },
+ "models/catalog/equipment/table.glb": {
+  "min": [
+   -0.8,
+   -0.0,
+   -0.665
+  ],
+  "max": [
+   0.8,
+   0.97,
+   0.665
+  ]
+ },
+ "models/catalog/vehicles/boxtruck.glb": {
+  "min": [
+   -1.21,
+   -0.0,
+   -3.77
+  ],
+  "max": [
+   1.21,
+   3.35,
+   3.81
+  ]
+ },
+ "models/catalog/vehicles/bus.glb": {
+  "min": [
+   -1.262,
+   -0.0,
+   -5.77
+  ],
+  "max": [
+   1.262,
+   3.1,
+   5.77
+  ]
+ },
+ "models/catalog/vehicles/Cube.glb": {
+  "min": [
+   -1,
+   -1,
+   -1
+  ],
+  "max": [
+   1,
+   1,
+   1
+  ]
+ },
+ "models/catalog/vehicles/hatchback.glb": {
+  "min": [
+   -0.885,
+   -0.0,
+   -1.99
+  ],
+  "max": [
+   0.885,
+   1.5,
+   1.99
+  ]
+ },
+ "models/catalog/vehicles/pickup.glb": {
+  "min": [
+   -1.005,
+   -0.0,
+   -2.67
+  ],
+  "max": [
+   1.005,
+   1.86,
+   2.7
+  ]
+ },
+ "models/catalog/vehicles/sedan.glb": {
+  "min": [
+   -0.91,
+   -0.0,
+   -2.34
+  ],
+  "max": [
+   0.91,
+   1.45,
+   2.34
+  ]
+ },
+ "models/catalog/vehicles/taxi.glb": {
+  "min": [
+   -0.91,
+   -0.0,
+   -2.34
+  ],
+  "max": [
+   0.91,
+   1.67,
+   2.34
+  ]
+ },
+ "models/catalog/vehicles/van.glb": {
+  "min": [
+   -0.99,
+   -0.0,
+   -2.52
+  ],
+  "max": [
+   0.99,
+   2.3,
+   2.54
+  ]
+ },
+ "models/catalog/vehicles/Vehicle_BoxTruck.glb": {
+  "min": [
+   -1.21,
+   -0.0,
+   -3.77
+  ],
+  "max": [
+   1.21,
+   3.35,
+   3.81
+  ]
+ },
+ "models/catalog/vehicles/Vehicle_Bus.glb": {
+  "min": [
+   -1.262,
+   -0.0,
+   -5.77
+  ],
+  "max": [
+   1.262,
+   3.1,
+   5.77
+  ]
+ },
+ "models/catalog/vehicles/Vehicle_Hatchback.glb": {
+  "min": [
+   -0.885,
+   -0.0,
+   -1.99
+  ],
+  "max": [
+   0.885,
+   1.5,
+   1.99
+  ]
+ },
+ "models/catalog/vehicles/Vehicle_Pickup.glb": {
+  "min": [
+   -1.005,
+   -0.0,
+   -2.67
+  ],
+  "max": [
+   1.005,
+   1.86,
+   2.7
+  ]
+ },
+ "models/catalog/vehicles/Vehicle_Sedan.glb": {
+  "min": [
+   -0.91,
+   -0.0,
+   -2.34
+  ],
+  "max": [
+   0.91,
+   1.45,
+   2.34
+  ]
+ },
+ "models/catalog/vehicles/Vehicle_Taxi.glb": {
+  "min": [
+   -0.91,
+   -0.0,
+   -2.34
+  ],
+  "max": [
+   0.91,
+   1.67,
+   2.34
+  ]
+ },
+ "models/catalog/vehicles/Vehicle_Van.glb": {
+  "min": [
+   -0.99,
+   -0.0,
+   -2.52
+  ],
+  "max": [
+   0.99,
+   2.3,
+   2.54
+  ]
+ },
+ "models/catalog/world/Apartment_a_Ground.glb": {
+  "min": [
+   243.2,
+   -0.0,
+   -7.58
+  ],
+  "max": [
+   261.36,
+   3.0,
+   8.9
+  ]
+ },
+ "models/catalog/world/Apartment_a_Middle.glb": {
+  "min": [
+   267.36,
+   -0.0,
+   -7.6
+  ],
+  "max": [
+   285.56,
+   3.0,
+   7.6
+  ]
+ },
+ "models/catalog/world/Apartment_a_Roof.glb": {
+  "min": [
+   291.56,
+   -0.0,
+   -7.5
+  ],
+  "max": [
+   309.56,
+   2.6,
+   7.5
+  ]
+ },
+ "models/catalog/world/Apartment_b_Ground.glb": {
+  "min": [
+   315.56,
+   -0.0,
+   -7.58
+  ],
+  "max": [
+   333.72,
+   3.0,
+   8.9
+  ]
+ },
+ "models/catalog/world/Apartment_b_Middle.glb": {
+  "min": [
+   339.72,
+   -0.0,
+   -7.6
+  ],
+  "max": [
+   357.92,
+   3.0,
+   7.6
+  ]
+ },
+ "models/catalog/world/Apartment_b_Roof.glb": {
+  "min": [
+   363.92,
+   -0.0,
+   -7.5
+  ],
+  "max": [
+   381.92,
+   2.6,
+   7.5
+  ]
+ },
+ "models/catalog/world/Barn_a.glb": {
+  "min": [
+   667.27,
+   -0.0,
+   -8.3
+  ],
+  "max": [
+   685.17,
+   12.6,
+   8.3
+  ]
+ },
+ "models/catalog/world/Barn_b.glb": {
+  "min": [
+   691.17,
+   -0.0,
+   -8.3
+  ],
+  "max": [
+   709.07,
+   12.6,
+   8.3
+  ]
+ },
+ "models/catalog/world/Bridge_Deck.glb": {
+  "min": [
+   815.92,
+   -1.3,
+   -10.0
+  ],
+  "max": [
+   816.92,
+   -0.03,
+   0.0
+  ]
+ },
+ "models/catalog/world/Bridge_Pier.glb": {
+  "min": [
+   829.92,
+   -1.0,
+   -0.6
+  ],
+  "max": [
+   830.92,
+   0.0,
+   0.6
+  ]
+ },
+ "models/catalog/world/Bridge_Railing.glb": {
+  "min": [
+   802.27,
+   -1.3,
+   -10.0
+  ],
+  "max": [
+   802.57,
+   1.1,
+   0.0
+  ]
+ },
+ "models/catalog/world/Cube.glb": {
+  "min": [
+   -1,
+   -1,
+   -1
+  ],
+  "max": [
+   1,
+   1,
+   1
+  ]
+ },
+ "models/catalog/world/Factory_a.glb": {
+  "min": [
+   591.92,
+   -0.0,
+   -13.3
+  ],
+  "max": [
+   622.52,
+   11.0,
+   14.2
+  ]
+ },
+ "models/catalog/world/Factory_b.glb": {
+  "min": [
+   628.52,
+   -0.0,
+   -13.05
+  ],
+  "max": [
+   658.62,
+   14.0,
+   14.2
+  ]
+ },
+ "models/catalog/world/Foundation.glb": {
+  "min": [
+   843.92,
+   -1.0,
+   -0.5
+  ],
+  "max": [
+   844.92,
+   0.0,
+   0.5
+  ]
+ },
+ "models/catalog/world/Ground_Quad.glb": {
+  "min": [
+   117.5,
+   -0.0,
+   -0.5
+  ],
+  "max": [
+   118.5,
+   0.0,
+   0.5
+  ]
+ },
+ "models/catalog/world/House_Large_a.glb": {
+  "min": [
+   178.45,
+   -0.0,
+   -6.5
+  ],
+  "max": [
+   193.95,
+   8.6,
+   7.8
+  ]
+ },
+ "models/catalog/world/House_Large_b.glb": {
+  "min": [
+   199.95,
+   -0.0,
+   -6.5
+  ],
+  "max": [
+   215.45,
+   8.6,
+   7.8
+  ]
+ },
+ "models/catalog/world/House_Large_c.glb": {
+  "min": [
+   221.45,
+   -0.0,
+   -6.5
+  ],
+  "max": [
+   236.95,
+   8.6,
+   7.8
+  ]
+ },
+ "models/catalog/world/House_Small_a.glb": {
+  "min": [
+   128.0,
+   -0.0,
+   -4.95
+  ],
+  "max": [
+   138.9,
+   6.4,
+   5.7
+  ]
+ },
+ "models/catalog/world/House_Small_b.glb": {
+  "min": [
+   144.9,
+   -0.0,
+   -4.95
+  ],
+  "max": [
+   155.8,
+   6.4,
+   5.7
+  ]
+ },
+ "models/catalog/world/House_Small_c.glb": {
+  "min": [
+   161.8,
+   -0.0,
+   -4.95
+  ],
+  "max": [
+   172.7,
+   6.4,
+   5.7
+  ]
+ },
+ "models/catalog/world/Office_a_Ground.glb": {
+  "min": [
+   387.92,
+   -0.0,
+   -9.5
+  ],
+  "max": [
+   409.92,
+   3.5,
+   12.0
+  ]
+ },
+ "models/catalog/world/Office_a_Middle.glb": {
+  "min": [
+   415.92,
+   -0.0,
+   -9.5
+  ],
+  "max": [
+   437.92,
+   3.5,
+   9.5
+  ]
+ },
+ "models/catalog/world/Office_a_Roof.glb": {
+  "min": [
+   443.92,
+   -0.0,
+   -9.5
+  ],
+  "max": [
+   465.92,
+   3.2,
+   9.5
+  ]
+ },
+ "models/catalog/world/Office_b_Ground.glb": {
+  "min": [
+   471.92,
+   -0.0,
+   -9.5
+  ],
+  "max": [
+   493.92,
+   3.5,
+   12.0
+  ]
+ },
+ "models/catalog/world/Office_b_Middle.glb": {
+  "min": [
+   499.92,
+   -0.0,
+   -9.5
+  ],
+  "max": [
+   521.92,
+   3.5,
+   9.5
+  ]
+ },
+ "models/catalog/world/Office_b_Roof.glb": {
+  "min": [
+   527.92,
+   -0.0,
+   -9.5
+  ],
+  "max": [
+   549.92,
+   3.2,
+   9.5
+  ]
+ },
+ "models/catalog/world/Rail_Crossing.glb": {
+  "min": [
+   729.82,
+   0.02,
+   -10.0
+  ],
+  "max": [
+   735.02,
+   0.27,
+   -0.0
+  ]
+ },
+ "models/catalog/world/Rail_Signal.glb": {
+  "min": [
+   745.77,
+   -0.0,
+   -0.3
+  ],
+  "max": [
+   747.17,
+   5.5,
+   0.3
+  ]
+ },
+ "models/catalog/world/Rail_Track.glb": {
+  "min": [
+   102.0,
+   -0.6,
+   -6.0
+  ],
+  "max": [
+   106.0,
+   0.27,
+   0.0
+  ]
+ },
+ "models/catalog/world/Restaurant_a.glb": {
+  "min": [
+   555.92,
+   -0.0,
+   -5.5
+  ],
+  "max": [
+   567.92,
+   5.5,
+   7.1
+  ]
+ },
+ "models/catalog/world/Restaurant_b.glb": {
+  "min": [
+   573.92,
+   -0.0,
+   -5.5
+  ],
+  "max": [
+   585.92,
+   5.5,
+   7.1
+  ]
+ },
+ "models/catalog/world/Road_Arterial.glb": {
+  "min": [
+   0.0,
+   -0.6,
+   -10.0
+  ],
+  "max": [
+   14.0,
+   0.17,
+   0.0
+  ]
+ },
+ "models/catalog/world/Road_Arterial_Crosswalk.glb": {
+  "min": [
+   20.0,
+   -0.6,
+   -10.0
+  ],
+  "max": [
+   34.0,
+   0.17,
+   0.0
+  ]
+ },
+ "models/catalog/world/Road_Junction.glb": {
+  "min": [
+   89.5,
+   0.025,
+   -0.5
+  ],
+  "max": [
+   90.5,
+   0.025,
+   0.5
+  ]
+ },
+ "models/catalog/world/Road_Local.glb": {
+  "min": [
+   40.0,
+   -0.6,
+   -10.0
+  ],
+  "max": [
+   50.0,
+   0.17,
+   0.0
+  ]
+ },
+ "models/catalog/world/Road_Local_Crosswalk.glb": {
+  "min": [
+   56.0,
+   -0.6,
+   -10.0
+  ],
+  "max": [
+   66.0,
+   0.17,
+   0.0
+  ]
+ },
+ "models/catalog/world/Road_Rural.glb": {
+  "min": [
+   72.0,
+   -0.6,
+   -10.0
+  ],
+  "max": [
+   80.0,
+   0.06,
+   0.0
+  ]
+ },
+ "models/catalog/world/Station.glb": {
+  "min": [
+   712.42,
+   -0.0,
+   -15.0
+  ],
+  "max": [
+   722.42,
+   4.3,
+   15.0
+  ]
+ },
+ "models/catalog/world/Stop_Sign.glb": {
+  "min": [
+   760.045,
+   -0.0,
+   -0.03
+  ],
+  "max": [
+   760.795,
+   2.825,
+   0.05
+  ]
+ },
+ "models/catalog/world/Traffic_Light_Arterial.glb": {
+  "min": [
+   768.82,
+   -0.0,
+   -0.35
+  ],
+  "max": [
+   774.77,
+   6.6,
+   0.64
+  ]
+ },
+ "models/catalog/world/Traffic_Light_Local.glb": {
+  "min": [
+   784.82,
+   -0.0,
+   -0.35
+  ],
+  "max": [
+   788.77,
+   6.6,
+   0.64
+  ]
+ },
+ "models/catalog/world/Tree_Broadleaf_a.glb": {
+  "min": [
+   855.9099,
+   -0.0,
+   -2.2118
+  ],
+  "max": [
+   861.1096,
+   6.3666,
+   2.3872
+  ]
+ },
+ "models/catalog/world/Tree_Broadleaf_b.glb": {
+  "min": [
+   870.5109,
+   -0.0,
+   -2.0337
+  ],
+  "max": [
+   874.504,
+   6.4934,
+   1.928
+  ]
+ },
+ "models/catalog/world/Tree_Bush.glb": {
+  "min": [
+   913.3616,
+   -0.2574,
+   -0.86
+  ],
+  "max": [
+   915.7623,
+   1.3361,
+   0.9676
+  ]
+ },
+ "models/catalog/world/Tree_Conifer.glb": {
+  "min": [
+   884.22,
+   -0.0,
+   -2.2
+  ],
+  "max": [
+   888.62,
+   9.3,
+   2.2
+  ]
+ },
+ "models/catalog/world/Tree_Poplar.glb": {
+  "min": [
+   899.091,
+   -0.0,
+   -1.4474
+  ],
+  "max": [
+   901.7672,
+   11.0625,
+   1.2572
+  ]
+ },
+ "models/Characters/Resources/Characters/Pedestrian_A.glb": {
+  "min": [
+   -0.4192,
+   -0.0,
+   -0.2924
+  ],
+  "max": [
+   0.4192,
+   1.9178,
+   0.2494
+  ]
+ },
+ "models/Characters/Resources/Characters/Pedestrian_B.glb": {
+  "min": [
+   -0.3928,
+   -0.0,
+   -0.2107
+  ],
+  "max": [
+   0.3928,
+   1.8662,
+   0.2064
+  ]
+ },
+ "models/gameplay/counter.glb": {
+  "min": [
+   -1.0,
+   -0.0,
+   -0.45
+  ],
+  "max": [
+   1.0,
+   1.34,
+   0.45
+  ]
+ },
+ "models/gameplay/dock.glb": {
+  "min": [
+   -1.0,
+   -0.0,
+   -0.525
+  ],
+  "max": [
+   1.0,
+   2.4,
+   0.525
+  ]
+ },
+ "models/gameplay/fridge.glb": {
+  "min": [
+   -0.45,
+   -0.0,
+   -0.4275
+  ],
+  "max": [
+   0.45,
+   1.9,
+   0.4275
+  ]
+ },
+ "models/gameplay/fryer.glb": {
+  "min": [
+   -0.42,
+   -0.0,
+   -0.43
+  ],
+  "max": [
+   0.42,
+   1.5,
+   0.43
+  ]
+ },
+ "models/gameplay/grill.glb": {
+  "min": [
+   -0.98,
+   -0.0,
+   -0.46
+  ],
+  "max": [
+   0.98,
+   1.78,
+   0.46
+  ]
+ },
+ "models/gameplay/kitchen-counter.glb": {
+  "min": [
+   -0.98,
+   -0.0,
+   -0.445
+  ],
+  "max": [
+   0.98,
+   1.39,
+   0.445
+  ]
+ },
+ "models/gameplay/mixer.glb": {
+  "min": [
+   -0.44,
+   -0.0,
+   -0.4
+  ],
+  "max": [
+   0.44,
+   1.52,
+   0.4
+  ]
+ },
+ "models/gameplay/oven.glb": {
+  "min": [
+   -1.2923,
+   0.0,
+   -1.1125
+  ],
+  "max": [
+   1.2923,
+   2.8925,
+   1.1125
+  ]
+ },
+ "models/gameplay/stove.glb": {
+  "min": [
+   -0.96,
+   -0.0,
+   -0.45
+  ],
+  "max": [
+   0.96,
+   1.55,
+   0.45
+  ]
+ },
+ "models/gameplay/table.glb": {
+  "min": [
+   -0.8,
+   -0.0,
+   -0.665
+  ],
+  "max": [
+   0.8,
+   0.97,
+   0.665
+  ]
+ },
+ "models/Kitchen/Models/Kitchen.glb": {
+  "min": [
+   -0.98,
+   -0.0,
+   -0.44
+  ],
+  "max": [
+   0.98,
+   1.78,
+   0.48
+  ]
+ },
+ "models/Models/Belt/Conveyor_Corner_Left_90.glb": {
+  "min": [
+   -0.5428,
+   0.0,
+   -1.1083
+  ],
+  "max": [
+   0.6,
+   0.875,
+   0.0428
+  ]
+ },
+ "models/Models/Belt/Conveyor_Corner_Right_90.glb": {
+  "min": [
+   -0.6,
+   0.0,
+   -1.1083
+  ],
+  "max": [
+   0.5428,
+   0.875,
+   0.0428
+  ]
+ },
+ "models/Models/Belt/Conveyor_Straight_1m.glb": {
+  "min": [
+   -0.612,
+   0.0,
+   -1.0
+  ],
+  "max": [
+   0.612,
+   0.875,
+   0.0
+  ]
+ },
+ "models/Models/Employee/Employee.glb": {
+  "min": [
+   -0.5322,
+   0.0215,
+   -0.2946
+  ],
+  "max": [
+   0.3529,
+   1.7495,
+   0.5064
+  ]
+ },
+ "models/Models/Oven/FF_Oven.glb": {
+  "min": [
+   -1.245,
+   0.03,
+   -0.945
+  ],
+  "max": [
+   1.3395,
+   2.9225,
+   1.28
+  ]
+ },
+ "models/Models/Player/Player.glb": {
+  "min": [
+   -0.3248,
+   -0.0,
+   -0.1725
+  ],
+  "max": [
+   0.3248,
+   1.88,
+   0.2125
+  ]
+ },
+ "models/player.glb": {
+  "min": [
+   -0.3248,
+   0.0,
+   -0.1725
+  ],
+  "max": [
+   0.3248,
+   1.88,
+   0.2125
+  ]
+ },
+ "models/Restaurant/Models/Architecture/RT_Cornice_1m.glb": {
+  "min": [
+   -0.5,
+   -0.0,
+   0.0
+  ],
+  "max": [
+   0.5,
+   0.18,
+   0.25
+  ]
+ },
+ "models/Restaurant/Models/Architecture/RT_DoorFrame_Double.glb": {
+  "min": [
+   -1.023,
+   -0.0,
+   -0.13
+  ],
+  "max": [
+   1.023,
+   2.243,
+   0.13
+  ]
+ },
+ "models/Restaurant/Models/Architecture/RT_DoorFrame_Single.glb": {
+  "min": [
+   -0.523,
+   -0.0,
+   -0.13
+  ],
+  "max": [
+   0.523,
+   2.243,
+   0.13
+  ]
+ },
+ "models/Restaurant/Models/Architecture/RT_DoorLeaf_Glazed.glb": {
+  "min": [
+   -0.0095,
+   -0.0,
+   -0.0785
+  ],
+  "max": [
+   0.95,
+   2.18,
+   0.0785
+  ]
+ },
+ "models/Restaurant/Models/Architecture/RT_DoorLeaf_Kitchen.glb": {
+  "min": [
+   -0.0095,
+   -0.0,
+   -0.0785
+  ],
+  "max": [
+   0.95,
+   2.18,
+   0.0785
+  ]
+ },
+ "models/Restaurant/Models/Architecture/RT_DoorLeaf_Panel.glb": {
+  "min": [
+   -0.0095,
+   -0.0,
+   -0.0785
+  ],
+  "max": [
+   0.95,
+   2.18,
+   0.0785
+  ]
+ },
+ "models/Restaurant/Models/Architecture/RT_Doorway_Double_3m.glb": {
+  "min": [
+   -1.5,
+   -0.0,
+   -0.1
+  ],
+  "max": [
+   1.5,
+   3.003,
+   0.1
+  ]
+ },
+ "models/Restaurant/Models/Architecture/RT_Doorway_Single_2m.glb": {
+  "min": [
+   -1.0,
+   -0.0,
+   -0.1
+  ],
+  "max": [
+   1.0,
+   3.003,
+   0.1
+  ]
+ },
+ "models/Restaurant/Models/Architecture/RT_Partition_HalfHeight_2m.glb": {
+  "min": [
+   -1.0,
+   -0.0,
+   -0.1505
+  ],
+  "max": [
+   1.0,
+   1.26,
+   0.1505
+  ]
+ },
+ "models/Restaurant/Models/Architecture/RT_Partition_Slatted_1m.glb": {
+  "min": [
+   -0.5,
+   -0.0,
+   -0.08
+  ],
+  "max": [
+   0.5,
+   2.5,
+   0.08
+  ]
+ },
+ "models/Restaurant/Models/Architecture/RT_ServingHatch_2m.glb": {
+  "min": [
+   -1.0,
+   -0.0021,
+   -0.135
+  ],
+  "max": [
+   1.0,
+   3.003,
+   0.415
+  ]
+ },
+ "models/Restaurant/Models/Architecture/RT_Wall_Brick_1m.glb": {
+  "min": [
+   -0.5,
+   -0.0,
+   -0.1335
+  ],
+  "max": [
+   0.5,
+   3.0,
+   0.1335
+  ]
+ },
+ "models/Restaurant/Models/Architecture/RT_Wall_Brick_2m.glb": {
+  "min": [
+   -1.0,
+   -0.0,
+   -0.1335
+  ],
+  "max": [
+   1.0,
+   3.0,
+   0.1335
+  ]
+ },
+ "models/Restaurant/Models/Architecture/RT_Wall_Plaster_1m.glb": {
+  "min": [
+   -0.5,
+   -0.0,
+   -0.1335
+  ],
+  "max": [
+   0.5,
+   3.0,
+   0.1335
+  ]
+ },
+ "models/Restaurant/Models/Architecture/RT_Wall_Plaster_2m.glb": {
+  "min": [
+   -1.0,
+   -0.0,
+   -0.1335
+  ],
+  "max": [
+   1.0,
+   3.0,
+   0.1335
+  ]
+ },
+ "models/Restaurant/Models/Architecture/RT_Wall_Tile_1m.glb": {
+  "min": [
+   -0.5,
+   -0.0,
+   -0.1335
+  ],
+  "max": [
+   0.5,
+   3.0,
+   0.1335
+  ]
+ },
+ "models/Restaurant/Models/Architecture/RT_Wall_Tile_2m.glb": {
+  "min": [
+   -1.0,
+   -0.0,
+   -0.1335
+  ],
+  "max": [
+   1.0,
+   3.0,
+   0.1335
+  ]
+ },
+ "models/Restaurant/Models/Architecture/RT_Wall_Wainscot_1m.glb": {
+  "min": [
+   -0.5,
+   -0.0,
+   -0.1505
+  ],
+  "max": [
+   0.5,
+   3.0,
+   0.1505
+  ]
+ },
+ "models/Restaurant/Models/Architecture/RT_Wall_Wainscot_2m.glb": {
+  "min": [
+   -1.0,
+   -0.0,
+   -0.1505
+  ],
+  "max": [
+   1.0,
+   3.0,
+   0.1505
+  ]
+ },
+ "models/Restaurant/Models/Architecture/RT_WallEnd_Brick.glb": {
+  "min": [
+   -0.12,
+   -0.0,
+   -0.12
+  ],
+  "max": [
+   0.12,
+   3.0,
+   0.12
+  ]
+ },
+ "models/Restaurant/Models/Architecture/RT_WallEnd_Plaster.glb": {
+  "min": [
+   -0.12,
+   -0.0,
+   -0.12
+  ],
+  "max": [
+   0.12,
+   3.0,
+   0.12
+  ]
+ },
+ "models/Restaurant/Models/Architecture/RT_WallEnd_Tile.glb": {
+  "min": [
+   -0.12,
+   -0.0,
+   -0.12
+  ],
+  "max": [
+   0.12,
+   3.0,
+   0.12
+  ]
+ },
+ "models/Restaurant/Models/Architecture/RT_WallEnd_Wainscot.glb": {
+  "min": [
+   -0.13,
+   -0.0,
+   -0.13
+  ],
+  "max": [
+   0.13,
+   3.0,
+   0.13
+  ]
+ },
+ "models/Restaurant/Models/Architecture/RT_Window_Mullioned.glb": {
+  "min": [
+   -0.85,
+   -0.0225,
+   -0.12
+  ],
+  "max": [
+   0.85,
+   1.652,
+   0.22
+  ]
+ },
+ "models/Restaurant/Models/Architecture/RT_Window_Picture.glb": {
+  "min": [
+   -0.85,
+   -0.0225,
+   -0.12
+  ],
+  "max": [
+   0.85,
+   1.652,
+   0.22
+  ]
+ },
+ "models/Restaurant/Models/Architecture/RT_WindowOpening_2m.glb": {
+  "min": [
+   -1.0,
+   -0.0021,
+   -0.1
+  ],
+  "max": [
+   1.0,
+   3.003,
+   0.1
+  ]
+ },
+ "models/Restaurant/Models/Decor/RT_CoatStand.glb": {
+  "min": [
+   -0.24,
+   -0.0,
+   -0.24
+  ],
+  "max": [
+   0.24,
+   1.7078,
+   0.24
+  ]
+ },
+ "models/Restaurant/Models/Decor/RT_MenuBoard_AFrame.glb": {
+  "min": [
+   -0.3256,
+   -0.0043,
+   -0.262
+  ],
+  "max": [
+   0.3256,
+   1.1243,
+   0.262
+  ]
+ },
+ "models/Restaurant/Models/Decor/RT_MenuBoard_Wall.glb": {
+  "min": [
+   -0.55,
+   -0.0,
+   0.0
+  ],
+  "max": [
+   0.55,
+   0.8,
+   0.0715
+  ]
+ },
+ "models/Restaurant/Models/Decor/RT_Plant_Floor.glb": {
+  "min": [
+   -0.4756,
+   -0.0,
+   -0.4674
+  ],
+  "max": [
+   0.4824,
+   1.8502,
+   0.4815
+  ]
+ },
+ "models/Restaurant/Models/Decor/RT_Plant_Table.glb": {
+  "min": [
+   -0.1081,
+   -0.0,
+   -0.1078
+  ],
+  "max": [
+   0.1094,
+   0.334,
+   0.1095
+  ]
+ },
+ "models/Restaurant/Models/Decor/RT_Planter_Divider_1_6m.glb": {
+  "min": [
+   -0.825,
+   -0.0,
+   -0.24
+  ],
+  "max": [
+   0.825,
+   1.3246,
+   0.2401
+  ]
+ },
+ "models/Restaurant/Models/Decor/RT_Rug_Bordered_2x3m.glb": {
+  "min": [
+   -1.0,
+   -0.0,
+   -1.5
+  ],
+  "max": [
+   1.0,
+   0.025,
+   1.5
+  ]
+ },
+ "models/Restaurant/Models/Decor/RT_Table_Caddy.glb": {
+  "min": [
+   -0.15,
+   -0.0,
+   -0.1
+  ],
+  "max": [
+   0.15,
+   0.21,
+   0.1
+  ]
+ },
+ "models/Restaurant/Models/Decor/RT_Vase_Ceramic.glb": {
+  "min": [
+   -0.101,
+   -0.0,
+   -0.095
+  ],
+  "max": [
+   0.1026,
+   0.5005,
+   0.1022
+  ]
+ },
+ "models/Restaurant/Models/Decor/RT_WallArt_Abstract.glb": {
+  "min": [
+   -0.36,
+   -0.0,
+   0.0
+  ],
+  "max": [
+   0.36,
+   1.0,
+   0.066
+  ]
+ },
+ "models/Restaurant/Models/Decor/RT_WallClock.glb": {
+  "min": [
+   -0.25,
+   -0.0,
+   0.0
+  ],
+  "max": [
+   0.25,
+   0.5,
+   0.0898
+  ]
+ },
+ "models/Restaurant/Models/Decor/RT_WasteBin.glb": {
+  "min": [
+   -0.23,
+   -0.0,
+   -0.23
+  ],
+  "max": [
+   0.23,
+   0.66,
+   0.24
+  ]
+ },
+ "models/Restaurant/Models/Furniture/RT_Bench_Slatted_1_6m.glb": {
+  "min": [
+   -0.8,
+   -0.0,
+   -0.2325
+  ],
+  "max": [
+   0.8,
+   0.4725,
+   0.2325
+  ]
+ },
+ "models/Restaurant/Models/Furniture/RT_Booth_Straight_2m.glb": {
+  "min": [
+   -1.0,
+   -0.0,
+   -0.395
+  ],
+  "max": [
+   1.0,
+   1.25,
+   0.38
+  ]
+ },
+ "models/Restaurant/Models/Furniture/RT_Chair_BarStool.glb": {
+  "min": [
+   -0.23,
+   -0.0,
+   -0.23
+  ],
+  "max": [
+   0.23,
+   0.78,
+   0.23
+  ]
+ },
+ "models/Restaurant/Models/Furniture/RT_Chair_Spindle.glb": {
+  "min": [
+   -0.235,
+   -0.0,
+   -0.2675
+  ],
+  "max": [
+   0.235,
+   0.9425,
+   0.23
+  ]
+ },
+ "models/Restaurant/Models/Furniture/RT_Chair_Upholstered.glb": {
+  "min": [
+   -0.235,
+   -0.0,
+   -0.275
+  ],
+  "max": [
+   0.235,
+   0.9314,
+   0.23
+  ]
+ },
+ "models/Restaurant/Models/Furniture/RT_Table_BistroRound.glb": {
+  "min": [
+   -0.48,
+   -0.0,
+   -0.48
+  ],
+  "max": [
+   0.48,
+   0.75,
+   0.48
+  ]
+ },
+ "models/Restaurant/Models/Furniture/RT_Table_Communal.glb": {
+  "min": [
+   -1.2,
+   -0.0,
+   -0.447
+  ],
+  "max": [
+   1.2,
+   0.75,
+   0.447
+  ]
+ },
+ "models/Restaurant/Models/Furniture/RT_Table_HighRound.glb": {
+  "min": [
+   -0.38,
+   -0.0,
+   -0.38
+  ],
+  "max": [
+   0.38,
+   1.05,
+   0.38
+  ]
+ },
+ "models/Restaurant/Models/Lighting/RT_Light_CeilingStrip.glb": {
+  "min": [
+   -0.6,
+   -0.095,
+   -0.1
+  ],
+  "max": [
+   0.6,
+   0.0,
+   0.1
+  ]
+ },
+ "models/Restaurant/Models/Lighting/RT_Light_FloorLamp.glb": {
+  "min": [
+   -0.2691,
+   -0.0,
+   -0.2691
+  ],
+  "max": [
+   0.2691,
+   1.61,
+   0.2691
+  ]
+ },
+ "models/Restaurant/Models/Lighting/RT_Light_Pendant.glb": {
+  "min": [
+   -0.2785,
+   -0.825,
+   -0.2785
+  ],
+  "max": [
+   0.2785,
+   0.0,
+   0.2785
+  ]
+ },
+ "models/Restaurant/Models/Lighting/RT_Light_Sconce.glb": {
+  "min": [
+   -0.1145,
+   -0.0,
+   0.0
+  ],
+  "max": [
+   0.1145,
+   0.4,
+   0.3545
+  ]
+ },
+ "models/Restaurant/Models/Service/RT_PrepTable_1_5m.glb": {
+  "min": [
+   -0.7523,
+   -0.0,
+   -0.35
+  ],
+  "max": [
+   0.7523,
+   1.02,
+   0.35
+  ]
+ },
+ "models/Restaurant/Models/Service/RT_Sink_Single.glb": {
+  "min": [
+   -0.6,
+   -0.0,
+   -0.3512
+  ],
+  "max": [
+   0.6,
+   1.1878,
+   0.3508
+  ]
+ },
+ "models/Restaurant/Models/Service/RT_StorageShelf_1_2m.glb": {
+  "min": [
+   -0.6,
+   -0.0,
+   -0.25
+  ],
+  "max": [
+   0.6,
+   1.85,
+   0.25
+  ]
+ },
+ "models/Restaurant/Models/Service/RT_StorageShelf_Boxes.glb": {
+  "min": [
+   -0.5071,
+   0.14,
+   -0.2115
+  ],
+  "max": [
+   0.4922,
+   1.981,
+   0.2112
+  ]
+ },
+ "models/Restaurant/Models/Service/RT_Trolley_TwoShelf.glb": {
+  "min": [
+   -0.425,
+   -0.0,
+   -0.265
+  ],
+  "max": [
+   0.425,
+   0.9425,
+   0.265
+  ]
+ },
+ "models/Restaurant/Models/Surfaces/RT_Ceiling_Panel_1m.glb": {
+  "min": [
+   -0.5,
+   -0.0,
+   -0.5
+  ],
+  "max": [
+   0.5,
+   0.07,
+   0.5
+  ]
+ },
+ "models/Restaurant/Models/Surfaces/RT_Floor_Checker_1m.glb": {
+  "min": [
+   -0.5,
+   -0.07,
+   -0.5
+  ],
+  "max": [
+   0.5,
+   0.0,
+   0.5
+  ]
+ },
+ "models/Restaurant/Models/Surfaces/RT_Floor_KitchenTile_1m.glb": {
+  "min": [
+   -0.5,
+   -0.07,
+   -0.5
+  ],
+  "max": [
+   0.5,
+   0.0,
+   0.5
+  ]
+ },
+ "models/Restaurant/Models/Surfaces/RT_Floor_OakPlank_1m.glb": {
+  "min": [
+   -0.5,
+   -0.07,
+   -0.5
+  ],
+  "max": [
+   0.5,
+   0.0,
+   0.5
+  ]
+ },
+ "models/Restaurant/Models/Surfaces/RT_Floor_Terracotta_1m.glb": {
+  "min": [
+   -0.5,
+   -0.07,
+   -0.5
+  ],
+  "max": [
+   0.5,
+   0.0,
+   0.5
+  ]
+ },
+ "models/Vehicles/Models/Vehicles.glb": {
+  "min": [
+   -1.262,
+   -0.0,
+   -5.77
+  ],
+  "max": [
+   1.262,
+   3.35,
+   5.77
+  ]
+ },
+ "models/World/Models/WorldArt.glb": {
+  "min": [
+   0.0,
+   -1.3,
+   -15.0
+  ],
+  "max": [
+   915.7623,
+   14.0,
+   15.0
+  ]
+ }
+}

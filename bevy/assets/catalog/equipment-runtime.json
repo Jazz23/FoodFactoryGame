@@ -1,0 +1,182 @@
+[
+  {
+    "kind": "counter",
+    "path": "models/gameplay/counter.glb",
+    "size": [
+      2.0,
+      1.3400000631809235,
+      0.8999999761581421
+    ]
+  },
+  {
+    "kind": "dock",
+    "path": "models/gameplay/dock.glb",
+    "size": [
+      2.0,
+      2.400000125169754,
+      1.0499999523162842
+    ]
+  },
+  {
+    "kind": "fridge",
+    "path": "models/gameplay/fridge.glb",
+    "size": [
+      0.8999999761581421,
+      1.9000001214444637,
+      0.8550001382827759
+    ]
+  },
+  {
+    "kind": "fryer",
+    "path": "models/gameplay/fryer.glb",
+    "size": [
+      0.8399999737739563,
+      1.5000000271792455,
+      0.8600000739097595
+    ]
+  },
+  {
+    "kind": "grill",
+    "path": "models/gameplay/grill.glb",
+    "size": [
+      1.9600000381469727,
+      1.7800000000789726,
+      0.9200000762939453
+    ]
+  },
+  {
+    "kind": "kitchen-counter",
+    "path": "models/gameplay/kitchen-counter.glb",
+    "size": [
+      1.9600000381469727,
+      1.3900000143840874,
+      0.8899999856948853
+    ]
+  },
+  {
+    "kind": "mixer",
+    "path": "models/gameplay/mixer.glb",
+    "size": [
+      0.8799999952316284,
+      1.5200000096157158,
+      0.800000011920929
+    ]
+  },
+  {
+    "kind": "oven",
+    "path": "models/gameplay/oven.glb",
+    "size": [
+      2.5845000743865967,
+      2.8925001360476017,
+      2.224999964237213
+    ]
+  },
+  {
+    "kind": "stove",
+    "path": "models/gameplay/stove.glb",
+    "size": [
+      1.9199999570846558,
+      1.5499999825154447,
+      0.9000000655651093
+    ]
+  },
+  {
+    "kind": "table",
+    "path": "models/gameplay/table.glb",
+    "size": [
+      1.600000023841858,
+      0.970000147819519,
+      1.3300000429153442
+    ]
+  },
+  {
+    "kind": "counter",
+    "path": "models/gameplay/counter.glb",
+    "size": [
+      2.0,
+      1.3400000631809235,
+      0.8999999761581421
+    ]
+  },
+  {
+    "kind": "dock",
+    "path": "models/gameplay/dock.glb",
+    "size": [
+      2.0,
+      2.400000125169754,
+      1.0499999523162842
+    ]
+  },
+  {
+    "kind": "fridge",
+    "path": "models/gameplay/fridge.glb",
+    "size": [
+      0.8999999761581421,
+      1.9000001214444637,
+      0.8550001382827759
+    ]
+  },
+  {
+    "kind": "fryer",
+    "path": "models/gameplay/fryer.glb",
+    "size": [
+      0.8399999737739563,
+      1.5000000271792455,
+      0.8600000739097595
+    ]
+  },
+  {
+    "kind": "grill",
+    "path": "models/gameplay/grill.glb",
+    "size": [
+      1.9600000381469727,
+      1.7800000000789726,
+      0.9200000762939453
+    ]
+  },
+  {
+    "kind": "kitchen-counter",
+    "path": "models/gameplay/kitchen-counter.glb",
+    "size": [
+      1.9600000381469727,
+      1.3900000143840874,
+      0.8899999856948853
+    ]
+  },
+  {
+    "kind": "mixer",
+    "path": "models/gameplay/mixer.glb",
+    "size": [
+      0.8799999952316284,
+      1.5200000096157158,
+      0.800000011920929
+    ]
+  },
+  {
+    "kind": "oven",
+    "path": "models/gameplay/oven.glb",
+    "size": [
+      2.5845000743865967,
+      2.8925001360476017,
+      2.224999964237213
+    ]
+  },
+  {
+    "kind": "stove",
+    "path": "models/gameplay/stove.glb",
+    "size": [
+      1.9199999570846558,
+      1.5499999825154447,
+      0.9000000655651093
+    ]
+  },
+  {
+    "kind": "table",
+    "path": "models/gameplay/table.glb",
+    "size": [
+      1.600000023841858,
+      0.970000147819519,
+      1.3300000429153442
+    ]
+  }
+]

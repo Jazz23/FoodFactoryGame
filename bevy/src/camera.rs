@@ -35,6 +35,9 @@ pub struct OrbitCamera {
     pub yaw: f32,
     pub pitch: f32,
     pub distance: f32,
+    pub top_down: bool,
+    pub top_distance: f32,
+    pub blend: f32,
 }
 
 impl OrbitCamera {
@@ -50,12 +53,25 @@ fn spawn_camera(mut commands: Commands) {
             yaw: 0.0,
             pitch: 40.0,
             distance: 9.0,
+            top_down: false,
+            top_distance: 12.0,
+            blend: 0.0,
         },
     ));
 }
 
-fn orbit_input(actions: Res<PlayerActions>, mut rigs: Query<&mut OrbitCamera>) {
+fn orbit_input(actions: Res<PlayerActions>, time: Res<Time>, mut rigs: Query<&mut OrbitCamera>) {
     for mut rig in &mut rigs {
+        if actions.camera_pressed {
+            rig.top_down = !rig.top_down;
+            if rig.top_down { rig.yaw = (rig.yaw / 90.0).round() * 90.0; }
+        }
+        let target = if rig.top_down { 1.0 } else { 0.0 };
+        rig.blend = rig.blend.move_towards(target, time.delta_secs() / 0.4);
+        if rig.top_down {
+            rig.top_distance = (rig.top_distance - actions.zoom.signum() * ZOOM_STEP).clamp(3.0, MAX_DISTANCE);
+            continue;
+        }
         rig.yaw = (rig.yaw + actions.look.x * ORBIT_DEGREES_PER_PIXEL).rem_euclid(360.0);
         rig.pitch =
             (rig.pitch + actions.look.y * ORBIT_DEGREES_PER_PIXEL).clamp(MIN_PITCH, MAX_PITCH);
@@ -74,8 +90,10 @@ fn follow(
     let Ok(target) = player.single() else { return };
     for (rig, mut transform) in &mut rigs {
         let focus = target.translation + Vec3::Y * FOCUS_HEIGHT;
-        let shoulder = focus + rig.yaw_rotation() * Vec3::X * SHOULDER_OFFSET;
-        let rotation = rig.yaw_rotation() * Quat::from_rotation_x(-rig.pitch.to_radians());
+        let blend = rig.blend * rig.blend * (3.0 - 2.0 * rig.blend);
+        let shoulder = focus + rig.yaw_rotation() * Vec3::X * SHOULDER_OFFSET * (1.0 - blend);
+        let pitch = rig.pitch + (90.0 - rig.pitch) * blend;
+        let rotation = rig.yaw_rotation() * Quat::from_rotation_x(-pitch.to_radians());
         let distance = if rig.pitch < 0.0 {
             rig.distance
                 .min((FOCUS_HEIGHT - FLOOR_CLEARANCE).max(0.0) / (-rig.pitch).to_radians().sin())
@@ -83,6 +101,7 @@ fn follow(
             rig.distance
         };
         // A Bevy camera looks down its local -Z, so it sits on its local +Z.
+        let distance = distance + (rig.top_distance - distance) * blend;
         *transform = Transform::from_translation(shoulder + rotation * Vec3::Z * distance)
             .with_rotation(rotation);
     }

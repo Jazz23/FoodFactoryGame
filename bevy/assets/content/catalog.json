@@ -1,0 +1,2392 @@
+{
+ "format": 2,
+ "items": [
+  {
+   "id": "batter",
+   "displayName": "Batter",
+   "maxStack": 20,
+   "icon": "Art/Icons/Batter.png"
+  },
+  {
+   "id": "beef",
+   "displayName": "Beef",
+   "maxStack": 20,
+   "icon": "Art/Icons/Beef.png"
+  },
+  {
+   "id": "belt",
+   "displayName": "Belt",
+   "maxStack": 100,
+   "icon": "Art/Icons/Belt.png"
+  },
+  {
+   "id": "bolognese",
+   "displayName": "Bolognese Sauce",
+   "maxStack": 20,
+   "icon": "Art/Icons/Bolognese.png"
+  },
+  {
+   "id": "bread",
+   "displayName": "Bread",
+   "maxStack": 20,
+   "icon": "Art/Icons/Bread.png"
+  },
+  {
+   "id": "breading",
+   "displayName": "Breading",
+   "maxStack": 20,
+   "icon": "Art/Icons/Breading.png"
+  },
+  {
+   "id": "bun",
+   "displayName": "Bun",
+   "maxStack": 20,
+   "icon": "Art/Icons/Bun.png"
+  },
+  {
+   "id": "cheese",
+   "displayName": "Cheese",
+   "maxStack": 20,
+   "icon": "Art/Icons/Cheese.png"
+  },
+  {
+   "id": "cheeseburger",
+   "displayName": "Cheeseburger",
+   "maxStack": 20,
+   "icon": "Art/Icons/Cheeseburger.png"
+  },
+  {
+   "id": "chicken",
+   "displayName": "Chicken",
+   "maxStack": 20,
+   "icon": "Art/Icons/Chicken.png"
+  },
+  {
+   "id": "chicken-and-fries",
+   "displayName": "Chicken & Fries",
+   "maxStack": 20,
+   "icon": "Art/Icons/ChickenAndFries.png"
+  },
+  {
+   "id": "chopped-lettuce",
+   "displayName": "Chopped Lettuce",
+   "maxStack": 20,
+   "icon": "Art/Icons/ChoppedLettuce.png"
+  },
+  {
+   "id": "cooked-patty",
+   "displayName": "Cooked Patty",
+   "maxStack": 20,
+   "icon": "Art/Icons/CookedPatty.png"
+  },
+  {
+   "id": "cut-potatoes",
+   "displayName": "Cut Potatoes",
+   "maxStack": 20,
+   "icon": "Art/Icons/CutPotatoes.png"
+  },
+  {
+   "id": "dough",
+   "displayName": "Dough",
+   "maxStack": 20,
+   "icon": "Art/Icons/Dough.png"
+  },
+  {
+   "id": "egg",
+   "displayName": "Egg",
+   "maxStack": 20,
+   "icon": "Art/Icons/Egg.png"
+  },
+  {
+   "id": "fish",
+   "displayName": "Fish",
+   "maxStack": 20,
+   "icon": "Art/Icons/Fish.png"
+  },
+  {
+   "id": "fish-and-chips",
+   "displayName": "Fish & Chips",
+   "maxStack": 20,
+   "icon": "Art/Icons/FishAndChips.png"
+  },
+  {
+   "id": "flour",
+   "displayName": "Flour",
+   "maxStack": 20,
+   "icon": "Art/Icons/Flour.png"
+  },
+  {
+   "id": "fried-chicken",
+   "displayName": "Fried Chicken",
+   "maxStack": 20,
+   "icon": "Art/Icons/FriedChicken.png"
+  },
+  {
+   "id": "fried-fish",
+   "displayName": "Fried Fish",
+   "maxStack": 20,
+   "icon": "Art/Icons/FriedFish.png"
+  },
+  {
+   "id": "fries",
+   "displayName": "Fries",
+   "maxStack": 20,
+   "icon": "Art/Icons/Fries.png"
+  },
+  {
+   "id": "grilled-cheese",
+   "displayName": "Grilled Cheese",
+   "maxStack": 20,
+   "icon": "Art/Icons/GrilledCheese.png"
+  },
+  {
+   "id": "ground-beef",
+   "displayName": "Ground Beef",
+   "maxStack": 20,
+   "icon": "Art/Icons/GroundBeef.png"
+  },
+  {
+   "id": "lasagna",
+   "displayName": "Lasagna",
+   "maxStack": 20,
+   "icon": "Art/Icons/Lasagna.png"
+  },
+  {
+   "id": "lettuce",
+   "displayName": "Lettuce",
+   "maxStack": 20,
+   "icon": "Art/Icons/Lettuce.png"
+  },
+  {
+   "id": "lift",
+   "displayName": "Lift",
+   "maxStack": 50,
+   "icon": "Art/Icons/Lift.png"
+  },
+  {
+   "id": "milk",
+   "displayName": "Milk",
+   "maxStack": 20,
+   "icon": "Art/Icons/Milk.png"
+  },
+  {
+   "id": "pancakes",
+   "displayName": "Pancakes",
+   "maxStack": 20,
+   "icon": "Art/Icons/Pancakes.png"
+  },
+  {
+   "id": "pasta",
+   "displayName": "Pasta",
+   "maxStack": 20,
+   "icon": "Art/Icons/Pasta.png"
+  },
+  {
+   "id": "patty",
+   "displayName": "Patty",
+   "maxStack": 20,
+   "icon": "Art/Icons/Patty.png"
+  },
+  {
+   "id": "pizza",
+   "displayName": "Margherita Pizza",
+   "maxStack": 20,
+   "icon": "Art/Icons/Pizza.png"
+  },
+  {
+   "id": "pizza-base",
+   "displayName": "Pizza Base",
+   "maxStack": 20,
+   "icon": "Art/Icons/PizzaBase.png"
+  },
+  {
+   "id": "potato",
+   "displayName": "Potato",
+   "maxStack": 20,
+   "icon": "Art/Icons/Potato.png"
+  },
+  {
+   "id": "soup-and-bread",
+   "displayName": "Soup & Bread",
+   "maxStack": 20,
+   "icon": "Art/Icons/SoupAndBread.png"
+  },
+  {
+   "id": "spaghetti",
+   "displayName": "Spaghetti Bolognese",
+   "maxStack": 20,
+   "icon": "Art/Icons/Spaghetti.png"
+  },
+  {
+   "id": "tomato",
+   "displayName": "Tomato",
+   "maxStack": 20,
+   "icon": "Art/Icons/Tomato.png"
+  },
+  {
+   "id": "tomato-sauce",
+   "displayName": "Tomato Sauce",
+   "maxStack": 20,
+   "icon": "Art/Icons/TomatoSauce.png"
+  },
+  {
+   "id": "tomato-soup",
+   "displayName": "Tomato Soup",
+   "maxStack": 20,
+   "icon": "Art/Icons/TomatoSoup.png"
+  }
+ ],
+ "recipes": [
+  {
+   "id": "oven-bread",
+   "displayName": "Bread",
+   "stationKind": "oven",
+   "durationSeconds": 10,
+   "inputs": [
+    {
+     "itemId": "dough",
+     "quantity": 1
+    }
+   ],
+   "outputItemId": "bread",
+   "outputQuantity": 1,
+   "outputSpoilAfterSeconds": 3600,
+   "saleCents": 0,
+   "tier": 1,
+   "cuisine": ""
+  },
+  {
+   "id": "fryer-fried-chicken",
+   "displayName": "Fried Chicken",
+   "stationKind": "fryer",
+   "durationSeconds": 8,
+   "inputs": [
+    {
+     "itemId": "chicken",
+     "quantity": 1
+    },
+    {
+     "itemId": "breading",
+     "quantity": 1
+    }
+   ],
+   "outputItemId": "fried-chicken",
+   "outputQuantity": 1,
+   "outputSpoilAfterSeconds": 900,
+   "saleCents": 0,
+   "tier": 1,
+   "cuisine": ""
+  },
+  {
+   "id": "fryer-fried-fish",
+   "displayName": "Fried Fish",
+   "stationKind": "fryer",
+   "durationSeconds": 8,
+   "inputs": [
+    {
+     "itemId": "fish",
+     "quantity": 1
+    },
+    {
+     "itemId": "batter",
+     "quantity": 1
+    }
+   ],
+   "outputItemId": "fried-fish",
+   "outputQuantity": 1,
+   "outputSpoilAfterSeconds": 900,
+   "saleCents": 0,
+   "tier": 1,
+   "cuisine": ""
+  },
+  {
+   "id": "fryer-fries",
+   "displayName": "Fries",
+   "stationKind": "fryer",
+   "durationSeconds": 6,
+   "inputs": [
+    {
+     "itemId": "cut-potatoes",
+     "quantity": 1
+    }
+   ],
+   "outputItemId": "fries",
+   "outputQuantity": 1,
+   "outputSpoilAfterSeconds": 900,
+   "saleCents": 0,
+   "tier": 1,
+   "cuisine": ""
+  },
+  {
+   "id": "grill-cooked-patty",
+   "displayName": "Cooked Patty",
+   "stationKind": "grill",
+   "durationSeconds": 8,
+   "inputs": [
+    {
+     "itemId": "patty",
+     "quantity": 1
+    }
+   ],
+   "outputItemId": "cooked-patty",
+   "outputQuantity": 1,
+   "outputSpoilAfterSeconds": 900,
+   "saleCents": 0,
+   "tier": 1,
+   "cuisine": ""
+  },
+  {
+   "id": "grill-grilled-cheese",
+   "displayName": "Grilled Cheese",
+   "stationKind": "grill",
+   "durationSeconds": 6,
+   "inputs": [
+    {
+     "itemId": "bread",
+     "quantity": 1
+    },
+    {
+     "itemId": "cheese",
+     "quantity": 1
+    }
+   ],
+   "outputItemId": "grilled-cheese",
+   "outputQuantity": 1,
+   "outputSpoilAfterSeconds": 900,
+   "saleCents": 0,
+   "tier": 1,
+   "cuisine": ""
+  },
+  {
+   "id": "kitchen-cheeseburger",
+   "displayName": "Cheeseburger",
+   "stationKind": "kitchen-counter",
+   "durationSeconds": 6,
+   "inputs": [
+    {
+     "itemId": "bun",
+     "quantity": 1
+    },
+    {
+     "itemId": "cooked-patty",
+     "quantity": 1
+    },
+    {
+     "itemId": "cheese",
+     "quantity": 1
+    },
+    {
+     "itemId": "chopped-lettuce",
+     "quantity": 1
+    }
+   ],
+   "outputItemId": "cheeseburger",
+   "outputQuantity": 1,
+   "outputSpoilAfterSeconds": 900,
+   "saleCents": 0,
+   "tier": 1,
+   "cuisine": ""
+  },
+  {
+   "id": "kitchen-chicken-and-fries",
+   "displayName": "Chicken & Fries",
+   "stationKind": "kitchen-counter",
+   "durationSeconds": 6,
+   "inputs": [
+    {
+     "itemId": "fried-chicken",
+     "quantity": 1
+    },
+    {
+     "itemId": "fries",
+     "quantity": 1
+    }
+   ],
+   "outputItemId": "chicken-and-fries",
+   "outputQuantity": 1,
+   "outputSpoilAfterSeconds": 900,
+   "saleCents": 0,
+   "tier": 1,
+   "cuisine": ""
+  },
+  {
+   "id": "kitchen-chopped-lettuce",
+   "displayName": "Chopped Lettuce",
+   "stationKind": "kitchen-counter",
+   "durationSeconds": 4,
+   "inputs": [
+    {
+     "itemId": "lettuce",
+     "quantity": 1
+    }
+   ],
+   "outputItemId": "chopped-lettuce",
+   "outputQuantity": 2,
+   "outputSpoilAfterSeconds": 720,
+   "saleCents": 0,
+   "tier": 1,
+   "cuisine": ""
+  },
+  {
+   "id": "kitchen-cut-potatoes",
+   "displayName": "Cut Potatoes",
+   "stationKind": "kitchen-counter",
+   "durationSeconds": 4,
+   "inputs": [
+    {
+     "itemId": "potato",
+     "quantity": 1
+    }
+   ],
+   "outputItemId": "cut-potatoes",
+   "outputQuantity": 2,
+   "outputSpoilAfterSeconds": 1440,
+   "saleCents": 0,
+   "tier": 1,
+   "cuisine": ""
+  },
+  {
+   "id": "kitchen-fish-and-chips",
+   "displayName": "Fish & Chips",
+   "stationKind": "kitchen-counter",
+   "durationSeconds": 6,
+   "inputs": [
+    {
+     "itemId": "fried-fish",
+     "quantity": 1
+    },
+    {
+     "itemId": "fries",
+     "quantity": 1
+    }
+   ],
+   "outputItemId": "fish-and-chips",
+   "outputQuantity": 1,
+   "outputSpoilAfterSeconds": 900,
+   "saleCents": 0,
+   "tier": 1,
+   "cuisine": ""
+  },
+  {
+   "id": "kitchen-ground-beef",
+   "displayName": "Ground Beef",
+   "stationKind": "kitchen-counter",
+   "durationSeconds": 4,
+   "inputs": [
+    {
+     "itemId": "beef",
+     "quantity": 1
+    }
+   ],
+   "outputItemId": "ground-beef",
+   "outputQuantity": 1,
+   "outputSpoilAfterSeconds": 240,
+   "saleCents": 0,
+   "tier": 1,
+   "cuisine": ""
+  },
+  {
+   "id": "kitchen-patty",
+   "displayName": "Patty",
+   "stationKind": "kitchen-counter",
+   "durationSeconds": 4,
+   "inputs": [
+    {
+     "itemId": "beef",
+     "quantity": 1
+    }
+   ],
+   "outputItemId": "patty",
+   "outputQuantity": 1,
+   "outputSpoilAfterSeconds": 240,
+   "saleCents": 0,
+   "tier": 1,
+   "cuisine": ""
+  },
+  {
+   "id": "kitchen-pizza-base",
+   "displayName": "Pizza Base",
+   "stationKind": "kitchen-counter",
+   "durationSeconds": 4,
+   "inputs": [
+    {
+     "itemId": "dough",
+     "quantity": 1
+    }
+   ],
+   "outputItemId": "pizza-base",
+   "outputQuantity": 1,
+   "outputSpoilAfterSeconds": 1440,
+   "saleCents": 0,
+   "tier": 1,
+   "cuisine": ""
+  },
+  {
+   "id": "kitchen-soup-and-bread",
+   "displayName": "Soup & Bread",
+   "stationKind": "kitchen-counter",
+   "durationSeconds": 6,
+   "inputs": [
+    {
+     "itemId": "tomato-soup",
+     "quantity": 1
+    },
+    {
+     "itemId": "bread",
+     "quantity": 1
+    }
+   ],
+   "outputItemId": "soup-and-bread",
+   "outputQuantity": 1,
+   "outputSpoilAfterSeconds": 900,
+   "saleCents": 0,
+   "tier": 1,
+   "cuisine": ""
+  },
+  {
+   "id": "mixer-batter",
+   "displayName": "Batter",
+   "stationKind": "mixer",
+   "durationSeconds": 6,
+   "inputs": [
+    {
+     "itemId": "flour",
+     "quantity": 1
+    },
+    {
+     "itemId": "egg",
+     "quantity": 1
+    },
+    {
+     "itemId": "milk",
+     "quantity": 1
+    }
+   ],
+   "outputItemId": "batter",
+   "outputQuantity": 2,
+   "outputSpoilAfterSeconds": 720,
+   "saleCents": 0,
+   "tier": 1,
+   "cuisine": ""
+  },
+  {
+   "id": "mixer-breading",
+   "displayName": "Breading",
+   "stationKind": "mixer",
+   "durationSeconds": 6,
+   "inputs": [
+    {
+     "itemId": "flour",
+     "quantity": 1
+    },
+    {
+     "itemId": "egg",
+     "quantity": 1
+    }
+   ],
+   "outputItemId": "breading",
+   "outputQuantity": 2,
+   "outputSpoilAfterSeconds": 1440,
+   "saleCents": 0,
+   "tier": 1,
+   "cuisine": ""
+  },
+  {
+   "id": "mixer-dough",
+   "displayName": "Dough",
+   "stationKind": "mixer",
+   "durationSeconds": 6,
+   "inputs": [
+    {
+     "itemId": "flour",
+     "quantity": 1
+    }
+   ],
+   "outputItemId": "dough",
+   "outputQuantity": 1,
+   "outputSpoilAfterSeconds": 7200,
+   "saleCents": 0,
+   "tier": 1,
+   "cuisine": ""
+  },
+  {
+   "id": "mixer-pasta",
+   "displayName": "Pasta",
+   "stationKind": "mixer",
+   "durationSeconds": 6,
+   "inputs": [
+    {
+     "itemId": "flour",
+     "quantity": 1
+    },
+    {
+     "itemId": "egg",
+     "quantity": 1
+    }
+   ],
+   "outputItemId": "pasta",
+   "outputQuantity": 1,
+   "outputSpoilAfterSeconds": 1440,
+   "saleCents": 0,
+   "tier": 1,
+   "cuisine": ""
+  },
+  {
+   "id": "oven-bun",
+   "displayName": "Bun",
+   "stationKind": "oven",
+   "durationSeconds": 10,
+   "inputs": [
+    {
+     "itemId": "dough",
+     "quantity": 1
+    }
+   ],
+   "outputItemId": "bun",
+   "outputQuantity": 1,
+   "outputSpoilAfterSeconds": 3600,
+   "saleCents": 0,
+   "tier": 1,
+   "cuisine": ""
+  },
+  {
+   "id": "oven-lasagna",
+   "displayName": "Lasagna",
+   "stationKind": "oven",
+   "durationSeconds": 20,
+   "inputs": [
+    {
+     "itemId": "pasta",
+     "quantity": 1
+    },
+    {
+     "itemId": "bolognese",
+     "quantity": 1
+    },
+    {
+     "itemId": "cheese",
+     "quantity": 1
+    }
+   ],
+   "outputItemId": "lasagna",
+   "outputQuantity": 1,
+   "outputSpoilAfterSeconds": 1800,
+   "saleCents": 0,
+   "tier": 1,
+   "cuisine": ""
+  },
+  {
+   "id": "oven-pizza",
+   "displayName": "Margherita Pizza",
+   "stationKind": "oven",
+   "durationSeconds": 12,
+   "inputs": [
+    {
+     "itemId": "pizza-base",
+     "quantity": 1
+    },
+    {
+     "itemId": "tomato-sauce",
+     "quantity": 1
+    },
+    {
+     "itemId": "cheese",
+     "quantity": 1
+    }
+   ],
+   "outputItemId": "pizza",
+   "outputQuantity": 1,
+   "outputSpoilAfterSeconds": 1200,
+   "saleCents": 0,
+   "tier": 1,
+   "cuisine": ""
+  },
+  {
+   "id": "stove-bolognese",
+   "displayName": "Bolognese Sauce",
+   "stationKind": "stove",
+   "durationSeconds": 12,
+   "inputs": [
+    {
+     "itemId": "ground-beef",
+     "quantity": 1
+    },
+    {
+     "itemId": "tomato-sauce",
+     "quantity": 1
+    }
+   ],
+   "outputItemId": "bolognese",
+   "outputQuantity": 1,
+   "outputSpoilAfterSeconds": 720,
+   "saleCents": 0,
+   "tier": 1,
+   "cuisine": ""
+  },
+  {
+   "id": "stove-pancakes",
+   "displayName": "Pancakes",
+   "stationKind": "stove",
+   "durationSeconds": 8,
+   "inputs": [
+    {
+     "itemId": "batter",
+     "quantity": 1
+    }
+   ],
+   "outputItemId": "pancakes",
+   "outputQuantity": 1,
+   "outputSpoilAfterSeconds": 900,
+   "saleCents": 0,
+   "tier": 1,
+   "cuisine": ""
+  },
+  {
+   "id": "stove-spaghetti",
+   "displayName": "Spaghetti Bolognese",
+   "stationKind": "stove",
+   "durationSeconds": 8,
+   "inputs": [
+    {
+     "itemId": "pasta",
+     "quantity": 1
+    },
+    {
+     "itemId": "bolognese",
+     "quantity": 1
+    }
+   ],
+   "outputItemId": "spaghetti",
+   "outputQuantity": 1,
+   "outputSpoilAfterSeconds": 900,
+   "saleCents": 0,
+   "tier": 1,
+   "cuisine": ""
+  },
+  {
+   "id": "stove-tomato-sauce",
+   "displayName": "Tomato Sauce",
+   "stationKind": "stove",
+   "durationSeconds": 10,
+   "inputs": [
+    {
+     "itemId": "tomato",
+     "quantity": 2
+    }
+   ],
+   "outputItemId": "tomato-sauce",
+   "outputQuantity": 1,
+   "outputSpoilAfterSeconds": 1440,
+   "saleCents": 0,
+   "tier": 1,
+   "cuisine": ""
+  },
+  {
+   "id": "stove-tomato-soup",
+   "displayName": "Tomato Soup",
+   "stationKind": "stove",
+   "durationSeconds": 8,
+   "inputs": [
+    {
+     "itemId": "tomato-sauce",
+     "quantity": 1
+    },
+    {
+     "itemId": "milk",
+     "quantity": 1
+    }
+   ],
+   "outputItemId": "tomato-soup",
+   "outputQuantity": 1,
+   "outputSpoilAfterSeconds": 900,
+   "saleCents": 0,
+   "tier": 1,
+   "cuisine": ""
+  },
+  {
+   "id": "counter-sell-bread",
+   "displayName": "Sell Bread",
+   "stationKind": "counter",
+   "durationSeconds": 5,
+   "inputs": [
+    {
+     "itemId": "bread",
+     "quantity": 1
+    }
+   ],
+   "outputItemId": "",
+   "outputQuantity": 0,
+   "outputSpoilAfterSeconds": 0,
+   "saleCents": 250,
+   "tier": 1,
+   "cuisine": "bakery"
+  },
+  {
+   "id": "counter-sell-fries",
+   "displayName": "Sell Fries",
+   "stationKind": "counter",
+   "durationSeconds": 5,
+   "inputs": [
+    {
+     "itemId": "fries",
+     "quantity": 1
+    }
+   ],
+   "outputItemId": "",
+   "outputQuantity": 0,
+   "outputSpoilAfterSeconds": 0,
+   "saleCents": 200,
+   "tier": 1,
+   "cuisine": "fast-food"
+  },
+  {
+   "id": "counter-sell-pancakes",
+   "displayName": "Sell Pancakes",
+   "stationKind": "counter",
+   "durationSeconds": 5,
+   "inputs": [
+    {
+     "itemId": "pancakes",
+     "quantity": 1
+    }
+   ],
+   "outputItemId": "",
+   "outputQuantity": 0,
+   "outputSpoilAfterSeconds": 0,
+   "saleCents": 300,
+   "tier": 1,
+   "cuisine": "bakery"
+  },
+  {
+   "id": "counter-sell-grilled-cheese",
+   "displayName": "Sell Grilled Cheese",
+   "stationKind": "counter",
+   "durationSeconds": 5,
+   "inputs": [
+    {
+     "itemId": "grilled-cheese",
+     "quantity": 1
+    }
+   ],
+   "outputItemId": "",
+   "outputQuantity": 0,
+   "outputSpoilAfterSeconds": 0,
+   "saleCents": 350,
+   "tier": 1,
+   "cuisine": "grill"
+  },
+  {
+   "id": "counter-sell-soup-and-bread",
+   "displayName": "Sell Soup & Bread",
+   "stationKind": "counter",
+   "durationSeconds": 5,
+   "inputs": [
+    {
+     "itemId": "soup-and-bread",
+     "quantity": 1
+    }
+   ],
+   "outputItemId": "",
+   "outputQuantity": 0,
+   "outputSpoilAfterSeconds": 0,
+   "saleCents": 400,
+   "tier": 1,
+   "cuisine": "bakery"
+  },
+  {
+   "id": "counter-sell-pizza",
+   "displayName": "Sell Margherita Pizza",
+   "stationKind": "counter",
+   "durationSeconds": 5,
+   "inputs": [
+    {
+     "itemId": "pizza",
+     "quantity": 1
+    }
+   ],
+   "outputItemId": "",
+   "outputQuantity": 0,
+   "outputSpoilAfterSeconds": 0,
+   "saleCents": 700,
+   "tier": 2,
+   "cuisine": "fast-food"
+  },
+  {
+   "id": "counter-sell-chicken-and-fries",
+   "displayName": "Sell Chicken & Fries",
+   "stationKind": "counter",
+   "durationSeconds": 5,
+   "inputs": [
+    {
+     "itemId": "chicken-and-fries",
+     "quantity": 1
+    }
+   ],
+   "outputItemId": "",
+   "outputQuantity": 0,
+   "outputSpoilAfterSeconds": 0,
+   "saleCents": 750,
+   "tier": 2,
+   "cuisine": "fast-food"
+  },
+  {
+   "id": "counter-sell-cheeseburger",
+   "displayName": "Sell Cheeseburger",
+   "stationKind": "counter",
+   "durationSeconds": 5,
+   "inputs": [
+    {
+     "itemId": "cheeseburger",
+     "quantity": 1
+    }
+   ],
+   "outputItemId": "",
+   "outputQuantity": 0,
+   "outputSpoilAfterSeconds": 0,
+   "saleCents": 800,
+   "tier": 2,
+   "cuisine": "grill"
+  },
+  {
+   "id": "counter-sell-spaghetti",
+   "displayName": "Sell Spaghetti Bolognese",
+   "stationKind": "counter",
+   "durationSeconds": 5,
+   "inputs": [
+    {
+     "itemId": "spaghetti",
+     "quantity": 1
+    }
+   ],
+   "outputItemId": "",
+   "outputQuantity": 0,
+   "outputSpoilAfterSeconds": 0,
+   "saleCents": 850,
+   "tier": 2,
+   "cuisine": "noodles"
+  },
+  {
+   "id": "counter-sell-fish-and-chips",
+   "displayName": "Sell Fish & Chips",
+   "stationKind": "counter",
+   "durationSeconds": 5,
+   "inputs": [
+    {
+     "itemId": "fish-and-chips",
+     "quantity": 1
+    }
+   ],
+   "outputItemId": "",
+   "outputQuantity": 0,
+   "outputSpoilAfterSeconds": 0,
+   "saleCents": 900,
+   "tier": 2,
+   "cuisine": "fast-food"
+  },
+  {
+   "id": "counter-sell-lasagna",
+   "displayName": "Sell Lasagna",
+   "stationKind": "counter",
+   "durationSeconds": 5,
+   "inputs": [
+    {
+     "itemId": "lasagna",
+     "quantity": 1
+    }
+   ],
+   "outputItemId": "",
+   "outputQuantity": 0,
+   "outputSpoilAfterSeconds": 0,
+   "saleCents": 1300,
+   "tier": 3,
+   "cuisine": "fine-dining"
+  }
+ ],
+ "offers": [
+  {
+   "id": "supplier-fish-5",
+   "itemId": "fish",
+   "quantity": 5,
+   "priceCents": 750,
+   "spoilAfterSeconds": 240
+  },
+  {
+   "id": "supplier-chicken-5",
+   "itemId": "chicken",
+   "quantity": 5,
+   "priceCents": 600,
+   "spoilAfterSeconds": 240
+  },
+  {
+   "id": "supplier-beef-5",
+   "itemId": "beef",
+   "quantity": 5,
+   "priceCents": 750,
+   "spoilAfterSeconds": 240
+  },
+  {
+   "id": "supplier-cheese-5",
+   "itemId": "cheese",
+   "quantity": 5,
+   "priceCents": 500,
+   "spoilAfterSeconds": 720
+  },
+  {
+   "id": "supplier-egg-5",
+   "itemId": "egg",
+   "quantity": 5,
+   "priceCents": 150,
+   "spoilAfterSeconds": 720
+  },
+  {
+   "id": "supplier-milk-5",
+   "itemId": "milk",
+   "quantity": 5,
+   "priceCents": 250,
+   "spoilAfterSeconds": 720
+  },
+  {
+   "id": "supplier-lettuce-5",
+   "itemId": "lettuce",
+   "quantity": 5,
+   "priceCents": 200,
+   "spoilAfterSeconds": 1440
+  },
+  {
+   "id": "supplier-tomato-5",
+   "itemId": "tomato",
+   "quantity": 5,
+   "priceCents": 200,
+   "spoilAfterSeconds": 1440
+  },
+  {
+   "id": "supplier-potato-5",
+   "itemId": "potato",
+   "quantity": 5,
+   "priceCents": 150,
+   "spoilAfterSeconds": 4320
+  },
+  {
+   "id": "supplier-flour-5",
+   "itemId": "flour",
+   "quantity": 5,
+   "priceCents": 200,
+   "spoilAfterSeconds": 10080
+  },
+  {
+   "id": "supplier-dough-5",
+   "itemId": "dough",
+   "quantity": 5,
+   "priceCents": 250,
+   "spoilAfterSeconds": 7200
+  },
+  {
+   "id": "supplier-belt-10",
+   "priceCents": 500,
+   "itemId": "belt",
+   "quantity": 10,
+   "spoilAfterSeconds": 1000000000000
+  },
+  {
+   "id": "supplier-counter",
+   "priceCents": 5000,
+   "equipmentKind": "counter"
+  },
+  {
+   "id": "supplier-dock",
+   "priceCents": 6000,
+   "equipmentKind": "dock"
+  },
+  {
+   "id": "supplier-fridge",
+   "priceCents": 8000,
+   "equipmentKind": "fridge"
+  },
+  {
+   "id": "supplier-fryer",
+   "priceCents": 14000,
+   "equipmentKind": "fryer"
+  },
+  {
+   "id": "supplier-grill",
+   "priceCents": 16000,
+   "equipmentKind": "grill"
+  },
+  {
+   "id": "supplier-kitchen-counter",
+   "priceCents": 9000,
+   "equipmentKind": "kitchen-counter"
+  },
+  {
+   "id": "supplier-mixer",
+   "priceCents": 12000,
+   "equipmentKind": "mixer"
+  },
+  {
+   "id": "supplier-oven",
+   "priceCents": 15000,
+   "equipmentKind": "oven"
+  },
+  {
+   "id": "supplier-rt-bench",
+   "priceCents": 9000,
+   "equipmentKind": "rt-bench"
+  },
+  {
+   "id": "supplier-rt-booth",
+   "priceCents": 18000,
+   "equipmentKind": "rt-booth"
+  },
+  {
+   "id": "supplier-rt-chair-stool",
+   "priceCents": 3000,
+   "equipmentKind": "rt-chair-stool"
+  },
+  {
+   "id": "supplier-rt-chair-spindle",
+   "priceCents": 2500,
+   "equipmentKind": "rt-chair-spindle"
+  },
+  {
+   "id": "supplier-rt-chair-upholstered",
+   "priceCents": 3500,
+   "equipmentKind": "rt-chair-upholstered"
+  },
+  {
+   "id": "supplier-rt-coat-stand",
+   "priceCents": 4000,
+   "equipmentKind": "rt-coat-stand"
+  },
+  {
+   "id": "supplier-rt-cornice",
+   "priceCents": 1500,
+   "equipmentKind": "rt-cornice"
+  },
+  {
+   "id": "supplier-rt-floor-checker",
+   "priceCents": 1200,
+   "equipmentKind": "rt-floor-checker"
+  },
+  {
+   "id": "supplier-rt-floor-kitchen",
+   "priceCents": 1000,
+   "equipmentKind": "rt-floor-kitchen"
+  },
+  {
+   "id": "supplier-rt-floor-oak",
+   "priceCents": 1400,
+   "equipmentKind": "rt-floor-oak"
+  },
+  {
+   "id": "supplier-rt-floor-terracotta",
+   "priceCents": 1200,
+   "equipmentKind": "rt-floor-terracotta"
+  },
+  {
+   "id": "supplier-rt-ceiling-strip",
+   "priceCents": 5000,
+   "equipmentKind": "rt-ceiling-strip"
+  },
+  {
+   "id": "supplier-rt-floor-lamp",
+   "priceCents": 7000,
+   "equipmentKind": "rt-floor-lamp"
+  },
+  {
+   "id": "supplier-rt-pendant",
+   "priceCents": 6000,
+   "equipmentKind": "rt-pendant"
+  },
+  {
+   "id": "supplier-rt-sconce",
+   "priceCents": 4500,
+   "equipmentKind": "rt-sconce"
+  },
+  {
+   "id": "supplier-rt-menu-aframe",
+   "priceCents": 3000,
+   "equipmentKind": "rt-menu-aframe"
+  },
+  {
+   "id": "supplier-rt-menu-wall",
+   "priceCents": 5000,
+   "equipmentKind": "rt-menu-wall"
+  },
+  {
+   "id": "supplier-rt-partition-half",
+   "priceCents": 9000,
+   "equipmentKind": "rt-partition-half"
+  },
+  {
+   "id": "supplier-rt-partition-slatted",
+   "priceCents": 6000,
+   "equipmentKind": "rt-partition-slatted"
+  },
+  {
+   "id": "supplier-rt-plant-floor",
+   "priceCents": 6000,
+   "equipmentKind": "rt-plant-floor"
+  },
+  {
+   "id": "supplier-rt-plant-table",
+   "priceCents": 1500,
+   "equipmentKind": "rt-plant-table"
+  },
+  {
+   "id": "supplier-rt-planter",
+   "priceCents": 12000,
+   "equipmentKind": "rt-planter"
+  },
+  {
+   "id": "supplier-rt-prep-table",
+   "priceCents": 15000,
+   "equipmentKind": "rt-prep-table"
+  },
+  {
+   "id": "supplier-rt-rug",
+   "priceCents": 9000,
+   "equipmentKind": "rt-rug"
+  },
+  {
+   "id": "supplier-rt-sink",
+   "priceCents": 20000,
+   "equipmentKind": "rt-sink"
+  },
+  {
+   "id": "supplier-rt-shelf",
+   "priceCents": 10000,
+   "equipmentKind": "rt-shelf"
+  },
+  {
+   "id": "supplier-rt-table-bistro",
+   "priceCents": 6000,
+   "equipmentKind": "rt-table-bistro"
+  },
+  {
+   "id": "supplier-rt-caddy",
+   "priceCents": 800,
+   "equipmentKind": "rt-caddy"
+  },
+  {
+   "id": "supplier-rt-table-communal",
+   "priceCents": 15000,
+   "equipmentKind": "rt-table-communal"
+  },
+  {
+   "id": "supplier-rt-table-high",
+   "priceCents": 7000,
+   "equipmentKind": "rt-table-high"
+  },
+  {
+   "id": "supplier-rt-trolley",
+   "priceCents": 6000,
+   "equipmentKind": "rt-trolley"
+  },
+  {
+   "id": "supplier-rt-vase",
+   "priceCents": 2000,
+   "equipmentKind": "rt-vase"
+  },
+  {
+   "id": "supplier-rt-wall-art",
+   "priceCents": 7000,
+   "equipmentKind": "rt-wall-art"
+  },
+  {
+   "id": "supplier-rt-wall-clock",
+   "priceCents": 3500,
+   "equipmentKind": "rt-wall-clock"
+  },
+  {
+   "id": "supplier-rt-waste-bin",
+   "priceCents": 1500,
+   "equipmentKind": "rt-waste-bin"
+  },
+  {
+   "id": "supplier-stove",
+   "priceCents": 18000,
+   "equipmentKind": "stove"
+  },
+  {
+   "id": "supplier-table",
+   "priceCents": 4000,
+   "equipmentKind": "table"
+  },
+  {
+   "id": "supplier-truck",
+   "priceCents": 25000,
+   "truck": {
+    "displayName": "Truck",
+    "cargoSlots": 4,
+    "speedMetresPerSecond": 15,
+    "loadUnitsPerSecond": 5
+   }
+  }
+ ],
+ "equipment": [
+  {
+   "kind": "counter",
+   "width": 2,
+   "depth": 1,
+   "inputCapacity": 25,
+   "outputCapacity": 1,
+   "inputRefrigerated": false,
+   "outputRefrigerated": false,
+   "seats": 0,
+   "layer": "",
+   "ambience": 0,
+   "displayName": "Register",
+   "category": "",
+   "mount": "floor",
+   "mountHeight": 1.5,
+   "hideFromAbove": false,
+   "opensScreen": true,
+   "manualPower": false,
+   "workerBound": false,
+   "model": "models/gameplay/counter.glb",
+   "icon": "Art/Icons/Counter.png"
+  },
+  {
+   "kind": "dock",
+   "width": 2,
+   "depth": 1,
+   "inputCapacity": 8,
+   "outputCapacity": 8,
+   "inputRefrigerated": false,
+   "outputRefrigerated": false,
+   "seats": 0,
+   "layer": "",
+   "ambience": 0,
+   "displayName": "dock",
+   "category": "",
+   "mount": "floor",
+   "mountHeight": 1.5,
+   "hideFromAbove": false,
+   "opensScreen": true,
+   "manualPower": false,
+   "workerBound": false,
+   "model": "models/gameplay/dock.glb",
+   "icon": "Art/Icons/Dock.png"
+  },
+  {
+   "kind": "fridge",
+   "width": 1,
+   "depth": 1,
+   "inputCapacity": 8,
+   "outputCapacity": 1,
+   "inputRefrigerated": true,
+   "outputRefrigerated": false,
+   "seats": 0,
+   "layer": "",
+   "ambience": 0,
+   "displayName": "fridge",
+   "category": "",
+   "mount": "floor",
+   "mountHeight": 1.5,
+   "hideFromAbove": false,
+   "opensScreen": true,
+   "manualPower": false,
+   "workerBound": false,
+   "model": "models/gameplay/fridge.glb",
+   "icon": "Art/Icons/Fridge.png"
+  },
+  {
+   "kind": "fryer",
+   "width": 1,
+   "depth": 1,
+   "inputCapacity": 2,
+   "outputCapacity": 2,
+   "inputRefrigerated": false,
+   "outputRefrigerated": false,
+   "seats": 0,
+   "layer": "",
+   "ambience": 0,
+   "displayName": "Fryer",
+   "category": "",
+   "mount": "floor",
+   "mountHeight": 1.5,
+   "hideFromAbove": false,
+   "opensScreen": true,
+   "manualPower": false,
+   "workerBound": false,
+   "model": "models/gameplay/fryer.glb",
+   "icon": "Art/Icons/Fryer.png"
+  },
+  {
+   "kind": "grill",
+   "width": 2,
+   "depth": 1,
+   "inputCapacity": 2,
+   "outputCapacity": 2,
+   "inputRefrigerated": false,
+   "outputRefrigerated": false,
+   "seats": 0,
+   "layer": "",
+   "ambience": 0,
+   "displayName": "Grill",
+   "category": "",
+   "mount": "floor",
+   "mountHeight": 1.5,
+   "hideFromAbove": false,
+   "opensScreen": true,
+   "manualPower": false,
+   "workerBound": false,
+   "model": "models/gameplay/grill.glb",
+   "icon": "Art/Icons/Grill.png"
+  },
+  {
+   "kind": "kitchen-counter",
+   "width": 2,
+   "depth": 1,
+   "inputCapacity": 4,
+   "outputCapacity": 2,
+   "inputRefrigerated": false,
+   "outputRefrigerated": false,
+   "seats": 0,
+   "layer": "",
+   "ambience": 0,
+   "displayName": "Kitchen Counter",
+   "category": "",
+   "mount": "floor",
+   "mountHeight": 1.5,
+   "hideFromAbove": false,
+   "opensScreen": true,
+   "manualPower": false,
+   "workerBound": true,
+   "model": "models/gameplay/kitchen-counter.glb",
+   "icon": "Art/Icons/KitchenCounter.png"
+  },
+  {
+   "kind": "mixer",
+   "width": 1,
+   "depth": 1,
+   "inputCapacity": 3,
+   "outputCapacity": 2,
+   "inputRefrigerated": false,
+   "outputRefrigerated": false,
+   "seats": 0,
+   "layer": "",
+   "ambience": 0,
+   "displayName": "Mixer",
+   "category": "",
+   "mount": "floor",
+   "mountHeight": 1.5,
+   "hideFromAbove": false,
+   "opensScreen": true,
+   "manualPower": false,
+   "workerBound": false,
+   "model": "models/gameplay/mixer.glb",
+   "icon": "Art/Icons/Mixer.png"
+  },
+  {
+   "kind": "oven",
+   "width": 3,
+   "depth": 3,
+   "inputCapacity": 3,
+   "outputCapacity": 2,
+   "inputRefrigerated": false,
+   "outputRefrigerated": false,
+   "seats": 0,
+   "layer": "",
+   "ambience": 0,
+   "displayName": "Oven",
+   "category": "",
+   "mount": "floor",
+   "mountHeight": 1.5,
+   "hideFromAbove": false,
+   "opensScreen": true,
+   "manualPower": false,
+   "workerBound": false,
+   "model": "models/gameplay/oven.glb",
+   "icon": "Art/Icons/Oven.png"
+  },
+  {
+   "kind": "stove",
+   "width": 2,
+   "depth": 1,
+   "inputCapacity": 2,
+   "outputCapacity": 2,
+   "inputRefrigerated": false,
+   "outputRefrigerated": false,
+   "seats": 0,
+   "layer": "",
+   "ambience": 0,
+   "displayName": "Stove",
+   "category": "",
+   "mount": "floor",
+   "mountHeight": 1.5,
+   "hideFromAbove": false,
+   "opensScreen": true,
+   "manualPower": false,
+   "workerBound": false,
+   "model": "models/gameplay/stove.glb",
+   "icon": "Art/Icons/Stove.png"
+  },
+  {
+   "kind": "table",
+   "width": 2,
+   "depth": 1,
+   "inputCapacity": 1,
+   "outputCapacity": 1,
+   "inputRefrigerated": false,
+   "outputRefrigerated": false,
+   "seats": 4,
+   "layer": "",
+   "ambience": 0,
+   "displayName": "Table for four",
+   "category": "",
+   "mount": "floor",
+   "mountHeight": 1.5,
+   "hideFromAbove": false,
+   "opensScreen": true,
+   "manualPower": false,
+   "workerBound": false,
+   "model": "models/gameplay/table.glb",
+   "icon": "Art/Icons/Table.png"
+  },
+  {
+   "kind": "rt-bench",
+   "width": 2,
+   "depth": 1,
+   "inputCapacity": 1,
+   "outputCapacity": 1,
+   "inputRefrigerated": false,
+   "outputRefrigerated": false,
+   "seats": 0,
+   "layer": "",
+   "ambience": 2,
+   "displayName": "Slatted bench",
+   "category": "Furniture",
+   "mount": "floor",
+   "mountHeight": 1.5,
+   "hideFromAbove": false,
+   "opensScreen": false,
+   "manualPower": false,
+   "workerBound": false,
+   "model": "models/Restaurant/Models/Furniture/RT_Bench_Slatted_1_6m.glb",
+   "icon": "Art/Icons/Restaurant/RT_Bench_Slatted_1_6m.png"
+  },
+  {
+   "kind": "rt-booth",
+   "width": 2,
+   "depth": 1,
+   "inputCapacity": 1,
+   "outputCapacity": 1,
+   "inputRefrigerated": false,
+   "outputRefrigerated": false,
+   "seats": 0,
+   "layer": "",
+   "ambience": 4,
+   "displayName": "Banquette",
+   "category": "Furniture",
+   "mount": "floor",
+   "mountHeight": 1.5,
+   "hideFromAbove": false,
+   "opensScreen": false,
+   "manualPower": false,
+   "workerBound": false,
+   "model": "models/Restaurant/Models/Furniture/RT_Booth_Straight_2m.glb",
+   "icon": "Art/Icons/Restaurant/RT_Booth_Straight_2m.png"
+  },
+  {
+   "kind": "rt-chair-stool",
+   "width": 1,
+   "depth": 1,
+   "inputCapacity": 1,
+   "outputCapacity": 1,
+   "inputRefrigerated": false,
+   "outputRefrigerated": false,
+   "seats": 0,
+   "layer": "",
+   "ambience": 1,
+   "displayName": "Bar stool",
+   "category": "Furniture",
+   "mount": "floor",
+   "mountHeight": 1.5,
+   "hideFromAbove": false,
+   "opensScreen": false,
+   "manualPower": false,
+   "workerBound": false,
+   "model": "models/Restaurant/Models/Furniture/RT_Chair_BarStool.glb",
+   "icon": "Art/Icons/Restaurant/RT_Chair_BarStool.png"
+  },
+  {
+   "kind": "rt-chair-spindle",
+   "width": 1,
+   "depth": 1,
+   "inputCapacity": 1,
+   "outputCapacity": 1,
+   "inputRefrigerated": false,
+   "outputRefrigerated": false,
+   "seats": 0,
+   "layer": "",
+   "ambience": 1,
+   "displayName": "Spindle chair",
+   "category": "Furniture",
+   "mount": "floor",
+   "mountHeight": 1.5,
+   "hideFromAbove": false,
+   "opensScreen": false,
+   "manualPower": false,
+   "workerBound": false,
+   "model": "models/Restaurant/Models/Furniture/RT_Chair_Spindle.glb",
+   "icon": "Art/Icons/Restaurant/RT_Chair_Spindle.png"
+  },
+  {
+   "kind": "rt-chair-upholstered",
+   "width": 1,
+   "depth": 1,
+   "inputCapacity": 1,
+   "outputCapacity": 1,
+   "inputRefrigerated": false,
+   "outputRefrigerated": false,
+   "seats": 0,
+   "layer": "",
+   "ambience": 2,
+   "displayName": "Upholstered chair",
+   "category": "Furniture",
+   "mount": "floor",
+   "mountHeight": 1.5,
+   "hideFromAbove": false,
+   "opensScreen": false,
+   "manualPower": false,
+   "workerBound": false,
+   "model": "models/Restaurant/Models/Furniture/RT_Chair_Upholstered.glb",
+   "icon": "Art/Icons/Restaurant/RT_Chair_Upholstered.png"
+  },
+  {
+   "kind": "rt-coat-stand",
+   "width": 1,
+   "depth": 1,
+   "inputCapacity": 1,
+   "outputCapacity": 1,
+   "inputRefrigerated": false,
+   "outputRefrigerated": false,
+   "seats": 0,
+   "layer": "",
+   "ambience": 2,
+   "displayName": "Coat stand",
+   "category": "Decor",
+   "mount": "floor",
+   "mountHeight": 1.5,
+   "hideFromAbove": false,
+   "opensScreen": false,
+   "manualPower": false,
+   "workerBound": false,
+   "model": "models/Restaurant/Models/Decor/RT_CoatStand.glb",
+   "icon": "Art/Icons/Restaurant/RT_CoatStand.png"
+  },
+  {
+   "kind": "rt-cornice",
+   "width": 1,
+   "depth": 1,
+   "inputCapacity": 1,
+   "outputCapacity": 1,
+   "inputRefrigerated": false,
+   "outputRefrigerated": false,
+   "seats": 0,
+   "layer": "wall",
+   "ambience": 1,
+   "displayName": "Cornice (1 m)",
+   "category": "Architecture",
+   "mount": "wall",
+   "mountHeight": 2.91,
+   "hideFromAbove": false,
+   "opensScreen": false,
+   "manualPower": false,
+   "workerBound": false,
+   "model": "models/Restaurant/Models/Architecture/RT_Cornice_1m.glb",
+   "icon": "Art/Icons/Restaurant/RT_Cornice_1m.png"
+  },
+  {
+   "kind": "rt-floor-checker",
+   "width": 1,
+   "depth": 1,
+   "inputCapacity": 1,
+   "outputCapacity": 1,
+   "inputRefrigerated": false,
+   "outputRefrigerated": false,
+   "seats": 0,
+   "layer": "floor",
+   "ambience": 1,
+   "displayName": "\"Checker floor (1 m\\xB2)\"",
+   "category": "Surfaces",
+   "mount": "flush",
+   "mountHeight": 1.5,
+   "hideFromAbove": false,
+   "opensScreen": false,
+   "manualPower": false,
+   "workerBound": false,
+   "model": "models/Restaurant/Models/Surfaces/RT_Floor_Checker_1m.glb",
+   "icon": "Art/Icons/Restaurant/RT_Floor_Checker_1m.png"
+  },
+  {
+   "kind": "rt-floor-kitchen",
+   "width": 1,
+   "depth": 1,
+   "inputCapacity": 1,
+   "outputCapacity": 1,
+   "inputRefrigerated": false,
+   "outputRefrigerated": false,
+   "seats": 0,
+   "layer": "floor",
+   "ambience": 1,
+   "displayName": "\"Kitchen tile floor (1 m\\xB2)\"",
+   "category": "Surfaces",
+   "mount": "flush",
+   "mountHeight": 1.5,
+   "hideFromAbove": false,
+   "opensScreen": false,
+   "manualPower": false,
+   "workerBound": false,
+   "model": "models/Restaurant/Models/Surfaces/RT_Floor_KitchenTile_1m.glb",
+   "icon": "Art/Icons/Restaurant/RT_Floor_KitchenTile_1m.png"
+  },
+  {
+   "kind": "rt-floor-oak",
+   "width": 1,
+   "depth": 1,
+   "inputCapacity": 1,
+   "outputCapacity": 1,
+   "inputRefrigerated": false,
+   "outputRefrigerated": false,
+   "seats": 0,
+   "layer": "floor",
+   "ambience": 1,
+   "displayName": "\"Oak plank floor (1 m\\xB2)\"",
+   "category": "Surfaces",
+   "mount": "flush",
+   "mountHeight": 1.5,
+   "hideFromAbove": false,
+   "opensScreen": false,
+   "manualPower": false,
+   "workerBound": false,
+   "model": "models/Restaurant/Models/Surfaces/RT_Floor_OakPlank_1m.glb",
+   "icon": "Art/Icons/Restaurant/RT_Floor_OakPlank_1m.png"
+  },
+  {
+   "kind": "rt-floor-terracotta",
+   "width": 1,
+   "depth": 1,
+   "inputCapacity": 1,
+   "outputCapacity": 1,
+   "inputRefrigerated": false,
+   "outputRefrigerated": false,
+   "seats": 0,
+   "layer": "floor",
+   "ambience": 1,
+   "displayName": "\"Terracotta floor (1 m\\xB2)\"",
+   "category": "Surfaces",
+   "mount": "flush",
+   "mountHeight": 1.5,
+   "hideFromAbove": false,
+   "opensScreen": false,
+   "manualPower": false,
+   "workerBound": false,
+   "model": "models/Restaurant/Models/Surfaces/RT_Floor_Terracotta_1m.glb",
+   "icon": "Art/Icons/Restaurant/RT_Floor_Terracotta_1m.png"
+  },
+  {
+   "kind": "rt-ceiling-strip",
+   "width": 1,
+   "depth": 1,
+   "inputCapacity": 1,
+   "outputCapacity": 1,
+   "inputRefrigerated": false,
+   "outputRefrigerated": false,
+   "seats": 0,
+   "layer": "ceiling",
+   "ambience": 1,
+   "displayName": "Ceiling strip light",
+   "category": "Lighting",
+   "mount": "ceiling",
+   "mountHeight": 1.5,
+   "hideFromAbove": false,
+   "opensScreen": false,
+   "manualPower": false,
+   "workerBound": false,
+   "model": "models/Restaurant/Models/Lighting/RT_Light_CeilingStrip.glb",
+   "icon": "Art/Icons/Restaurant/RT_Light_CeilingStrip.png"
+  },
+  {
+   "kind": "rt-floor-lamp",
+   "width": 1,
+   "depth": 1,
+   "inputCapacity": 1,
+   "outputCapacity": 1,
+   "inputRefrigerated": false,
+   "outputRefrigerated": false,
+   "seats": 0,
+   "layer": "",
+   "ambience": 3,
+   "displayName": "Floor lamp",
+   "category": "Lighting",
+   "mount": "floor",
+   "mountHeight": 1.5,
+   "hideFromAbove": false,
+   "opensScreen": false,
+   "manualPower": false,
+   "workerBound": false,
+   "model": "models/Restaurant/Models/Lighting/RT_Light_FloorLamp.glb",
+   "icon": "Art/Icons/Restaurant/RT_Light_FloorLamp.png"
+  },
+  {
+   "kind": "rt-pendant",
+   "width": 1,
+   "depth": 1,
+   "inputCapacity": 1,
+   "outputCapacity": 1,
+   "inputRefrigerated": false,
+   "outputRefrigerated": false,
+   "seats": 0,
+   "layer": "ceiling",
+   "ambience": 3,
+   "displayName": "Pendant light",
+   "category": "Lighting",
+   "mount": "ceiling",
+   "mountHeight": 1.5,
+   "hideFromAbove": false,
+   "opensScreen": false,
+   "manualPower": false,
+   "workerBound": false,
+   "model": "models/Restaurant/Models/Lighting/RT_Light_Pendant.glb",
+   "icon": "Art/Icons/Restaurant/RT_Light_Pendant.png"
+  },
+  {
+   "kind": "rt-sconce",
+   "width": 1,
+   "depth": 1,
+   "inputCapacity": 1,
+   "outputCapacity": 1,
+   "inputRefrigerated": false,
+   "outputRefrigerated": false,
+   "seats": 0,
+   "layer": "wall",
+   "ambience": 2,
+   "displayName": "Wall sconce",
+   "category": "Lighting",
+   "mount": "wall",
+   "mountHeight": 1.9,
+   "hideFromAbove": false,
+   "opensScreen": false,
+   "manualPower": false,
+   "workerBound": false,
+   "model": "models/Restaurant/Models/Lighting/RT_Light_Sconce.glb",
+   "icon": "Art/Icons/Restaurant/RT_Light_Sconce.png"
+  },
+  {
+   "kind": "rt-menu-aframe",
+   "width": 1,
+   "depth": 1,
+   "inputCapacity": 1,
+   "outputCapacity": 1,
+   "inputRefrigerated": false,
+   "outputRefrigerated": false,
+   "seats": 0,
+   "layer": "",
+   "ambience": 2,
+   "displayName": "A-frame menu board",
+   "category": "Decor",
+   "mount": "floor",
+   "mountHeight": 1.5,
+   "hideFromAbove": false,
+   "opensScreen": false,
+   "manualPower": false,
+   "workerBound": false,
+   "model": "models/Restaurant/Models/Decor/RT_MenuBoard_AFrame.glb",
+   "icon": "Art/Icons/Restaurant/RT_MenuBoard_AFrame.png"
+  },
+  {
+   "kind": "rt-menu-wall",
+   "width": 1,
+   "depth": 1,
+   "inputCapacity": 1,
+   "outputCapacity": 1,
+   "inputRefrigerated": false,
+   "outputRefrigerated": false,
+   "seats": 0,
+   "layer": "wall",
+   "ambience": 3,
+   "displayName": "Wall menu board",
+   "category": "Decor",
+   "mount": "wall",
+   "mountHeight": 1.5,
+   "hideFromAbove": false,
+   "opensScreen": false,
+   "manualPower": false,
+   "workerBound": false,
+   "model": "models/Restaurant/Models/Decor/RT_MenuBoard_Wall.glb",
+   "icon": "Art/Icons/Restaurant/RT_MenuBoard_Wall.png"
+  },
+  {
+   "kind": "rt-partition-half",
+   "width": 2,
+   "depth": 1,
+   "inputCapacity": 1,
+   "outputCapacity": 1,
+   "inputRefrigerated": false,
+   "outputRefrigerated": false,
+   "seats": 0,
+   "layer": "",
+   "ambience": 2,
+   "displayName": "Half-height partition",
+   "category": "Architecture",
+   "mount": "floor",
+   "mountHeight": 1.5,
+   "hideFromAbove": false,
+   "opensScreen": false,
+   "manualPower": false,
+   "workerBound": false,
+   "model": "models/Restaurant/Models/Architecture/RT_Partition_HalfHeight_2m.glb",
+   "icon": "Art/Icons/Restaurant/RT_Partition_HalfHeight_2m.png"
+  },
+  {
+   "kind": "rt-partition-slatted",
+   "width": 1,
+   "depth": 1,
+   "inputCapacity": 1,
+   "outputCapacity": 1,
+   "inputRefrigerated": false,
+   "outputRefrigerated": false,
+   "seats": 0,
+   "layer": "",
+   "ambience": 2,
+   "displayName": "Slatted screen",
+   "category": "Architecture",
+   "mount": "floor",
+   "mountHeight": 1.5,
+   "hideFromAbove": false,
+   "opensScreen": false,
+   "manualPower": false,
+   "workerBound": false,
+   "model": "models/Restaurant/Models/Architecture/RT_Partition_Slatted_1m.glb",
+   "icon": "Art/Icons/Restaurant/RT_Partition_Slatted_1m.png"
+  },
+  {
+   "kind": "rt-plant-floor",
+   "width": 1,
+   "depth": 1,
+   "inputCapacity": 1,
+   "outputCapacity": 1,
+   "inputRefrigerated": false,
+   "outputRefrigerated": false,
+   "seats": 0,
+   "layer": "",
+   "ambience": 4,
+   "displayName": "Floor plant",
+   "category": "Decor",
+   "mount": "floor",
+   "mountHeight": 1.5,
+   "hideFromAbove": false,
+   "opensScreen": false,
+   "manualPower": false,
+   "workerBound": false,
+   "model": "models/Restaurant/Models/Decor/RT_Plant_Floor.glb",
+   "icon": "Art/Icons/Restaurant/RT_Plant_Floor.png"
+  },
+  {
+   "kind": "rt-plant-table",
+   "width": 1,
+   "depth": 1,
+   "inputCapacity": 1,
+   "outputCapacity": 1,
+   "inputRefrigerated": false,
+   "outputRefrigerated": false,
+   "seats": 0,
+   "layer": "tabletop",
+   "ambience": 1,
+   "displayName": "Table plant",
+   "category": "Decor",
+   "mount": "tabletop",
+   "mountHeight": 1.5,
+   "hideFromAbove": false,
+   "opensScreen": false,
+   "manualPower": false,
+   "workerBound": false,
+   "model": "models/Restaurant/Models/Decor/RT_Plant_Table.glb",
+   "icon": "Art/Icons/Restaurant/RT_Plant_Table.png"
+  },
+  {
+   "kind": "rt-planter",
+   "width": 2,
+   "depth": 1,
+   "inputCapacity": 1,
+   "outputCapacity": 1,
+   "inputRefrigerated": false,
+   "outputRefrigerated": false,
+   "seats": 0,
+   "layer": "",
+   "ambience": 4,
+   "displayName": "Planter divider",
+   "category": "Decor",
+   "mount": "floor",
+   "mountHeight": 1.5,
+   "hideFromAbove": false,
+   "opensScreen": false,
+   "manualPower": false,
+   "workerBound": false,
+   "model": "models/Restaurant/Models/Decor/RT_Planter_Divider_1_6m.glb",
+   "icon": "Art/Icons/Restaurant/RT_Planter_Divider_1_6m.png"
+  },
+  {
+   "kind": "rt-prep-table",
+   "width": 2,
+   "depth": 1,
+   "inputCapacity": 4,
+   "outputCapacity": 1,
+   "inputRefrigerated": false,
+   "outputRefrigerated": false,
+   "seats": 0,
+   "layer": "",
+   "ambience": 0,
+   "displayName": "Prep table",
+   "category": "Service",
+   "mount": "floor",
+   "mountHeight": 1.5,
+   "hideFromAbove": false,
+   "opensScreen": true,
+   "manualPower": false,
+   "workerBound": false,
+   "model": "models/Restaurant/Models/Service/RT_PrepTable_1_5m.glb",
+   "icon": "Art/Icons/Restaurant/RT_PrepTable_1_5m.png"
+  },
+  {
+   "kind": "rt-rug",
+   "width": 2,
+   "depth": 3,
+   "inputCapacity": 1,
+   "outputCapacity": 1,
+   "inputRefrigerated": false,
+   "outputRefrigerated": false,
+   "seats": 0,
+   "layer": "floor",
+   "ambience": 4,
+   "displayName": "Bordered rug",
+   "category": "Decor",
+   "mount": "floor",
+   "mountHeight": 1.5,
+   "hideFromAbove": false,
+   "opensScreen": false,
+   "manualPower": false,
+   "workerBound": false,
+   "model": "models/Restaurant/Models/Decor/RT_Rug_Bordered_2x3m.glb",
+   "icon": "Art/Icons/Restaurant/RT_Rug_Bordered_2x3m.png"
+  },
+  {
+   "kind": "rt-sink",
+   "width": 2,
+   "depth": 1,
+   "inputCapacity": 1,
+   "outputCapacity": 1,
+   "inputRefrigerated": false,
+   "outputRefrigerated": false,
+   "seats": 0,
+   "layer": "",
+   "ambience": 0,
+   "displayName": "Sink",
+   "category": "Service",
+   "mount": "backed",
+   "mountHeight": 1.5,
+   "hideFromAbove": false,
+   "opensScreen": false,
+   "manualPower": false,
+   "workerBound": false,
+   "model": "models/Restaurant/Models/Service/RT_Sink_Single.glb",
+   "icon": "Art/Icons/Restaurant/RT_Sink_Single.png"
+  },
+  {
+   "kind": "rt-shelf",
+   "width": 2,
+   "depth": 1,
+   "inputCapacity": 8,
+   "outputCapacity": 1,
+   "inputRefrigerated": false,
+   "outputRefrigerated": false,
+   "seats": 0,
+   "layer": "",
+   "ambience": 0,
+   "displayName": "Storage shelf",
+   "category": "Service",
+   "mount": "floor",
+   "mountHeight": 1.5,
+   "hideFromAbove": false,
+   "opensScreen": true,
+   "manualPower": false,
+   "workerBound": false,
+   "model": "models/Restaurant/Models/Service/RT_StorageShelf_1_2m.glb",
+   "icon": "Art/Icons/Restaurant/RT_StorageShelf_1_2m.png"
+  },
+  {
+   "kind": "rt-table-bistro",
+   "width": 1,
+   "depth": 1,
+   "inputCapacity": 1,
+   "outputCapacity": 1,
+   "inputRefrigerated": false,
+   "outputRefrigerated": false,
+   "seats": 2,
+   "layer": "",
+   "ambience": 2,
+   "displayName": "Bistro table (2 seats)",
+   "category": "Furniture",
+   "mount": "floor",
+   "mountHeight": 1.5,
+   "hideFromAbove": false,
+   "opensScreen": true,
+   "manualPower": false,
+   "workerBound": false,
+   "model": "models/Restaurant/Models/Furniture/RT_Table_BistroRound.glb",
+   "icon": "Art/Icons/Restaurant/RT_Table_BistroRound.png"
+  },
+  {
+   "kind": "rt-caddy",
+   "width": 1,
+   "depth": 1,
+   "inputCapacity": 1,
+   "outputCapacity": 1,
+   "inputRefrigerated": false,
+   "outputRefrigerated": false,
+   "seats": 0,
+   "layer": "tabletop",
+   "ambience": 1,
+   "displayName": "Table caddy",
+   "category": "Decor",
+   "mount": "tabletop",
+   "mountHeight": 1.5,
+   "hideFromAbove": false,
+   "opensScreen": false,
+   "manualPower": false,
+   "workerBound": false,
+   "model": "models/Restaurant/Models/Decor/RT_Table_Caddy.glb",
+   "icon": "Art/Icons/Restaurant/RT_Table_Caddy.png"
+  },
+  {
+   "kind": "rt-table-communal",
+   "width": 3,
+   "depth": 1,
+   "inputCapacity": 1,
+   "outputCapacity": 1,
+   "inputRefrigerated": false,
+   "outputRefrigerated": false,
+   "seats": 6,
+   "layer": "",
+   "ambience": 3,
+   "displayName": "Communal table (6 seats)",
+   "category": "Furniture",
+   "mount": "floor",
+   "mountHeight": 1.5,
+   "hideFromAbove": false,
+   "opensScreen": true,
+   "manualPower": false,
+   "workerBound": false,
+   "model": "models/Restaurant/Models/Furniture/RT_Table_Communal.glb",
+   "icon": "Art/Icons/Restaurant/RT_Table_Communal.png"
+  },
+  {
+   "kind": "rt-table-high",
+   "width": 1,
+   "depth": 1,
+   "inputCapacity": 1,
+   "outputCapacity": 1,
+   "inputRefrigerated": false,
+   "outputRefrigerated": false,
+   "seats": 2,
+   "layer": "",
+   "ambience": 2,
+   "displayName": "High table (2 seats)",
+   "category": "Furniture",
+   "mount": "floor",
+   "mountHeight": 1.5,
+   "hideFromAbove": false,
+   "opensScreen": true,
+   "manualPower": false,
+   "workerBound": false,
+   "model": "models/Restaurant/Models/Furniture/RT_Table_HighRound.glb",
+   "icon": "Art/Icons/Restaurant/RT_Table_HighRound.png"
+  },
+  {
+   "kind": "rt-trolley",
+   "width": 1,
+   "depth": 1,
+   "inputCapacity": 2,
+   "outputCapacity": 1,
+   "inputRefrigerated": false,
+   "outputRefrigerated": false,
+   "seats": 0,
+   "layer": "",
+   "ambience": 0,
+   "displayName": "Service trolley",
+   "category": "Service",
+   "mount": "floor",
+   "mountHeight": 1.5,
+   "hideFromAbove": false,
+   "opensScreen": true,
+   "manualPower": false,
+   "workerBound": false,
+   "model": "models/Restaurant/Models/Service/RT_Trolley_TwoShelf.glb",
+   "icon": "Art/Icons/Restaurant/RT_Trolley_TwoShelf.png"
+  },
+  {
+   "kind": "rt-vase",
+   "width": 1,
+   "depth": 1,
+   "inputCapacity": 1,
+   "outputCapacity": 1,
+   "inputRefrigerated": false,
+   "outputRefrigerated": false,
+   "seats": 0,
+   "layer": "tabletop",
+   "ambience": 1,
+   "displayName": "Ceramic vase",
+   "category": "Decor",
+   "mount": "tabletop",
+   "mountHeight": 1.5,
+   "hideFromAbove": false,
+   "opensScreen": false,
+   "manualPower": false,
+   "workerBound": false,
+   "model": "models/Restaurant/Models/Decor/RT_Vase_Ceramic.glb",
+   "icon": "Art/Icons/Restaurant/RT_Vase_Ceramic.png"
+  },
+  {
+   "kind": "rt-wall-art",
+   "width": 1,
+   "depth": 1,
+   "inputCapacity": 1,
+   "outputCapacity": 1,
+   "inputRefrigerated": false,
+   "outputRefrigerated": false,
+   "seats": 0,
+   "layer": "wall",
+   "ambience": 4,
+   "displayName": "Abstract wall art",
+   "category": "Decor",
+   "mount": "wall",
+   "mountHeight": 1.6,
+   "hideFromAbove": false,
+   "opensScreen": false,
+   "manualPower": false,
+   "workerBound": false,
+   "model": "models/Restaurant/Models/Decor/RT_WallArt_Abstract.glb",
+   "icon": "Art/Icons/Restaurant/RT_WallArt_Abstract.png"
+  },
+  {
+   "kind": "rt-wall-clock",
+   "width": 1,
+   "depth": 1,
+   "inputCapacity": 1,
+   "outputCapacity": 1,
+   "inputRefrigerated": false,
+   "outputRefrigerated": false,
+   "seats": 0,
+   "layer": "wall",
+   "ambience": 2,
+   "displayName": "Wall clock",
+   "category": "Decor",
+   "mount": "wall",
+   "mountHeight": 2.1,
+   "hideFromAbove": false,
+   "opensScreen": false,
+   "manualPower": false,
+   "workerBound": false,
+   "model": "models/Restaurant/Models/Decor/RT_WallClock.glb",
+   "icon": "Art/Icons/Restaurant/RT_WallClock.png"
+  },
+  {
+   "kind": "rt-waste-bin",
+   "width": 1,
+   "depth": 1,
+   "inputCapacity": 1,
+   "outputCapacity": 1,
+   "inputRefrigerated": false,
+   "outputRefrigerated": false,
+   "seats": 0,
+   "layer": "",
+   "ambience": 0,
+   "displayName": "Waste bin",
+   "category": "Decor",
+   "mount": "floor",
+   "mountHeight": 1.5,
+   "hideFromAbove": false,
+   "opensScreen": false,
+   "manualPower": false,
+   "workerBound": false,
+   "model": "models/Restaurant/Models/Decor/RT_WasteBin.glb",
+   "icon": "Art/Icons/Restaurant/RT_WasteBin.png"
+  }
+ ],
+ "trucks": [],
+ "styles": {
+  "walls": [
+   {
+    "style": "plaster",
+    "displayName": "Plaster",
+    "wall1m": "models/Restaurant/Models/Architecture/RT_Wall_Plaster_1m.glb",
+    "wall2m": "models/Restaurant/Models/Architecture/RT_Wall_Plaster_2m.glb",
+    "end": "models/Restaurant/Models/Architecture/RT_WallEnd_Plaster.glb"
+   },
+   {
+    "style": "brick",
+    "displayName": "Exposed brick",
+    "wall1m": "models/Restaurant/Models/Architecture/RT_Wall_Brick_1m.glb",
+    "wall2m": "models/Restaurant/Models/Architecture/RT_Wall_Brick_2m.glb",
+    "end": "models/Restaurant/Models/Architecture/RT_WallEnd_Brick.glb"
+   },
+   {
+    "style": "wainscot",
+    "displayName": "Teal wainscot",
+    "wall1m": "models/Restaurant/Models/Architecture/RT_Wall_Wainscot_1m.glb",
+    "wall2m": "models/Restaurant/Models/Architecture/RT_Wall_Wainscot_2m.glb",
+    "end": "models/Restaurant/Models/Architecture/RT_WallEnd_Wainscot.glb"
+   },
+   {
+    "style": "tile",
+    "displayName": "Kitchen tile",
+    "wall1m": "models/Restaurant/Models/Architecture/RT_Wall_Tile_1m.glb",
+    "wall2m": "models/Restaurant/Models/Architecture/RT_Wall_Tile_2m.glb",
+    "end": "models/Restaurant/Models/Architecture/RT_WallEnd_Tile.glb"
+   }
+  ],
+  "doors": [
+   {
+    "style": "panel",
+    "displayName": "Panel door",
+    "leaf": "models/Restaurant/Models/Architecture/RT_DoorLeaf_Panel.glb"
+   },
+   {
+    "style": "glazed",
+    "displayName": "Glazed door",
+    "leaf": "models/Restaurant/Models/Architecture/RT_DoorLeaf_Glazed.glb"
+   },
+   {
+    "style": "kitchen",
+    "displayName": "Kitchen swing door",
+    "leaf": "models/Restaurant/Models/Architecture/RT_DoorLeaf_Kitchen.glb"
+   }
+  ],
+  "windows": [
+   {
+    "style": "picture",
+    "displayName": "Picture window",
+    "bay": "models/Restaurant/Models/Architecture/RT_WindowOpening_2m.glb",
+    "window": "models/Restaurant/Models/Architecture/RT_Window_Picture.glb"
+   },
+   {
+    "style": "mullioned",
+    "displayName": "Mullioned window",
+    "bay": "models/Restaurant/Models/Architecture/RT_WindowOpening_2m.glb",
+    "window": "models/Restaurant/Models/Architecture/RT_Window_Mullioned.glb"
+   },
+   {
+    "style": "hatch",
+    "displayName": "Serving hatch",
+    "bay": "models/Restaurant/Models/Architecture/RT_ServingHatch_2m.glb",
+    "window": ""
+   }
+  ],
+  "singleDoorway": "models/Restaurant/Models/Architecture/RT_Doorway_Single_2m.glb",
+  "doubleDoorway": "models/Restaurant/Models/Architecture/RT_Doorway_Double_3m.glb",
+  "singleFrame": "models/Restaurant/Models/Architecture/RT_DoorFrame_Single.glb",
+  "doubleFrame": "models/Restaurant/Models/Architecture/RT_DoorFrame_Double.glb"
+ }
+}

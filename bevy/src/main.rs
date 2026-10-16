@@ -1,5 +1,4 @@
-// Food Factory character sandbox: one flat floor and the player character from the Unity project, with the same
-// movement, orbit camera and animator behaviour. No buildings, networking or game logic.
+// Food Factory Bevy application: render and input composition over the authoritative game runtime.
 // Release builds on Windows run without a console window.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 mod actions;
@@ -7,6 +6,9 @@ mod animation;
 mod camera;
 mod dev_capture;
 mod player;
+mod presentation;
+mod ui;
+mod game;
 
 use bevy::asset::RenderAssetUsages;
 use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin};
@@ -50,6 +52,9 @@ fn main() {
             player::PlayerPlugin,
             animation::CharacterAnimationPlugin,
             dev_capture::DevCapturePlugin,
+            presentation::PresentationPlugin,
+            ui::GameUiPlugin,
+            game::GamePlugin,
         ))
         .add_plugins(FrameTimeDiagnosticsPlugin::default())
         .add_systems(Startup, spawn_world)

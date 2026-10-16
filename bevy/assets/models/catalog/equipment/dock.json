@@ -1,0 +1,18 @@
+{
+  "dimensions": [
+    2.0,
+    2.4,
+    1.05
+  ],
+  "offset": [
+    0.0,
+    1.2,
+    0.025
+  ],
+  "materials": [
+    "DockBumper",
+    "DockConcrete",
+    "DockCrate",
+    "DockDoor"
+  ]
+}

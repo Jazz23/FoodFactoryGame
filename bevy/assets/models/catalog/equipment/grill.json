@@ -1,0 +1,21 @@
+{
+  "dimensions": [
+    1.96,
+    0.92,
+    1.78
+  ],
+  "offset": [
+    0.0,
+    0.02,
+    -0.89
+  ],
+  "materials": [
+    "KT_Black",
+    "KT_DarkSteel",
+    "KT_Steel",
+    "KT_Accent",
+    "KT_Flame",
+    "KT_Food",
+    "KT_Cream"
+  ]
+}

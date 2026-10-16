@@ -1,0 +1,2382 @@
+{
+  "schemaVersion": 1,
+  "status": "generated",
+  "units": "metres",
+  "coordinates": {
+    "up": "Y",
+    "forward": "Z",
+    "source": "Unity-authored prefab/catalog coordinates; Blender exports are converted to Y-up GLB"
+  },
+  "entries": [
+    {
+      "kind": "counter",
+      "group": "equipment",
+      "path": "assets/models/catalog/equipment/counter.glb",
+      "source": "Assets/Content/Equipment/Counter.asset",
+      "prefab": "Assets/Prefabs/Equipment/Counter.prefab",
+      "displayName": "Register",
+      "footprint": [
+        2,
+        1
+      ],
+      "mount": "0",
+      "dimensions": [
+        4.0,
+        1.86,
+        1.8
+      ],
+      "offset": [
+        0.0,
+        0.48,
+        -0.0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "CounterRegister",
+        "CounterScreen",
+        "CounterTop",
+        "CounterWood"
+      ],
+      "notes": "Unity EquipmentDefinition visualPrefab mapping; prefabs with primitive meshes are reconstructed from read-only YAML."
+    },
+    {
+      "kind": "dock",
+      "group": "equipment",
+      "path": "assets/models/catalog/equipment/dock.glb",
+      "source": "Assets/Content/Equipment/Dock.asset",
+      "prefab": "Assets/Prefabs/Equipment/Dock.prefab",
+      "displayName": "dock",
+      "footprint": [
+        2,
+        1
+      ],
+      "mount": "0",
+      "dimensions": [
+        4.0,
+        3.6,
+        2.0
+      ],
+      "offset": [
+        0.0,
+        1.5,
+        0.0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "DockBumper",
+        "DockConcrete",
+        "DockCrate",
+        "DockDoor"
+      ],
+      "notes": "Unity EquipmentDefinition visualPrefab mapping; prefabs with primitive meshes are reconstructed from read-only YAML."
+    },
+    {
+      "kind": "fridge",
+      "group": "equipment",
+      "path": "assets/models/catalog/equipment/fridge.glb",
+      "source": "Assets/Content/Equipment/Fridge.asset",
+      "prefab": "Assets/Prefabs/Equipment/Fridge.prefab",
+      "displayName": "fridge",
+      "footprint": [
+        1,
+        1
+      ],
+      "mount": "0",
+      "dimensions": [
+        1.8,
+        3.72,
+        1.6
+      ],
+      "offset": [
+        0.0,
+        0.97,
+        -0.0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "FridgeBadge",
+        "FridgeShell",
+        "FridgeSteel",
+        "FridgeTrim"
+      ],
+      "notes": "Unity EquipmentDefinition visualPrefab mapping; prefabs with primitive meshes are reconstructed from read-only YAML."
+    },
+    {
+      "kind": "fryer",
+      "group": "equipment",
+      "path": "assets/models/catalog/equipment/fryer.glb",
+      "source": "Assets/Content/Equipment/Fryer.asset",
+      "prefab": "Assets/Prefabs/Equipment/Fryer.prefab",
+      "displayName": "Fryer",
+      "footprint": [
+        1,
+        1
+      ],
+      "mount": "0",
+      "dimensions": [
+        0.84,
+        0.86,
+        1.5
+      ],
+      "offset": [
+        0.0,
+        0.03,
+        -0.75
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "KT_Black",
+        "KT_Steel",
+        "KT_DarkSteel",
+        "KT_Accent",
+        "KT_Oil",
+        "KT_Food"
+      ],
+      "notes": "Unity EquipmentDefinition visualPrefab mapping; prefabs with primitive meshes are reconstructed from read-only YAML."
+    },
+    {
+      "kind": "grill",
+      "group": "equipment",
+      "path": "assets/models/catalog/equipment/grill.glb",
+      "source": "Assets/Content/Equipment/Grill.asset",
+      "prefab": "Assets/Prefabs/Equipment/Grill.prefab",
+      "displayName": "Grill",
+      "footprint": [
+        2,
+        1
+      ],
+      "mount": "0",
+      "dimensions": [
+        1.96,
+        0.92,
+        1.78
+      ],
+      "offset": [
+        0.0,
+        0.02,
+        -0.89
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "KT_Black",
+        "KT_DarkSteel",
+        "KT_Steel",
+        "KT_Accent",
+        "KT_Flame",
+        "KT_Food",
+        "KT_Cream"
+      ],
+      "notes": "Unity EquipmentDefinition visualPrefab mapping; prefabs with primitive meshes are reconstructed from read-only YAML."
+    },
+    {
+      "kind": "kitchen-counter",
+      "group": "equipment",
+      "path": "assets/models/catalog/equipment/kitchen-counter.glb",
+      "source": "Assets/Content/Equipment/KitchenCounter.asset",
+      "prefab": "Assets/Prefabs/Equipment/KitchenCounter.prefab",
+      "displayName": "Kitchen Counter",
+      "footprint": [
+        2,
+        1
+      ],
+      "mount": "0",
+      "dimensions": [
+        1.96,
+        0.89,
+        1.39
+      ],
+      "offset": [
+        0.0,
+        0.005,
+        -0.695
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "KT_Black",
+        "KT_Cream",
+        "KT_Enamel",
+        "KT_Steel",
+        "KT_Wood",
+        "KT_Board",
+        "KT_Tomato",
+        "KT_Leaf",
+        "KT_Food",
+        "KT_DarkSteel"
+      ],
+      "notes": "Unity EquipmentDefinition visualPrefab mapping; prefabs with primitive meshes are reconstructed from read-only YAML."
+    },
+    {
+      "kind": "mixer",
+      "group": "equipment",
+      "path": "assets/models/catalog/equipment/mixer.glb",
+      "source": "Assets/Content/Equipment/Mixer.asset",
+      "prefab": "Assets/Prefabs/Equipment/Mixer.prefab",
+      "displayName": "Mixer",
+      "footprint": [
+        1,
+        1
+      ],
+      "mount": "0",
+      "dimensions": [
+        0.88,
+        0.8,
+        1.52
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        -0.76
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "KT_Steel",
+        "KT_DarkSteel",
+        "KT_Black",
+        "KT_Enamel",
+        "KT_Accent",
+        "KT_Cream"
+      ],
+      "notes": "Unity EquipmentDefinition visualPrefab mapping; prefabs with primitive meshes are reconstructed from read-only YAML."
+    },
+    {
+      "kind": "oven",
+      "group": "equipment",
+      "path": "assets/models/catalog/equipment/oven.glb",
+      "source": "Assets/Content/Equipment/Oven.asset",
+      "prefab": "Assets/Prefabs/Equipment/Oven.prefab",
+      "displayName": "Oven",
+      "footprint": [
+        3,
+        3
+      ],
+      "mount": "0",
+      "dimensions": null,
+      "offset": null,
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [],
+      "notes": "Unity EquipmentDefinition visualPrefab mapping; prefabs with primitive meshes are reconstructed from read-only YAML."
+    },
+    {
+      "kind": "stove",
+      "group": "equipment",
+      "path": "assets/models/catalog/equipment/stove.glb",
+      "source": "Assets/Content/Equipment/Stove.asset",
+      "prefab": "Assets/Prefabs/Equipment/Stove.prefab",
+      "displayName": "Stove",
+      "footprint": [
+        2,
+        1
+      ],
+      "mount": "0",
+      "dimensions": [
+        1.92,
+        0.9,
+        1.55
+      ],
+      "offset": [
+        0.0,
+        0.03,
+        -0.775
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "KT_Black",
+        "KT_Steel",
+        "KT_DarkSteel",
+        "KT_Glass",
+        "KT_Accent",
+        "KT_Flame",
+        "KT_Tomato"
+      ],
+      "notes": "Unity EquipmentDefinition visualPrefab mapping; prefabs with primitive meshes are reconstructed from read-only YAML."
+    },
+    {
+      "kind": "table",
+      "group": "equipment",
+      "path": "assets/models/catalog/equipment/table.glb",
+      "source": "Assets/Content/Equipment/Table.asset",
+      "prefab": "Assets/Prefabs/Equipment/Table.prefab",
+      "displayName": "Table for four",
+      "footprint": [
+        2,
+        1
+      ],
+      "mount": "0",
+      "dimensions": [
+        3.2,
+        1.58,
+        1.6
+      ],
+      "offset": [
+        0.0,
+        0.43,
+        -0.0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "TableDark",
+        "TableWood"
+      ],
+      "notes": "Unity EquipmentDefinition visualPrefab mapping; prefabs with primitive meshes are reconstructed from read-only YAML."
+    },
+    {
+      "kind": "Apartment_a_Ground",
+      "group": "world",
+      "path": "assets/models/catalog/world/Apartment_a_Ground.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        18.16,
+        16.48,
+        3.0
+      ],
+      "offset": [
+        0.0,
+        0.66,
+        -1.5
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Facade_Apartment",
+        "WG_Concrete",
+        "WG_Door_Glass"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Apartment_a_Middle",
+      "group": "world",
+      "path": "assets/models/catalog/world/Apartment_a_Middle.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        18.2,
+        15.2,
+        3.0
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        -1.5
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Facade_Apartment",
+        "WG_Concrete"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Apartment_a_Roof",
+      "group": "world",
+      "path": "assets/models/catalog/world/Apartment_a_Roof.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        18.0,
+        15.0,
+        2.6
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        -1.3
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Roof_Flat",
+        "WG_Concrete"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Apartment_b_Ground",
+      "group": "world",
+      "path": "assets/models/catalog/world/Apartment_b_Ground.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        18.16,
+        16.48,
+        3.0
+      ],
+      "offset": [
+        0.0,
+        0.66,
+        -1.5
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Facade_Brick",
+        "WG_Concrete",
+        "WG_Door_Glass"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Apartment_b_Middle",
+      "group": "world",
+      "path": "assets/models/catalog/world/Apartment_b_Middle.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        18.2,
+        15.2,
+        3.0
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        -1.5
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Facade_Brick",
+        "WG_Concrete"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Apartment_b_Roof",
+      "group": "world",
+      "path": "assets/models/catalog/world/Apartment_b_Roof.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        18.0,
+        15.0,
+        2.6
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        -1.3
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Roof_Flat",
+        "WG_Concrete"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Barn_a",
+      "group": "world",
+      "path": "assets/models/catalog/world/Barn_a.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        17.9,
+        16.6,
+        12.6
+      ],
+      "offset": [
+        2.65,
+        0.0,
+        -6.3
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Wood_Barn",
+        "WG_Metal_Roof",
+        "WG_Trim",
+        "WG_Metal_Wall"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Barn_b",
+      "group": "world",
+      "path": "assets/models/catalog/world/Barn_b.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        17.9,
+        16.6,
+        12.6
+      ],
+      "offset": [
+        2.65,
+        0.0,
+        -6.3
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Metal_Wall",
+        "WG_Metal_Roof",
+        "WG_Wood_Barn",
+        "WG_Trim"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Bridge_Deck",
+      "group": "world",
+      "path": "assets/models/catalog/world/Bridge_Deck.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        1.0,
+        10.0,
+        1.27
+      ],
+      "offset": [
+        0.0,
+        -5.0,
+        0.665
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Concrete"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Bridge_Pier",
+      "group": "world",
+      "path": "assets/models/catalog/world/Bridge_Pier.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        1.0,
+        1.2,
+        1.0
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.5
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Concrete"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Bridge_Railing",
+      "group": "world",
+      "path": "assets/models/catalog/world/Bridge_Railing.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        0.3,
+        10.0,
+        2.4
+      ],
+      "offset": [
+        0.0,
+        -5.0,
+        0.1
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Concrete",
+        "WG_Steel"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Factory_a",
+      "group": "world",
+      "path": "assets/models/catalog/world/Factory_a.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        30.6,
+        27.5,
+        11.0
+      ],
+      "offset": [
+        0.0,
+        0.45,
+        -5.5
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Metal_Wall",
+        "WG_Concrete",
+        "WG_Window_Industrial",
+        "WG_Door_Roller",
+        "WG_Door_Wood",
+        "WG_Metal_Dark",
+        "WG_Metal_Roof"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Factory_b",
+      "group": "world",
+      "path": "assets/models/catalog/world/Factory_b.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        30.1,
+        27.25,
+        14.0
+      ],
+      "offset": [
+        0.0,
+        0.575,
+        -7.0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Metal_Wall",
+        "WG_Concrete",
+        "WG_Window_Industrial",
+        "WG_Door_Roller",
+        "WG_Door_Wood",
+        "WG_Metal_Dark",
+        "WG_Roof_Flat",
+        "WG_Steel"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Foundation",
+      "group": "world",
+      "path": "assets/models/catalog/world/Foundation.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.5
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Concrete"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Ground_Quad",
+      "group": "world",
+      "path": "assets/models/catalog/world/Ground_Quad.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        1.0,
+        1.0,
+        0.0
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        -0.0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Ground"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "House_Large_a",
+      "group": "world",
+      "path": "assets/models/catalog/world/House_Large_a.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        15.5,
+        14.3,
+        8.6
+      ],
+      "offset": [
+        -0.25,
+        0.65,
+        -4.3
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Facade_Brick",
+        "WG_Concrete",
+        "WG_Roof_Shingles",
+        "WG_Door_Wood",
+        "WG_Trim",
+        "WG_Roof_Flat",
+        "WG_Door_Roller"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "House_Large_b",
+      "group": "world",
+      "path": "assets/models/catalog/world/House_Large_b.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        15.5,
+        14.3,
+        8.6
+      ],
+      "offset": [
+        -0.25,
+        0.65,
+        -4.3
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Facade_Siding",
+        "WG_Concrete",
+        "WG_Roof_ClayTiles",
+        "WG_Door_Wood",
+        "WG_Trim",
+        "WG_Roof_Flat",
+        "WG_Door_Roller"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "House_Large_c",
+      "group": "world",
+      "path": "assets/models/catalog/world/House_Large_c.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        15.5,
+        14.3,
+        8.6
+      ],
+      "offset": [
+        -0.25,
+        0.65,
+        -4.3
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Facade_Plaster",
+        "WG_Concrete",
+        "WG_Roof_ClayTiles",
+        "WG_Door_Wood",
+        "WG_Trim",
+        "WG_Roof_Flat",
+        "WG_Door_Roller"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "House_Small_a",
+      "group": "world",
+      "path": "assets/models/catalog/world/House_Small_a.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        10.9,
+        10.65,
+        6.4
+      ],
+      "offset": [
+        0.0,
+        0.375,
+        -3.2
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Facade_Brick",
+        "WG_Concrete",
+        "WG_Roof_Shingles",
+        "WG_Trim",
+        "WG_Door_Wood"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "House_Small_b",
+      "group": "world",
+      "path": "assets/models/catalog/world/House_Small_b.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        10.9,
+        10.65,
+        6.4
+      ],
+      "offset": [
+        0.0,
+        0.375,
+        -3.2
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Facade_Siding",
+        "WG_Concrete",
+        "WG_Roof_Shingles",
+        "WG_Trim",
+        "WG_Door_Wood"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "House_Small_c",
+      "group": "world",
+      "path": "assets/models/catalog/world/House_Small_c.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        10.9,
+        10.65,
+        6.4
+      ],
+      "offset": [
+        0.0,
+        0.375,
+        -3.2
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Facade_Plaster",
+        "WG_Concrete",
+        "WG_Roof_ClayTiles",
+        "WG_Trim",
+        "WG_Door_Wood"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Office_a_Ground",
+      "group": "world",
+      "path": "assets/models/catalog/world/Office_a_Ground.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        22.0,
+        21.5,
+        3.5
+      ],
+      "offset": [
+        0.0,
+        1.25,
+        -1.75
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Facade_Office",
+        "WG_Door_Glass",
+        "WG_Metal_Dark"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Office_a_Middle",
+      "group": "world",
+      "path": "assets/models/catalog/world/Office_a_Middle.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        22.0,
+        19.0,
+        3.5
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        -1.75
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Facade_Office"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Office_a_Roof",
+      "group": "world",
+      "path": "assets/models/catalog/world/Office_a_Roof.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        22.0,
+        19.0,
+        3.2
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        -1.6
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Roof_Flat",
+        "WG_Metal_Dark",
+        "WG_Metal_Wall"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Office_b_Ground",
+      "group": "world",
+      "path": "assets/models/catalog/world/Office_b_Ground.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        22.0,
+        21.5,
+        3.5
+      ],
+      "offset": [
+        0.0,
+        1.25,
+        -1.75
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Facade_OfficeDark",
+        "WG_Door_Glass",
+        "WG_Metal_Dark"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Office_b_Middle",
+      "group": "world",
+      "path": "assets/models/catalog/world/Office_b_Middle.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        22.0,
+        19.0,
+        3.5
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        -1.75
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Facade_OfficeDark"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Office_b_Roof",
+      "group": "world",
+      "path": "assets/models/catalog/world/Office_b_Roof.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        22.0,
+        19.0,
+        3.2
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        -1.6
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Roof_Flat",
+        "WG_Metal_Dark",
+        "WG_Metal_Wall"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Rail_Crossing",
+      "group": "world",
+      "path": "assets/models/catalog/world/Rail_Crossing.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        5.2,
+        10.0,
+        0.25
+      ],
+      "offset": [
+        0.0,
+        -5.0,
+        -0.145
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Concrete",
+        "WG_Steel"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Rail_Signal",
+      "group": "world",
+      "path": "assets/models/catalog/world/Rail_Signal.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        1.4,
+        0.6,
+        5.5
+      ],
+      "offset": [
+        0.05,
+        0.0,
+        -2.75
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Concrete",
+        "WG_Steel",
+        "WG_Sign_Crossbuck",
+        "WG_Metal_Dark",
+        "WG_Lamp_Red",
+        "WG_Paint_Red",
+        "WG_Trim"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Rail_Track",
+      "group": "world",
+      "path": "assets/models/catalog/world/Rail_Track.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        4.0,
+        6.0,
+        0.87
+      ],
+      "offset": [
+        0.0,
+        -3.0,
+        0.165
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Rail_Ballast",
+        "WG_Steel"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Restaurant_a",
+      "group": "world",
+      "path": "assets/models/catalog/world/Restaurant_a.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        12.0,
+        12.6,
+        5.5
+      ],
+      "offset": [
+        0.0,
+        0.8,
+        -2.75
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Facade_Storefront",
+        "WG_Stucco",
+        "WG_Roof_Flat",
+        "WG_Trim",
+        "WG_Door_Glass",
+        "WG_Awning",
+        "WG_Sign",
+        "WG_Metal_Wall"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Restaurant_b",
+      "group": "world",
+      "path": "assets/models/catalog/world/Restaurant_b.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        12.0,
+        12.6,
+        5.5
+      ],
+      "offset": [
+        0.0,
+        0.8,
+        -2.75
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Facade_Storefront",
+        "WG_Facade_Brick",
+        "WG_Roof_Flat",
+        "WG_Trim",
+        "WG_Door_Glass",
+        "WG_Awning",
+        "WG_Sign",
+        "WG_Metal_Wall"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Road_Arterial",
+      "group": "world",
+      "path": "assets/models/catalog/world/Road_Arterial.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        14.0,
+        10.0,
+        0.77
+      ],
+      "offset": [
+        0.0,
+        -5.0,
+        0.215
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Road_Arterial"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Road_Arterial_Crosswalk",
+      "group": "world",
+      "path": "assets/models/catalog/world/Road_Arterial_Crosswalk.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        14.0,
+        10.0,
+        0.77
+      ],
+      "offset": [
+        0.0,
+        -5.0,
+        0.215
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Road_Arterial_Crosswalk"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Road_Junction",
+      "group": "world",
+      "path": "assets/models/catalog/world/Road_Junction.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        1.0,
+        1.0,
+        0.0
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        -0.025
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Road_Junction"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Road_Local",
+      "group": "world",
+      "path": "assets/models/catalog/world/Road_Local.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        10.0,
+        10.0,
+        0.77
+      ],
+      "offset": [
+        0.0,
+        -5.0,
+        0.215
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Road_Local"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Road_Local_Crosswalk",
+      "group": "world",
+      "path": "assets/models/catalog/world/Road_Local_Crosswalk.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        10.0,
+        10.0,
+        0.77
+      ],
+      "offset": [
+        0.0,
+        -5.0,
+        0.215
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Road_Local_Crosswalk"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Road_Rural",
+      "group": "world",
+      "path": "assets/models/catalog/world/Road_Rural.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        8.0,
+        10.0,
+        0.66
+      ],
+      "offset": [
+        0.0,
+        -5.0,
+        0.27
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Road_Rural"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Station",
+      "group": "world",
+      "path": "assets/models/catalog/world/Station.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        10.0,
+        30.0,
+        4.3
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        -2.15
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Concrete",
+        "WG_Paint_Yellow",
+        "WG_Metal_Dark",
+        "WG_Metal_Roof",
+        "WG_Door_Glass",
+        "WG_Wood_Barn",
+        "WG_Sign"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Stop_Sign",
+      "group": "world",
+      "path": "assets/models/catalog/world/Stop_Sign.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        0.75,
+        0.08,
+        2.825
+      ],
+      "offset": [
+        0.0,
+        0.01,
+        -1.4125
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Steel",
+        "WG_Sign_Stop"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Traffic_Light_Arterial",
+      "group": "world",
+      "path": "assets/models/catalog/world/Traffic_Light_Arterial.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        5.95,
+        0.99,
+        6.6
+      ],
+      "offset": [
+        -2.625,
+        0.145,
+        -3.3
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Metal_Dark",
+        "WG_Concrete",
+        "WG_Lamp_Red",
+        "WG_Lamp_Amber",
+        "WG_Lamp_Green"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Traffic_Light_Local",
+      "group": "world",
+      "path": "assets/models/catalog/world/Traffic_Light_Local.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        3.95,
+        0.99,
+        6.6
+      ],
+      "offset": [
+        -1.625,
+        0.145,
+        -3.3
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Metal_Dark",
+        "WG_Concrete",
+        "WG_Lamp_Red",
+        "WG_Lamp_Amber",
+        "WG_Lamp_Green"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Tree_Broadleaf_a",
+      "group": "world",
+      "path": "assets/models/catalog/world/Tree_Broadleaf_a.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        5.19977,
+        4.59899,
+        6.3666
+      ],
+      "offset": [
+        0.08978,
+        0.08773,
+        -3.1833
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Bark",
+        "WG_Foliage"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Tree_Broadleaf_b",
+      "group": "world",
+      "path": "assets/models/catalog/world/Tree_Broadleaf_b.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        3.99312,
+        3.9617,
+        6.49339
+      ],
+      "offset": [
+        0.08745,
+        -0.05285,
+        -3.2467
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Bark",
+        "WG_Foliage"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Tree_Bush",
+      "group": "world",
+      "path": "assets/models/catalog/world/Tree_Bush.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        2.40069,
+        1.82761,
+        1.59358
+      ],
+      "offset": [
+        0.14193,
+        0.05377,
+        -0.53935
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Foliage"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Tree_Conifer",
+      "group": "world",
+      "path": "assets/models/catalog/world/Tree_Conifer.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        4.4,
+        4.4,
+        9.3
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        -4.65
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Bark",
+        "WG_Foliage_Dark"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Tree_Poplar",
+      "group": "world",
+      "path": "assets/models/catalog/world/Tree_Poplar.glb",
+      "source": "Assets/Art/World/Models/WorldArt.fbx",
+      "dimensions": [
+        2.67615,
+        2.70467,
+        11.06251
+      ],
+      "offset": [
+        0.00912,
+        -0.09509,
+        -5.53126
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "WG_Bark",
+        "WG_Foliage_Light"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Vehicle_BoxTruck",
+      "group": "vehicles",
+      "path": "assets/models/catalog/vehicles/boxtruck.glb",
+      "source": "Assets/Art/Vehicles/Models/Vehicles.fbx",
+      "dimensions": [
+        2.42,
+        7.58,
+        3.35
+      ],
+      "offset": [
+        0.0,
+        0.02,
+        -1.675
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "VH_Trim",
+        "VH_Body",
+        "VH_Glass",
+        "VH_Box",
+        "VH_Chrome",
+        "VH_Headlight",
+        "VH_Taillight",
+        "VH_Tyre"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Vehicle_Bus",
+      "group": "vehicles",
+      "path": "assets/models/catalog/vehicles/bus.glb",
+      "source": "Assets/Art/Vehicles/Models/Vehicles.fbx",
+      "dimensions": [
+        2.524,
+        11.54,
+        3.1
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        -1.55
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "VH_Bus",
+        "VH_Glass",
+        "VH_Box",
+        "VH_Sign",
+        "VH_Headlight",
+        "VH_Taillight",
+        "VH_Tyre",
+        "VH_Chrome"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Vehicle_Hatchback",
+      "group": "vehicles",
+      "path": "assets/models/catalog/vehicles/hatchback.glb",
+      "source": "Assets/Art/Vehicles/Models/Vehicles.fbx",
+      "dimensions": [
+        1.77,
+        3.98,
+        1.5
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        -0.75
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "VH_Body",
+        "VH_Glass",
+        "VH_Trim",
+        "VH_Headlight",
+        "VH_Taillight",
+        "VH_Tyre",
+        "VH_Chrome"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Vehicle_Pickup",
+      "group": "vehicles",
+      "path": "assets/models/catalog/vehicles/pickup.glb",
+      "source": "Assets/Art/Vehicles/Models/Vehicles.fbx",
+      "dimensions": [
+        2.01,
+        5.37,
+        1.86
+      ],
+      "offset": [
+        0.0,
+        0.015,
+        -0.93
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "VH_Body",
+        "VH_Glass",
+        "VH_Trim",
+        "VH_Chrome",
+        "VH_Headlight",
+        "VH_Taillight",
+        "VH_Tyre"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Vehicle_Sedan",
+      "group": "vehicles",
+      "path": "assets/models/catalog/vehicles/sedan.glb",
+      "source": "Assets/Art/Vehicles/Models/Vehicles.fbx",
+      "dimensions": [
+        1.82,
+        4.68,
+        1.45
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        -0.725
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "VH_Body",
+        "VH_Glass",
+        "VH_Trim",
+        "VH_Headlight",
+        "VH_Taillight",
+        "VH_Tyre",
+        "VH_Chrome"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Vehicle_Taxi",
+      "group": "vehicles",
+      "path": "assets/models/catalog/vehicles/taxi.glb",
+      "source": "Assets/Art/Vehicles/Models/Vehicles.fbx",
+      "dimensions": [
+        1.82,
+        4.68,
+        1.67
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        -0.835
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "VH_Taxi",
+        "VH_Glass",
+        "VH_Trim",
+        "VH_Headlight",
+        "VH_Taillight",
+        "VH_Tyre",
+        "VH_Chrome",
+        "VH_Sign"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Vehicle_Van",
+      "group": "vehicles",
+      "path": "assets/models/catalog/vehicles/van.glb",
+      "source": "Assets/Art/Vehicles/Models/Vehicles.fbx",
+      "dimensions": [
+        1.98,
+        5.06,
+        2.3
+      ],
+      "offset": [
+        0.0,
+        0.01,
+        -1.15
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "VH_Body",
+        "VH_Glass",
+        "VH_Trim",
+        "VH_Headlight",
+        "VH_Taillight",
+        "VH_Tyre",
+        "VH_Chrome"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Kitchen_Counter",
+      "group": "kitchen-equipment",
+      "path": "assets/models/catalog/equipment/kitchen-counter.glb",
+      "source": "Assets/Art/Kitchen/Models/Kitchen.fbx",
+      "dimensions": [
+        1.96,
+        0.89,
+        1.39
+      ],
+      "offset": [
+        0.0,
+        0.005,
+        -0.695
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "KT_Black",
+        "KT_Cream",
+        "KT_Enamel",
+        "KT_Steel",
+        "KT_Wood",
+        "KT_Board",
+        "KT_Tomato",
+        "KT_Leaf",
+        "KT_Food",
+        "KT_DarkSteel"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Kitchen_Fryer",
+      "group": "kitchen-equipment",
+      "path": "assets/models/catalog/equipment/fryer.glb",
+      "source": "Assets/Art/Kitchen/Models/Kitchen.fbx",
+      "dimensions": [
+        0.84,
+        0.86,
+        1.5
+      ],
+      "offset": [
+        0.0,
+        0.03,
+        -0.75
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "KT_Black",
+        "KT_Steel",
+        "KT_DarkSteel",
+        "KT_Accent",
+        "KT_Oil",
+        "KT_Food"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Kitchen_Grill",
+      "group": "kitchen-equipment",
+      "path": "assets/models/catalog/equipment/grill.glb",
+      "source": "Assets/Art/Kitchen/Models/Kitchen.fbx",
+      "dimensions": [
+        1.96,
+        0.92,
+        1.78
+      ],
+      "offset": [
+        0.0,
+        0.02,
+        -0.89
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "KT_Black",
+        "KT_DarkSteel",
+        "KT_Steel",
+        "KT_Accent",
+        "KT_Flame",
+        "KT_Food",
+        "KT_Cream"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Kitchen_Mixer",
+      "group": "kitchen-equipment",
+      "path": "assets/models/catalog/equipment/mixer.glb",
+      "source": "Assets/Art/Kitchen/Models/Kitchen.fbx",
+      "dimensions": [
+        0.88,
+        0.8,
+        1.52
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        -0.76
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "KT_Steel",
+        "KT_DarkSteel",
+        "KT_Black",
+        "KT_Enamel",
+        "KT_Accent",
+        "KT_Cream"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "Kitchen_Stove",
+      "group": "kitchen-equipment",
+      "path": "assets/models/catalog/equipment/stove.glb",
+      "source": "Assets/Art/Kitchen/Models/Kitchen.fbx",
+      "dimensions": [
+        1.92,
+        0.9,
+        1.55
+      ],
+      "offset": [
+        0.0,
+        0.03,
+        -0.775
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "KT_Black",
+        "KT_Steel",
+        "KT_DarkSteel",
+        "KT_Glass",
+        "KT_Accent",
+        "KT_Flame",
+        "KT_Tomato"
+      ],
+      "notes": "Measured Blender FBX mesh bounds; catalog object split, Unity prefab rotation/placement not applied."
+    },
+    {
+      "kind": "counter",
+      "group": "equipment",
+      "path": "assets/models/catalog/equipment/counter.glb",
+      "source": "Assets/Content/Equipment/Counter.asset",
+      "prefab": "Assets/Prefabs/Equipment/Counter.prefab",
+      "displayName": "Register",
+      "footprint": [
+        2,
+        1
+      ],
+      "mount": "0",
+      "dimensions": [
+        2.0,
+        1.34,
+        0.9
+      ],
+      "offset": [
+        0.0,
+        0.67,
+        -0.0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "CounterRegister",
+        "CounterScreen",
+        "CounterTop",
+        "CounterWood"
+      ],
+      "notes": "Unity EquipmentDefinition visualPrefab mapping; prefabs with primitive meshes are reconstructed from read-only YAML."
+    },
+    {
+      "kind": "dock",
+      "group": "equipment",
+      "path": "assets/models/catalog/equipment/dock.glb",
+      "source": "Assets/Content/Equipment/Dock.asset",
+      "prefab": "Assets/Prefabs/Equipment/Dock.prefab",
+      "displayName": "dock",
+      "footprint": [
+        2,
+        1
+      ],
+      "mount": "0",
+      "dimensions": [
+        2.0,
+        2.4,
+        1.05
+      ],
+      "offset": [
+        0.0,
+        1.2,
+        0.025
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "DockBumper",
+        "DockConcrete",
+        "DockCrate",
+        "DockDoor"
+      ],
+      "notes": "Unity EquipmentDefinition visualPrefab mapping; prefabs with primitive meshes are reconstructed from read-only YAML."
+    },
+    {
+      "kind": "fridge",
+      "group": "equipment",
+      "path": "assets/models/catalog/equipment/fridge.glb",
+      "source": "Assets/Content/Equipment/Fridge.asset",
+      "prefab": "Assets/Prefabs/Equipment/Fridge.prefab",
+      "displayName": "fridge",
+      "footprint": [
+        1,
+        1
+      ],
+      "mount": "0",
+      "dimensions": [
+        0.9,
+        1.9,
+        0.855
+      ],
+      "offset": [
+        0.0,
+        0.95,
+        -0.0275
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "FridgeBadge",
+        "FridgeShell",
+        "FridgeSteel",
+        "FridgeTrim"
+      ],
+      "notes": "Unity EquipmentDefinition visualPrefab mapping; prefabs with primitive meshes are reconstructed from read-only YAML."
+    },
+    {
+      "kind": "fryer",
+      "group": "equipment",
+      "path": "assets/models/catalog/equipment/fryer.glb",
+      "source": "Assets/Content/Equipment/Fryer.asset",
+      "prefab": "Assets/Prefabs/Equipment/Fryer.prefab",
+      "displayName": "Fryer",
+      "footprint": [
+        1,
+        1
+      ],
+      "mount": "0",
+      "dimensions": [
+        0.84,
+        0.86,
+        1.5
+      ],
+      "offset": [
+        0.0,
+        0.03,
+        -0.75
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "KT_Black",
+        "KT_Steel",
+        "KT_DarkSteel",
+        "KT_Accent",
+        "KT_Oil",
+        "KT_Food"
+      ],
+      "notes": "Unity EquipmentDefinition visualPrefab mapping; prefabs with primitive meshes are reconstructed from read-only YAML."
+    },
+    {
+      "kind": "grill",
+      "group": "equipment",
+      "path": "assets/models/catalog/equipment/grill.glb",
+      "source": "Assets/Content/Equipment/Grill.asset",
+      "prefab": "Assets/Prefabs/Equipment/Grill.prefab",
+      "displayName": "Grill",
+      "footprint": [
+        2,
+        1
+      ],
+      "mount": "0",
+      "dimensions": [
+        1.96,
+        0.92,
+        1.78
+      ],
+      "offset": [
+        0.0,
+        0.02,
+        -0.89
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "KT_Black",
+        "KT_DarkSteel",
+        "KT_Steel",
+        "KT_Accent",
+        "KT_Flame",
+        "KT_Food",
+        "KT_Cream"
+      ],
+      "notes": "Unity EquipmentDefinition visualPrefab mapping; prefabs with primitive meshes are reconstructed from read-only YAML."
+    },
+    {
+      "kind": "kitchen-counter",
+      "group": "equipment",
+      "path": "assets/models/catalog/equipment/kitchen-counter.glb",
+      "source": "Assets/Content/Equipment/KitchenCounter.asset",
+      "prefab": "Assets/Prefabs/Equipment/KitchenCounter.prefab",
+      "displayName": "Kitchen Counter",
+      "footprint": [
+        2,
+        1
+      ],
+      "mount": "0",
+      "dimensions": [
+        1.96,
+        0.89,
+        1.39
+      ],
+      "offset": [
+        0.0,
+        0.005,
+        -0.695
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "KT_Black",
+        "KT_Cream",
+        "KT_Enamel",
+        "KT_Steel",
+        "KT_Wood",
+        "KT_Board",
+        "KT_Tomato",
+        "KT_Leaf",
+        "KT_Food",
+        "KT_DarkSteel"
+      ],
+      "notes": "Unity EquipmentDefinition visualPrefab mapping; prefabs with primitive meshes are reconstructed from read-only YAML."
+    },
+    {
+      "kind": "mixer",
+      "group": "equipment",
+      "path": "assets/models/catalog/equipment/mixer.glb",
+      "source": "Assets/Content/Equipment/Mixer.asset",
+      "prefab": "Assets/Prefabs/Equipment/Mixer.prefab",
+      "displayName": "Mixer",
+      "footprint": [
+        1,
+        1
+      ],
+      "mount": "0",
+      "dimensions": [
+        0.88,
+        0.8,
+        1.52
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        -0.76
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "KT_Steel",
+        "KT_DarkSteel",
+        "KT_Black",
+        "KT_Enamel",
+        "KT_Accent",
+        "KT_Cream"
+      ],
+      "notes": "Unity EquipmentDefinition visualPrefab mapping; prefabs with primitive meshes are reconstructed from read-only YAML."
+    },
+    {
+      "kind": "oven",
+      "group": "equipment",
+      "path": "assets/models/catalog/equipment/oven.glb",
+      "source": "Assets/Content/Equipment/Oven.asset",
+      "prefab": "Assets/Prefabs/Equipment/Oven.prefab",
+      "displayName": "Oven",
+      "footprint": [
+        3,
+        3
+      ],
+      "mount": "0",
+      "dimensions": null,
+      "offset": null,
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [],
+      "notes": "Unity EquipmentDefinition visualPrefab mapping; prefabs with primitive meshes are reconstructed from read-only YAML."
+    },
+    {
+      "kind": "stove",
+      "group": "equipment",
+      "path": "assets/models/catalog/equipment/stove.glb",
+      "source": "Assets/Content/Equipment/Stove.asset",
+      "prefab": "Assets/Prefabs/Equipment/Stove.prefab",
+      "displayName": "Stove",
+      "footprint": [
+        2,
+        1
+      ],
+      "mount": "0",
+      "dimensions": [
+        1.92,
+        0.9,
+        1.55
+      ],
+      "offset": [
+        0.0,
+        0.03,
+        -0.775
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "KT_Black",
+        "KT_Steel",
+        "KT_DarkSteel",
+        "KT_Glass",
+        "KT_Accent",
+        "KT_Flame",
+        "KT_Tomato"
+      ],
+      "notes": "Unity EquipmentDefinition visualPrefab mapping; prefabs with primitive meshes are reconstructed from read-only YAML."
+    },
+    {
+      "kind": "table",
+      "group": "equipment",
+      "path": "assets/models/catalog/equipment/table.glb",
+      "source": "Assets/Content/Equipment/Table.asset",
+      "prefab": "Assets/Prefabs/Equipment/Table.prefab",
+      "displayName": "Table for four",
+      "footprint": [
+        2,
+        1
+      ],
+      "mount": "0",
+      "dimensions": [
+        1.6,
+        0.97,
+        1.33
+      ],
+      "offset": [
+        0.0,
+        0.485,
+        -0.0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "TableDark",
+        "TableWood"
+      ],
+      "notes": "Unity EquipmentDefinition visualPrefab mapping; prefabs with primitive meshes are reconstructed from read-only YAML."
+    }
+  ],
+  "entryContract": {
+    "kind": "Stable content kind or catalog object name",
+    "path": "assets-relative GLB path, slash-separated",
+    "source": "Unity content definition/prefab/model source path",
+    "dimensions": "Measured unscaled bounds [width, height, depth] in metres",
+    "offset": "Pivot-to-visual-bounds-center offset [x,y,z] in metres",
+    "scale": "Additional renderer scale [x,y,z], normally [1,1,1]",
+    "materials": "Exported GLB material names, preserving slot order where available",
+    "notes": "Known assembly, coordinate, or fidelity caveats"
+  }
+}
