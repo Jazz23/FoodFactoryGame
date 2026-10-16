@@ -260,6 +260,9 @@ namespace FoodFactoryGame.Session.PlayModeTests
             yield return Key(UnityEngine.InputSystem.Key.Z);
             yield return Until(() => Server.Lots.Any(x => x.LocationId == end.LocationId) && !_interaction.HasPendingRequests, "dough on the last belt");
             _interaction.ClearCursor();
+            // Belts are taken up only while laying belts (right click in the world never deconstructs otherwise).
+            yield return CarryFromInventory(GoodsWorld.BeltItemId);
+            yield return AimAt(6, 5);
             // Holding Remove fills a wheel at the crosshair first, like removing in build mode.
             var pressed = Time.unscaledTime;
             Mouse(false, true);

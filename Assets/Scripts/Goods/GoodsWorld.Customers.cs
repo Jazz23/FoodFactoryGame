@@ -7,6 +7,10 @@
 // Customers advance in one-second sub-steps after the rest of a clock step, so a long step matches many one-second steps.
 // Decision 0043: a customer considers only the menu items a player restaurant has in stock at one of its staffed registers, and
 // only items (and competitors) of at least its district's minimum tier: wealthy districts are picky (MinTier).
+// Owner request 2026-10-15: travel to a player restaurant includes the walk over the lot from the street edge to the nearest
+// register (Diner.EntrySeconds), so a customer queues, and can buy, only once it could physically stand at the register; a
+// dine-in customer is given a free seat (GoodsCustomer.Seat) at a table customers can walk to from the register that serves it
+// (RestaurantRules.TablesByRegister), and takes the order away when the restaurant has no such table at all.
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -92,6 +96,9 @@ namespace FoodFactoryGame.Goods
         public string CounterId = "";
         // Table (player restaurant) or competitor ID the dine-in customer's seat belongs to, from purchase until they leave.
         public string TableId = "";
+        // Which of its table's seats (0 to Seats - 1) the server gave a dine-in customer at a player table at purchase; -1 with
+        // no seat, at a competitor, or for a customer seated before seats were assigned (clients then pick one by ticket).
+        public int Seat = -1;
         // Price paid at purchase; 0 before.
         public long PaidCents;
     }
@@ -127,6 +134,12 @@ namespace FoodFactoryGame.Goods
         private const long MinEatSeconds = 120, MaxEatSeconds = 300;
         // PROTOTYPE (decision 0043): districts at least this wealthy accept only tier 2 food and up.
         public const int PickyWealthPercent = 70;
+        // PROTOTYPE (owner request 2026-10-15): the share of a generated district's customers who order to go and walk straight
+        // out; the rest look for a table (WorldLayoutCustomers sets every district's DineInPercent from it).
+        public const int TakeawayPercent = 12;
+        // PROTOTYPE: seconds added to a player restaurant's in-lot walk for the stretch of sidewalk from where a customer's figure
+        // leaves the street to the lot's edge, so a sale never comes before the customer could have walked to the register.
+        public const long EntryMarginSeconds = 4;
 
         // The lowest tier a district's customers will buy (decision 0043, PROTOTYPE rule from wealth).
         public static int MinTier(GoodsDistrict district) => district.WealthPercent >= PickyWealthPercent ? 2 : 1;
@@ -141,6 +154,10 @@ namespace FoodFactoryGame.Goods
             public List<RecipeDefinition> Menu = new();
             public List<GoodsEquipment> Counters = new();
             public List<GoodsEquipment> Tables = new();
+            // Player restaurant: per register ID, the tables its customers can walk to from it (RestaurantRules.TablesByRegister).
+            public Dictionary<string, List<GoodsEquipment>> TablesByCounter = new(StringComparer.Ordinal);
+            // Player restaurant: seconds a customer walks from the lot's street edge to the nearest register (0 at a competitor).
+            public long EntrySeconds;
             public int Servers;
             public long ServiceSeconds;
             public int Seats;
@@ -327,14 +344,25 @@ namespace FoodFactoryGame.Goods
                 var placed = _state.Equipment.Where(x => x.SiteId == site.Id && x.State == EquipmentState.Placed).OrderBy(x => x.Id, StringComparer.Ordinal).ToList();
                 var counters = placed.Where(x => x.Kind == CounterKind && !string.IsNullOrEmpty(x.StaffId) && !UnpaidLocked(x.StaffId)).ToList();
                 if (menu.Count == 0 || counters.Count == 0 || CompanyOfSiteLocked(site.Id) is null) continue;
-                // Customers walk in from the lot's street edge (every edge of a dev site) and never through a back door (decision 0037).
-                var reached = RestaurantRules.CustomerReach(_state, site.Id, _propertyOffers?.Values.FirstOrDefault(x => x.SiteId == site.Id));
+                // Customers walk in from the lot's street edge (every edge of a dev site) and never through a back door (decision 0037):
+                // the cells of RestaurantRules.CustomerReach, with how many steps each is from the street.
+                var offer = _propertyOffers?.Values.FirstOrDefault(x => x.SiteId == site.Id);
+                var walkable = RestaurantRules.Walkable(_state, site.Id, customers: true);
+                var steps = RestaurantRules.Steps(walkable, RestaurantRules.StreetCells(_state.SiteLayouts.FirstOrDefault(x => x.SiteId == site.Id), offer));
+                var reached = new HashSet<(int X, int Z)>(steps.Keys);
                 counters = counters.Where(x => RestaurantRules.ServesCustomers(reached, x)).ToList();
                 if (counters.Count == 0) continue;
-                var tables = placed.Where(x => IsTable(x) && RestaurantRules.ServesCustomers(reached, x)).ToList();
+                // Seats only at tables customers can walk to from a register (RestaurantRules.TablesByRegister).
+                var tablesByCounter = RestaurantRules.TablesByRegister(walkable, reached, counters, placed);
+                var seating = new HashSet<string>(tablesByCounter.Values.SelectMany(x => x).Select(x => x.Id), StringComparer.Ordinal);
+                var tables = placed.Where(x => seating.Contains(x.Id)).ToList();
+                // A customer physically walks from the street edge to a register before queueing there (owner request 2026-10-15).
+                var entrySteps = counters.Min(x => RestaurantRules.CellsBeside(reached, x).Select(cell => steps[cell]).DefaultIfEmpty(0).Min());
                 diners.Add(new Diner
                 {
                     Id = site.Id, Player = true, MapX = site.MapX, MapZ = site.MapZ, Menu = menu, Counters = counters, Tables = tables,
+                    TablesByCounter = tablesByCounter,
+                    EntrySeconds = EntryMarginSeconds + (long)Math.Ceiling((entrySteps + 1) * SiteGrid.CellSize / WalkMetresPerSecond),
                     Servers = counters.Count, ServiceSeconds = menu[0].DurationSeconds, Seats = tables.Sum(x => x.Seats),
                     Ambience = RestaurantRules.Ambience(_state, site.Id)
                 });
@@ -421,6 +449,7 @@ namespace FoodFactoryGame.Goods
             {
                 Id = $"customer:{district.Id}:{_state.NextCustomerNumber++}", DistrictId = district.Id,
                 Appearance = (int)(NextCustomerRandom() * district.AppearanceVariants),
+                // Most look for a table; the rest (TakeawayPercent in generated districts) order to go and walk straight out.
                 DineIn = NextCustomerRandom() * 100 < district.DineInPercent,
                 PatienceSeconds = Between(MinPatienceSeconds, MaxPatienceSeconds)
             };
@@ -481,7 +510,9 @@ namespace FoodFactoryGame.Goods
                 customer.State = CustomerState.Travelling;
                 customer.RestaurantId = option.Diner.Id;
                 customer.RecipeId = option.RecipeId;
-                customer.RemainingSeconds = Math.Max(1, WalkMetres(district, distance) / WalkMetresPerSecond);
+                // The walk to the restaurant, then (at a player restaurant) in from the street to a register: the customer queues,
+                // and can buy, only once a figure walking the same way could stand there.
+                customer.RemainingSeconds = Math.Max(1, WalkMetres(district, distance) / WalkMetresPerSecond) + option.Diner.EntrySeconds;
                 customer.QueuedAtSeconds = 0;
                 return true;
             }
@@ -545,13 +576,7 @@ namespace FoodFactoryGame.Goods
                 if (diner.BusyServers >= diner.Servers) return;
                 var customer = diner.Queue[index];
                 var table = "";
-                if (customer.DineIn)
-                {
-                    table = diner.Player
-                        ? diner.Tables.FirstOrDefault(x => !diner.SeatsUsed.TryGetValue(x.Id, out var used) || used < x.Seats)?.Id
-                        : diner.OccupiedSeats < diner.Seats ? diner.Id : null;
-                    if (table is null) { index++; continue; }
-                }
+                var seat = -1;
                 long price, service;
                 var tier = 1;
                 var counterId = "";
@@ -560,9 +585,34 @@ namespace FoodFactoryGame.Goods
                     if (!_recipes.TryGetValue(customer.RecipeId, out var recipe)) { index++; continue; }
                     var company = _state.Companies.First(x => x.SiteIds.Contains(diner.Id));
                     if (company.Cash > long.MaxValue - recipe.SaleCents) { index++; continue; }
-                    var counter = diner.Counters.FirstOrDefault(x => !diner.BusyCounters.Contains(x.Id)
-                        && InputPlan(_state.Stations.First(y => y.Id == x.Id), recipe) != null);
+                    // A dine-in customer at a restaurant with no table anyone can walk to takes the order away instead of waiting
+                    // for a seat that cannot come.
+                    if (customer.DineIn && diner.Seats == 0) customer.DineIn = false;
+                    // A free register with the item and, to dine in, a free table its customers can walk to from it.
+                    GoodsEquipment counter = null;
+                    GoodsEquipment chosen = null;
+                    foreach (var candidate in diner.Counters)
+                    {
+                        if (diner.BusyCounters.Contains(candidate.Id)) continue;
+                        GoodsEquipment free = null;
+                        if (customer.DineIn)
+                        {
+                            free = diner.TablesByCounter.TryGetValue(candidate.Id, out var reachable)
+                                ? reachable.FirstOrDefault(x => !diner.SeatsUsed.TryGetValue(x.Id, out var used) || used < x.Seats)
+                                : null;
+                            if (free is null) continue;
+                        }
+                        if (InputPlan(_state.Stations.First(y => y.Id == candidate.Id), recipe) == null) continue;
+                        counter = candidate;
+                        chosen = free;
+                        break;
+                    }
                     if (counter is null) { index++; continue; }
+                    if (chosen is not null)
+                    {
+                        table = chosen.Id;
+                        seat = FreeSeat(chosen);
+                    }
                     // The purchase: the item leaves the world and the company is paid, in this same commit.
                     foreach (var (lot, take) in InputPlan(_state.Stations.First(x => x.Id == counter.Id), recipe))
                     {
@@ -577,6 +627,11 @@ namespace FoodFactoryGame.Goods
                 }
                 else
                 {
+                    if (customer.DineIn)
+                    {
+                        if (diner.OccupiedSeats >= diner.Seats) { index++; continue; }
+                        table = diner.Id;
+                    }
                     price = diner.Competitor.PriceCents;
                     service = diner.Competitor.ServiceSeconds;
                     tier = diner.Competitor.Tier;
@@ -586,6 +641,7 @@ namespace FoodFactoryGame.Goods
                 customer.RemainingSeconds = service;
                 customer.CounterId = counterId;
                 customer.TableId = table;
+                customer.Seat = seat;
                 diner.Queue.RemoveAt(index);
                 diner.BusyServers++;
                 if (counterId != "") diner.BusyCounters.Add(counterId);
@@ -688,8 +744,37 @@ namespace FoodFactoryGame.Goods
                 || state.Customers.Where(x => x.CounterId != "").GroupBy(x => x.CounterId).Any(x => x.Count() != 1)
                 || state.Customers.Where(x => x.TableId != "").GroupBy(x => x.TableId)
                     .Any(x => !seats.TryGetValue(x.Key, out var capacity) || x.Count() > capacity)
-                || state.Competitors.Any(x => ordering.TryGetValue(x.Id, out var count) && count > x.Servers))
+                || state.Competitors.Any(x => ordering.TryGetValue(x.Id, out var count) && count > x.Servers)
+                // A seat index belongs to a seated customer's table, within its seats, and holds one customer.
+                || state.Customers.Any(x => x.Seat < -1 || (x.Seat >= 0 && (x.TableId == "" || !seats.TryGetValue(x.TableId, out var capacity) || x.Seat >= capacity)))
+                || state.Customers.Where(x => x.Seat >= 0).GroupBy(x => (x.TableId, x.Seat)).Any(x => x.Count() != 1))
                 throw new InvalidOperationException("Goods snapshot violates customer invariants.");
+        }
+
+        // The lowest seat of a player table no customer holds, or -1 when each is held (a customer seated before seat indices).
+        private int FreeSeat(GoodsEquipment table)
+        {
+            var taken = new HashSet<int>();
+            foreach (var customer in _state.Customers)
+                if (customer.TableId == table.Id) taken.Add(customer.Seat);
+            for (var seat = 0; seat < table.Seats; seat++)
+                if (!taken.Contains(seat)) return seat;
+            return -1;
+        }
+
+        // Server-only: sets a district's dine-in share to the value its map data now derives (WorldLayoutCustomers), for a world
+        // whose district records were added before that tuning changed. Nothing else about the district or its customers changes.
+        public void RetuneDistrictDining(string districtId, int dineInPercent)
+        {
+            lock (_gate)
+            {
+                var district = _state.Districts.FirstOrDefault(x => x.Id == districtId);
+                if (district is null || district.DineInPercent == dineInPercent) return;
+                var before = Snapshot();
+                district.DineInPercent = dineInPercent;
+                _state.Revision++;
+                ValidateOrRestore(before, "district");
+            }
         }
 
         // Per-state shape: only a paying customer (Ordering or Eating) holds a price, a counter (Ordering at a player counter)

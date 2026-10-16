@@ -281,6 +281,10 @@
 .menu-volume__slider { margin: 0 12px 0 0; }
 .menu-volume__value { width: 46px; flex-shrink: 0; -unity-text-align: middle-right; }
 
+/* Graphics: the anti-aliasing choices as one segmented control that wraps on a narrow card. */
+.menu-aa__caption { margin-top: 12px; }
+.menu-aa__options { margin-top: 8px; flex-wrap: wrap; align-self: flex-start; }
+
 .menu-keys { flex-grow: 1; flex-shrink: 1; }
 
 .menu-keys__header {

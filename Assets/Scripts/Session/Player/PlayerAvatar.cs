@@ -114,6 +114,39 @@ namespace FoodFactoryGame.Session.Player
             _verticalSpeed = 0f;
         }
 
+        // Metres beyond a lot's street edge where TeleportToLot sets the avatar down: on the sidewalk, clear of the lot.
+        private const float LotFrontStep = 1.5f;
+
+        // Owner-only move to the front of a lot (the phone map's Teleport for the company's own places). Same authority as walking:
+        // the owner moves its avatar and NetworkTransform replicates the pose, which no server rule trusts. The avatar waits for
+        // ground under the new spot (as after spawning), so a far lot whose ground is not drawn yet is never fallen through.
+        public bool TeleportToLot(SitePlacement placement, string lotId)
+        {
+            if (!IsOwner || placement == null || !TryLotFront(placement, lotId, out var position, out var facingYaw)) return false;
+            Teleport(position);
+            transform.rotation = Quaternion.Euler(0f, facingYaw, 0f);
+            _groundFound = false;
+            return true;
+        }
+
+        // The fixed spot in front of a lot: the middle of its street-facing edge (its building's facing, the side its doors and
+        // apron face), LotFrontStep metres out, on the drawn ground, and the yaw that looks back at the building. Doors are not
+        // considered, so the spot never changes with the building's door layout.
+        public static bool TryLotFront(SitePlacement placement, string lotId, out Vector3 position, out float facingYaw)
+        {
+            position = default;
+            facingYaw = 0f;
+            var lot = placement?.Layout?.Lots.Find(x => x.Id == lotId);
+            var building = lot == null ? null : placement.Layout.Buildings.Find(x => x.Id == lot.BuildingId);
+            if (building == null) return false;
+            var (stepX, stepZ) = FoodFactoryGame.World.WorldGeometry.Step(building.Facing);
+            var x = lot.X + lot.Width * 0.5f + stepX * (lot.Width * 0.5f + LotFrontStep);
+            var z = lot.Z + lot.Depth * 0.5f + stepZ * (lot.Depth * 0.5f + LotFrontStep);
+            position = placement.OnGround(x, z) + Vector3.up * 0.2f;
+            facingYaw = Mathf.Atan2(-stepX, -stepZ) * Mathf.Rad2Deg;
+            return true;
+        }
+
         // Presentation only: hides this avatar's renderers on this client, such as a player on a storey the viewer hides.
         public void SetHidden(bool hidden)
         {

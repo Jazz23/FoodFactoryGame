@@ -93,7 +93,8 @@ namespace FoodFactoryGame.Session
             return world;
         }
 
-        // One-time, by ID: every district and competitor the layout derives that the world does not have yet.
+        // One-time, by ID: every district and competitor the layout derives that the world does not have yet. A district already
+        // there takes the layout's current dine-in share (the takeaway retune of 2026-10-15).
         public static void AddCustomers(GoodsWorld world, WorldLayout layout)
         {
             var state = world.Snapshot();
@@ -101,6 +102,7 @@ namespace FoodFactoryGame.Session
             var competitors = new HashSet<string>(state.Competitors.Select(x => x.Id));
             foreach (var district in WorldLayoutCustomers.Districts(layout))
                 if (!districts.Contains(district.Id)) world.Bootstrap(district);
+                else world.RetuneDistrictDining(district.Id, district.DineInPercent);
             foreach (var competitor in WorldLayoutCustomers.Competitors(layout))
                 if (!competitors.Contains(competitor.Id)) world.Bootstrap(competitor);
         }

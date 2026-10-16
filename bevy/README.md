@@ -3,22 +3,100 @@
 A flat floor and the Food Factory player character, nothing else. Movement, orbit camera and animator behaviour are
 ported from the Unity project (`PlayerAvatar`, `OrbitCameraRig`, `PlayerAnimation`, `Player.controller`).
 
-## Run
-
-```bash
-sudo apt install libxkbcommon-x11-0   # one-time: winit needs it under WSLg/X11
-cargo run
-```
-
-The first build compiles Bevy (~4 min); after that, rebuilds take about a second.
-
 Controls: WASD/arrows to move, Left Shift to sprint, Space to jump, mouse to orbit, scroll to zoom. Esc frees the
 cursor, and left click captures it again.
 
-## Windows build
+## Windows setup (with hot reloading)
 
-Cross-compiled from WSL. One-time setup: `sudo apt install mingw-w64`, then run
-`rustup target add x86_64-pc-windows-gnu` from this folder.
+Run every command in PowerShell from this `bevy` folder.
+
+### 1. Install the tools (one time)
+
+1. **Visual Studio C++ build tools.** Install
+   [Build Tools for Visual Studio](https://visualstudio.microsoft.com/visual-cpp-build-tools/) (or Visual Studio
+   Community) with the **Desktop development with C++** workload. Rust uses its MSVC linker and the Windows SDK.
+2. **Rust.** Install rustup from [rustup.rs](https://rustup.rs/) and accept the defaults
+   (`x86_64-pc-windows-msvc`). Open a new terminal afterwards so `cargo` is on `PATH`. The first `cargo` command in
+   this folder installs the Rust version pinned in `rust-toolchain.toml` automatically.
+3. **Git LFS.** The character model `assets/models/player.glb` is stored in Git LFS. Without it the file is a small
+   text pointer and the character does not appear:
+
+   ```powershell
+   git lfs install
+   git lfs pull
+   ```
+
+4. **Dioxus CLI (`dx`)**, which drives hot patching. Its version must match the `subsecond` version in `Cargo.lock`
+   (currently 0.7.10). Installing it compiles from source and takes a few minutes:
+
+   ```powershell
+   cargo install dioxus-cli@0.7.10 --locked
+   dx --version
+   ```
+
+   If a Bevy update changes the version, check it with `Select-String -Path Cargo.lock -Pattern 'name = "subsecond"' -Context 0,1`
+   and install the matching `dioxus-cli`.
+
+### 2. Run with hot patching
+
+```powershell
+dx serve --hot-patch --no-default-features --features hotpatch
+```
+
+The first run compiles all of Bevy and takes about 7 minutes; the progress bar shows how far along it is. Later
+launches reuse that build. When the window opens, edit the body of any system and save: dx shows
+`Hot-patching...` and the running game picks up the change within a second or two. To try it, change the title text
+in `show_fps` in `src/main.rs`. Files under `assets/` also reload when they change.
+
+Some edits cannot be patched into the running game. Press `r` in the dx terminal to rebuild and restart after:
+
+- changing a system's parameters, or adding or removing a system
+- editing a `Startup` system (it already ran)
+- changing a struct or component definition
+- editing code in a crate other than this one
+
+Why the command looks like this:
+
+- `--no-default-features` drops the `dev` feature, so Bevy is linked statically. dx cannot launch a dynamically
+  linked Bevy on Windows: the game exits with `0xc0000135` (DLL not found,
+  [DioxusLabs/dioxus#4693](https://github.com/DioxusLabs/dioxus/issues/4693)). Patches rebuild only this crate, so they
+  stay fast without dynamic linking.
+- The `hotpatch` feature turns on Bevy's `hotpatching` and `file_watcher` features, and reads assets straight from
+  this folder's `assets/`. dx launches the game from `target/dx/...`, so you do not need to set `BEVY_ASSET_ROOT`.
+- dx builds into its own `target/x86_64-pc-windows-msvc/desktop-dev` folder with its own compiler flags, so it does
+  not share the `cargo build` cache.
+
+### 3. Run without hot patching
+
+```powershell
+cargo run
+```
+
+Bevy is dynamically linked here, so the first build takes about 2.5 minutes and rebuilds after an edit take about
+3 seconds. Each change needs a restart.
+
+### Troubleshooting
+
+- **`linking with dx.exe failed ... lld is a generic driver`:** something set the Windows linker to `rust-lld.exe`
+  (for example in `.cargo/config.toml` or a user-wide `~/.cargo/config.toml`). dx wraps the linker and cannot use
+  `rust-lld.exe`, so remove that setting and use MSVC's default `link.exe`.
+- **Game exits with `0xc0000135`:** the `dev` feature is on under dx. Use the exact command above, including
+  `--no-default-features`.
+- **Character missing:** run `git lfs pull` (step 1.3).
+
+## Linux / WSL
+
+```bash
+sudo apt install lld clang libxkbcommon-x11-0   # one-time; winit needs libxkbcommon-x11 under WSLg/X11
+cargo run
+```
+
+The first build compiles Bevy (~4 min); after that, rebuilds take about a second. Build on the Linux filesystem
+(for example `~/`), not under `/mnt/`: Windows drives mounted into WSL are much slower to compile on.
+
+### Windows release build from WSL
+
+One-time setup: `sudo apt install mingw-w64`, then run `rustup target add x86_64-pc-windows-gnu` from this folder.
 
 ```bash
 cargo build --release --target x86_64-pc-windows-gnu --no-default-features --features gamepad
@@ -29,9 +107,10 @@ depends only on Windows system DLLs, and release builds open without a console w
 
 ## Fast compiles
 
-- `dev` feature (on by default): Bevy is dynamically linked. Turn it off for a standalone build:
-  `cargo build --release --no-default-features`.
-- `.cargo/config.toml`: links with LLD through clang.
+- `dev` feature (on by default): Bevy is dynamically linked, and asset files hot-reload. Turn it off for a
+  standalone build: `cargo build --release --no-default-features`.
+- `.cargo/config.toml`: links with LLD through clang on Linux. Native Windows keeps MSVC's `link.exe`, because
+  `dx serve --hot-patch` fails with `rust-lld.exe` ("lld is a generic driver").
 - `[profile.dev]`: `opt-level = 1` for this crate and `3` for dependencies.
 - `rust-toolchain.toml` pins Rust 1.99.1, because Bevy 0.20 needs 1.97.1 or newer.
 

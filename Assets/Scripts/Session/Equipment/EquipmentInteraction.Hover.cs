@@ -1,5 +1,5 @@
 // What the crosshair is on that has a screen: an employee, a placed machine or the dev storage within interactReach of
-// the avatar on its floor, or a purchasable map building (PropertyMarker) within propertyReach. That target is outlined
+// the avatar on its floor, or a purchasable map building (PropertyMarker) within interactReach across the ground. That target is outlined
 // (HoverOutline; map buildings are not) while no screen is open, and the Interact key (or left click with an empty cursor) opens
 // its screen. The Inventory key always opens the player's own inventory; both default to E, so E on nothing opens the
 // inventory and E on something opens that. Local presentation only: opening a screen never changes gameplay state.
@@ -17,8 +17,6 @@ namespace FoodFactoryGame.Session.Equipment
         [SerializeField] private Material hoverOutlineMaterial;
         // Light green see-through tint (FoodFactory/XRayTint) on every valid target while picking one for an employee task.
         [SerializeField] private Material pickTintMaterial;
-        // Farthest the avatar may stand from a map building (metres across the ground) to open its buy panel.
-        [SerializeField] private float propertyReach = 60f;
 
         // An EmployeeWorker, EquipmentVisual or storage SiteLocationMarker; null when the crosshair is on nothing openable
         // within reach.
@@ -86,14 +84,14 @@ namespace FoodFactoryGame.Session.Equipment
                             && (!x.collider.isTrigger || x.collider.GetComponentInParent<EmployeeWorker>() != null))
                 .OrderBy(x => x.distance).FirstOrDefault().collider;
             if (hit == null) return null;
-            // Map buildings are aimed at from the street, so they have their own reach and no floor check.
+            // Map buildings are aimed at from the street: the same interactReach as everything else, but no floor check.
             var property = hit.GetComponentInParent<PropertyMarker>();
             if (property != null)
             {
-                var position = _avatar == null ? hit.bounds.center : _avatar.transform.position;
+                if (_avatar == null) return null;
+                var position = _avatar.transform.position;
                 var nearest = hit.bounds.ClosestPoint(position);
-                return _avatar != null && Vector2.Distance(new Vector2(nearest.x, nearest.z), new Vector2(position.x, position.z)) <= propertyReach
-                    ? property : null;
+                return Vector2.Distance(new Vector2(nearest.x, nearest.z), new Vector2(position.x, position.z)) <= interactReach ? property : null;
             }
             if (!InReach(hit.bounds)) return null;
             var employee = hit.GetComponentInParent<EmployeeWorker>();

@@ -1,5 +1,5 @@
 // The phone's world map (decision 0047): draws the stored layout's districts, rivers, roads and every lot from above, coloured by
-// what the lot is and who owns it, with the local player's position. Map x runs right and map z up (north). The wheel zooms about
+// what the lot is and who owns it, with the local player's position as an arrow turned to the camera's yaw. Map x runs right and map z up (north). The wheel zooms about
 // the pointer, dragging pans, and a click without a drag selects the lot under the pointer (LotClicked) or clears the selection.
 // The company's trucks are small icons (SetTrucks) kept as child elements and only moved in place (a translate, no rebuild or
 // layout pass) as their positions change; hovering one highlights it and shows its name, clicking it raises TruckClicked.
@@ -63,6 +63,8 @@ namespace FoodFactoryGame.Session.WorldMap
         public string SelectedLotId { get; set; }
         // The local player on the map, or null when unknown.
         public Vector2? Player { get; set; }
+        // Where the local player's camera looks, in degrees of yaw (0 = north); the player's marker points this way.
+        public float PlayerYaw { get; set; }
         public event Action<string> LotClicked;
         // A truck icon was clicked (its truck ID).
         public event Action<string> TruckClicked;
@@ -310,16 +312,28 @@ namespace FoodFactoryGame.Session.WorldMap
                 if (lot.Id == SelectedLotId) selected = lot;
             }
             if (selected != null) Outline(painter, selected.X, selected.Z, selected.Width, selected.Depth, Highlight, 3f);
-            if (Player is { } player)
-            {
-                painter.fillColor = PlayerDot;
-                painter.strokeColor = Color.white;
-                painter.lineWidth = 2f;
-                painter.BeginPath();
-                painter.Arc(ToLocal(player), 6f, 0f, 360f);
-                painter.Fill();
-                painter.Stroke();
-            }
+            if (Player is { } player) Chevron(painter, ToLocal(player), PlayerYaw);
+        }
+
+        // The player's marker: an arrowhead pointing along the camera's yaw (0 = north, up the map; 90 = east, right).
+        private static void Chevron(Painter2D painter, Vector2 centre, float yaw)
+        {
+            var radians = yaw * Mathf.Deg2Rad;
+            // Local y runs down, so north (map +z) is -y.
+            var forward = new Vector2(Mathf.Sin(radians), -Mathf.Cos(radians));
+            var right = new Vector2(-forward.y, forward.x);
+            painter.fillColor = PlayerDot;
+            painter.strokeColor = Color.white;
+            painter.lineWidth = 2f;
+            painter.lineJoin = LineJoin.Round;
+            painter.BeginPath();
+            painter.MoveTo(centre + forward * 10f);
+            painter.LineTo(centre - forward * 7f + right * 7f);
+            painter.LineTo(centre - forward * 3f);
+            painter.LineTo(centre - forward * 7f - right * 7f);
+            painter.ClosePath();
+            painter.Fill();
+            painter.Stroke();
         }
 
         private void Rect(Painter2D painter, float x, float z, float width, float depth, Color colour)

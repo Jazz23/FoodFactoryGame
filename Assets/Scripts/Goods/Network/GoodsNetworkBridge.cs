@@ -846,6 +846,13 @@ namespace FoodFactoryGame.Goods.Network
         // Server-only: the worker's authorized view of a site (null if it has no grant or the bridge is not serving).
         public GoodsSnapshot WorkerView(string workerId, string siteId) => IsServing ? _world.View(workerId, siteId) : null;
 
+        // Server-only: whether a worker's hands hold any goods, without building a view.
+        public bool WorkerCarrying(string workerId) => IsServing && _world.HasLotsAt(GoodsWorld.InventoryLocationId(workerId));
+
+        // Server-only: the register a worker staffs (a copy) and its site's grid size, without building a view; null when none.
+        public (GoodsEquipment Register, SiteLayout Layout)? WorkerStaffedRegister(string workerId) =>
+            IsServing ? _world.StaffedRegister(workerId) : null;
+
         // Server-only: a worker's transfer takes the same durable, validated path as a player's request and is broadcast.
         public GoodsOutcome WorkerTransfer(string workerId, TransferIntent intent)
         {

@@ -4,8 +4,9 @@
 // storage when E opened it at the storage (EquipmentInteraction.StorageOpen); the machine screen shows the inventory beside
 // the machine's input slots, progress arrow and output slots. A grid has one slot per unit of its location's capacity
 // (decision 0009); each (item, spoiled) stack fills as many slots as its max stack needs.
-// Clicking a slot picks its stack up onto the cursor (the icon follows the pointer); clicking another container drops it
-// there, and shift+click sends it straight to the other open container, both with ordinary server-checked transfers.
+// Clicking a slot picks its stack up onto the cursor (the icon follows the pointer), right clicking picks up half of it (rounded
+// up); clicking another container drops it there, and shift+click sends it straight to the other open container, both with
+// ordinary server-checked transfers. A register's screen has this client's "Sale sound" checkbox for the till (ClientSettings).
 // On a screen a hotbar key over a stack, or clicking a hotbar slot with a stack on the cursor, assigns that stack's machine
 // or item to the hotbar slot (the cursor stack goes back where it was); an empty cursor takes up the slot's machine or item.
 // The site company's cash is shown top right, read from the latest baseline. Edible goods slots show the ambient time left
@@ -20,7 +21,7 @@
 // with a screen a prompt under it names the interact key. While Remove is held on a belt a wheel at the crosshair (or the free
 // pointer) fills until the belt is taken up (EquipmentInteraction.BeltRemoveProgress).
 // Presentation only: slot positions are this client's arrangement of the replicated stacks, never saved or sent, and
-// progress is interpolated for at most one clock step past the latest baseline and eased so it never jumps backwards. Grids
+// progress is interpolated for at most one clock step past the latest clock step seen and eased so it never jumps backwards. Grids
 // show this client's pending transfers already applied (EquipmentInteraction.PreviewLots), so a drop or shift+click shows at
 // once and a rejection puts the goods back. A screen is rebuilt only when its layout changes (Signature); a change of what the
 // slots hold refreshes the existing slot elements and live labels in place (RefreshSlots), and the hotbar is rebuilt on its own.
@@ -109,6 +110,8 @@ namespace FoodFactoryGame.Session.Equipment
         // Spoil timers on goods slots (location, item), and the goods slot under the pointer, refreshed every frame from the
         // latest baseline without rebuilding the screen.
         private readonly List<(Label Label, string LocationId, string ItemId)> _timers = new();
+        // This frame's shown lots per location for the spoil timers (UpdateSpoilage).
+        private readonly Dictionary<string, List<GoodsLot>> _spoilLots = new();
         // The grid slot under the pointer (its grid and element; the element's userData is its current content).
         private (string Grid, VisualElement Slot)? _hovered;
         // Slot elements of the open screen per grid, refreshed in place when only their contents change.
@@ -120,10 +123,16 @@ namespace FoodFactoryGame.Session.Equipment
         private string _hotbarSignature;
         private string _contentsSignature;
         private GoodsSnapshot _site;
-        private float _siteSeenAt;
+        // The latest game clock (seconds) and when this client first saw it: progress is interpolated from that instant.
+        private long _clockSeen = long.MinValue;
+        private float _clockSeenAt;
+        // Whether income rings the till; this client's preference (ClientSettings.SaleSound), toggled on the register screen.
+        private bool _saleSound = true;
         // Slot (element name) where the current left press began, recorded only once screen clicks were armed; releasing on
         // that slot clicks it. So the press that opened the screen never also picks up the stack under the pointer.
         private string _pressedSlot;
+        // The same for a right press (half a stack).
+        private string _rightPressedSlot;
 
         public VisualElement ScreenRoot => _screen;
         public VisualElement CursorIcon => _cursor;
@@ -162,7 +171,45 @@ namespace FoodFactoryGame.Session.Equipment
             _removeWheel.style.display = DisplayStyle.None;
             _removeWheel.generateVisualContent += DrawRemoveWheel;
             interaction.HoveredEntry = HoveredEntry;
+            _saleSound = LoadSaleSound();
         }
+
+        // Reads this client's sale sound preference from the client settings database (decision 0011); defaults on when the
+        // settings are missing or unreadable.
+        private bool LoadSaleSound()
+        {
+            var path = interaction.Session.Options?.SettingsPath;
+            try
+            {
+                return ClientSettings.Load(path).SaleSound;
+            }
+            catch (Exception error) when (error is SQLite.SQLiteException || error is System.IO.IOException || error is NotSupportedException
+                || error is UnauthorizedAccessException)
+            {
+                Debug.LogWarning($"[Hud] Could not read the sale sound setting at {path}: {error.Message}. Leaving it on.");
+                return true;
+            }
+        }
+
+        // The register screen's "Sale sound" checkbox: turns the till sound for income on or off for this client and saves it.
+        // Public so tests drive the same path as the checkbox.
+        public void SetSaleSound(bool on)
+        {
+            _saleSound = on;
+            var path = interaction.Session.Options?.SettingsPath;
+            if (string.IsNullOrWhiteSpace(path)) return;
+            try
+            {
+                ClientSettings.SaveSaleSound(path, on);
+            }
+            catch (Exception error) when (error is SQLite.SQLiteException || error is System.IO.IOException || error is NotSupportedException
+                || error is UnauthorizedAccessException)
+            {
+                Debug.LogWarning($"[Hud] Could not save the sale sound setting at {path}: {error.Message}");
+            }
+        }
+
+        public bool SaleSound => _saleSound;
 
         private void Update()
         {
@@ -171,7 +218,13 @@ namespace FoodFactoryGame.Session.Equipment
             if (!ReferenceEquals(site, _site))
             {
                 _site = site;
-                _siteSeenAt = Time.unscaledTime;
+                // Only a clock step moves the game clock; a baseline sent for a request (a transfer) carries the same clock,
+                // so it must not restart the interpolation (UpdateProgress).
+                if (site != null && site.ClockSeconds != _clockSeen)
+                {
+                    _clockSeen = site.ClockSeconds;
+                    _clockSeenAt = Time.unscaledTime;
+                }
             }
             var active = site != null && interaction.Session.IsRunning;
             // The employee script screen is EmployeeScriptPanel's, not a slot screen.
@@ -184,7 +237,7 @@ namespace FoodFactoryGame.Session.Equipment
             if (hasCompany && site.Companies[0].Cash != _shownCash)
             {
                 // Money coming in (a sale) rings the till; spending and wages are silent.
-                if (_cashCompany == site.Companies[0].Id && _shownCash != long.MinValue && site.Companies[0].Cash > _shownCash)
+                if (_saleSound && _cashCompany == site.Companies[0].Id && _shownCash != long.MinValue && site.Companies[0].Cash > _shownCash)
                     Audio.GameAudio.PlayUi(Audio.GameAudio.CashClip, 0.55f);
                 _cashCompany = site.Companies[0].Id;
                 _shownCash = site.Companies[0].Cash;
@@ -406,6 +459,19 @@ namespace FoodFactoryGame.Session.Equipment
                 _claimed.Add((grid, SlotKey(key, 0)));
             }
             interaction.DropGoods(location);
+        }
+
+        // Right click on a goods slot with an empty cursor: picks up half of its stack, rounded up (a single unit is taken whole).
+        // Like a left click it only points the cursor at the lots; dropping it sends ordinary server-checked transfers of that
+        // many units. With anything already on the cursor it does nothing. Public so tests drive the same path as the slots.
+        public void ClickSlotHalf(string grid, int index)
+        {
+            var site = interaction.Session.ClientSite;
+            if (site == null || !_grids.TryGetValue(grid, out var slots) || index < 0 || index >= slots.Count) return;
+            if (interaction.CursorGoods != null || interaction.CursorKind != null) return;
+            var content = slots[index];
+            if (content == null || content.Carried || content.MachineKind != null) return;
+            interaction.PickUpGoods(LocationOf(grid), content.ItemId, content.Spoiled, (content.Count + 1) / 2, content.Key);
         }
 
         // Shift+click: sends a slot's goods stack to the other open container (inventory <-> storage; inventory -> machine
@@ -880,6 +946,15 @@ namespace FoodFactoryGame.Session.Equipment
             {
                 window.Part("output-column").RemoveFromHierarchy();
                 Live(window.Part<Label>("hud-sale-value-amount"), site, x => FormatCash(SaleValueCents(PreviewedLots(x, input), saleRecipes)));
+                // The till sound is this client's choice, not the register's: it rings for any income this client's HUD sees,
+                // which it cannot attribute to one register, so the checkbox shows the same setting on every register.
+                var saleValue = window.Part("hud-sale-value");
+                var sound = new Toggle("Sale sound") { name = "hud-sale-sound", focusable = false };
+                sound.AddToClassList("ff-toggle");
+                sound.AddToClassList("hud-sale-sound");
+                sound.SetValueWithoutNotify(_saleSound);
+                sound.RegisterValueChangedCallback(evt => SetSaleSound(evt.newValue));
+                saleValue.parent.Insert(saleValue.parent.IndexOf(saleValue) + 1, sound);
             }
             else
             {
@@ -1033,12 +1108,20 @@ namespace FoodFactoryGame.Session.Equipment
                 views.Add(slot);
                 // Presses are read here rather than through Button.clicked, whose activator ignores any press with a
                 // modifier held and so would never report a shift+click. Trickle-down runs before the button's own handler.
+                // A right press picks up half the stack (ClickSlotHalf).
                 slot.RegisterCallback<PointerDownEvent>(evt =>
                 {
                     if (evt.button == 0) _pressedSlot = interaction.ScreenClicksArmed ? slot.name : null;
+                    else if (evt.button == 1) _rightPressedSlot = interaction.ScreenClicksArmed ? slot.name : null;
                 }, TrickleDown.TrickleDown);
                 slot.RegisterCallback<PointerUpEvent>(evt =>
                 {
+                    if (evt.button == 1 && _rightPressedSlot == slot.name)
+                    {
+                        _rightPressedSlot = null;
+                        ClickSlotHalf(grid, slotIndex);
+                        return;
+                    }
                     if (evt.button != 0 || _pressedSlot != slot.name) return;
                     _pressedSlot = null;
                     OnSlotClicked(grid, slotIndex);
@@ -1161,15 +1244,29 @@ namespace FoodFactoryGame.Session.Equipment
             var job = site.Jobs.FirstOrDefault(x => x.StationId == interaction.OpenMachineId);
             // Customers (decision 0024) buy at a counter: the one being served there fills the bar.
             var serving = site.Customers.FirstOrDefault(x => x.CounterId == interaction.OpenMachineId);
-            var since = Mathf.Min(Time.unscaledTime - _siteSeenAt, 1f);
+            // Real seconds since this client saw the current game clock (one game second per clock step), at most one step.
+            var since = Mathf.Min(Time.unscaledTime - _clockSeenAt, 1f);
+            var key = job?.Id ?? serving?.Id ?? "";
+            var fresh = key != _progressKey;
             var target = 0f;
             var running = false;
+            // Seconds left as of now (the baseline's remaining less the time since its clock step), and the span the bar fills
+            // over. A batch the client sees before any clock step has worked on it (remaining == duration) started between
+            // steps, typically from a transfer, yet the server credits it a whole second at the next step. Its span is
+            // therefore the time actually left when first seen, so the bar starts at 0 and reaches full exactly when the
+            // server finishes, instead of leaping forward at the first step and racing to catch up.
+            void Fill(long duration, long remaining, bool advancing)
+            {
+                duration = Math.Max(1, duration);
+                var left = Mathf.Max(0f, remaining - (advancing ? since : 0f));
+                if (fresh) _progressSpan = remaining >= duration && advancing ? Mathf.Max(left, 0.01f) : duration;
+                target = Mathf.Clamp01(1f - left / Mathf.Max(_progressSpan, 0.01f));
+                running = advancing;
+            }
             if (job == null && serving != null)
             {
                 var item = interaction.Session.Recipes.FirstOrDefault(x => x != null && x.Id == serving.RecipeId);
-                var duration = Math.Max(1, item?.DurationSeconds ?? 1);
-                target = Mathf.Clamp01((float)((duration - serving.RemainingSeconds + since) / duration));
-                running = true;
+                Fill(item?.DurationSeconds ?? 1, serving.RemainingSeconds, true);
             }
             else if (job != null && job.State == StationJobState.Blocked) target = 1f;
             else if (job != null)
@@ -1177,14 +1274,11 @@ namespace FoodFactoryGame.Session.Equipment
                 var equipment = site.Equipment.FirstOrDefault(x => x.Id == interaction.OpenMachineId);
                 // A worker-bound station nobody works (decision 0043) holds its batch where it is.
                 var paused = equipment != null && interaction.IsWorkerBound(equipment.Kind) && string.IsNullOrEmpty(equipment.StaffId);
-                var elapsed = job.DurationSeconds - job.RemainingSeconds + (paused ? 0f : since);
-                target = Mathf.Clamp01((float)(elapsed / Math.Max(1, job.DurationSeconds)));
-                running = !paused;
+                Fill(job.DurationSeconds, job.RemainingSeconds, !paused);
             }
             // The bar follows the target smoothly every frame. It only moves back when a new batch starts (the target drops
             // to near empty), so a late baseline never makes it flicker backwards.
-            var key = job?.Id ?? serving?.Id ?? "";
-            if (key != _progressKey || target < _progressShown - 0.5f)
+            if (fresh || target < _progressShown - 0.5f)
             {
                 _progressKey = key;
                 _progressShown = target;
@@ -1200,13 +1294,17 @@ namespace FoodFactoryGame.Session.Equipment
         // The open machine's progress bar as last drawn, and the batch (or customer) it shows.
         private float _progressShown;
         private string _progressKey = "";
+        // Seconds the shown batch (or customer) fills the bar over; set when it is first seen (UpdateProgress).
+        private float _progressSpan = 1f;
 
         // Spoil timers and the hover line follow each baseline (the server ages goods every clock step); display only.
         private void UpdateSpoilage(GoodsSnapshot site)
         {
+            _spoilLots.Clear();
+            var spoilLots = _spoilLots;
             foreach (var (label, locationId, itemId) in _timers)
             {
-                var time = SpoilTime(site, locationId, itemId);
+                var time = SpoilTime(site, locationId, itemId, spoilLots);
                 label.SetText(time is { } known ? FormatDuration(known.Seconds, true) : "");
                 label.EnableInClassList("ff-warning-text", time is { Soon: true });
                 label.EnableInClassList("ff-chilled-text", time is { Soon: false, Refrigerated: true });
@@ -1221,7 +1319,7 @@ namespace FoodFactoryGame.Session.Equipment
             var name = content.MachineKind != null ? Title(content.MachineKind) : ItemName(content.ItemId);
             var text = $"{name} ×{content.Count}";
             if (content.Spoiled) text += " (spoiled)";
-            else if (content.MachineKind == null && SpoilTime(site, location, content.ItemId) is { } spoil)
+            else if (content.MachineKind == null && SpoilTime(site, location, content.ItemId, spoilLots) is { } spoil)
                 text += spoil.Refrigerated
                     ? $"  ·  refrigerated: not spoiling ({FormatDuration(spoil.Seconds, false)} left out of the cold)"
                     : $"  ·  spoils in {FormatDuration(spoil.Seconds, false)}";
@@ -1229,15 +1327,19 @@ namespace FoodFactoryGame.Session.Equipment
         }
 
         // Ambient time left for the first edible lot of an item in a location to spoil; null if none of them spoils. A refrigerated
-        // location pauses spoilage (decision 0018), so there the time is frozen until the goods leave the cold.
-        private static (long Seconds, bool Refrigerated, bool Soon)? SpoilTime(GoodsSnapshot site, string locationId, string itemId)
+        // location pauses spoilage (decision 0018), so there the time is frozen until the goods leave the cold. Read from the
+        // same view as the slots (this client's pending transfers applied), so a moved stack shows its timer at once.
+        private (long Seconds, bool Refrigerated, bool Soon)? SpoilTime(GoodsSnapshot site, string locationId, string itemId,
+            Dictionary<string, List<GoodsLot>> spoilLots)
         {
             var refrigerated = site.Locations.FirstOrDefault(x => x.Id == locationId)?.Refrigerated ?? false;
             GoodsLot first = null;
             var seconds = long.MaxValue;
-            foreach (var lot in site.Lots)
+            // Each location's lots are gathered once per frame and shared by its slots' timers.
+            if (!spoilLots.TryGetValue(locationId ?? "", out var lots)) spoilLots[locationId ?? ""] = lots = interaction.PreviewSpoilLots(site, locationId);
+            foreach (var lot in lots)
             {
-                if (lot.LocationId != locationId || lot.ItemId != itemId || lot.Spoiled || lot.SpoilAfterSeconds >= GoodsWorld.NonPerishableSeconds)
+                if (lot.ItemId != itemId || lot.Spoiled || lot.SpoilAfterSeconds >= GoodsWorld.NonPerishableSeconds)
                     continue;
                 var left = Math.Max(0, lot.SpoilAfterSeconds - lot.ExposureSeconds);
                 if (left >= seconds) continue;

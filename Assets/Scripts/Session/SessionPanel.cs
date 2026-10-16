@@ -1,6 +1,6 @@
 // The main menu, hidden during a session (decision 0041): Resume repeats the last session this menu started (a hosted world or
 // a server address), Select World hosts a saved or new world as singleplayer or for others, Connect to Server joins by
-// address, Settings holds the name, mouse sensitivity, volumes and key bindings, and Quit exits. A saved world is deleted from Select
+// address, Settings holds the name, mouse sensitivity, volumes, anti-aliasing and key bindings, and Quit exits. A saved world is deleted from Select
 // World after a second click confirms it. During a session the same overlay is the in-game menu while EquipmentInteraction's
 // Menu screen is open (Esc): Resume, Settings, Quit to Main Menu (ends the session) and Quit Game; nothing pauses. Its look is the MainMenu UXML and USS
 // under Assets/UI/Resources/UI (decision 0042); this class clones a screen, fills it in and wires its buttons.
@@ -157,6 +157,7 @@ namespace FoodFactoryGame.Session
             }
             OrbitCameraRig.LookSensitivity = _settings.LookSensitivity;
             ApplyVolumes();
+            AntiAliasing.Apply(_settings.AntiAliasing);
             _visibility = _settings.LastVisibility;
             if (_actions != null)
             {
@@ -615,6 +616,7 @@ namespace FoodFactoryGame.Session
             FillVolume("effects", () => _settings.EffectsVolume, x => _settings.EffectsVolume = x);
             FillVolume("interface", () => _settings.InterfaceVolume, x => _settings.InterfaceVolume = x);
             FillVolume("ambience", () => _settings.AmbienceVolume, x => _settings.AmbienceVolume = x);
+            FillAntiAliasing();
             RefreshKeybinds();
         }
 
@@ -669,6 +671,33 @@ namespace FoodFactoryGame.Session
             });
         }
 
+        // The anti-aliasing segments (menu-aa-<option>, lower case): a click applies at once and saves.
+        private void FillAntiAliasing()
+        {
+            var options = (AntiAliasingOption[])Enum.GetValues(typeof(AntiAliasingOption));
+            void Mark()
+            {
+                foreach (var option in options)
+                    _page.Q<Button>($"menu-aa-{option.ToString().ToLowerInvariant()}")?.EnableInClassList("ff-segment--chosen", option == _settings.AntiAliasing);
+            }
+            foreach (var option in options)
+            {
+                var button = _page.Q<Button>($"menu-aa-{option.ToString().ToLowerInvariant()}");
+                if (button == null) continue;
+                var chosen = option;
+                button.text = AntiAliasing.Label(option);
+                button.clicked += () =>
+                {
+                    _settings.AntiAliasing = chosen;
+                    AntiAliasing.Apply(chosen);
+                    Mark();
+                    Audio.GameAudio.PlayUi(Audio.GameAudio.ClickClip);
+                    SaveSettings();
+                };
+            }
+            Mark();
+        }
+
         private void ApplyVolumes()
         {
             AudioListener.volume = _settings.Volume;
@@ -685,6 +714,8 @@ namespace FoodFactoryGame.Session
             _settings.Volume = ClientSettings.DefaultVolume;
             _settings.EffectsVolume = _settings.InterfaceVolume = _settings.AmbienceVolume = 1f;
             ApplyVolumes();
+            _settings.AntiAliasing = AntiAliasingOption.Off;
+            AntiAliasing.Apply(AntiAliasingOption.Off);
             _actions?.RemoveAllBindingOverrides();
             _settings.BindingOverrides = "";
             SaveSettings();

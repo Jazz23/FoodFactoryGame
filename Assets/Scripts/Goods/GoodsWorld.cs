@@ -304,22 +304,8 @@ namespace FoodFactoryGame.Goods
             lock (_gate)
             {
                 if (!CanView(playerId, siteId)) return null;
-                var view = Snapshot();
-                view.Locations = view.Locations.Where(x => x.SiteId == siteId).ToList();
-                var ids = new HashSet<string>(view.Locations.Select(x => x.Id));
-                view.Lots = view.Lots.Where(x => ids.Contains(x.LocationId)).ToList();
-                view.Stations = view.Stations.Where(x => x.SiteId == siteId).ToList();
-                var stationIds = new HashSet<string>(view.Stations.Select(x => x.Id));
-                view.Jobs = view.Jobs.Where(x => stationIds.Contains(x.StationId)).ToList();
-                view.Equipment = view.Equipment.Where(x => x.SiteId == siteId).ToList();
-                view.SiteLayouts = view.SiteLayouts.Where(x => x.SiteId == siteId).ToList();
-                view.Belts = view.Belts.Where(x => x.SiteId == siteId).ToList();
-                view.Buildings = view.Buildings.Where(x => x.SiteId == siteId).ToList();
-                view.Companies = view.Companies.Where(x => x.SiteIds.Contains(siteId)).ToList();
-                // The ledger reaches only the players of the company that owns the site (decision 0038).
-                view.Ledger = view.Ledger.Where(x => view.Companies.Any(y => y.Id == x.CompanyId)).ToList();
+                var view = SiteCopyLocked(siteId);
                 // Scripts and task lists reach clients through the employee object, not with every baseline.
-                view.Employees = view.Employees.Where(x => x.SiteId == siteId).ToList();
                 foreach (var employee in view.Employees)
                 {
                     employee.Script = "";
@@ -335,6 +321,65 @@ namespace FoodFactoryGame.Goods
                 view.Grants.Clear();
                 return view;
             }
+        }
+
+        // A deep copy of only what a view of the site starts from. Copying the whole world and filtering the copy cost tens of
+        // milliseconds a call on a large city, and views are built for every baseline and by employees, so the state's lists are
+        // swapped for site-filtered ones (sharing the records) just for one serialization, then restored. Lists the view
+        // rebuilds from the state itself (ViewLogistics, ViewFarms) or clears are copied empty. Caller holds _gate.
+        private GoodsSnapshot SiteCopyLocked(string siteId)
+        {
+            var s = _state;
+            var saved = (s.Locations, s.Lots, s.Reservations, s.Outcomes, s.Grants, s.Stations, s.Jobs, s.Equipment, s.SiteLayouts,
+                s.Belts, s.Companies, s.Buildings, s.Employees, s.Sites, s.Trucks, s.Routes, s.RoadTrucks, s.Districts, s.Competitors,
+                s.Customers, s.Diners, s.Ledger, s.FarmOrders, s.FarmSchedules);
+            try
+            {
+                s.Locations = saved.Locations.Where(x => x.SiteId == siteId).ToList();
+                var ids = new HashSet<string>(s.Locations.Select(x => x.Id));
+                s.Lots = saved.Lots.Where(x => ids.Contains(x.LocationId)).ToList();
+                s.Stations = saved.Stations.Where(x => x.SiteId == siteId).ToList();
+                var stationIds = new HashSet<string>(s.Stations.Select(x => x.Id));
+                s.Jobs = saved.Jobs.Where(x => stationIds.Contains(x.StationId)).ToList();
+                s.Equipment = saved.Equipment.Where(x => x.SiteId == siteId).ToList();
+                s.SiteLayouts = saved.SiteLayouts.Where(x => x.SiteId == siteId).ToList();
+                s.Belts = saved.Belts.Where(x => x.SiteId == siteId).ToList();
+                s.Buildings = saved.Buildings.Where(x => x.SiteId == siteId).ToList();
+                s.Companies = saved.Companies.Where(x => x.SiteIds.Contains(siteId)).ToList();
+                // The ledger reaches only the players of the company that owns the site (decision 0038).
+                var companies = s.Companies;
+                s.Ledger = saved.Ledger.Where(x => companies.Any(y => y.Id == x.CompanyId)).ToList();
+                s.Employees = saved.Employees.Where(x => x.SiteId == siteId).ToList();
+                s.Customers = saved.Customers.Where(x => x.RestaurantId == siteId).ToList();
+                s.Diners = saved.Diners.Where(x => x.RestaurantId == siteId).ToList();
+                s.Reservations = new List<GoodsReservation>();
+                s.Outcomes = new List<GoodsOutcome>();
+                s.Grants = new List<GoodsGrant>();
+                s.Sites = new List<GoodsSite>();
+                s.Trucks = new List<GoodsTruck>();
+                s.Routes = new List<GoodsRoute>();
+                s.RoadTrucks = new List<GoodsTruck>();
+                s.Districts = new List<GoodsDistrict>();
+                s.Competitors = new List<GoodsCompetitor>();
+                s.FarmOrders = new List<GoodsFarmOrder>();
+                s.FarmSchedules = new List<GoodsFarmSchedule>();
+                return JsonUtility.FromJson<GoodsSnapshot>(JsonUtility.ToJson(s));
+            }
+            finally
+            {
+                (s.Locations, s.Lots, s.Reservations, s.Outcomes, s.Grants, s.Stations, s.Jobs, s.Equipment, s.SiteLayouts,
+                    s.Belts, s.Companies, s.Buildings, s.Employees, s.Sites, s.Trucks, s.Routes, s.RoadTrucks, s.Districts, s.Competitors,
+                    s.Customers, s.Diners, s.Ledger, s.FarmOrders, s.FarmSchedules) = saved;
+            }
+        }
+
+        // Whether any lot is at a location; a cheap check that needs no view (an employee's hands, polled twice a second).
+        public bool HasLotsAt(string locationId)
+        {
+            lock (_gate)
+                foreach (var lot in _state.Lots)
+                    if (lot.LocationId == locationId) return true;
+            return false;
         }
 
         // Volatile domain primitive for bootstrap/tests. Live ticking uses AdvanceUncommitted plus TryCommitDurably

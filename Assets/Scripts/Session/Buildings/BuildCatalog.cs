@@ -103,9 +103,10 @@ namespace FoodFactoryGame.Session.Buildings
         };
 
         // Every card, in heading order: structure styles first, then equipment offers (trucks are bought elsewhere), then belt
-        // packs. styleName gives a style's shown name; pricePercent is the site's district price percentage.
+        // packs. styleName gives a style's shown name; pricePercent is the site's district price percentage; shellIcon, when
+        // given, draws a structure card's icon (StructureIcons), which has no authored sprite.
         public static List<BuildCatalogEntry> Entries(IEnumerable<OfferAsset> offers, IEnumerable<ItemDefinition> items,
-            Func<string, string> styleName, int pricePercent)
+            Func<string, string> styleName, int pricePercent, Func<BuildTool, string, Sprite> shellIcon = null)
         {
             var entries = new List<BuildCatalogEntry>();
             long Price(long cents) => GoodsWorld.ScaledCents(cents, pricePercent);
@@ -115,7 +116,7 @@ namespace FoodFactoryGame.Session.Buildings
                     entries.Add(new BuildCatalogEntry
                     {
                         Key = ShellKey(tool, style), Filter = BuildCatalogFilter.Structure, Section = section, Title = title(styleName(style)),
-                        PriceCents = cents, PriceSuffix = suffix, Tool = tool, Style = style
+                        PriceCents = cents, PriceSuffix = suffix, Tool = tool, Style = style, Icon = shellIcon?.Invoke(tool, style)
                     });
             }
             Shell(BuildTool.Wall, "Walls", GoodsWorld.WallStyles, name => $"{name} wall", Price(GoodsWorld.ShellWallCellCents), " / m");

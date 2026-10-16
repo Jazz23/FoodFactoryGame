@@ -53,6 +53,10 @@ namespace FoodFactoryGame.World
             public JunctionControl Control;
             // Segment indices meeting here, in layout order.
             public readonly List<int> Segments = new();
+            private int _lightOffset = -1;
+
+            // RoadTraffic.LightOffset(Id), hashed once: light phases are asked per car per frame.
+            public int LightOffset => _lightOffset >= 0 ? _lightOffset : (_lightOffset = RoadTraffic.LightOffset(Id));
         }
 
         public sealed class Segment
@@ -85,6 +89,8 @@ namespace FoodFactoryGame.World
         private readonly List<Node> _nodes = new();
         private readonly List<Segment> _segments = new();
         private readonly Dictionary<string, int> _segmentIndex = new(StringComparer.Ordinal);
+        // Stops(segment, forward) by 2 * segment + (forward ? 0 : 1).
+        private readonly bool[] _stops;
 
         public IReadOnlyList<Node> Nodes => _nodes;
         public IReadOnlyList<Segment> Segments => _segments;
@@ -124,6 +130,12 @@ namespace FoodFactoryGame.World
                 _segments.Add(segment);
                 a.Segments.Add(segment.Index);
                 b.Segments.Add(segment.Index);
+            }
+            _stops = new bool[2 * _segments.Count];
+            for (var index = 0; index < _segments.Count; index++)
+            {
+                _stops[2 * index] = ComputeStops(index, true);
+                _stops[2 * index + 1] = ComputeStops(index, false);
             }
         }
 
@@ -169,8 +181,11 @@ namespace FoodFactoryGame.World
             return (a.X + s.Dx * offset, a.Z + s.Dz * offset);
         }
 
-        // Whether traffic arriving at the end node of a segment driven in this direction must stop there.
-        public bool Stops(int segment, bool forward)
+        // Whether traffic arriving at the end node of a segment driven in this direction must stop there. Presenters ask this
+        // per car per frame, so the network (fixed once built) answers from a table filled in its constructor.
+        public bool Stops(int segment, bool forward) => _stops[2 * segment + (forward ? 0 : 1)];
+
+        private bool ComputeStops(int segment, bool forward)
         {
             var node = _nodes[EndNode(segment, forward)];
             if (node.Control == JunctionControl.None) return false;

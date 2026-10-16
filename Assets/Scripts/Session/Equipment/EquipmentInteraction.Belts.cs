@@ -6,14 +6,15 @@
 // and including the crosshair's cell (its projection on that line); the drag carries on from there. Rotate while dragging
 // over any belt does nothing. Rotate may be held through the drag: the line then follows the crosshair round each turn.
 // Rotate without a drag turns the cursor direction, or with no belts on the cursor the belt under the
-// crosshair. Holding Remove on a belt fills a wheel at the crosshair (PlayerHud) for BuildMode.HoldSeconds, like removing in build
-// mode, then takes it up; for the rest of that press every belt the crosshair passes over is taken up at once. With any other goods on the cursor, aiming at a
+// crosshair. With belts or lifts on the cursor, holding Remove on a belt fills a wheel at the crosshair (PlayerHud) for
+// BuildMode.HoldSeconds, like removing in build mode, then takes it up; for the rest of that press every belt the crosshair
+// passes over is taken up at once. With anything else (or nothing) on the cursor Remove takes nothing up. With any other goods on the cursor, aiming at a
 // belt shows a ghost of the item where it would land and PlaceItem (Z) puts exactly one on the belt. TakeItem (F), whatever
 // the cursor holds, takes the riding item nearest the crosshair off the aimed belt into the inventory.
 // Each belt is its own request; pending ones are drawn as ghosts until the baseline shows them, and the server re-checks all.
 // With lifts on the cursor (decision 0021), a ghost lift shows the crosshair's cell going up or down one floor; Place puts
 // one there, R turns it, FlipLift (V) switches up and down. Belt drags never turn a lift; with an empty cursor R turns the
-// aimed lift like a belt, and Remove takes it up.
+// aimed lift like a belt, and Remove (with belts or lifts on the cursor) takes it up.
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -110,7 +111,9 @@ namespace FoodFactoryGame.Session.Equipment
                 _beltHoldId = null;
                 _beltSweep = false;
             }
-            else if (active) RemoveAimedBelt();
+            // Only while laying belts or lifts (owner, 2026-10-15: right click in the world never deconstructs otherwise; build
+            // mode removes pieces, and build mode has no belts, so this is where belts are taken up).
+            else if (active && (BeltCursor || LiftCursor)) RemoveAimedBelt();
             else _beltHoldId = null;
             if (!active || CursorGoods == null)
             {

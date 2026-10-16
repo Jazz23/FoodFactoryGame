@@ -130,7 +130,7 @@ namespace FoodFactoryGame.World
         // Seconds into the node's cycle at a time: traffic along X has green from 0, along Z from half the cycle.
         public static double LightPhase(RoadNetwork.Node node, double seconds)
         {
-            var phase = (seconds + LightOffset(node.Id)) % LightCycleSeconds;
+            var phase = (seconds + node.LightOffset) % LightCycleSeconds;
             return phase < 0 ? phase + LightCycleSeconds : phase;
         }
 

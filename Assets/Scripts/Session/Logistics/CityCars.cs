@@ -68,21 +68,95 @@ namespace FoodFactoryGame.Session.Logistics
         public static List<CityCar> Compute(RoadNetwork network, double seconds, Vector2 view, float radius, IEnumerable<GoodsTruck> trucks,
             float since, int cap, IReadOnlyList<Vector2> pedestrians = null)
         {
-            var obstacles = new Dictionary<(int, bool), List<float>>();
+            var result = new List<CityCar>();
+            Compute(network, seconds, view, radius, trucks, since, cap, pedestrians, result);
+            return result;
+        }
+
+        // Scratch buffers reused by every Compute call (presentation runs on the main thread only), so drawing the cars every
+        // frame produces no garbage.
+        // Only the lanes' lists in use stay in Obstacles (the rest go back to a pool), so a world explored for hours does not
+        // leave every segment a truck ever drove on to be cleared each frame.
+        private static readonly Dictionary<(int, bool), List<float>> Obstacles = new();
+        private static readonly Stack<List<float>> ObstacleLists = new();
+        private static readonly List<(float Distance, CityCar Car)> Found = new();
+        private static readonly List<LaneCar> LaneScratch = new();
+        private static readonly List<(long K, double Arrival, double Departure)> Entries = new();
+        private static readonly bool[] Directions = { true, false };
+        private static readonly Comparison<(float Distance, CityCar Car)> NearestFirst = (a, b) => a.Distance.CompareTo(b.Distance);
+        // Segments near the view, refreshed only once the view has moved CandidateSlack metres (scanning every segment of the
+        // world each frame grew with the map), and this frame's ones within the radius, nearest first.
+        private const float CandidateSlack = 25f;
+        private static readonly List<int> Candidates = new();
+        private static RoadNetwork _candidatesOf;
+        private static Vector2 _candidatesAt;
+        private static float _candidatesRadius;
+        private static readonly List<(float Distance, int Segment)> InRange = new();
+        private static readonly Comparison<(float Distance, int Segment)> NearestSegmentFirst = (a, b) => a.Distance.CompareTo(b.Distance);
+
+        // As above, filling `result` (cleared first) instead of allocating a new list. Segments are taken nearest first, and
+        // once `cap` cars are found a segment none of whose lanes can come nearer than the cap-th car is skipped: the result is
+        // the same as computing every segment in the radius.
+        public static void Compute(RoadNetwork network, double seconds, Vector2 view, float radius, IEnumerable<GoodsTruck> trucks,
+            float since, int cap, IReadOnlyList<Vector2> pedestrians, List<CityCar> result)
+        {
+            result.Clear();
+            if (cap <= 0) return;
+            var obstacles = Obstacles;
+            foreach (var list in obstacles.Values)
+            {
+                list.Clear();
+                ObstacleLists.Push(list);
+            }
+            obstacles.Clear();
             foreach (var truck in trucks)
             {
                 if (!truck.Driving || !truck.OnRoad || !network.TryGetSegment(truck.LegSegmentId, out var index)) continue;
+                if (SegmentDistance(network, network.Segments[index], view) > radius) continue;
                 var forward = truck.LegTo >= truck.LegFrom;
                 var offset = RoadPose.TruckOffset(network, index, truck, since, TruckHalfLength);
                 var along = forward ? offset : network.Segments[index].Length - offset;
-                if (!obstacles.TryGetValue((index, forward), out var list)) obstacles[(index, forward)] = list = new List<float>();
+                if (!obstacles.TryGetValue((index, forward), out var list))
+                    obstacles[(index, forward)] = list = ObstacleLists.Count > 0 ? ObstacleLists.Pop() : new List<float>();
                 list.Add(along);
             }
-            var found = new List<(float Distance, CityCar Car)>();
-            var lane = new List<LaneCar>();
-            foreach (var segment in network.Segments)
+            var found = Found;
+            found.Clear();
+            var lane = LaneScratch;
+            var segments = network.Segments;
+            if (!ReferenceEquals(_candidatesOf, network) || !Mathf.Approximately(_candidatesRadius, radius)
+                || (view - _candidatesAt).sqrMagnitude > CandidateSlack * CandidateSlack)
             {
-                if (segment.Length < MinLength || Distance(network, segment, view) > radius) continue;
+                _candidatesOf = network;
+                _candidatesAt = view;
+                _candidatesRadius = radius;
+                Candidates.Clear();
+                for (var i = 0; i < segments.Count; i++)
+                    if (segments[i].Length >= MinLength && SegmentDistance(network, segments[i], view) <= radius + CandidateSlack) Candidates.Add(i);
+            }
+            var inRange = InRange;
+            inRange.Clear();
+            foreach (var index in Candidates)
+            {
+                var distance = SegmentDistance(network, segments[index], view);
+                if (distance <= radius) inRange.Add((distance, index));
+            }
+            inRange.Sort(NearestSegmentFirst);
+            var threshold = float.PositiveInfinity;
+            foreach (var (distance, segmentIndex) in inRange)
+            {
+                var segment = segments[segmentIndex];
+                if (found.Count >= cap)
+                {
+                    // The cap-th distance only falls as more cars are found, so this first one is a safe bound.
+                    if (float.IsPositiveInfinity(threshold))
+                    {
+                        found.Sort(NearestFirst);
+                        threshold = found[cap - 1].Distance;
+                    }
+                    // A lane's centre lies less than half the road's width from the centreline.
+                    if (distance - segment.Width / 2f > threshold) continue;
+                }
                 var clock = (long)Math.Floor(seconds);
                 var background = RoadTraffic.BackgroundPercent(segment, clock);
                 var speed = LaneSpeed(segment, seconds);
@@ -90,11 +164,11 @@ namespace FoodFactoryGame.Session.Logistics
                 if (flowPerLane <= 0f) continue;
                 var headway = 1f / flowPerLane;
                 if (headway > MaxHeadwaySeconds) continue;
-                foreach (var forward in new[] { true, false })
+                foreach (var forward in Directions)
                 for (var l = 0; l < segment.LanesPerDirection; l++)
                 {
                     Lane(network, segment, forward, l, seconds, speed, headway, lane);
-                    if (l == 0 && obstacles.TryGetValue((segment.Index, forward), out var blocking)) BehindTrucks(lane, blocking);
+                    if (l == 0 && obstacles.TryGetValue((segment.Index, forward), out var blocking) && blocking.Count > 0) BehindTrucks(lane, blocking);
                     if (pedestrians != null && pedestrians.Count > 0) BeforePedestrians(network, segment, forward, l, lane, pedestrians);
                     foreach (var car in lane)
                     {
@@ -103,10 +177,8 @@ namespace FoodFactoryGame.Session.Logistics
                     }
                 }
             }
-            found.Sort((a, b) => a.Distance.CompareTo(b.Distance));
-            var result = new List<CityCar>(Math.Min(cap, found.Count));
+            found.Sort(NearestFirst);
             for (var i = 0; i < found.Count && i < cap; i++) result.Add(found[i].Car);
-            return result;
         }
 
         // Free-flow speed of the city cars on a segment at a clock time, slowed by the background load, in metres per second.
@@ -166,7 +238,8 @@ namespace FoodFactoryGame.Session.Logistics
             var first = (long)Math.Floor((seconds - LookbackSeconds - length / speed - phase) / headway);
             var last = (long)Math.Floor((seconds - phase) / headway);
             var previousDeparture = double.NegativeInfinity;
-            var cars = new List<(long K, double Arrival, double Departure)>();
+            var cars = Entries;
+            cars.Clear();
             for (var k = first; k <= last; k++)
             {
                 var entered = k * (double)headway + phase;
@@ -265,7 +338,8 @@ namespace FoodFactoryGame.Session.Logistics
             return time + wait;
         }
 
-        private static float Distance(RoadNetwork network, RoadNetwork.Segment segment, Vector2 view)
+        // Map metres from a point to a segment's centreline.
+        public static float SegmentDistance(RoadNetwork network, RoadNetwork.Segment segment, Vector2 view)
         {
             var a = network.Nodes[segment.From];
             var b = network.Nodes[segment.To];

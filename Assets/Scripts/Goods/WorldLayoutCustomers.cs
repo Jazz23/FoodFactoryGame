@@ -15,15 +15,19 @@ namespace FoodFactoryGame.Goods
         public const int LikedCuisineWeight = 25;
         public const int AppearanceVariants = 4;
 
-        // PROTOTYPE per district kind: wealth (0-100), dine-in share (%), walking range (Manhattan metres).
-        private static (int Wealth, int DineIn, int Range) Tuning(DistrictKind kind) => kind switch
+        // PROTOTYPE per district kind: wealth (0-100), walking range (Manhattan metres).
+        private static (int Wealth, int Range) Tuning(DistrictKind kind) => kind switch
         {
-            DistrictKind.Downtown => (55, 50, 350),
-            DistrictKind.Residential => (40, 70, 400),
-            DistrictKind.Wealthy => (85, 80, 450),
-            DistrictKind.Industrial => (25, 40, 300),
+            DistrictKind.Downtown => (55, 350),
+            DistrictKind.Residential => (40, 400),
+            DistrictKind.Wealthy => (85, 450),
+            DistrictKind.Industrial => (25, 300),
             _ => throw new ArgumentOutOfRangeException(nameof(kind))
         };
+
+        // PROTOTYPE (owner request 2026-10-15): every district's dine-in share; the rest (GoodsWorld.TakeawayPercent) order to go.
+        // It replaced per-kind shares of 40-80 %; GeneratedWorld.AddCustomers retunes districts stored with the old shares.
+        public const int DineInPercent = 100 - GoodsWorld.TakeawayPercent;
 
         // PROTOTYPE, a testing value (starting-loop decision 28): customers of a layout from generator v7 on enter the world on the
         // street this close to the restaurant they chose (GoodsDistrict.SpawnWalkMetres), a 5 s walk, so the first customer of a
@@ -43,7 +47,7 @@ namespace FoodFactoryGame.Goods
             var result = new List<GoodsDistrict>();
             foreach (var district in layout.Districts)
             {
-                var (wealth, dineIn, range) = Tuning(district.Kind);
+                var (wealth, range) = Tuning(district.Kind);
                 var liked = district.Cuisines.Where(x => x.Weight >= LikedCuisineWeight)
                     .OrderByDescending(x => x.Weight).ThenBy(x => x.Cuisine, StringComparer.Ordinal).Select(x => x.Cuisine).ToList();
                 var areas = district.Areas.Select(x => (long)x.Width * x.Depth).ToList();
@@ -56,7 +60,7 @@ namespace FoodFactoryGame.Goods
                         Id = DistrictId(district, block), Name = $"{district.Kind} {block + 1}",
                         MapX = area.X + area.Width / 2, MapZ = area.Z + area.Depth / 2, CustomersPerHour = shares[block],
                         WealthPercent = wealth, Appearance = district.Id, AppearanceVariants = AppearanceVariants,
-                        LikedCuisines = liked.ToList(), DineInPercent = dineIn, RangeMetres = range,
+                        LikedCuisines = liked.ToList(), DineInPercent = WorldLayoutCustomers.DineInPercent, RangeMetres = range,
                         SpawnWalkMetres = layout.GeneratorVersion >= StreetSpawnGenerator ? StreetSpawnMetres : 0
                     });
                 }

@@ -114,6 +114,15 @@
                     "initialStateCheck": false
                 },
                 {
+                    "name": "PickBlock",
+                    "type": "Button",
+                    "id": "7d2e9b41-3c5a-4f80-9e1b-6a4c2d8f0b13",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
                     "name": "Point",
                     "type": "Value",
                     "id": "338e9985-ca18-445f-953f-c165ec1a2e36",
@@ -198,6 +207,15 @@
                     "name": "Phone",
                     "type": "Button",
                     "id": "5d1e8f27-9c3a-4b6e-b0f4-2a7c6e9d1b83",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "Map",
+                    "type": "Button",
+                    "id": "9a6c2e14-7b3d-4f58-8e21-d4b07c9f3a62",
                     "expectedControlType": "Button",
                     "processors": "",
                     "interactions": "",
@@ -776,6 +794,28 @@
                 },
                 {
                     "name": "",
+                    "id": "c3e8b2f5-1d4a-4c79-9b06-5e2a8d7f1c43",
+                    "path": "<Keyboard>/m",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
+                    "action": "Map",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "e7a1d904-6c2b-4f35-a8e9-3b5c0f6d2a71",
+                    "path": "",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
+                    "action": "Map",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "a42f4cfa-f37a-4a34-862f-2637057cc9a5",
                     "path": "<Mouse>/scroll",
                     "interactions": "",
@@ -837,6 +877,28 @@
                     "processors": "",
                     "groups": "Keyboard&Mouse",
                     "action": "Remove",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "2b8f6e0c-91d4-4a37-b5e2-0c7a9f3d6e58",
+                    "path": "<Mouse>/middleButton",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Keyboard&Mouse",
+                    "action": "PickBlock",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "e4a1c7d9-5f20-4b6e-8a93-1d0b7c2e4f86",
+                    "path": "",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
+                    "action": "PickBlock",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },

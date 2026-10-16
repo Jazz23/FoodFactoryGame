@@ -5,6 +5,7 @@
 // the subscription changes, or after PreviewTimeoutSeconds without an answer. Nothing here ever creates, removes or moves goods.
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using FoodFactoryGame.Goods;
 using UnityEngine;
 
@@ -23,6 +24,9 @@ namespace FoodFactoryGame.Session.Equipment
             public string ItemId;
             public bool Spoiled;
             public int Quantity;
+            // The lot's shelf life and exposure when the transfer was asked for, so the destination shows its spoil timer at once.
+            public long SpoilAfterSeconds;
+            public long ExposureSeconds;
             // World revision the accepted transfer produced; -1 until the server accepts it.
             public long AcceptedRevision = -1;
             public float Started;
@@ -36,7 +40,8 @@ namespace FoodFactoryGame.Session.Equipment
         private void AddPreview(string requestId, GoodsLot lot, string destinationId, int quantity) => _previews.Add(new TransferPreview
         {
             RequestId = requestId, LotId = lot.Id, SourceId = lot.LocationId, DestinationId = destinationId, ItemId = lot.ItemId,
-            Spoiled = lot.Spoiled, Quantity = quantity, Started = Time.unscaledTime
+            Spoiled = lot.Spoiled, Quantity = quantity, SpoilAfterSeconds = lot.SpoilAfterSeconds, ExposureSeconds = lot.ExposureSeconds,
+            Started = Time.unscaledTime
         });
 
         // A rejection reverts the preview; an acceptance keeps it until a baseline shows the move.
@@ -96,6 +101,34 @@ namespace FoodFactoryGame.Session.Equipment
                 result.Add(new GoodsLot
                 {
                     Id = "", LocationId = locationId, ItemId = key.ItemId, Spoiled = key.Spoiled, Quantity = (int)Math.Min(int.MaxValue, quantity)
+                });
+            }
+            return result;
+        }
+
+        // The individual lots in one location as this client shows them, for spoil timers: the baseline's lots less units
+        // promised to pending transfers out (a lot entirely promised away is left out), plus one lot per pending transfer in,
+        // aged like its source lot while that is still in the baseline (the server keeps a lot's exposure when it moves). So a
+        // moved stack shows when it spoils as soon as it is shown, not only once the next baseline carries the move.
+        public List<GoodsLot> PreviewSpoilLots(GoodsSnapshot site, string locationId)
+        {
+            var result = new List<GoodsLot>();
+            if (site == null || locationId == null) return result;
+            foreach (var lot in site.Lots)
+            {
+                if (lot.LocationId != locationId) continue;
+                var left = lot.Quantity - PreviewedOut(lot.Id, site);
+                if (left > 0) result.Add(lot);
+            }
+            foreach (var preview in _previews)
+            {
+                if (preview.DestinationId != locationId || !Applies(preview, site)) continue;
+                var source = site.Lots.FirstOrDefault(x => x.Id == preview.LotId);
+                result.Add(new GoodsLot
+                {
+                    Id = "", LocationId = locationId, ItemId = preview.ItemId, Spoiled = source?.Spoiled ?? preview.Spoiled,
+                    Quantity = preview.Quantity, SpoilAfterSeconds = source?.SpoilAfterSeconds ?? preview.SpoilAfterSeconds,
+                    ExposureSeconds = source?.ExposureSeconds ?? preview.ExposureSeconds
                 });
             }
             return result;

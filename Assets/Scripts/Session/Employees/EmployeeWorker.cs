@@ -45,8 +45,9 @@ namespace FoodFactoryGame.Session.Employees
         // How close (metres, horizontally) to a place's footprint the employee must stand to use it.
         [SerializeField] private float reach = 1.3f;
         [SerializeField] private float walkTimeoutSeconds = 60f;
-        // Ground speed at which the walk clip's feet do not slide; the clip is sped up or slowed to match actual speed.
-        [SerializeField] private float walkClipSpeed = 1.5f;
+        // Ground speed (m/s) at which the walk clips, played at 1x, keep the planted foot still: they are authored for it
+        // (ArtSource/Employee/author_walk_cycle.py, CLIP_SPEED), and played at measured speed / this so the feet never slide.
+        [SerializeField] private float walkClipSpeed = 1f;
         // How often the server records the pose in the world (saved by the next commit), and the change worth recording.
         [SerializeField] private float poseRecordSeconds = 1f;
 
@@ -79,6 +80,13 @@ namespace FoodFactoryGame.Session.Employees
         private float _nextPayCheck;
         private float _nextOutsidePath;
         private float _nextNavMeshTry;
+        // Server-only, while idle and staffing a register (HoldPost): which register and placement the spot was found for, the
+        // spot behind it, the point to face there, and when to check again.
+        private string _postKey;
+        private Vector3? _post;
+        private Vector3 _postFace;
+        private float _nextPostCheck;
+        private float _postRefresh;
 
         public string EmployeeId => _id.Value;
         public string DisplayName => _name.Value;
@@ -292,7 +300,8 @@ namespace FoodFactoryGame.Session.Employees
             if (Time.time >= _nextCarryCheck)
             {
                 _nextCarryCheck = Time.time + 0.5f;
-                RefreshCarrying(bridge.WorkerView(_employeeId, _siteId));
+                var carrying = bridge.WorkerCarrying(_employeeId);
+                if (_carrying.Value != carrying) _carrying.Value = carrying;
             }
             RecordPose(bridge);
             if (!agent.isOnNavMesh && Time.time >= _nextNavMeshTry) PlaceOnNavMesh();
@@ -312,7 +321,12 @@ namespace FoodFactoryGame.Session.Employees
                 WalkOutside();
                 return;
             }
-            if (_script == null || _script.Step()) return;
+            if (_script == null)
+            {
+                HoldPost(bridge);
+                return;
+            }
+            if (_script.Step()) return;
             _status.Value = _script.State == EmployeeScriptState.Failed ? "Error: " + _script.Error
                 : "Finished" + (_lastMessage != null ? $" (last said: {_lastMessage})" : "");
             _script = null;
@@ -374,6 +388,88 @@ namespace FoodFactoryGame.Session.Employees
             var offset = _outside.Value - transform.position;
             offset.y = 0f;
             if (offset.sqrMagnitude > StandTolerance * StandTolerance) agent.SetDestination(_outside.Value);
+        }
+
+        // While no script runs, an employee that staffs a register (assigned from the register screen, or left there by work())
+        // walks to the spot behind it and stands there facing it. A running script steers instead; the employee comes back
+        // once it ends. Presentation of who serves only: selling depends on StaffId, not on where the employee stands.
+        private void HoldPost(Goods.Network.GoodsNetworkBridge bridge)
+        {
+            if (!agent.enabled || !agent.isOnNavMesh) return;
+            if (Time.time >= _nextPostCheck)
+            {
+                _nextPostCheck = Time.time + 1f;
+                var staffed = bridge.WorkerStaffedRegister(_employeeId);
+                var register = staffed?.Register;
+                var key = register != null && register.Level == 0
+                    ? $"{register.Id}:{register.CellX}:{register.CellZ}:{register.Rotation}" : null;
+                if (key == null)
+                {
+                    if (_post != null && agent.hasPath) agent.ResetPath();
+                    _post = null;
+                    _postKey = null;
+                    return;
+                }
+                // The NavMesh is rebuilt when the shell changes, so the spot is found again now and then.
+                if (key != _postKey || _post == null || Time.time >= _postRefresh)
+                {
+                    _postKey = key;
+                    _postRefresh = Time.time + 10f;
+                    _post = OperatorSpot(register, staffed.Value.Layout, out var spot, out _postFace) ? spot : null;
+                }
+                if (_post is { } target && Flat(target - transform.position) > StandTolerance
+                    && (!agent.hasPath || Flat(agent.destination - target) > 0.1f))
+                    agent.SetDestination(target);
+            }
+            if (_post is not { } post || Flat(post - transform.position) > StandTolerance) return;
+            if (agent.hasPath) agent.ResetPath();
+            var look = _postFace - transform.position;
+            look.y = 0f;
+            if (look.sqrMagnitude < 0.0001f) return;
+            transform.rotation = Quaternion.RotateTowards(transform.rotation, Quaternion.LookRotation(look), 360f * Time.deltaTime);
+        }
+
+        private static float Flat(Vector3 offset) => new Vector2(offset.x, offset.z).magnitude;
+
+        // Where a register's operator stands: a walkable cell beside its footprint that the employee can walk to, behind it
+        // first (customers order from the side it faces, SiteWalk.ServiceSpot), then its sides, nearest its middle. face is the
+        // register's centre, to turn towards once there.
+        private bool OperatorSpot(GoodsEquipment register, SiteLayout layout, out Vector3 point, out Vector3 face)
+        {
+            point = default;
+            face = SiteGridSpace.Center(layout, register);
+            if (register.Level != 0) return false;
+            var (width, depth) = SiteGrid.Footprint(register.Width, register.Depth, register.Rotation);
+            var (fx, fz) = SiteGrid.Facing(register.Rotation);
+            var beside = new List<(int X, int Z)>();
+            for (var x = register.CellX; x < register.CellX + width; x++)
+            {
+                beside.Add((x, register.CellZ - 1));
+                beside.Add((x, register.CellZ + depth));
+            }
+            for (var z = register.CellZ; z < register.CellZ + depth; z++)
+            {
+                beside.Add((register.CellX - 1, z));
+                beside.Add((register.CellX + width, z));
+            }
+            var centerX = register.CellX + (width - 1) * 0.5f;
+            var centerZ = register.CellZ + (depth - 1) * 0.5f;
+            var half = SiteGrid.CellSize * 0.5f;
+            var area = new Rect(face.x - width * half, face.z - depth * half, width * SiteGrid.CellSize, depth * SiteGrid.CellSize);
+            var path = new NavMeshPath();
+            foreach (var cell in beside
+                         .Where(c => c.X >= 0 && c.Z >= 0 && c.X < layout.Width && c.Z < layout.Depth)
+                         .OrderBy(c => (c.X - centerX) * fx + (c.Z - centerZ) * fz)
+                         .ThenBy(c => Mathf.Abs(c.X - centerX) + Mathf.Abs(c.Z - centerZ)))
+            {
+                var center = SiteGridSpace.FootprintCenter(layout, cell.X, cell.Z, 1, 1);
+                if (!NavMesh.SamplePosition(center, out var hit, half, NavMesh.AllAreas)) continue;
+                if (area.Contains(new Vector2(hit.position.x, hit.position.z))) continue;
+                if (!NavMesh.CalculatePath(transform.position, hit.position, NavMesh.AllAreas, path) || path.status != NavMeshPathStatus.PathComplete) continue;
+                point = hit.position;
+                return true;
+            }
+            return false;
         }
 
         // A walkable point outside the site's buildings that the employee can walk to, the shortest walk first: the street in
@@ -734,6 +830,11 @@ namespace FoodFactoryGame.Session.Employees
                 yield break;
             }
             _status.Value = $"Running: walking to work at {place.Name}";
+            // A register is served from behind (HoldPost's spot), not from whichever side is nearest.
+            var counter = register ? view.Equipment.FirstOrDefault(x => x.Id == place.EquipmentId) : null;
+            var counterLayout = counter == null ? null : view.SiteLayouts.FirstOrDefault(x => x.SiteId == _siteId);
+            if (counter != null && counterLayout != null && OperatorSpot(counter, counterLayout, out var spot, out _))
+                place = new Place { Name = place.Name, EquipmentId = place.EquipmentId, Stand = true, StandPoint = spot, Area = new Rect(spot.x, spot.z, 0f, 0f) };
             var walk = Walk(place, result);
             while (walk.MoveNext()) yield return null;
             if (!result.Value.IsNil())
@@ -1274,7 +1375,9 @@ namespace FoodFactoryGame.Session.Employees
             var measured = Time.deltaTime > 0f ? delta.magnitude / Time.deltaTime : 0f;
             _speed = Mathf.Lerp(_speed, measured, 1f - Mathf.Exp(-10f * Time.deltaTime));
             animator.SetFloat(SpeedParameter, _speed);
-            animator.SetFloat(WalkRateParameter, Mathf.Max(0.5f, _speed / walkClipSpeed));
+            // No floor on the rate: a minimum would make the feet slide while starting or stopping. Below the controller's
+            // Speed threshold the Idle state plays instead, so the walk never freezes in place.
+            animator.SetFloat(WalkRateParameter, Mathf.Max(0.05f, _speed / walkClipSpeed));
             animator.SetBool(CarryingParameter, _carrying.Value);
         }
     }

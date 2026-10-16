@@ -24,15 +24,20 @@ const TILE_SIZE: f32 = 2.0;
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins.set(WindowPlugin {
-            primary_window: Some(Window {
-                title: "Food Factory - Bevy".into(),
-                // Uncapped frame rate: no vsync, falling back to vsync where the platform cannot present without it.
-                present_mode: PresentMode::AutoNoVsync,
-                ..default()
-            }),
-            ..default()
-        }))
+        .add_plugins(
+            DefaultPlugins
+                .set(WindowPlugin {
+                    primary_window: Some(Window {
+                        title: "Food Factory - Bevy".into(),
+                        // Uncapped frame rate: no vsync, falling back to vsync where the platform cannot present
+                        // without it.
+                        present_mode: PresentMode::AutoNoVsync,
+                        ..default()
+                    }),
+                    ..default()
+                })
+                .set(asset_plugin()),
+        )
         .insert_resource(ClearColor(Color::srgb(0.62, 0.74, 0.86)))
         .insert_resource(GlobalAmbientLight {
             color: Color::WHITE,
@@ -50,6 +55,19 @@ fn main() {
         .add_systems(Startup, spawn_world)
         .add_systems(Update, show_fps)
         .run();
+}
+
+// dx launches the game from target/dx/.../app, whose assets folder is empty, so hot-patch builds read the project's
+// assets folder directly (and file_watcher reloads edits there). Other builds keep Bevy's default lookup.
+fn asset_plugin() -> AssetPlugin {
+    #[cfg(feature = "hotpatch")]
+    let file_path = concat!(env!("CARGO_MANIFEST_DIR"), "/assets").to_string();
+    #[cfg(not(feature = "hotpatch"))]
+    let file_path = AssetPlugin::default().file_path;
+    AssetPlugin {
+        file_path,
+        ..default()
+    }
 }
 
 fn spawn_world(

@@ -30,6 +30,8 @@ namespace FoodFactoryGame.Session.Logistics
         private static readonly VehicleEngineAudio[] Nearest = new VehicleEngineAudio[MaxAudible];
         private static readonly float[] NearestDistance = new float[MaxAudible];
         private static float _nextSelect;
+        // At most one Select per frame, whichever engine updates first.
+        private static int _selectedFrame = -1;
         // Level against distance as a fraction of the hearing distance: close cars are loud, the far half is a faint hush.
         private static readonly AnimationCurve Rolloff = new(
             new Keyframe(0f, 1f), new Keyframe(0.08f, 0.75f), new Keyframe(0.2f, 0.4f), new Keyframe(0.45f, 0.13f),
@@ -84,8 +86,11 @@ namespace FoodFactoryGame.Session.Logistics
             _last = position;
             _hasLast = true;
 
-            // The second test covers a clock that restarted under a stale schedule (play mode without a domain reload).
-            if (Time.unscaledTime >= _nextSelect || _nextSelect - Time.unscaledTime > SelectSeconds) Select();
+            // The second test covers a clock that restarted under a stale schedule (play mode without a domain reload); it allows
+            // a whole extra interval, because right after Select `_nextSelect - now` can round to just over SelectSeconds, which
+            // made every engine run Select again in that frame (quadratic in the number of cars, a stall five times a second).
+            if (_selectedFrame != Time.frameCount
+                && (Time.unscaledTime >= _nextSelect || _nextSelect - Time.unscaledTime > 2f * SelectSeconds)) Select();
             _gain = Mathf.MoveTowards(_gain, _audible ? 1f : 0f, FadeRate * deltaTime);
             if (_gain <= 0f)
             {
@@ -136,6 +141,7 @@ namespace FoodFactoryGame.Session.Logistics
         private static void Select()
         {
             _nextSelect = Time.unscaledTime + SelectSeconds;
+            _selectedFrame = Time.frameCount;
             var count = 0;
             var listener = GameAudio.Listener;
             if (listener != null)

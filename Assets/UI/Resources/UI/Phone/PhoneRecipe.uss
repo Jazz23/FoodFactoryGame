@@ -1,0 +1,44 @@
+/* Recipes app detail screen (PhoneRecipePage): a recipe's ingredient tree and quantity calculator. Added to the Recipes page
+   at runtime beside Phone.uss; colours are the shared Theme.uss tokens. */
+
+/* List cards open the detail screen. */
+.phone-recipe--link:hover { border-color: var(--ff-accent); }
+
+.phone-recipe-detail__bar { margin-top: 4px; }
+.phone-recipe-detail__back { padding: 0 12px 0 8px; }
+.phone-recipe-detail__back > .ff-glyph { margin-right: 4px; }
+.phone-recipe-detail__head { align-items: center; margin-top: 10px; }
+.phone-recipe-detail__icon { width: 40px; height: 40px; margin-right: 12px; flex-shrink: 0; }
+.phone-recipe-detail__name { font-size: 16px; -unity-font-style: bold; white-space: normal; }
+
+.phone-recipe-calc { margin-top: 10px; padding: 12px; }
+.phone-recipe-calc__field { width: 72px; flex-shrink: 0; margin: 0 2px; }
+.phone-recipe-calc__field > .unity-base-text-field__input { -unity-text-align: middle-center; }
+.phone-recipe-calc__unit { margin-left: 8px; font-size: 13px; }
+.phone-recipe-calc__summary { margin-top: 8px; white-space: normal; }
+
+/* The tree: each expanded ingredient's inputs sit indented under it, joined by a guide line. */
+.phone-recipe-tree__row { align-items: center; padding: 6px 10px; margin-top: 4px; height: auto; justify-content: flex-start; }
+/* An expandable row is a button wearing the card look (ff-button would otherwise fix its height, margin and fill). */
+.ff-button.phone-recipe-tree__row {
+    height: auto;
+    margin: 4px 0 0 0;
+    padding: 6px 10px;
+    background-color: var(--ff-card);
+    border-color: var(--ff-card-edge);
+    border-radius: 10px;
+}
+.ff-button.phone-recipe-tree__row:hover { background-color: var(--ff-control-hover); border-color: var(--ff-accent); }
+.phone-recipe-tree__row--open { border-color: var(--ff-edge-strong); }
+.phone-recipe-tree__row > .ff-glyph { margin-right: 6px; color: var(--ff-accent); }
+.phone-recipe-tree__spacer { width: 16px; height: 16px; margin-right: 6px; flex-shrink: 0; }
+.phone-recipe-tree__icon { width: 28px; height: 28px; margin-right: 10px; flex-shrink: 0; }
+.phone-recipe-tree__name { font-size: 14px; -unity-font-style: bold; white-space: normal; -unity-text-align: middle-left; }
+.phone-recipe-tree__sub { margin-top: 1px; white-space: normal; -unity-text-align: middle-left; }
+.phone-recipe-tree__amount { margin-left: 10px; flex-shrink: 0; font-size: 15px; -unity-font-style: bold; color: var(--ff-accent); }
+.phone-recipe-tree__children {
+    margin-left: 18px;
+    padding-left: 12px;
+    border-left-width: 1px;
+    border-left-color: var(--ff-edge-strong);
+}

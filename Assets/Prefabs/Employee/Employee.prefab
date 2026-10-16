@@ -212,7 +212,7 @@ MonoBehaviour:
   handSlots: 4
   reach: 1.3
   walkTimeoutSeconds: 60
-  walkClipSpeed: 1.5
+  walkClipSpeed: 1
 --- !u!114 &7550649130149245276
 MonoBehaviour:
   m_ObjectHideFlags: 0

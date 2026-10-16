@@ -96,7 +96,10 @@
 /* Ledger app: one row per cash change, newest first. */
 .phone-ledger__row { align-items: center; padding: 6px 10px; margin-top: 4px; }
 .phone-ledger__time { width: 90px; font-size: 13px; }
-.phone-ledger__kind { width: 180px; font-size: 13px; }
+.phone-ledger__kind { width: 240px; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Column titles over the rows: card padding, no card. */
+.phone-ledger__header { margin-top: 0; padding-top: 0; padding-bottom: 2px; border-width: 1px; border-color: rgba(0, 0, 0, 0); }
+.phone-ledger__header > .ff-eyebrow { margin: 0; }
 .phone-ledger__site { flex-grow: 1; flex-shrink: 1; min-width: 0; font-size: 13px; }
 .phone-ledger__amount { width: 110px; font-size: 13px; -unity-font-style: bold; -unity-text-align: middle-right; }
 .phone-ledger__totals { margin-top: 10px; }

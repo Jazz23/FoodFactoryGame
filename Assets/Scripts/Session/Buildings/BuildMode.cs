@@ -21,11 +21,18 @@
 // behind either way round. Every order is a request; nothing changes here until the next replicated baseline, and the server's
 // reason is shown when it refuses. Controls come from the Player action map (Input System). Leaving build mode remembers its
 // camera (focus, distance, tilt and turn) and the next opening on the same site returns to it, unless the avatar has since
-// moved more than RememberedViewReach from that focus, which frames the lot again.
+// moved more than RememberedViewReach from that focus, which frames the lot again. Pick (PickBlock, middle mouse; owner,
+// 2026-10-15) copies what the pointer is on into the cursor, as Minecraft's pick block does: a placed piece selects its offer
+// (and its rotation), a wall, door, back door or window selects that tool in its style. Picking only selects; nothing is ordered.
+// Build mode is the only way to remove things (owner, 2026-10-15): Remove works on every site the player builds on (restaurant
+// and factory) and every floor shown. A placed piece with a recorded charge is sold for that refund; one without (a machine
+// placed from the inventory) is picked up into the inventory instead, so nothing is deleted for nothing; a belt or conveyor lift
+// is taken up into the inventory. These are the same server-validated requests (Sell, PickUp, RemoveBelt) the world cursor sent.
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using FoodFactoryGame.Goods;
+using FoodFactoryGame.Session.Belts;
 using FoodFactoryGame.Session.Equipment;
 using FoodFactoryGame.Session.Player;
 using UnityEngine;
@@ -72,6 +79,8 @@ namespace FoodFactoryGame.Session.Buildings
         private const float WheelSize = 34f;
         // Farthest (metres across the ground) the avatar may be from the remembered build focus for build mode to reopen there.
         public const float RememberedViewReach = 20f;
+        // The Player map action that picks what the pointer is on; looked up in the same map as Place, so binding overrides apply.
+        public const string PickActionName = "PickBlock";
 
         [SerializeField] private SessionRoot session;
         [SerializeField] private EquipmentInteraction interaction;
@@ -105,6 +114,8 @@ namespace FoodFactoryGame.Session.Buildings
         private float _removeStart;
         // The placed piece on the current site the pointer is on (its colliders), or null.
         private string _pointed;
+        // The belt or lift the pointer is on (its collider, before anything solid), or null.
+        private string _pointedBelt;
         // The cell a removal aims at: the cell of the solid surface under the pointer (a wall's side or top, a door, the floor),
         // so a wall is removed by pointing anywhere on it; the floor cell under the pointer when nothing solid is hit.
         private (int X, int Z)? _removeCell;
@@ -124,6 +135,8 @@ namespace FoodFactoryGame.Session.Buildings
         private string _shownTools;
         // The drag-to-remove sweep after a completed hold; null when none.
         private RemovalSweep _sweep;
+        // PickBlock from the Place action's map; null when the asset lacks it (picking is then unavailable).
+        private InputAction _pickAction;
 
         // What one sweep has removed: the family it started on, the things sent (each once) and, for structure, their cells (a
         // removed window's or door's wall is not taken next). Last is the thing under the pointer on the previous frame.
@@ -135,6 +148,19 @@ namespace FoodFactoryGame.Session.Buildings
             public string Last;
             public Vector2 Pointer;
         }
+        // Removal orders other than a sale (an equipment ID string) or a ShellOrder.
+        private sealed class PickUpOrder
+        {
+            public readonly string EquipmentId;
+            public PickUpOrder(string equipmentId) => EquipmentId = equipmentId;
+        }
+
+        private sealed class BeltRemoval
+        {
+            public readonly string BeltId;
+            public BeltRemoval(string beltId) => BeltId = beltId;
+        }
+
         // The build camera when build mode was last left (this client's presentation only, never saved or sent).
         private (string SiteId, Vector3 Focus, float Distance, float Yaw, float Pitch)? _rememberedView;
 
@@ -170,6 +196,8 @@ namespace FoodFactoryGame.Session.Buildings
             _block ??= new MaterialPropertyBlock();
             buildAction.action.performed += OnBuild;
             buildAction.action.Enable();
+            _pickAction = placeAction.action.actionMap?.FindAction(PickActionName);
+            _pickAction?.Enable();
             interaction.BuildEscape = CancelPending;
             interaction.BuildClear = ClearSelection;
         }
@@ -178,6 +206,7 @@ namespace FoodFactoryGame.Session.Buildings
         {
             buildAction.action.performed -= OnBuild;
             buildAction.action.Disable();
+            _pickAction?.Disable();
             if (interaction != null && interaction.BuildEscape == CancelPending) interaction.BuildEscape = null;
             if (interaction != null && interaction.BuildClear == ClearSelection) interaction.BuildClear = null;
             Subscribe(null);
@@ -267,15 +296,17 @@ namespace FoodFactoryGame.Session.Buildings
             var overPanel = PointerOverPanel();
             var pointer = pointAction.action.ReadValue<Vector2>();
             (int X, int Z)? surface = null;
-            _pointed = !overPanel && ForcedHover == null ? PointedPiece(pointer, layout, out surface) : null;
+            _pointedBelt = null;
+            _pointed = !overPanel && ForcedHover == null ? PointedPiece(pointer, layout, out surface, out _pointedBelt) : null;
             _removeCell = surface ?? _hover;
             // What a hold would sell or remove now; with nothing there, a right press starts no hold and shows no wheel.
-            var removal = RemovalPlan(_removeCell, _pointed, out var removalOrder);
+            var removal = RemovalPlan(_removeCell, _pointed, out var removalOrder, _pointedBelt);
             if (!overPanel && ForcedHover == null)
             {
                 if (placeAction.action.WasPressedThisFrame() && _hover.HasValue && interaction.ScreenClicksArmed)
                     PressAt(Tool == BuildTool.Sell ? _removeCell ?? _hover.Value : _hover.Value);
                 if (placeAction.action.WasReleasedThisFrame() && _dragStart.HasValue) ReleaseAt(_hover ?? _dragStart.Value);
+                if (_pickAction != null && _pickAction.WasPressedThisFrame()) PickAt(_removeCell, _pointed);
                 if (removeAction.action.WasPressedThisFrame() && removalOrder != null)
                 {
                     _removePress = pointer;
@@ -360,6 +391,72 @@ namespace FoodFactoryGame.Session.Buildings
             return offset.magnitude <= RememberedViewReach;
         }
 
+        // Pick block: selects what is at the pointer as the cursor (a placed piece's offer and rotation, else the wall, door, back
+        // door or window on the cell in its style). False, with the selection unchanged, when nothing there can be bought again.
+        public bool PickAt((int X, int Z)? cell, string pieceId = null)
+        {
+            var site = session.ClientSite;
+            if (site == null) return false;
+            var piece = pieceId != null
+                ? site.Equipment.FirstOrDefault(x => x.Id == pieceId && x.SiteId == session.ClientSiteId && x.State == EquipmentState.Placed)
+                : null;
+            if (piece == null && cell is { } at)
+            {
+                var layers = new[] { SiteGrid.TabletopLayer, SiteGrid.ObjectLayer };
+                piece = site.Equipment.Where(x => x.SiteId == session.ClientSiteId && x.State == EquipmentState.Placed && x.Level == buildings.LocalLevel
+                        && Array.IndexOf(layers, x.Layer ?? "") >= 0 && SiteGrid.Contains(x, at.X, at.Z, 1, 1))
+                    .OrderBy(x => Array.IndexOf(layers, x.Layer ?? "")).FirstOrDefault();
+            }
+            if (piece != null)
+            {
+                var offer = session.Offers.FirstOrDefault(x => x != null && x.Truck == null && x.Equipment != null && x.Equipment.Kind == piece.Kind);
+                if (offer == null) return false;
+                SelectOffer(offer.Id);
+                Rotation = ((piece.Rotation % 4) + 4) % 4;
+                return true;
+            }
+            var restaurant = Restaurant;
+            if (restaurant == null || cell is not { } c) return PickFloor(cell);
+            var window = SiteGrid.WindowAt(restaurant, c.X, c.Z);
+            if (window != null)
+            {
+                SelectTool(BuildTool.Window, StyleOr(window.Style, GoodsWorld.WindowStyles));
+                return true;
+            }
+            if (SiteGrid.IsDoor(restaurant, c.X, c.Z))
+            {
+                var record = restaurant.Structures?.FirstOrDefault(x => x != null && x.Kind == GoodsWorld.DoorStructure && x.X == c.X && x.Z == c.Z);
+                var back = SiteGrid.IsServiceDoor(restaurant, c.X, c.Z);
+                SelectTool(back ? BuildTool.BackDoor : BuildTool.Door, back ? GoodsWorld.BackDoorStyle : StyleOr(record?.Style, GoodsWorld.DoorStyles));
+                return true;
+            }
+            if (IsWallCell(restaurant, c.X, c.Z))
+            {
+                var partition = restaurant.Structures?.FirstOrDefault(x => x != null && x.Kind == GoodsWorld.PartitionStructure && x.X == c.X && x.Z == c.Z);
+                SelectTool(BuildTool.Wall, StyleOr(partition?.Style ?? restaurant.WallStyle, GoodsWorld.WallStyles));
+                return true;
+            }
+            return PickFloor(cell);
+        }
+
+        // A floor-layer piece (a floor tile or rug) under the cell, picked when nothing stands above it.
+        private bool PickFloor((int X, int Z)? cell)
+        {
+            if (cell is not { } at) return false;
+            var piece = session.ClientSite.Equipment.FirstOrDefault(x => x.SiteId == session.ClientSiteId && x.State == EquipmentState.Placed
+                && x.Level == buildings.LocalLevel && x.Layer == SiteGrid.FloorLayer && SiteGrid.Contains(x, at.X, at.Z, 1, 1));
+            var offer = piece == null ? null
+                : session.Offers.FirstOrDefault(x => x != null && x.Truck == null && x.Equipment != null && x.Equipment.Kind == piece.Kind);
+            if (offer == null) return false;
+            SelectOffer(offer.Id);
+            Rotation = ((piece.Rotation % 4) + 4) % 4;
+            return true;
+        }
+
+        // A recorded style when the server lists it, else the list's first (the style an unstyled wall, door or window is drawn in).
+        private static string StyleOr(string style, IReadOnlyList<string> styles) =>
+            !string.IsNullOrEmpty(style) && styles.Contains(style) ? style : styles[0];
+
         // Click: single-cell tools act at once; drawing tools start a drag.
         public void PressAt((int X, int Z) cell)
         {
@@ -377,7 +474,7 @@ namespace FoodFactoryGame.Session.Buildings
                     _dragStart = cell;
                     break;
                 case BuildTool.Sell:
-                    RemoveAt(cell, _pointed);
+                    RemoveAt(cell, _pointed, beltId: _pointedBelt);
                     break;
                 default:
                     Send(Plan(cell, cell, out var order), order);
@@ -415,9 +512,9 @@ namespace FoodFactoryGame.Session.Buildings
 
         // Sells a placed piece (pieceId, the one the pointer is on) or, without one, removes the door, window or wall on the cell or
         // sells a piece standing on it; wall and ceiling decor is sold only by pointing at it. useCell false ignores the cell.
-        public void RemoveAt((int X, int Z) cell, string pieceId = null, bool useCell = true)
+        public void RemoveAt((int X, int Z) cell, string pieceId = null, bool useCell = true, string beltId = null)
         {
-            var preview = RemovalPlan(useCell ? cell : null, pieceId, out var order);
+            var preview = RemovalPlan(useCell ? cell : null, pieceId, out var order, beltId);
             Send(preview, order);
         }
 
@@ -446,6 +543,8 @@ namespace FoodFactoryGame.Session.Buildings
             cells = new List<(int X, int Z)>();
             structure = order is ShellOrder;
             if (order is string pieceId) return $"piece:{pieceId}";
+            if (order is PickUpOrder pickUp) return $"piece:{pickUp.EquipmentId}";
+            if (order is BeltRemoval belt) return $"belt:{belt.BeltId}";
             if (order is not ShellOrder { Cells: { Count: > 0 } } shell) return null;
             var (x, z) = (shell.Cells[0].X, shell.Cells[0].Z);
             var restaurant = Restaurant;
@@ -494,6 +593,14 @@ namespace FoodFactoryGame.Session.Buildings
                     Debug.Log($"[Build] Requesting the sale of {equipmentId}.");
                     bridge.RequestSell(requestId, equipmentId);
                     break;
+                case PickUpOrder pickUp:
+                    Debug.Log($"[Build] Requesting pickup of {pickUp.EquipmentId}.");
+                    bridge.RequestPickUp(requestId, pickUp.EquipmentId);
+                    break;
+                case BeltRemoval belt:
+                    Debug.Log($"[Build] Requesting removal of belt {belt.BeltId}.");
+                    bridge.RequestRemoveBelt(requestId, belt.BeltId);
+                    break;
             }
         }
 
@@ -505,7 +612,8 @@ namespace FoodFactoryGame.Session.Buildings
             var preview = new BuildPreview();
             var restaurant = Restaurant;
             if (Tool == BuildTool.None) return preview;
-            if (Tool == BuildTool.Sell) return RemovalPlan(ForcedHover == null ? _removeCell ?? to : to, _pointed, out order);
+            if (Tool == BuildTool.Sell)
+                return RemovalPlan(ForcedHover == null ? _removeCell ?? to : to, _pointed, out order, ForcedHover == null ? _pointedBelt : null);
             if (Tool == BuildTool.Item) return ItemPlan(from, to, out order);
             if (restaurant == null)
             {
@@ -684,30 +792,46 @@ namespace FoodFactoryGame.Session.Buildings
             return preview;
         }
 
-        // The sale of the given piece, else of a piece standing on the cell (tabletop, object, then floor layer; wall and ceiling
-        // decor hangs away from its cell, so it is only sold by pointing at it), else the removal of the door, window or wall there.
-        private BuildPreview RemovalPlan((int X, int Z)? target, string pieceId, out object order)
+        // The removal of the given piece (any floor), else of the given belt or lift, else of a piece standing on the cell on the
+        // floor shown (tabletop, object, then floor layer; wall and ceiling decor hangs away from its cell, so it is only removed by
+        // pointing at it), else of a belt or lift there, else of the door, window or wall there. A piece with a recorded charge is
+        // sold for that refund; one without is picked up into the inventory, so removing never deletes it for nothing.
+        private BuildPreview RemovalPlan((int X, int Z)? target, string pieceId, out object order, string beltId = null)
         {
             order = null;
             var preview = new BuildPreview { Removal = true };
             var site = session.ClientSite;
+            var level = buildings.LocalLevel;
             var layers = new[] { SiteGrid.TabletopLayer, SiteGrid.ObjectLayer, SiteGrid.FloorLayer };
-            var placed = site.Equipment.Where(x => x.SiteId == session.ClientSiteId && x.State == EquipmentState.Placed && x.Level == 0);
+            var placed = site.Equipment.Where(x => x.SiteId == session.ClientSiteId && x.State == EquipmentState.Placed);
             var piece = pieceId != null ? placed.FirstOrDefault(x => x.Id == pieceId)
-                : target is { } at ? placed.Where(x => Array.IndexOf(layers, x.Layer ?? "") >= 0 && SiteGrid.Contains(x, at.X, at.Z, 1, 1))
+                : beltId == null && target is { } at ? placed.Where(x => x.Level == level && Array.IndexOf(layers, x.Layer ?? "") >= 0
+                        && SiteGrid.Contains(x, at.X, at.Z, 1, 1))
                     .OrderBy(x => Array.IndexOf(layers, x.Layer ?? "")).FirstOrDefault()
                 : null;
             if (piece != null)
             {
                 var definition = session.EquipmentDefinitions.FirstOrDefault(x => x != null && x.Kind == piece.Kind);
+                var sold = piece.ChargedCents > 0;
                 preview.RefundCents = piece.ChargedCents;
-                preview.Label = $"Sell {definition?.DisplayName ?? piece.Kind}";
+                preview.Label = $"{(sold ? "Sell" : "Pick up")} {definition?.DisplayName ?? piece.Kind}";
                 var (width, depth) = SiteGrid.Footprint(piece.Width, piece.Depth, piece.Rotation);
                 for (var x = piece.CellX; x < piece.CellX + width; x++)
                 for (var z = piece.CellZ; z < piece.CellZ + depth; z++)
                     preview.Cells.Add((x, z));
                 if (site.Customers.Any(x => x.CounterId == piece.Id || x.TableId == piece.Id)) preview.Problem = "occupied";
-                order = piece.Id;
+                order = sold ? piece.Id : new PickUpOrder(piece.Id);
+                return preview;
+            }
+            var belts = site.Belts.Where(x => x.SiteId == session.ClientSiteId);
+            var belt = beltId != null ? belts.FirstOrDefault(x => x.Id == beltId)
+                : target is { } on ? BeltPresenter.Touching(belts, level).FirstOrDefault(x => x.CellX == on.X && x.CellZ == on.Z)
+                : null;
+            if (belt != null)
+            {
+                preview.Label = belt.Lift != 0 ? "Take up conveyor lift" : "Take up belt";
+                preview.Cells.Add((belt.CellX, belt.CellZ));
+                order = new BeltRemoval(belt.Id);
                 return preview;
             }
             var restaurant = Restaurant;
@@ -762,9 +886,10 @@ namespace FoodFactoryGame.Session.Buildings
         // anything solid, or inside the first solid thing hit (wall decor hangs within its wall cell's collider box). Anything
         // further, behind a wall or the floor, is never picked. Pieces drawn hidden in build mode (ceiling panels) and avatars are
         // looked through. surface is the lot cell of the first solid thing hit (just inside it), or null.
-        private string PointedPiece(Vector2 pointer, SiteLayout layout, out (int X, int Z)? surface)
+        private string PointedPiece(Vector2 pointer, SiteLayout layout, out (int X, int Z)? surface, out string belt)
         {
             surface = null;
+            belt = null;
             var camera = BuildCamera();
             if (camera == null) return null;
             Collider blocker = null;
@@ -774,6 +899,18 @@ namespace FoodFactoryGame.Session.Buildings
             foreach (var hit in hits.OrderBy(x => x.distance))
             {
                 if (hit.collider.GetComponentInParent<PlayerAvatar>() != null) continue;
+                // A belt or lift in front of anything solid is what the pointer is on (belt is set; no piece is).
+                var beltVisual = hit.collider.GetComponentInParent<BeltVisual>();
+                if (beltVisual != null)
+                {
+                    if (blocker == null && beltVisual.GetComponentsInChildren<Renderer>().Any(x => x.enabled)
+                        && session.ClientSite?.Belts.Any(x => x.Id == beltVisual.BeltId && x.SiteId == session.ClientSiteId) == true)
+                    {
+                        belt = beltVisual.BeltId;
+                        return null;
+                    }
+                    continue;
+                }
                 var visual = hit.collider.GetComponentInParent<EquipmentVisual>();
                 if (visual == null)
                 {
@@ -1047,8 +1184,8 @@ namespace FoodFactoryGame.Session.Buildings
 
         // What to do next, while nothing is previewed.
         private string Hint() => Tool == BuildTool.None
-            ? "Pick an item from the catalog. Hold right click on something to sell or remove it, then keep holding and sweep to remove more."
-            : "Click to place, drag to draw. R rotates; X clears.";
+            ? "Pick an item from the catalog, or middle click something to pick it. Hold right click on something to sell or remove it, then keep holding and sweep to remove more."
+            : "Click to place, drag to draw. R rotates; X clears. Middle click picks what the pointer is on.";
 
         // Lights the chosen tool and marks the chosen catalog card (a structure style or an offer).
         private void FillTools()
@@ -1065,7 +1202,8 @@ namespace FoodFactoryGame.Session.Buildings
         // The filter chips (All, then each category with cards) and the cards of the chosen filter under their headings.
         private void FillCatalog()
         {
-            _entries = BuildCatalog.Entries(session.Offers, session.Items, Name, PricePercent());
+            _entries = BuildCatalog.Entries(session.Offers, session.Items, Name, PricePercent(),
+                (tool, style) => StructureIcons.Get(buildings.RestaurantStyles, tool, style));
             if (Filter != BuildCatalogFilter.All && _entries.All(x => x.Filter != Filter)) Filter = BuildCatalogFilter.All;
             _filters.Clear();
             foreach (var filter in BuildCatalog.Filters)

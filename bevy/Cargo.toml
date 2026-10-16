@@ -19,7 +19,11 @@ bevy = { version = "0.20", default-features = false, features = [
 [features]
 # Dynamic linking makes incremental rebuilds fast; `cargo run --release --no-default-features` for a standalone build.
 default = ["dev"]
-dev = ["bevy/dynamic_linking"]
+# `file_watcher` reloads changed files under assets/ (models, textures) while the game runs.
+dev = ["bevy/dynamic_linking", "bevy/file_watcher"]
+# Live-patches edited system bodies into the running game under `dx serve --hot-patch` (see README). Used without `dev`:
+# dx cannot launch a dynamically linked Bevy on Windows (DioxusLabs/dioxus#4693), and patches only rebuild this crate.
+hotpatch = ["bevy/hotpatching", "bevy/file_watcher"]
 gamepad = ["bevy/bevy_gilrs"]
 
 # Our code compiles quickly with light optimisation; dependencies are built optimised once and cached.

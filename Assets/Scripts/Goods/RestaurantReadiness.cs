@@ -56,13 +56,16 @@ namespace FoodFactoryGame.Goods
             var result = new RestaurantReadiness();
             var placed = state.Equipment.Where(x => x.SiteId == siteId && x.State == EquipmentState.Placed).OrderBy(x => x.Id, StringComparer.Ordinal).ToList();
             var registers = placed.Where(x => x.Kind == GoodsWorld.CounterKind).ToList();
-            var reach = RestaurantRules.CustomerReach(state, siteId, offer);
+            // The same cells as RestaurantRules.CustomerReach, keeping the walkable grid for the table rule.
+            var walkable = RestaurantRules.Walkable(state, siteId, customers: true);
+            var reach = RestaurantRules.Reached(walkable, RestaurantRules.StreetCells(state.SiteLayouts.FirstOrDefault(x => x.SiteId == siteId), offer));
             var reachable = registers.Where(x => RestaurantRules.ServesCustomers(reach, x)).ToList();
             var staffed = reachable.Where(x => !string.IsNullOrEmpty(x.StaffId)).ToList();
             result.Registers = registers.Count;
             result.ReachableRegisters = reachable.Count;
             result.StaffedRegisters = staffed.Count;
-            result.ReachableSeats = placed.Where(x => GoodsWorld.IsTable(x) && RestaurantRules.ServesCustomers(reach, x)).Sum(x => x.Seats);
+            // Seats count only at tables customers can walk to from a register they reach (RestaurantRules.TablesByRegister).
+            result.ReachableSeats = RestaurantRules.SeatingTables(walkable, reach, reachable, placed).Sum(x => x.Seats);
 
             var restaurants = state.Buildings.Where(x => x.SiteId == siteId && x.Kind == GoodsWorld.RestaurantKind).ToList();
             if (restaurants.All(x => !SiteGrid.CustomerDoors(x).Any())) result.Blocker = NoCustomerDoor;

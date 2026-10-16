@@ -3,7 +3,8 @@
 // AmbientPedestrians fills the city sidewalks near the camera with pooled walkers that represent no record and never touch the
 // simulation: they walk the sidewalk on either side of every non-rural road, turn at junction corners and use the crosswalks,
 // crossing on the traffic light's walk phase (the cars' own green along the same axis) or, at other junctions, when no drawn car
-// is close. Walkers are recycled once they are far from the camera.
+// is close. Walkers are recycled once they are far from the camera and out of sight (ViewCulling); a walker nobody can see is
+// not drawn and its animator stands still, though it walks on. Customers walking to a restaurant are not walkers.
 using System.Collections.Generic;
 using FoodFactoryGame.Session.Customers;
 using FoodFactoryGame.World;
@@ -40,7 +41,11 @@ namespace FoodFactoryGame.Session.Logistics
         public const int MaxWalkers = 36;
         private const float DensityMetres = 10f;
         private const float Radius = 90f;
-        private const float DespawnRadius = 115f;
+        // Walkers beyond Radius go once out of sight (or too small to be drawn); beyond this, always.
+        private const float DespawnRadius = 200f;
+        // Within this distance of a camera a walker is always drawn (its shadow may fall into view).
+        private const float AlwaysDrawn = 15f;
+        private const float FigureHeight = 1.8f;
         // New walkers appear out of view, or anywhere this far away (too small to notice popping in).
         private const float HiddenDistance = 45f;
         private const int SpawnsPerFrame = 2;
@@ -86,6 +91,8 @@ namespace FoodFactoryGame.Session.Logistics
             public Transform Transform;
             public Animator Animator;
             public Renderer[] Tinted;
+            public Renderer[] Renderers;
+            public bool Drawn = true;
             public int Variant;
             public float Speed;
             // Map position (metres) on the walked line, before stepping around trees.
@@ -159,12 +166,14 @@ namespace FoodFactoryGame.Session.Logistics
             {
                 var walker = _walkers[i];
                 var distance = (walker.Position - view).magnitude;
-                if (distance > DespawnRadius || distance > Radius && !OnScreen(camera, walker.Transform.position))
+                var seen = ViewCulling.Seen(walker.Transform.position + Vector3.up, 1f, FigureHeight);
+                if (distance > DespawnRadius || distance > Radius && !seen)
                 {
                     Release(walker);
                     _walkers.RemoveAt(i);
                     continue;
                 }
+                Draw(walker, seen || distance < AlwaysDrawn);
                 Step(walker, clock.Value, placement);
             }
             var target = Mathf.Min(MaxWalkers, (int)(_nearbyLength / DensityMetres));
@@ -374,6 +383,7 @@ namespace FoodFactoryGame.Session.Logistics
                 transform.SetPositionAndRotation(scene,
                     Quaternion.RotateTowards(transform.rotation, Quaternion.LookRotation(direction), 360f * Time.deltaTime));
             else transform.position = scene;
+            if (!walker.Drawn) return;
             walker.Animator.SetFloat(SpeedParameter, moving ? walker.Speed : 0f, 0.12f, Time.deltaTime);
             walker.Animator.SetFloat(WalkRateParameter, walker.Speed / WalkClipSpeed);
         }
@@ -475,7 +485,6 @@ namespace FoodFactoryGame.Session.Logistics
                 var into = RoadTraffic.LightPhase(node, clock) - (walkAlongX ? 0 : RoadTraffic.LightCycleSeconds / 2);
                 return into >= 0 && into < RoadTraffic.GreenSeconds && into + width / walker.Speed + 1f <= RoadTraffic.LightCycleSeconds / 2f;
             }
-            var placement = _streets.Placement;
             if (_traffic == null && Time.time >= _nextTrafficLookup)
             {
                 _nextTrafficLookup = Time.time + 5f;
@@ -485,10 +494,7 @@ namespace FoodFactoryGame.Session.Logistics
             var middle = move == 4
                 ? new Vector2(node.X, node.Z + walker.Sz * (_streets.SpanZ[walker.Node] + CrosswalkOut))
                 : new Vector2(node.X + walker.Sx * (_streets.SpanX[walker.Node] + CrosswalkOut), node.Z);
-            foreach (var car in _traffic.Cars)
-                if (car.Value != null && (placement.ToMap(car.Value.transform.position) - middle).sqrMagnitude < CarClearance * CarClearance)
-                    return false;
-            return true;
+            return !_traffic.AnyCarWithin(middle, CarClearance);
         }
 
         // Builds the path of a move from the walker's corner.
@@ -554,8 +560,13 @@ namespace FoodFactoryGame.Session.Logistics
             if (walker == null || walker.Root == null)
             {
                 var root = CharacterFigures.Create(prefab, variant, _container, Vector3.zero, Quaternion.identity, out var animator);
-                animator.cullingMode = AnimatorCullingMode.CullUpdateTransforms;
-                walker = new Walker { Root = root, Transform = root.transform, Animator = animator, Tinted = CharacterFigures.Tinted(root), Variant = variant };
+                // This class moves walkers (no root motion), so the animator of one nobody sees can stop entirely.
+                animator.cullingMode = AnimatorCullingMode.CullCompletely;
+                walker = new Walker
+                {
+                    Root = root, Transform = root.transform, Animator = animator, Tinted = CharacterFigures.Tinted(root), Variant = variant,
+                    Renderers = root.GetComponentsInChildren<Renderer>(true)
+                };
                 DistanceCulling.Apply(root);
                 Pedestrians.Add(walker.Transform);
             }
@@ -563,7 +574,17 @@ namespace FoodFactoryGame.Session.Logistics
             CharacterFigures.Tint(walker.Tinted, Color.HSVToRGB((float)_random.NextDouble(), Mathf.Lerp(0.35f, 0.6f, (float)_random.NextDouble()),
                 Mathf.Lerp(0.55f, 0.9f, (float)_random.NextDouble())));
             walker.Root.SetActive(true);
+            Draw(walker, true);
             return walker;
+        }
+
+        // Draws or hides a walker's renderers (a hidden one's animator, culling completely, stops too).
+        private static void Draw(Walker walker, bool drawn)
+        {
+            if (walker.Drawn == drawn) return;
+            walker.Drawn = drawn;
+            foreach (var renderer in walker.Renderers)
+                if (renderer != null) renderer.forceRenderingOff = !drawn;
         }
 
         private void Release(Walker walker)

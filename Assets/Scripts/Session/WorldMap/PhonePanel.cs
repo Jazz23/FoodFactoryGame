@@ -1,7 +1,9 @@
 // Local player's phone (owner request 2026-10-13, decision 0047), drawn from the Phone UXML and USS under Assets/UI/Resources/UI
-// and opened with C (EquipmentInteraction.TogglePhone). It has seven apps:
-// - Map: the world from above (PhoneMapView) with every lot coloured by what it is and who owns it. Tapping a lot shows its
-//   price, owner and a Buy button (the same server request as PropertyPanel), a rename box for the company's own places and,
+// and opened with C (EquipmentInteraction.TogglePhone), or straight on the Map app with the Map key (M by default). It has seven apps:
+// - Map: the world from above (PhoneMapView) with every lot coloured by what it is and who owns it, and the player as an arrow
+//   turned to the camera's yaw. Tapping a lot shows its price, owner and a Buy button (the same server request as PropertyPanel;
+//   hovering it says why the lot cannot be bought), for the company's own places a rename box (Enter saves) and Teleport (the
+//   avatar is set down on the sidewalk at the middle of the lot's street edge, PlayerAvatar.TeleportToLot) and,
 //   for a farm, its type and the goods it sells: choose one, how many packs, delivery (flat fee) or pickup by a parked company
 //   truck, and the dock it goes to, then Order now. Owning the farm halves the goods price. A "Repeat order" checkbox
 //   (unchecked by default) shows the "Repeat every N game h" stepper; checked, Order now asks the server for a repeating
@@ -12,9 +14,10 @@
 //   "Running tasks" badge on each employee whose server record says it runs its task loop (EmployeeScriptPanel.IsRunning).
 // - Trucks: the logistics screen (routes, the fleet, buying trucks, stock at other sites), moved into the phone while this app
 //   is open (LogisticsPanel.Embed), so it is the same screen L opens.
-// - Places: every site of the company with a rename box.
-// - Ledger: the company's latest cash changes (decision 0038), newest first, with its opening and current cash (owner,
-//   2026-10-13: the ledger lives in the phone, not beside the Supplier).
+// - Places: every site of the company with a rename box (Enter saves).
+// - Ledger: the company's latest cash changes (decision 0038), newest first, under column titles, with its opening and current
+//   cash (owner, 2026-10-13: the ledger lives in the phone, not beside the Supplier). A sale names what was sold: its entry's
+//   menu item (OfferId, the sale recipe) read from the session's recipes, as "quantity x item" for a single-item sale.
 // - Recipes: every recipe in the game, grouped by the machine that makes it, with its inputs, output and time, then the menu
 //   items registers sell with their price and serving time. A machine recipe's card shows what its output sells for at a
 //   register (a menu item selling that item alone), or that it is not sold there. Content only, so it is built once.
@@ -90,6 +93,14 @@ namespace FoodFactoryGame.Session.WorldMap
         private readonly Dictionary<string, VisualElement> _pages = new();
         private readonly Dictionary<string, Button> _tabButtons = new();
         private bool _wasOpen;
+        // The Map key (Player/Map, rebindable in Settings): opens the phone on the Map app.
+        private UnityEngine.InputSystem.InputAction _mapAction;
+        // Says why the map's Buy button cannot be used while the pointer rests on it.
+        private CursorTooltip _tooltip;
+        private Button _buy;
+        private Func<string> _buyBlocker;
+        // This client's own avatar, looked up again once it is gone (Unity null).
+        private PlayerAvatar _avatar;
 
         public VisualElement Window => _window;
         public string Tab { get; private set; } = MapTab;
@@ -107,6 +118,8 @@ namespace FoodFactoryGame.Session.WorldMap
         public string LastAccepted { get; private set; }
         public bool HasPendingRequests => _pending.Count > 0;
         public PhoneMapView MapView => _mapView;
+        // Why the map's Buy button cannot be used, as its tooltip shows it while hovered; empty otherwise.
+        public string BuyTooltip => _tooltip?.Text ?? "";
 
         private SessionRoot Session => interaction.Session;
         private GoodsSnapshot Primary => Session.ClientSite;
@@ -148,9 +161,27 @@ namespace FoodFactoryGame.Session.WorldMap
             _mapView = new PhoneMapView { LotColour = LotColour };
             _mapView.LotClicked += SelectLot;
             root.Part("phone-map-frame").Insert(0, _mapView);
+            _tooltip = new CursorTooltip(root, "phone-buy-tooltip");
             ShowTab(MapTab);
             _window.Show(false);
             _dim.Show(false);
+            _mapAction = UnityEngine.InputSystem.InputSystem.actions?.FindActionMap(KeyBindings.MapName)?.FindAction("Map");
+            if (_mapAction != null)
+            {
+                _mapAction.performed += OnMapKey;
+                _mapAction.Enable();
+            }
+        }
+
+        // The Map key opens the phone on the Map app (from the world only: OpenPhone refuses while another screen is open). While
+        // the phone is open the key is suspended with the other gameplay keys, so typing "m" in a name box does nothing.
+        private void OnMapKey(UnityEngine.InputSystem.InputAction.CallbackContext _) => OpenMap();
+
+        public bool OpenMap()
+        {
+            if (interaction.Screen == InteractionScreen.Phone ? interaction.PhoneTextFocused : !interaction.OpenPhone()) return false;
+            ShowTab(MapTab);
+            return true;
         }
 
         private void Update()
@@ -166,6 +197,7 @@ namespace FoodFactoryGame.Session.WorldMap
             if (!open)
             {
                 _wasOpen = false;
+                _tooltip.Hide();
                 return;
             }
             WatchCompanySites(site);
@@ -174,7 +206,10 @@ namespace FoodFactoryGame.Session.WorldMap
             RefreshFarmKinds();
             _mapView.Layout = map != null ? map.Shown : null;
             _mapEmpty.Show(_mapView.Layout == null);
-            _mapView.Player = PlayerOnMap();
+            if (_avatar == null) _avatar = LocalAvatar();
+            _mapView.Player = PlayerOnMap(_avatar);
+            // The arrow follows the camera's yaw, not the body's, so it shows where the player is looking.
+            if (_avatar != null && _avatar.CameraRig != null) _mapView.PlayerYaw = _avatar.CameraRig.Yaw;
             if (!_wasOpen)
             {
                 _wasOpen = true;
@@ -202,6 +237,7 @@ namespace FoodFactoryGame.Session.WorldMap
             }
             foreach (var (element, text) in _live) element.SetText(text());
             foreach (var (element, enabled) in _liveEnabled) element.SetEnabled(enabled());
+            _tooltip.Show(Tab == MapTab ? _buy : null, _buyBlocker?.Invoke());
         }
 
         // ---------- Tabs and selection ----------
@@ -303,6 +339,17 @@ namespace FoodFactoryGame.Session.WorldMap
             _subscription?.Bridge?.RequestRenameSite(Track("Renamed."), siteId, name.Trim());
         }
 
+        // Sets the local avatar down in front of one of the company's own places (PlayerAvatar.TeleportToLot: the middle of the
+        // lot's street edge, on the sidewalk) and closes the phone. The owner moves its own avatar, as when walking.
+        public bool Teleport(string lotId)
+        {
+            if (!LotOffers.TryGetValue(lotId ?? "", out var offer) || Company?.SiteIds.Contains(offer.SiteId) != true) return false;
+            if (_avatar == null) _avatar = LocalAvatar();
+            if (_avatar == null || !_avatar.TeleportToLot(SitePlacement.Active, lotId)) return false;
+            interaction.CloseScreen();
+            return true;
+        }
+
         public void Hire() => interaction.Hire();
 
         // Opens an employee's task screen from the staff list.
@@ -349,7 +396,11 @@ namespace FoodFactoryGame.Session.WorldMap
             _successes.Clear();
         }
 
-        private void OnDestroy() => Subscribe(null);
+        private void OnDestroy()
+        {
+            Subscribe(null);
+            if (_mapAction != null) _mapAction.performed -= OnMapKey;
+        }
 
         // ---------- Content ----------
 
@@ -421,12 +472,12 @@ namespace FoodFactoryGame.Session.WorldMap
             return offer.Category == GoodsWorld.FarmCategory ? Farm : ForSale;
         }
 
-        private Vector2? PlayerOnMap()
+        private static PlayerAvatar LocalAvatar() => FindObjectsByType<PlayerAvatar>().FirstOrDefault(x => x != null && x.IsOwner);
+
+        private static Vector2? PlayerOnMap(PlayerAvatar avatar)
         {
             var placement = SitePlacement.Active;
-            if (placement == null) return null;
-            var avatar = FindObjectsByType<PlayerAvatar>().FirstOrDefault(x => x != null && x.IsOwner);
-            return avatar == null ? null : placement.ToMap(avatar.transform.position);
+            return placement == null || avatar == null ? null : placement.ToMap(avatar.transform.position);
         }
 
         private string SiteName(string siteId) => Primary?.Sites.FirstOrDefault(x => x.Id == siteId)?.Name ?? siteId ?? "";
@@ -486,6 +537,8 @@ namespace FoodFactoryGame.Session.WorldMap
         private void BuildDetail()
         {
             _detail.Clear();
+            _buy = null;
+            _buyBlocker = null;
             var offer = SelectedOffer;
             if (offer == null)
             {
@@ -513,11 +566,21 @@ namespace FoodFactoryGame.Session.WorldMap
             {
                 var buy = Button("Buy  ·  " + PlayerHud.FormatCash(offer.PriceCents), Buy, "ff-button--primary", "phone-detail__buy");
                 buy.name = "phone-buy";
-                Enabled(buy, () => !HasPendingRequests && offer.ForSale && Company != null && Company.Cash >= offer.PriceCents
-                    && Primary.Properties.All(x => x.LotId != offer.LotId));
+                // Disabled exactly when there is a reason, which its tooltip shows (PropertyPanel.BuyBlocker, shared with the buy panel).
+                _buy = buy;
+                _buyBlocker = () => PropertyPanel.BuyBlocker(Primary, Company, offer, HasPendingRequests);
+                Enabled(buy, () => _buyBlocker() == null);
                 _detail.Add(buy);
             }
-            else _detail.Add(RenameRow(offer.SiteId, "phone-detail__section"));
+            else
+            {
+                _detail.Add(RenameRow(offer.SiteId, "phone-detail__section"));
+                var lotId = offer.LotId;
+                var teleport = Button("Teleport", () => Teleport(lotId), "phone-detail__buy");
+                teleport.name = "phone-teleport";
+                Enabled(teleport, () => SitePlacement.Active != null && _avatar != null);
+                _detail.Add(teleport);
+            }
             if (offer.Category == GoodsWorld.FarmCategory) BuildFarm(offer);
         }
 
@@ -741,6 +804,18 @@ namespace FoodFactoryGame.Session.WorldMap
             var entries = company == null ? new List<GoodsLedgerEntry>()
                 : GoodsWorld.LedgerOf(site, company.Id).Take(PlayerHud.LedgerRowsShown).ToList();
             if (entries.Count == 0) _ledger.Add(Text("No cash changes recorded yet.", "ff-small"));
+            else
+            {
+                var header = new VisualElement { name = "phone-ledger-header", pickingMode = PickingMode.Ignore };
+                header.AddToClassList("ff-row");
+                header.AddToClassList("phone-ledger__row");
+                header.AddToClassList("phone-ledger__header");
+                header.Add(Text("Time", "phone-ledger__time", "ff-eyebrow"));
+                header.Add(Text("What", "phone-ledger__kind", "ff-eyebrow"));
+                header.Add(Text("Place", "phone-ledger__site", "ff-eyebrow"));
+                header.Add(Text("Amount", "phone-ledger__amount", "ff-eyebrow"));
+                _ledger.Add(header);
+            }
             foreach (var entry in entries)
             {
                 var row = new VisualElement { name = "phone-ledger-row-" + entry.Id, pickingMode = PickingMode.Ignore };
@@ -748,7 +823,7 @@ namespace FoodFactoryGame.Session.WorldMap
                 row.AddToClassList("ff-row");
                 row.AddToClassList("phone-ledger__row");
                 row.Add(Text(PlayerHud.FormatDuration(entry.ClockSeconds, false), "phone-ledger__time", "ff-muted"));
-                row.Add(Text(PlayerHud.LedgerKind(entry.Kind), "phone-ledger__kind"));
+                row.Add(Text(LedgerWhat(entry), "phone-ledger__kind"));
                 row.Add(Text(SiteName(entry.SiteId), "phone-ledger__site", "ff-muted", "ff-nowrap"));
                 var amount = Text((entry.Cents > 0 ? "+" : "-") + PlayerHud.FormatCash(Math.Abs(entry.Cents)), "phone-ledger__amount");
                 amount.EnableInClassList("ff-positive-text", entry.Cents > 0);
@@ -758,6 +833,20 @@ namespace FoodFactoryGame.Session.WorldMap
             if (company != null)
                 _ledger.Add(Text($"Opening {PlayerHud.FormatCash(company.OpeningCents)}, earlier entries {PlayerHud.FormatCash(company.LedgerCarriedCents)}, "
                     + $"now {PlayerHud.FormatCash(company.Cash)}", "ff-small", "ff-muted", "phone-ledger__totals"));
+        }
+
+        // A ledger entry's "What" column: its kind and, for a sale, what was sold. A sale's OfferId is the menu item (sale recipe)
+        // the counter sold; one with a single input reads "quantity x item", a combo its menu name. Older or unknown records fall
+        // back to the kind alone.
+        public string LedgerWhat(GoodsLedgerEntry entry)
+        {
+            var kind = PlayerHud.LedgerKind(entry.Kind);
+            if (entry.Kind != GoodsWorld.LedgerSale || string.IsNullOrEmpty(entry.OfferId)) return kind;
+            var recipe = Session.Recipes.FirstOrDefault(x => x != null && x.Id == entry.OfferId);
+            if (recipe == null) return kind;
+            var single = recipe.Inputs.Count == 1 && !string.IsNullOrEmpty(recipe.Inputs[0].itemId);
+            var sold = single ? $"{Math.Max(1, recipe.Inputs[0].quantity)} x {ItemName(recipe.Inputs[0].itemId)}" : recipe.DisplayName;
+            return string.IsNullOrEmpty(sold) ? kind : $"{kind}: {sold}";
         }
 
         // ---------- Recipes ----------
@@ -784,13 +873,17 @@ namespace FoodFactoryGame.Session.WorldMap
                 _recipes.Add(grid);
             }
             var menu = recipes.Where(x => x.IsSale).OrderBy(x => x.Tier).ThenBy(x => x.DisplayName).ToList();
-            if (menu.Count == 0) return;
-            _recipes.Add(Text("MENU: SOLD AT THE REGISTER", "ff-eyebrow", "phone__heading"));
-            var menuGrid = new VisualElement { pickingMode = PickingMode.Ignore };
-            menuGrid.AddToClassList("phone-recipes__grid");
-            foreach (var recipe in menu)
-                menuGrid.Add(RecipeCard(recipe, recipe.Inputs.FirstOrDefault()?.itemId, "Sells for " + PlayerHud.FormatCash(recipe.SaleCents)));
-            _recipes.Add(menuGrid);
+            if (menu.Count > 0)
+            {
+                _recipes.Add(Text("MENU: SOLD AT THE REGISTER", "ff-eyebrow", "phone__heading"));
+                var menuGrid = new VisualElement { pickingMode = PickingMode.Ignore };
+                menuGrid.AddToClassList("phone-recipes__grid");
+                foreach (var recipe in menu)
+                    menuGrid.Add(RecipeCard(recipe, recipe.Inputs.FirstOrDefault()?.itemId, "Sells for " + PlayerHud.FormatCash(recipe.SaleCents)));
+                _recipes.Add(menuGrid);
+            }
+            // Tapping a card opens its ingredient tree and quantity calculator (PhoneRecipePage).
+            PhoneRecipePage.Attach(_recipes, Session);
         }
 
         // What one unit of an item sells for at a register: the menu items that sell that item alone (one input), per unit,
@@ -855,9 +948,20 @@ namespace FoodFactoryGame.Session.WorldMap
             field.AddToClassList("ff-text-field");
             field.AddToClassList("phone-row__field");
             field.RegisterValueChangedCallback(evt => _names[siteId] = evt.newValue);
+            bool CanRename() => !HasPendingRequests && !string.IsNullOrWhiteSpace(field.value) && field.value.Trim() != SiteName(siteId);
             var rename = Button("Rename", () => Rename(siteId, field.value), "phone-row__button");
             rename.name = "phone-rename-" + siteId;
-            Enabled(rename, () => !HasPendingRequests && !string.IsNullOrWhiteSpace(field.value) && field.value.Trim() != SiteName(siteId));
+            Enabled(rename, CanRename);
+            // Enter in the box saves like the button (the same check, so a second Enter while the first is pending sends nothing),
+            // then leaves the box so the page can show the server's answer. Same text-box handling as EmployeeScriptPanel's name.
+            field.RegisterCallback<KeyDownEvent>(evt =>
+            {
+                if (evt.keyCode is not (KeyCode.Return or KeyCode.KeypadEnter)) return;
+                evt.StopPropagation();
+                if (!CanRename()) return;
+                Rename(siteId, field.value);
+                field.Blur();
+            }, TrickleDown.TrickleDown);
             row.Add(field);
             row.Add(rename);
             return row;

@@ -3,7 +3,8 @@
 // covers them; decor on the floor, walls, ceiling or tables never blocks. A piece is reached when a walkable cell beside its
 // footprint can be walked to from a source. Customers come from the street edge of a lot (any edge of a dev site) and never pass
 // a back door (decision 0037); trucks stop on the street edge. A restaurant dock stands beside a back door's doorstep;
-// no other object-layer piece and no belt covers that doorstep.
+// no other object-layer piece and no belt covers that doorstep. A table seats customers only when they can walk to it from a
+// register they order at (TablesByRegister), directly or through a chair standing beside it.
 // Ambience: one score per restaurant from its placed pieces' ambience points, with diminishing returns and a cap.
 using System;
 using System.Collections.Generic;
@@ -29,7 +30,8 @@ namespace FoodFactoryGame.Goods
             var buildings = state.Buildings?.Where(x => x.SiteId == siteId).ToList() ?? new List<GoodsBuilding>();
             for (var x = 0; x < layout.Width; x++)
             for (var z = 0; z < layout.Depth; z++)
-                open[x, z] = !buildings.Any(b => SiteGrid.IsWall(b, x, z));
+                open[x, z] = true;
+            foreach (var building in buildings) CloseWalls(building, open);
             if (customers)
                 foreach (var (x, z) in buildings.SelectMany(SiteGrid.ServiceDoors))
                     if (x >= 0 && z >= 0 && x < layout.Width && z < layout.Depth) open[x, z] = false;
@@ -46,6 +48,39 @@ namespace FoodFactoryGame.Goods
             }
             if (block is { } extra) Close(extra.X, extra.Z, extra.Width, extra.Depth);
             return open;
+        }
+
+        // Marks the ground-floor wall cells of a building (exactly SiteGrid.IsWall at level 0) closed. Only perimeter and partition
+        // cells can be walls, so just those are visited, with the building's doors looked up in sets: testing IsWall on every cell
+        // scanned every structure per cell, several milliseconds a call on a built-up site, and readiness runs it per baseline.
+        private static void CloseWalls(GoodsBuilding building, bool[,] open)
+        {
+            var width = open.GetLength(0);
+            var depth = open.GetLength(1);
+            var doors = new HashSet<(int, int)>();
+            foreach (var door in building.Doors ?? new List<GridCell>()) doors.Add((door.X, door.Z));
+            var doorStructures = new HashSet<(int, int)>();
+            var partitions = new List<(int X, int Z)>();
+            foreach (var structure in building.Structures ?? new List<GoodsStructure>())
+            {
+                if (structure == null) continue;
+                if (structure.Kind == GoodsWorld.DoorStructure) doorStructures.Add((structure.X, structure.Z));
+                else if (structure.Kind == GoodsWorld.PartitionStructure) partitions.Add((structure.X, structure.Z));
+            }
+            void Close(int x, int z)
+            {
+                if (x >= 0 && z >= 0 && x < width && z < depth) open[x, z] = false;
+            }
+            if (!building.FreeWalls && building.Width > 0 && building.Depth > 0)
+            {
+                var right = building.CellX + building.Width - 1;
+                var top = building.CellZ + building.Depth - 1;
+                for (var x = building.CellX; x <= right; x++)
+                for (var z = building.CellZ; z <= top; z++)
+                    if ((x == building.CellX || x == right || z == building.CellZ || z == top) && !doors.Contains((x, z))) Close(x, z);
+            }
+            foreach (var cell in partitions)
+                if (!doorStructures.Contains(cell)) Close(cell.X, cell.Z);
         }
 
         // Every walkable cell reachable (four-way) from the walkable source cells.
@@ -96,7 +131,7 @@ namespace FoodFactoryGame.Goods
         }
 
         // True when a walkable cell beside the footprint was reached.
-        public static bool Touches(HashSet<(int X, int Z)> reached, int cellX, int cellZ, int width, int depth)
+        public static bool Touches(ICollection<(int X, int Z)> reached, int cellX, int cellZ, int width, int depth)
         {
             for (var x = cellX; x < cellX + width; x++)
                 if (reached.Contains((x, cellZ - 1)) || reached.Contains((x, cellZ + depth))) return true;
@@ -105,7 +140,7 @@ namespace FoodFactoryGame.Goods
             return false;
         }
 
-        public static bool Touches(HashSet<(int X, int Z)> reached, GoodsEquipment piece)
+        public static bool Touches(ICollection<(int X, int Z)> reached, GoodsEquipment piece)
         {
             var (width, depth) = SiteGrid.Footprint(piece.Width, piece.Depth, piece.Rotation);
             return Touches(reached, piece.CellX, piece.CellZ, width, depth);
@@ -118,6 +153,94 @@ namespace FoodFactoryGame.Goods
 
         // A register or table serves customers when it stands on the ground floor beside a cell they reach (decision 0034).
         public static bool ServesCustomers(HashSet<(int X, int Z)> reach, GoodsEquipment piece) => piece.Level == 0 && Touches(reach, piece);
+
+        // Steps (four-way cells) from the nearest walkable source cell to every walkable cell reached from the sources.
+        public static Dictionary<(int X, int Z), int> Steps(bool[,] walkable, IEnumerable<(int X, int Z)> sources)
+        {
+            var steps = new Dictionary<(int X, int Z), int>();
+            if (walkable == null) return steps;
+            var width = walkable.GetLength(0);
+            var depth = walkable.GetLength(1);
+            var queue = new Queue<(int X, int Z)>();
+            foreach (var cell in sources)
+                if (cell.X >= 0 && cell.Z >= 0 && cell.X < width && cell.Z < depth && walkable[cell.X, cell.Z] && steps.TryAdd(cell, 0)) queue.Enqueue(cell);
+            while (queue.Count > 0)
+            {
+                var (x, z) = queue.Dequeue();
+                var next = steps[(x, z)] + 1;
+                foreach (var (nx, nz) in new[] { (x + 1, z), (x - 1, z), (x, z + 1), (x, z - 1) })
+                    if (nx >= 0 && nz >= 0 && nx < width && nz < depth && walkable[nx, nz] && steps.TryAdd((nx, nz), next)) queue.Enqueue((nx, nz));
+            }
+            return steps;
+        }
+
+        // The reached cells edge to edge with a piece's footprint: where a customer stands to use it.
+        public static List<(int X, int Z)> CellsBeside(ICollection<(int X, int Z)> reached, GoodsEquipment piece)
+        {
+            var (width, depth) = SiteGrid.Footprint(piece.Width, piece.Depth, piece.Rotation);
+            var cells = new List<(int X, int Z)>();
+            void Add((int X, int Z) cell)
+            {
+                if (reached.Contains(cell)) cells.Add(cell);
+            }
+            for (var x = piece.CellX; x < piece.CellX + width; x++)
+            {
+                Add((x, piece.CellZ - 1));
+                Add((x, piece.CellZ + depth));
+            }
+            for (var z = piece.CellZ; z < piece.CellZ + depth; z++)
+            {
+                Add((piece.CellX - 1, z));
+                Add((piece.CellX + width, z));
+            }
+            return cells;
+        }
+
+        // PROTOTYPE (customer seating, owner request 2026-10-15): seat-less furniture customers sit on beside a table (chairs,
+        // stools, benches, banquettes). It blocks walking like any object-layer piece, so a table counts as reached through one.
+        public static bool IsSeatFurniture(GoodsEquipment piece) => piece?.Kind is { } kind
+            && (kind.StartsWith("rt-chair", StringComparison.Ordinal) || kind == "rt-bench" || kind == "rt-booth");
+
+        // True when two footprints touch edge to edge without overlapping.
+        public static bool Beside(GoodsEquipment a, GoodsEquipment b)
+        {
+            var (aw, ad) = SiteGrid.Footprint(a.Width, a.Depth, a.Rotation);
+            var (bw, bd) = SiteGrid.Footprint(b.Width, b.Depth, b.Rotation);
+            var alongX = a.CellX < b.CellX + bw && b.CellX < a.CellX + aw;
+            var alongZ = a.CellZ < b.CellZ + bd && b.CellZ < a.CellZ + ad;
+            return (alongX && (a.CellZ + ad == b.CellZ || b.CellZ + bd == a.CellZ)) || (alongZ && (a.CellX + aw == b.CellX || b.CellX + bw == a.CellX));
+        }
+
+        // PROTOTYPE seat rule (owner request 2026-10-15, refining decision 0034): a table seats customers only when a walkable
+        // customer route leads from where they order at a register (a reached cell beside it) to a cell beside the table, or
+        // beside seat furniture standing beside it. Per register ID (in the given order), the ground-floor tables in `placed`
+        // order its customers can walk to. walkable and reach are the customers' (Walkable with customers, CustomerReach).
+        public static Dictionary<string, List<GoodsEquipment>> TablesByRegister(bool[,] walkable, ICollection<(int X, int Z)> reach,
+            IEnumerable<GoodsEquipment> registers, IReadOnlyList<GoodsEquipment> placed)
+        {
+            var result = new Dictionary<string, List<GoodsEquipment>>(StringComparer.Ordinal);
+            var tables = placed.Where(x => GoodsWorld.IsTable(x) && x.Level == 0).ToList();
+            var seats = placed.Where(x => x.Level == 0 && IsSeatFurniture(x)).ToList();
+            // A register's walkable area is the whole connected area around its service cells, shared by registers in it.
+            var areas = new List<HashSet<(int X, int Z)>>();
+            foreach (var register in registers)
+            {
+                var spots = register.Level == 0 ? CellsBeside(reach, register) : new List<(int X, int Z)>();
+                var area = areas.FirstOrDefault(x => spots.Any(x.Contains));
+                if (area == null && spots.Count > 0) areas.Add(area = Reached(walkable, spots));
+                result[register.Id] = area == null ? new List<GoodsEquipment>()
+                    : tables.Where(t => Touches(area, t) || seats.Any(s => Beside(s, t) && Touches(area, s))).ToList();
+            }
+            return result;
+        }
+
+        // The tables of a site customers can walk to from one of the given registers (TablesByRegister), in `placed` order.
+        public static List<GoodsEquipment> SeatingTables(bool[,] walkable, ICollection<(int X, int Z)> reach,
+            IEnumerable<GoodsEquipment> registers, IReadOnlyList<GoodsEquipment> placed)
+        {
+            var valid = new HashSet<string>(TablesByRegister(walkable, reach, registers, placed).Values.SelectMany(x => x).Select(x => x.Id), StringComparer.Ordinal);
+            return placed.Where(x => valid.Contains(x.Id)).ToList();
+        }
 
         // A sale recipe sold at registers (decision 0024): the restaurant's menu.
         public static bool IsMenuItem(RecipeDefinition recipe) => recipe != null && recipe.IsSale && recipe.StationKind == GoodsWorld.CounterKind;

@@ -43,7 +43,7 @@ namespace FoodFactoryGame.Session.Audio
 
         private readonly Incidental _honks = new()
         {
-            Clips = new[] { "honk_1", "honk_2", "honk_3" }, MinGap = 12f, MaxGap = 35f, MinDistance = 20f, MaxDistance = 50f, Volume = 0.5f
+            Clips = new[] { "honk_1", "honk_2", "honk_3" }, MinGap = 12f, MaxGap = 35f, MinDistance = 20f, MaxDistance = 50f, Volume = 0.35f
         };
         private readonly Incidental _birds = new()
         {
@@ -70,9 +70,12 @@ namespace FoodFactoryGame.Session.Audio
         private void Awake()
         {
             _music = Source(GameAudio.Clip(MusicClip));
-            _city = new Bed { Source = Source(GameAudio.Clip("city")), Level = 0.32f };
-            _farm = new Bed { Source = Source(GameAudio.Clip("farm")), Level = 0.36f };
-            _factory = new Bed { Source = Source(GameAudio.Clip("factory")), Level = 0.3f };
+            // The beds are continuous broadband noise (traffic, wind, machinery) and read as loud static at full level, so they
+            // sit far under the incidentals (owner, 2026-10-15: about 30% of their earlier 0.32 / 0.36 / 0.3, the noisiest,
+            // factory, a little lower) and the incidentals still stand out over them.
+            _city = new Bed { Source = Source(GameAudio.Clip("city")), Level = 0.1f };
+            _farm = new Bed { Source = Source(GameAudio.Clip("farm")), Level = 0.11f };
+            _factory = new Bed { Source = Source(GameAudio.Clip("factory")), Level = 0.08f };
             var now = Time.unscaledTime;
             foreach (var incidental in new[] { _honks, _birds, _clanks }) incidental.Next = now + Random.Range(incidental.MinGap, incidental.MaxGap);
         }

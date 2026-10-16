@@ -1,7 +1,8 @@
 // Local player's buy panel for a map building (decision 0028), drawn from the Property UXML and USS under Assets/UI/Resources/UI
 // (decision 0042): opened by aiming at a purchasable building and pressing Interact (EquipmentInteraction.OpenProperty). It
 // shows the building's category, its lot's price,
-// whether it is for sale, owned by this company, owned by another or not sold, and the company's cash, with a Buy button.
+// whether it is for sale, owned by this company, owned by another or not sold, and the company's cash, with a Buy button whose
+// tooltip (CursorTooltip) says why the company cannot buy the lot when it cannot (BuyBlocker, shared with the phone).
 // The offer comes from the replicated layout through the same WorldLayoutShells call the server uses, so nothing extra is sent;
 // ownership comes from the primary baseline's public property records. Buy is a request the server checks; like
 // LogisticsPanel it shows "waiting" while the request is pending and the server's reason when it is rejected, and nothing
@@ -34,8 +35,12 @@ namespace FoodFactoryGame.Session.WorldMap
         private Label _cash;
         private Label _status;
         private Button _buy;
+        // Says why Buy is disabled while the pointer rests on it.
+        private CursorTooltip _tooltip;
 
         public VisualElement Window => _window;
+        // Why Buy is disabled, as its tooltip shows it while hovered; empty otherwise.
+        public string BuyTooltip => _tooltip?.Text ?? "";
         public string LastRejection { get; private set; }
         public bool HasPendingRequests => _pending.Count > 0;
         // What the panel shows now, for tests and captures.
@@ -59,6 +64,7 @@ namespace FoodFactoryGame.Session.WorldMap
             _buy = root.Part<Button>("property-buy");
             _buy.clicked += Buy;
             root.Part<Button>("property-close").clicked += interaction.CloseScreen;
+            _tooltip = new CursorTooltip(root, "property-buy-tooltip");
             _window.Show(false);
             _dim.Show(false);
         }
@@ -72,7 +78,11 @@ namespace FoodFactoryGame.Session.WorldMap
             var open = site != null && offer != null && Session.IsRunning && interaction.Screen == InteractionScreen.Property;
             _window.Show(open);
             _dim.Show(open);
-            if (!open) return;
+            if (!open)
+            {
+                _tooltip.Hide();
+                return;
+            }
             var company = site.Companies.FirstOrDefault(x => x.SiteIds.Contains(Session.ClientSiteId));
             var owner = site.Properties.FirstOrDefault(x => x.LotId == offer.LotId)?.CompanyId;
             _title.text = $"{Category(offer.Category)}  {offer.BuildingId}";
@@ -82,7 +92,9 @@ namespace FoodFactoryGame.Session.WorldMap
             _state.EnableInClassList("prop__state--yours", owner != null && owner == company?.Id);
             _state.EnableInClassList("prop__state--taken", owner != null && owner != company?.Id);
             _cash.text = company == null ? "Your company: none on this site" : $"Your company's cash: {PlayerHud.FormatCash(company.Cash)}";
+            // Too little cash leaves Buy pressable (the server's refusal is shown), but its tooltip still says why it will fail.
             _buy.SetEnabled(owner == null && offer.ForSale && company != null && !HasPendingRequests);
+            _tooltip.Show(_buy, BuyBlocker(site, company, offer, HasPendingRequests));
             _status.text = HasPendingRequests ? "Waiting for the server..." : string.IsNullOrEmpty(LastRejection) ? " " : $"Rejected: {LastRejection}";
         }
 
@@ -120,6 +132,23 @@ namespace FoodFactoryGame.Session.WorldMap
         }
 
         private void OnDestroy() => Subscribe(null);
+
+        // Why a company cannot buy a lot now, in the player's words, or null when it can: the server's own checks (owned, not for
+        // sale, no paying company, too little cash) as far as this client's baseline knows them, then a request still pending.
+        // The server decides; this only explains a disabled Buy button (its tooltip) here and in the phone.
+        public static string BuyBlocker(GoodsSnapshot site, GoodsCompany company, PropertyOffer offer, bool pending)
+        {
+            if (offer == null) return "Unknown lot.";
+            var owner = site?.Properties.FirstOrDefault(x => x.LotId == offer.LotId)?.CompanyId;
+            if (owner != null)
+                return owner == company?.Id ? "Your company already owns this place." : "Owned by a competitor: another company bought it.";
+            if (!offer.ForSale) return "Not for sale: this building is never sold.";
+            if (company == null) return "You have no company here to pay for it.";
+            if (company.Cash < offer.PriceCents)
+                return $"Too expensive: it costs {PlayerHud.FormatCash(offer.PriceCents)} and your company has {PlayerHud.FormatCash(company.Cash)} "
+                       + $"({PlayerHud.FormatCash(offer.PriceCents - company.Cash)} short).";
+            return pending ? "Waiting for the server to answer the last request." : null;
+        }
 
         private static string Category(string category) => category switch
         {

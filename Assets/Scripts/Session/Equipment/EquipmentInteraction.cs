@@ -6,8 +6,8 @@
 // machine kind or an item, assigned on a screen (a hotbar key over a stack, or dropping the cursor on a hotbar slot); this
 // client's arrangement only, never saved or sent. Hotbar keys (or picking a machine out of the inventory grid) put a held
 // machine kind or the inventory's stack of an item on the cursor; a machine shows a see-through ghost of the machine
-// on its footprint; left click places it (or opens the highlighted machine or storage when the cursor is empty) and right click
-// picks the machine under the crosshair back into the inventory. On a screen the cursor can instead carry a goods stack
+// on its footprint; left click places it (or opens the highlighted machine or storage when the cursor is empty). Right click in
+// the world never deconstructs (only build mode removes pieces); on a screen it picks up half a stack. On a screen the cursor can instead carry a goods stack
 // (CursorGoods), which is only a pointer to lots still in their container until it is dropped on another one. Capacity
 // counts slots (decision 0009): moves are previewed against the destination's free slots with the items' max stacks.
 // Every change is a request through the goods bridge: the ghost, cursor stack, capacity hints and the screens' view of a
@@ -221,7 +221,6 @@ namespace FoodFactoryGame.Session.Equipment
         {
             _block ??= new MaterialPropertyBlock();
             placeAction.action.performed += OnPlace;
-            removeAction.action.performed += OnRemove;
             rotateAction.action.performed += OnRotate;
             inventoryAction.action.performed += OnInventory;
             logisticsAction.action.performed += OnLogistics;
@@ -248,7 +247,6 @@ namespace FoodFactoryGame.Session.Equipment
         private void OnDisable()
         {
             placeAction.action.performed -= OnPlace;
-            removeAction.action.performed -= OnRemove;
             rotateAction.action.performed -= OnRotate;
             inventoryAction.action.performed -= OnInventory;
             logisticsAction.action.performed -= OnLogistics;
@@ -353,17 +351,17 @@ namespace FoodFactoryGame.Session.Equipment
                 if (_ghostModel != null) _ghostModel.SetActive(false);
                 Status = site == null ? "" : Screen switch
                 {
-                    InteractionScreen.Inventory => "Inventory: click a slot to pick up or put down, shift+click to move a stack across, 1-9 over a stack or dropping it on the hotbar assigns it there, Buy spends company cash at the supplier; E or Esc closes" + suffix,
+                    InteractionScreen.Inventory => "Inventory: click a slot to pick up or put down, right click picks up half, shift+click to move a stack across, 1-9 over a stack or dropping it on the hotbar assigns it there, Buy spends company cash at the supplier; E or Esc closes" + suffix,
                     // A sale station (decision 0013) has no results to take: it sells its input for the company.
                     InteractionScreen.Machine when _openMachineSells =>
                         "Register: put edible goods in the input; customers queue and pay here only while someone works it (Work this register); E or Esc closes" + suffix,
                     InteractionScreen.Build => "Build mode: pick a tool or item, click to place, drag to draw (ordered on release), hold right click on something to sell or remove it, X or Cancel clears the selection; WASD pans, the wheel zooms, right drag tilts; B or Esc leaves" + suffix,
                     InteractionScreen.Machine when _openMachineTable =>
-                        "Table: customers who dine in buy only once a seat is free, then sit here to eat; right click picks it up when nobody sits here; E or Esc closes" + suffix,
+                        "Table: customers who dine in buy only once a seat is free, then sit here to eat; E or Esc closes" + suffix,
                     InteractionScreen.Machine when _openMachineDock =>
                         "Dock: put goods in Outgoing for trucks to load; take deliveries from Incoming (shift+click moves a stack); L: trucks and routes; E or Esc closes" + suffix,
                     InteractionScreen.Machine when _openMachineStores =>
-                        "Storage: click or shift+click to move goods in and out; hover a stack to see when it spoils; E or Esc closes" + suffix,
+                        "Storage: click or shift+click to move goods in and out, right click picks up half; hover a stack to see when it spoils; E or Esc closes" + suffix,
                     InteractionScreen.Logistics => "Logistics: set each truck's route and cargo, and move stock at remote sites; L or Esc closes" + suffix,
                     InteractionScreen.Property => "Property: Buy spends company cash on this building and its lot; E or Esc closes",
                     InteractionScreen.Employee => "Employee: add tasks (or edit the Lua) and press Run; Stop halts it; Esc closes" + suffix,
@@ -372,10 +370,10 @@ namespace FoodFactoryGame.Session.Equipment
                         + "look at a pulsing red one and click or press E; Esc returns" + (PickText != null ? $" [{PickText}]" : ""),
                     InteractionScreen.PickPosition => "Select world pos: look at a cell or a machine (red) and click to insert it into the script; Esc returns"
                         + (PickText != null ? $" [{PickText}]" : ""),
-                    InteractionScreen.Machine => "Machine: put ingredients in the input, take results from the output (shift+click moves a stack); E or Esc closes" + suffix,
+                    InteractionScreen.Machine => "Machine: put ingredients in the input, take results from the output (shift+click moves a stack, right click picks up half); E or Esc closes" + suffix,
                     InteractionScreen.Menu => "Menu: Resume or Esc returns to the game",
                     InteractionScreen.Phone => "Phone: tap the map to see lots and farms, order from farms, manage staff and names; C or Esc closes" + suffix,
-                    _ => ElevatorHint() + HoverHint() + $"B: build mode, {InventoryKey}: inventory (pick belts or goods to carry them out), L: trucks, 1-9: hotbar, left click: open machine, right click: pick up, R: turn belt, F: take an item off a belt" + suffix
+                    _ => ElevatorHint() + HoverHint() + $"B: build mode, {InventoryKey}: inventory (pick belts or goods to carry them out), L: trucks, 1-9: hotbar, left click: open machine, R: turn belt, F: take an item off a belt" + suffix
                 };
                 return;
             }
@@ -850,22 +848,6 @@ namespace FoodFactoryGame.Session.Equipment
             return $"Elevator (floor {Level + 1} of {building.Floors}): PgUp up, PgDn down. ";
         }
 
-        private void OnRemove(InputAction.CallbackContext _)
-        {
-            var bridge = _subscription?.Bridge;
-            if (Screen != InteractionScreen.None || bridge == null || _camera == null) return;
-            var visual = EquipmentUnderCrosshair();
-            // Belts under the crosshair are taken up while Remove is held (UpdateBelts).
-            if (visual == null && _aimBelt != null) return;
-            if (visual == null)
-            {
-                LastRejection = "nothing-under-cursor";
-                return;
-            }
-            Debug.Log($"[Equipment] Requesting pickup of {visual.EquipmentId}.");
-            bridge.RequestPickUp(Track(), visual.EquipmentId);
-        }
-
         private void OnRotate(InputAction.CallbackContext _)
         {
             if (!RotateBelts()) _rotation = (_rotation + 1) % 4;
@@ -976,13 +958,6 @@ namespace FoodFactoryGame.Session.Equipment
         private Collider UnderCrosshair() => Physics.RaycastAll(AimRay(), maximumRayDistance, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)
             .Where(x => x.collider.GetComponentInParent<PlayerAvatar>() == null)
             .OrderBy(x => x.distance).FirstOrDefault().collider;
-
-        private EquipmentVisual EquipmentUnderCrosshair()
-        {
-            var hit = UnderCrosshair();
-            var visual = hit == null ? null : hit.GetComponentInParent<EquipmentVisual>();
-            return visual != null && OnCurrentSite(visual) ? visual : null;
-        }
 
         private bool OnCurrentSite(EquipmentVisual visual) => session.ClientSite?.Equipment.Any(x => x.Id == visual.EquipmentId) == true;
 

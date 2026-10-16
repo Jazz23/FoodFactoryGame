@@ -1,5 +1,5 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
-    <!-- Settings: name, mouse sensitivity, sound volumes, and the keybinds (MenuKeybindGroup/Row templates fill the two columns). -->
+    <!-- Settings: name, mouse sensitivity, sound volumes, anti-aliasing, and the keybinds (MenuKeybindGroup/Row templates fill the two columns). -->
     <Style src="project://database/Assets/UI/Theme/Theme.uss" />
     <Style src="MainMenu.uss" />
     <ui:VisualElement name="main-menu-page" class="menu-page">
@@ -51,6 +51,18 @@
                         <ui:Label text="Ambience" class="menu-sensitivity__caption menu-volume__caption" picking-mode="Ignore" />
                         <ui:Slider name="menu-volume-ambience" low-value="0" high-value="1" value="1" focusable="false" class="ff-slider ff-grow menu-volume__slider" />
                         <ui:Label name="menu-volume-ambience-value" class="menu-sensitivity__value menu-volume__value" picking-mode="Ignore" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+                <ui:VisualElement class="menu-card menu-settings__card">
+                    <ui:Label text="GRAPHICS" class="ff-eyebrow" picking-mode="Ignore" />
+                    <ui:Label text="Anti-aliasing" class="menu-sensitivity__caption menu-aa__caption" picking-mode="Ignore" />
+                    <ui:VisualElement name="menu-aa" class="ff-segmented menu-aa__options">
+                        <ui:Button name="menu-aa-off" text="Off" focusable="false" class="ff-segment" />
+                        <ui:Button name="menu-aa-fxaa" text="FXAA" focusable="false" class="ff-segment" />
+                        <ui:Button name="menu-aa-smaa" text="SMAA" focusable="false" class="ff-segment" />
+                        <ui:Button name="menu-aa-msaa2x" text="MSAA 2×" focusable="false" class="ff-segment" />
+                        <ui:Button name="menu-aa-msaa4x" text="MSAA 4×" focusable="false" class="ff-segment" />
+                        <ui:Button name="menu-aa-msaa8x" text="MSAA 8×" focusable="false" class="ff-segment" />
                     </ui:VisualElement>
                 </ui:VisualElement>
                 <ui:VisualElement class="menu-card menu-card--quiet menu-settings__card">

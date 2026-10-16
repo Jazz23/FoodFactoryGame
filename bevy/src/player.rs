@@ -20,7 +20,7 @@ pub enum PlayerSet {
     Move,
 }
 
-const SPEED: f32 = 4.0;
+const SPEED: f32 = 12.0;
 const SPRINT_SPEED: f32 = 7.0;
 const JUMP_HEIGHT: f32 = 1.2;
 const TURN_DEGREES_PER_SECOND: f32 = 720.0;

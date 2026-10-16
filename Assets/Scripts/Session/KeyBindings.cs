@@ -51,6 +51,7 @@ namespace FoodFactoryGame.Session
             ("Building", "Place", "Place", null),
             ("Building", "Remove", "Remove", null),
             ("Building", "Rotate", "Rotate", null),
+            ("Building", "Pick block", "PickBlock", null),
             ("Building", "Confirm build", "BuildConfirm", null),
             ("Camera and floors", "Tilt camera", "CameraTilt", null),
             ("Camera and floors", "Zoom", "Zoom", "fixed:Scroll"),
@@ -59,6 +60,7 @@ namespace FoodFactoryGame.Session
             ("Camera and floors", "Flip lift", "FlipLift", null),
             ("Camera and floors", "Logistics", "Logistics", null),
             ("Camera and floors", "Phone", "Phone", null),
+            ("Camera and floors", "Phone map", "Map", null),
             ("Hotbar", "Hotbar slots", "Hotbar", "fixed:1 – 9")
         };
 

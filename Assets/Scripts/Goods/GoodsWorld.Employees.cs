@@ -69,6 +69,21 @@ namespace FoodFactoryGame.Goods
             lock (_gate) return _state.Employees.Select(x => JsonUtility.FromJson<GoodsEmployee>(JsonUtility.ToJson(x))).ToList();
         }
 
+        // Server-only: a copy of the placed register (kind counter) the actor staffs and its site's grid size, without building a
+        // view, so an idle employee can keep standing at its post; null when it staffs none.
+        public (GoodsEquipment Register, SiteLayout Layout)? StaffedRegister(string actorId)
+        {
+            if (string.IsNullOrEmpty(actorId)) return null;
+            lock (_gate)
+            {
+                var register = _state.Equipment.FirstOrDefault(x => x.StaffId == actorId && x.Kind == CounterKind && x.State == EquipmentState.Placed);
+                var layout = register == null ? null : _state.SiteLayouts.FirstOrDefault(x => x.SiteId == register.SiteId);
+                if (layout == null) return null;
+                return (JsonUtility.FromJson<GoodsEquipment>(JsonUtility.ToJson(register)),
+                    new SiteLayout { SiteId = layout.SiteId, Width = layout.Width, Depth = layout.Depth });
+            }
+        }
+
         // Server-only: records where the employee stands. In memory only; it is saved by the next commit. Returns false for an
         // unknown employee or a non-finite pose.
         public bool SetEmployeePose(string employeeId, float x, float y, float z, float yaw)

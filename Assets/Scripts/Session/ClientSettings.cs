@@ -1,4 +1,4 @@
-// Client-local preferences kept in one SQLite key/value table (decision 0011): display name, mouse sensitivity, volume, key binding
+// Client-local preferences kept in one SQLite key/value table (decision 0011): display name, mouse sensitivity, volume, anti-aliasing, key binding
 // overrides and the last session the menu started, which Resume repeats (decision 0041). Loading never creates the database,
 // so reading settings (and tests that pass no path) leave application data untouched; only Save writes.
 using System;
@@ -34,6 +34,8 @@ namespace FoodFactoryGame.Session
         public float EffectsVolume = 1f;
         public float InterfaceVolume = 1f;
         public float AmbienceVolume = 1f;
+        // Applied to the game cameras by AntiAliasing; Off is the authored look.
+        public AntiAliasingOption AntiAliasing = AntiAliasingOption.Off;
         // InputActionAsset.SaveBindingOverridesAsJson output; empty means the authored bindings.
         public string BindingOverrides = "";
         public LastSessionKind LastKind;
@@ -41,6 +43,9 @@ namespace FoodFactoryGame.Session
         public HostVisibility LastVisibility = HostVisibility.Singleplayer;
         public string LastAddress = "";
         public DateTime LastPlayedUtc;
+        // Whether income rings the till (PlayerHud, the register screen's checkbox). Written only by SaveSaleSound, never by
+        // Save, so the menu's in-memory copy can never revert a choice made on the register screen.
+        public bool SaleSound = true;
 
         // Defaults when the path is null or the database does not exist yet; a newer schema is refused, never overwritten.
         public static ClientSettings Load(string path)
@@ -62,6 +67,9 @@ namespace FoodFactoryGame.Session
             settings.EffectsVolume = ReadVolume(values, "effects_volume", 1f);
             settings.InterfaceVolume = ReadVolume(values, "interface_volume", 1f);
             settings.AmbienceVolume = ReadVolume(values, "ambience_volume", 1f);
+            if (values.TryGetValue("anti_aliasing", out var aa) && Enum.TryParse(aa, out AntiAliasingOption antiAliasing)
+                && Enum.IsDefined(typeof(AntiAliasingOption), antiAliasing))
+                settings.AntiAliasing = antiAliasing;
             settings.BindingOverrides = values.TryGetValue("binding_overrides", out var bindings) ? bindings ?? "" : "";
             if (values.TryGetValue("last_kind", out var kind) && Enum.TryParse(kind, out LastSessionKind lastKind)) settings.LastKind = lastKind;
             settings.LastWorld = values.TryGetValue("last_world", out var world) ? world ?? "" : "";
@@ -71,6 +79,7 @@ namespace FoodFactoryGame.Session
             if (values.TryGetValue("last_played_utc", out var played)
                 && DateTime.TryParse(played, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var playedUtc))
                 settings.LastPlayedUtc = playedUtc;
+            settings.SaleSound = !values.TryGetValue("sale_sound", out var sale) || !bool.TryParse(sale, out var saleOn) || saleOn;
             return settings;
         }
 
@@ -97,12 +106,34 @@ namespace FoodFactoryGame.Session
                 Put(db, "effects_volume", ClampVolume(EffectsVolume).ToString("R", CultureInfo.InvariantCulture));
                 Put(db, "interface_volume", ClampVolume(InterfaceVolume).ToString("R", CultureInfo.InvariantCulture));
                 Put(db, "ambience_volume", ClampVolume(AmbienceVolume).ToString("R", CultureInfo.InvariantCulture));
+                Put(db, "anti_aliasing", AntiAliasing.ToString());
                 Put(db, "binding_overrides", BindingOverrides ?? "");
                 Put(db, "last_kind", LastKind.ToString());
                 Put(db, "last_world", LastWorld ?? "");
                 Put(db, "last_visibility", LastVisibility.ToString());
                 Put(db, "last_address", LastAddress ?? "");
                 Put(db, "last_played_utc", LastPlayedUtc.ToString("O", CultureInfo.InvariantCulture));
+            });
+        }
+
+        // Writes only the sale sound preference, creating the database on first use like Save.
+        public static void SaveSaleSound(string path, bool on)
+        {
+            if (string.IsNullOrWhiteSpace(path)) throw new ArgumentException("Explicit settings path required.");
+            var full = Path.GetFullPath(path);
+            Directory.CreateDirectory(Path.GetDirectoryName(full));
+            using var db = new SQLiteConnection(full, SQLiteOpenFlags.ReadWrite | SQLiteOpenFlags.Create | SQLiteOpenFlags.FullMutex);
+            db.BusyTimeout = TimeSpan.FromSeconds(5);
+            var version = db.ExecuteScalar<int>("PRAGMA user_version");
+            if (version > SchemaVersion) throw new NotSupportedException("Newer client settings schema.");
+            db.RunInTransaction(() =>
+            {
+                if (version == 0)
+                {
+                    db.Execute("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)");
+                    db.Execute($"PRAGMA user_version = {SchemaVersion}");
+                }
+                Put(db, "sale_sound", on.ToString(CultureInfo.InvariantCulture));
             });
         }
 

@@ -134,6 +134,11 @@ namespace FoodFactoryGame.Session.WorldMap
         private readonly Dictionary<string, (MeshRenderer Renderer, int Index, WorldBuilding Building)> _awnings = new();
         private readonly Dictionary<string, Color> _awningColours = new();
         private GoodsSnapshot _tintedFrom;
+        // Owning company by lot ID from the last tinted baseline's ownership records (null company: an unowned record).
+        private Dictionary<string, string> _lotOwners = new();
+        private Dictionary<string, string> _nextLotOwners = new();
+        private readonly HashSet<string> _fromSites = new();
+        private Camera[] _cameras = System.Array.Empty<Camera>();
         private Dictionary<string, PropertyOffer> _offers = new();
         private readonly List<Mesh> _meshes = new();
         private readonly Dictionary<(Material Material, int X, int Z, bool Collide), MeshBuffer> _buffers = new();
@@ -159,16 +164,17 @@ namespace FoodFactoryGame.Session.WorldMap
         private void Update()
         {
             var manager = session.NetworkManager;
-            if (_bridge == null && manager != null && manager.IsClientStarted)
-                _bridge = manager.ClientManager.Objects.Spawned.Values.Select(x => x.GetComponent<WorldLayoutBridge>()).FirstOrDefault(x => x != null);
+            if (_bridge == null && manager != null && manager.IsClientStarted) _bridge = FindBridge(manager);
             var layout = _bridge != null && _bridge.IsClientStarted ? _bridge.Layout : null;
             if (layout != Shown) Show(layout);
             if (Shown != null) ExtendCameraRange(Shown);
             var site = session.ClientSite;
+            // Baselines arrive several times a second; awnings are re-tinted only when the ownership records they read change.
             if (Shown != null && !ReferenceEquals(site, _tintedFrom))
             {
                 _tintedFrom = site;
-                foreach (var awning in _awnings.Values) TintAwning(awning.Renderer, awning.Index, awning.Building, site);
+                if (UpdateLotOwners(site))
+                    foreach (var awning in _awnings.Values) TintAwning(awning.Renderer, awning.Index, awning.Building);
             }
             var drawn = session.DrawnSites;
             if (Shown != null && drawn.Version != _hiddenFor)
@@ -176,10 +182,43 @@ namespace FoodFactoryGame.Session.WorldMap
                 _hiddenFor = drawn.Version;
                 // A drawn site's shell comes from its site data (BuildingPresenter), so the map's own model steps aside; it
                 // returns when the site stops being drawn.
-                var fromSites = new HashSet<string>(drawn.Sites.SelectMany(x => x.Snapshot.Buildings.Where(b => b.SiteId == x.SiteId).Select(b => b.Id)));
+                _fromSites.Clear();
+                foreach (var drawnSite in drawn.Sites)
+                foreach (var building in drawnSite.Snapshot.Buildings)
+                    if (building.SiteId == drawnSite.SiteId) _fromSites.Add(building.Id);
                 foreach (var (id, model) in _shellModels)
-                    if (model.activeSelf == fromSites.Contains(id)) model.SetActive(!fromSites.Contains(id));
+                {
+                    var hidden = _fromSites.Contains(id);
+                    if (model.activeSelf == hidden) model.SetActive(!hidden);
+                }
             }
+        }
+
+        private static WorldLayoutBridge FindBridge(FishNet.Managing.NetworkManager manager)
+        {
+            foreach (var spawned in manager.ClientManager.Objects.Spawned.Values)
+                if (spawned.TryGetComponent<WorldLayoutBridge>(out var bridge)) return bridge;
+            return null;
+        }
+
+        // Refreshes the lot → owning company map from a baseline's ownership records; true when it changed.
+        private bool UpdateLotOwners(GoodsSnapshot site)
+        {
+            // The first record for a lot decides its owner, as before.
+            _nextLotOwners.Clear();
+            if (site != null)
+                foreach (var property in site.Properties)
+                    if (property.LotId != null && !_nextLotOwners.ContainsKey(property.LotId)) _nextLotOwners[property.LotId] = property.CompanyId;
+            var changed = _nextLotOwners.Count != _lotOwners.Count;
+            if (!changed)
+                foreach (var (lotId, owner) in _nextLotOwners)
+                    if (!_lotOwners.TryGetValue(lotId, out var shown) || shown != owner)
+                    {
+                        changed = true;
+                        break;
+                    }
+            if (changed) (_lotOwners, _nextLotOwners) = (_nextLotOwners, _lotOwners);
+            return changed;
         }
 
         // True while the map's own model of a restaurant or factory is drawn (false while its site draws the shell instead).
@@ -190,8 +229,11 @@ namespace FoodFactoryGame.Session.WorldMap
         private void ExtendCameraRange(WorldLayout layout)
         {
             var needed = new Vector2(_layoutOrigin.x, _layoutOrigin.z).magnitude + layout.MapHalfSize * 1.5f;
-            foreach (var camera in Camera.allCameras)
-                if (camera.farClipPlane < needed) camera.farClipPlane = needed;
+            // Camera.allCameras allocates a new array every call; reuse one instead.
+            if (_cameras.Length < Camera.allCamerasCount) _cameras = new Camera[Camera.allCamerasCount];
+            var count = Camera.GetAllCameras(_cameras);
+            for (var index = 0; index < count; index++)
+                if (_cameras[index].farClipPlane < needed) _cameras[index].farClipPlane = needed;
         }
 
         private void OnDestroy() => Clear();
@@ -208,6 +250,7 @@ namespace FoodFactoryGame.Session.WorldMap
             _awnings.Clear();
             _awningColours.Clear();
             _tintedFrom = null;
+            _lotOwners.Clear();
             _lotBuckets.Clear();
             _shellModels.Clear();
             _hiddenFor = -1;
@@ -981,7 +1024,7 @@ namespace FoodFactoryGame.Session.WorldMap
             var renderer = Place("Awning", awningMesh, new[] { piece.materials[awning] }, awningHolder, Vector3.zero, Quaternion.identity, Vector3.one)
                 .GetComponent<MeshRenderer>();
             _awnings[building.Id] = (renderer, 0, building);
-            TintAwning(renderer, 0, building, session.ClientSite);
+            TintAwning(renderer, 0, building);
         }
 
         // The piece without its awning submesh (left empty, so material indices hold) and the awning submesh as its own mesh.
@@ -1065,13 +1108,14 @@ namespace FoodFactoryGame.Session.WorldMap
         // Ownership records first (decision 0028): a restaurant a company has bought (only purchases make ownership records) or
         // the layout's own player restaurant has its awning hidden (owner, 2026-10-14); a lot nobody has bought shows the layout's
         // own for-sale or competitor colour.
-        private void TintAwning(MeshRenderer renderer, int index, WorldBuilding building, GoodsSnapshot site)
+        // Reads the ownership records UpdateLotOwners last took from a baseline, and touches the renderer only when its
+        // colour changes.
+        private void TintAwning(MeshRenderer renderer, int index, WorldBuilding building)
         {
             if (renderer == null) return;
             var competitor = CompetitorAwnings[(int)(WorldRandom.Fnv1a(building.Id) % (ulong)CompetitorAwnings.Length)];
-            var lotId = WorldLot.IdFor(building.Id);
-            var owner = site?.Properties.FirstOrDefault(x => x.LotId == lotId)?.CompanyId;
-            var playerOwned = owner != null || building.Ownership == Ownership.Player;
+            var playerOwned = _lotOwners.TryGetValue(WorldLot.IdFor(building.Id), out var owner) && owner != null
+                || building.Ownership == Ownership.Player;
             if (renderer.gameObject.activeSelf == playerOwned) renderer.gameObject.SetActive(!playerOwned);
             if (playerOwned)
             {
@@ -1079,8 +1123,9 @@ namespace FoodFactoryGame.Session.WorldMap
                 return;
             }
             var colour = building.Ownership == Ownership.ForSale ? ForSaleAwning : competitor;
-            if (_awningColours.TryGetValue(building.Id, out var shown) && shown != colour)
-                Debug.Log($"[World] {building.Id} awning re-tinted: unowned.");
+            var hadColour = _awningColours.TryGetValue(building.Id, out var shown);
+            if (hadColour && shown == colour) return;
+            if (hadColour) Debug.Log($"[World] {building.Id} awning re-tinted: unowned.");
             _awningColours[building.Id] = colour;
             _block.Clear();
             _block.SetColor(BaseColor, colour);
