@@ -123,6 +123,11 @@ impl Default for Session {
 }
 
 impl Session {
+    #[cfg(test)]
+    pub fn isolated_test_session() -> Self {
+        Self { link: Link::None, status: String::new(), pending: BTreeMap::new(), request_counter: 0, secret: "test-only".into(), display_name: "Test".into() }
+    }
+
     pub fn joined(&self) -> Option<&Joined> {
         match &self.link {
             Link::Joined { world, .. } => Some(world),

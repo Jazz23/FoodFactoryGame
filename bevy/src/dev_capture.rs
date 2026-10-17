@@ -20,7 +20,7 @@ impl Plugin for DevCapturePlugin {
         let Ok(dir) = std::env::var("FF_CAPTURE_DIR") else { return };
         let script = std::env::var("FF_CAPTURE_SCRIPT").unwrap_or_else(|_| "wait 2;shot look;turn 180;wait 0.5;shot behind;topdown;wait 1;shot topdown".into());
         let steps = script.split(';').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
-        app.insert_resource(Capture { dir: dir.into(), steps, started: false, ready_at: None, busy_until: 0.0, walk: None, lot: None })
+        app.insert_resource(Capture { dir: dir.into(), steps, started: false, ready_at: None, busy_until: 0.0, walk: None, lot: None, held_place: false, held_rotate: false })
             .add_plugins(bevy::render::diagnostic::RenderDiagnosticsPlugin)
             .init_resource::<StatsRequest>()
             .add_systems(PreUpdate, autopilot.after(crate::actions::ReadActions))
@@ -38,6 +38,8 @@ struct Capture {
     walk: Option<(Vec2, f64)>,
     /// The lot chosen by `property`, for `gotoprop`.
     lot: Option<String>,
+    held_place: bool,
+    held_rotate: bool,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -53,6 +55,8 @@ fn autopilot(
     actions.pointer_zoom = 0.0;
     actions.movement = Vec2::ZERO;
     actions.pan = Vec2::ZERO;
+    actions.place_held = capture.held_place;
+    actions.rotate_held = capture.held_rotate;
     if !capture.started {
         capture.started = true;
         let world = std::env::var("FF_CAPTURE_WORLD").unwrap_or_else(|_| "capture".into());
@@ -261,6 +265,28 @@ fn autopilot(
                 let site = indoors.site.clone().unwrap_or_default();
                 transform.translation = space.site_point(&site, number(1), number(2), 0) + Vec3::Y * 0.05;
             }
+        }
+        "hold" | "release" => {
+            let held = parts[0] == "hold";
+            match parts.get(1).copied().unwrap_or("") {
+                "place" => {
+                    actions.pointer_place_pressed = held && !capture.held_place;
+                    actions.place_pressed = actions.pointer_place_pressed;
+                    capture.held_place = held;
+                    actions.place_held = held;
+                }
+                "rotate" => {
+                    actions.rotate_pressed = held && !capture.held_rotate;
+                    capture.held_rotate = held;
+                    actions.rotate_held = held;
+                }
+                _ => warn!("[Capture] unknown hold action"),
+            }
+        }
+        "beltstate" => {
+            let belts: Vec<_> = session.joined().and_then(|w| w.view()).into_iter().flat_map(|v| v.belts.iter()).map(|b| (b.cell_x, b.cell_z, b.direction, b.level)).collect();
+            let cameras: Vec<_> = rigs.iter().map(|r| (r.build_focus, r.yaw, r.build_pitch, r.build_distance)).collect();
+            info!("[Capture] beltstate {}: active={:?} tool={:?} level={} cameras={:?} belts={:?}", parts.get(1).copied().unwrap_or(""), build.active, build.tool, build.level, cameras, belts);
         }
         "bcell" => build.forced_cell = Some((number(1) as i32, number(2) as i32)),
         "intent" => intents.0.push(parts[1..].join(" ")),

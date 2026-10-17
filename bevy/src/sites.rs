@@ -690,11 +690,12 @@ fn build_equipment(
     }
 }
 
-/// The model and yaw (quarter turns) a belt is drawn with.
+/// The model and yaw (quarter turns) a belt is drawn with. The corner files sit a half turn from Unity's corner prefabs
+/// once `fitted` applies the handedness turn, so their yaw is the reverse of Unity's BeltPath.ModelRotation.
 pub fn belt_model(shape: rules::BeltShape, direction: i32) -> (&'static str, i32) {
     match shape {
-        rules::BeltShape::CurveFromLeft => (BELT_LEFT, rules::right_of(direction)),
-        rules::BeltShape::CurveFromRight => (BELT_RIGHT, rules::left_of(direction)),
+        rules::BeltShape::CurveFromLeft => (BELT_LEFT, rules::left_of(direction)),
+        rules::BeltShape::CurveFromRight => (BELT_RIGHT, rules::right_of(direction)),
         rules::BeltShape::Straight => (BELT_STRAIGHT, direction),
     }
 }

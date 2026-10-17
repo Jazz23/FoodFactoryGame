@@ -19,7 +19,6 @@ use food_factory_bevy::protocol::Command;
 
 use crate::actions::{PlayerActions, UiFocus};
 use crate::camera::OrbitCamera;
-use crate::interaction::Cursor;
 use crate::models::{fitted, Bounds, Fit};
 use crate::panels::{Panel, Panels};
 use crate::screens::{reason_text, Screen};
@@ -32,9 +31,12 @@ pub struct BuildPlugin;
 
 impl Plugin for BuildPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<Build>().add_systems(Update, (enter_leave, catalog_intents, pointer, orders, ghost, draw_catalog).chain().after(crate::player::PlayerSet::Move));
+        app.init_resource::<Build>().add_systems(Update, (enter_leave, catalog_intents, pointer, orders, ghost, draw_catalog).chain().after(crate::player::PlayerSet::Move).after(crate::panels::close_keys).in_set(BuildSet));
     }
 }
+
+#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+pub struct BuildSet;
 
 const HOLD_SECONDS: f32 = 0.5;
 const TILT_PIXELS: f32 = 6.0;
@@ -45,6 +47,7 @@ pub enum Tool {
     #[default]
     None,
     Sell,
+    Belts,
     Wall(String),
     Door(String),
     BackDoor(String),
@@ -61,7 +64,9 @@ pub struct Build {
     pub rotation: i32,
     pub filter: String,
     /// The pointer's cell on the build level.
-    cell: Option<(i32, i32)>,
+    pub cell: Option<(i32, i32)>,
+    pub belt_dragging: bool,
+    pub cancel_belt_drag: bool,
     drag_start: Option<(i32, i32)>,
     remove_press: Option<(Vec2, f32, bool)>,
     sweeping: Option<bool>,
@@ -77,6 +82,7 @@ fn enter_leave(
     mut build: ResMut<Build>, mut panels: ResMut<Panels>, actions: Res<PlayerActions>, session: Res<Session>, space: Option<Res<Space>>, mut rigs: Query<&mut OrbitCamera>,
     mut edited: ResMut<EditedSite>, mut focus: ResMut<UiFocus>, screen: Res<Screen>,
 ) {
+    build.cancel_belt_drag = false;
     let open = panels.open == Some(Panel::Build);
     match (&build.active, open) {
         (None, true) => {
@@ -101,7 +107,9 @@ fn enter_leave(
         }
         (Some(_), true) => {
             let leave = *screen != Screen::Playing || session.joined().is_none() || actions.build_pressed || (actions.close_pressed && build.drag_start.is_none() && build.tool == Tool::None);
-            if actions.close_pressed && build.drag_start.is_some() {
+            if actions.close_pressed && build.belt_dragging {
+                build.cancel_belt_drag = true;
+            } else if actions.close_pressed && build.drag_start.is_some() {
                 build.drag_start = None;
             } else if actions.close_pressed && build.tool != Tool::None {
                 build.tool = Tool::None;
@@ -123,7 +131,7 @@ fn enter_leave(
     }
 }
 
-fn catalog_intents(mut intents: ResMut<UiIntents>, mut build: ResMut<Build>, mut panels: ResMut<Panels>, mut cursor: ResMut<Cursor>, mut session: ResMut<Session>, time: Res<Time>, content: Res<Content>) {
+fn catalog_intents(mut intents: ResMut<UiIntents>, mut build: ResMut<Build>, mut panels: ResMut<Panels>, mut session: ResMut<Session>, time: Res<Time>, content: Res<Content>) {
     let actions: Vec<String> = intents.0.iter().filter(|a| a.starts_with("b:")).cloned().collect();
     intents.0.retain(|a| !a.starts_with("b:"));
     for action in actions {
@@ -140,20 +148,19 @@ fn catalog_intents(mut intents: ResMut<UiIntents>, mut build: ResMut<Build>, mut
             ["finish", style] => build.tool = Tool::Finish(style.to_string()),
             ["item", offer] => build.tool = Tool::Item(offer.to_string()),
             ["belts"] => {
-                // Leaves build mode with belts on the cursor, buying a pack when none are carried.
+                // Keep the current build session and camera; buy a pack when none are carried.
                 let has = session.joined().is_some_and(|w| crate::interaction::inventory_lot(w, goods::BELT_ITEM_ID).is_some());
                 if !has {
                     if let Some(world) = session.joined() {
                         let site = world.site.clone();
                         if let Some(offer) = content.0.offers.iter().find(|o| matches!(&o.kind, OfferKind::Goods(g) if g.item_id == goods::BELT_ITEM_ID)) {
                             let offer = offer.id.clone();
-                            session.command(Command::Buy { site, offer }, time.elapsed_secs_f64());
+                            let pending = session.pending.values().any(|p| matches!(&p.command, Command::Buy { site: s, offer: o } if s == &site && o == &offer));
+                            if !pending { session.command(Command::Buy { site, offer }, time.elapsed_secs_f64()); }
                         }
                     }
                 }
-                cursor.machine = None;
-                cursor.item = Some(goods::BELT_ITEM_ID.to_string());
-                panels.open = None;
+                build.tool = Tool::Belts;
             }
             ["floor-up"] => build.level += 1,
             ["floor-down"] => build.level = (build.level - 1).max(0),
@@ -182,7 +189,7 @@ fn pointer(mut build: ResMut<Build>, space: Option<Res<Space>>, cameras: Query<(
     if actions.floor_down_pressed {
         build.level = (build.level - 1).max(0);
     }
-    if actions.rotate_pressed {
+    if actions.rotate_pressed && build.tool != Tool::Belts {
         build.rotation = (build.rotation + 1) & 3;
     }
     if actions.clear_pressed {
@@ -284,13 +291,17 @@ fn order_for(build: &Build, world: &crate::session::Joined, content: &Content, s
             let order = FurnishOrder { site_id: world.site.clone(), offer_id: offer_id.clone(), level: build.level, placements };
             Some((Command::BuyAndPlace { order }, money(cents), problem))
         }
-        Tool::None | Tool::Sell => None,
+        Tool::None | Tool::Sell | Tool::Belts => None,
     }
 }
 
 /// What right click would remove at a cell: a placed piece (decor layers first), a belt, or a structure.
-fn removal_at(world: &crate::session::Joined, level: i32, cell: (i32, i32)) -> Option<(Command, bool)> {
+fn removal_at(world: &crate::session::Joined, level: i32, cell: (i32, i32), belts_only: bool) -> Option<(Command, bool)> {
     let view = world.view()?;
+    if belts_only {
+        return view.belts.iter().find(|b| b.site_id == world.site && (b.level == level || b.exit_level() == level) && (b.cell_x, b.cell_z) == cell)
+            .map(|b| (Command::RemoveBelt { belt: b.id.clone() }, true));
+    }
     let mut pieces: Vec<&goods::Equipment> = view.equipment.iter().filter(|e| e.site_id == world.site && e.placed() && e.level == level && goods::grid::contains(e, cell.0, cell.1, 1, 1)).collect();
     pieces.sort_by_key(|e| e.layer.is_empty());
     if let Some(piece) = pieces.first() {
@@ -325,7 +336,7 @@ fn orders(mut build: ResMut<Build>, actions: Res<PlayerActions>, mut session: Re
     let cell = build.cell;
     // Left: start, then order on release.
     if actions.pointer_place_pressed && !over_ui {
-        if let (Some(cell), true) = (cell, build.tool != Tool::None && build.tool != Tool::Sell) {
+        if let (Some(cell), true) = (cell, !matches!(build.tool, Tool::None | Tool::Sell | Tool::Belts)) {
             build.drag_start = Some(cell);
         }
     }
@@ -377,14 +388,14 @@ fn orders(mut build: ResMut<Build>, actions: Res<PlayerActions>, mut session: Re
             if let (Some(cell), false) = (cell, tilting) {
                 match build.sweeping {
                     None if held >= HOLD_SECONDS => {
-                        if let Some((c, piece)) = removal_at(world, build.level, cell) {
+                        if let Some((c, piece)) = removal_at(world, build.level, cell, build.tool == Tool::Belts) {
                             build.sweeping = Some(piece);
                             build.swept.push(cell);
                             command = Some(c);
                         }
                     }
                     Some(family) if !build.swept.contains(&cell) => {
-                        if let Some((c, piece)) = removal_at(world, build.level, cell).filter(|(_, p)| *p == family) {
+                        if let Some((c, piece)) = removal_at(world, build.level, cell, build.tool == Tool::Belts).filter(|(_, p)| *p == family) {
                             build.swept.push(cell);
                             command = Some(c);
                         }
@@ -430,6 +441,7 @@ fn ghost(
         commands.entity(entity).despawn();
     }
     let (Some(world), Some(space), Some(m), Some(site), Some(end)) = (world, space, m, build.active.clone(), build.cell) else { return };
+    if build.tool == Tool::Belts { return; }
     let (valid, invalid) = tints.get_or_insert_with(|| {
         let tint = |c: Color| StandardMaterial { base_color: c, alpha_mode: AlphaMode::Blend, unlit: true, ..default() };
         (materials.add(tint(Color::srgba(0.2, 0.85, 0.3, 0.45))), materials.add(tint(Color::srgba(0.9, 0.2, 0.15, 0.45))))
@@ -546,11 +558,40 @@ fn draw_catalog(build: Res<Build>, session: Res<Session>, content: Res<Content>,
         items.push(UiEntry::button(format!("b:item|{}", offer.id), format!("{}\n{}", content.0.equipment_name(&e.equipment.kind), money(offer.price_cents))).with_icon(kind.map(|k| k.icon.clone()).unwrap_or_default()).selected(build.tool == Tool::Item(offer.id.clone())));
     }
     if filter == "All" || filter == "Logistics" {
-        items.push(UiEntry::button("b:belts", "Belts\nlay a line"));
+        items.push(UiEntry::button("b:belts", "Belts\nlay a line").selected(build.tool == Tool::Belts));
     }
     next.entries.push(UiEntry::row("items", items));
-    next.footer = if !build.problem.is_empty() { build.problem.clone() } else if !build.preview.is_empty() { build.preview.clone() } else { "Left click places, drag draws or fills, hold right click removes, R turns, B leaves".into() };
+    next.footer = if !build.problem.is_empty() { build.problem.clone() } else if build.tool == Tool::Belts { "Belts: drag forward; hold R to corner; hold right click removes; X clears".into() } else if !build.preview.is_empty() { build.preview.clone() } else { "Left click places, drag draws or fills, hold right click removes, R turns, B leaves".into() };
     if *model != next {
         *model = next;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn belt_catalog_selection_preserves_build_session_and_camera() {
+        let mut app = App::new();
+        let mut panels = Panels::default();
+        panels.open = Some(Panel::Build);
+        app.insert_resource(Build { active: Some("site".into()), level: 2, rotation: 3, ..default() })
+            .insert_resource(panels)
+            .insert_resource(UiIntents(vec!["b:belts".into()]))
+            .insert_resource(Session::isolated_test_session())
+            .insert_resource(Content(std::sync::Arc::new(food_factory_bevy::content::GameContent::bundled().unwrap())))
+            .insert_resource(Time::<()>::default())
+            .add_systems(Update, catalog_intents);
+        let camera = app.world_mut().spawn(OrbitCamera { yaw: 37.0, pitch: 25.0, distance: 6.0, top_down: false,
+            top_distance: 12.0, blend: 0.0, build_focus: Some(Vec3::new(4.0, 6.0, 8.0)), build_distance: 42.0, build_pitch: 53.0, arm: 6.0 }).id();
+        app.update();
+        let build = app.world().resource::<Build>();
+        assert_eq!(build.tool, Tool::Belts);
+        assert_eq!(build.active.as_deref(), Some("site"));
+        assert_eq!((build.level, build.rotation), (2, 3));
+        assert_eq!(app.world().resource::<Panels>().open, Some(Panel::Build));
+        let rig = app.world().get::<OrbitCamera>(camera).unwrap();
+        assert_eq!(rig.build_focus, Some(Vec3::new(4.0, 6.0, 8.0)));
+        assert_eq!((rig.yaw, rig.build_pitch, rig.build_distance), (37.0, 53.0, 42.0));
     }
 }

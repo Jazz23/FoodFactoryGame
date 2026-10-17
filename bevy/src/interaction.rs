@@ -21,9 +21,12 @@ use crate::space::{grid_rotation, Space, LEVEL_HEIGHT};
 
 pub struct InteractionPlugin;
 
+#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+pub struct InteractionSet;
+
 impl Plugin for InteractionPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<Aim>().init_resource::<Cursor>().init_resource::<Hotbar>().add_systems(Update, (aim, hover_outline, pick_outlines, hotbar, act, show_ghost, hint).chain().after(crate::player::PlayerSet::Move).after(crate::panels::close_keys));
+        app.init_resource::<Aim>().init_resource::<Cursor>().init_resource::<Hotbar>().add_systems(Update, (aim, hover_outline, pick_outlines, hotbar, act, show_ghost, hint).chain().after(crate::player::PlayerSet::Move).after(crate::panels::close_keys).in_set(InteractionSet));
     }
 }
 

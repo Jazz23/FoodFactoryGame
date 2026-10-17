@@ -8,6 +8,16 @@ selected here.
 Status labels below: **implemented** (code exists and was exercised as stated), **implemented, untested** (code exists,
 not yet exercised in a running game), **simplified** (works, but deliberately less than Unity), **missing**.
 
+### Belt construction in build mode (2026-10-17)
+
+Selecting Belts keeps the build panel, camera focus/orientation/distance, and selected floor. This intentionally changes
+Unity's catalog handoff while retaining its belt construction controls: press and drag forward to fill skipped cells,
+hold R to corner toward the pointer, release to finish, and Esc to cancel the active drag before clearing the tool.
+The walking cursor and build tool share the line planner. Build mode uses its own floor pointer and keeps right-drag
+camera tilt; a stationary hold with Belts selected removes only belts. Pending placements reserve carried inventory,
+show connected ghosts, and remain server requests. Repeated selection does not duplicate an in-flight pack purchase.
+Six focused regression tests pass; running-game acceptance is recorded in `development.md`.
+
 ## Contracts (unchanged from the Unity game)
 
 - The server owns gameplay state. Clients send `protocol::Command`s; the server validates every one against its own
