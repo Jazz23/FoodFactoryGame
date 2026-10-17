@@ -118,7 +118,8 @@ pub(super) fn draw_hud(mut commands: Commands, ui: Ui, roots: Res<Roots>, hud: R
         }
         if hud.crosshair {
             p.spawn((
-                Node { position_type: PositionType::Absolute, left: pct(50.0), top: pct(50.0), width: px(6.0), height: px(6.0), margin: UiRect::new(px(-3.0), px(0.0), px(-3.0), px(0.0)), border_radius: radius(3.0), ..default() },
+                Node { position_type: PositionType::Absolute, left: pct(50.0), top: pct(crate::interaction::CROSSHAIR_FROM_TOP * 100.0), width: px(6.0), height: px(6.0), border_radius: radius(3.0), ..default() },
+                UiTransform::from_translation(Val2::new(pct(-50.0), pct(-50.0))),
                 BackgroundColor(TEXT),
                 BoxShadow::new(rgba(0, 0, 0, 0.35), px(0.0), px(0.0), px(2.0), px(0.0)),
                 Pickable::IGNORE,
@@ -126,7 +127,7 @@ pub(super) fn draw_hud(mut commands: Commands, ui: Ui, roots: Res<Roots>, hud: R
         }
         if !hud.prompt.is_empty() && !model.open {
             p.spawn((
-                Node { position_type: PositionType::Absolute, left: pct(50.0), top: pct(50.0), column_gap: px(10.0), padding: UiRect::new(px(8.0), px(14.0), px(8.0), px(8.0)), border_radius: radius(10.0), ..row() },
+                Node { position_type: PositionType::Absolute, left: pct(50.0), top: pct(crate::interaction::CROSSHAIR_FROM_TOP * 100.0), column_gap: px(10.0), padding: UiRect::new(px(8.0), px(14.0), px(8.0), px(8.0)), border_radius: radius(10.0), ..row() },
                 BackgroundColor(GLASS),
                 centre_x(28.0),
                 Pickable::IGNORE,

@@ -420,6 +420,25 @@ impl WorldServer {
         outcome
     }
 
+    /// Applies an employee's command without its own commit: it lands with the next periodic commit, like clock steps
+    /// (a failed commit stops the world as it does for them). Employees act many times a second, and a full-state copy and
+    /// save per action grew with the world until the server thread could not keep up.
+    fn apply_batched(&mut self, actor: &str, request: &str, command: Command) -> Outcome {
+        if self.persistence_failed.is_some() {
+            return Outcome { request_id: request.into(), player_id: actor.into(), reason: "persistence-unavailable".into(), revision: self.world.state.revision, ..Default::default() };
+        }
+        let revision = self.world.state.revision;
+        let outcome = self.dispatch(actor, request, command);
+        if self.world.state.revision != revision {
+            if self.world.state.outcomes.len() > OUTCOMES_KEPT {
+                let excess = self.world.state.outcomes.len() - OUTCOMES_KEPT;
+                self.world.state.outcomes.drain(..excess);
+            }
+            self.uncommitted_steps = self.uncommitted_steps.max(1);
+        }
+        outcome
+    }
+
     fn dispatch(&mut self, actor: &str, request: &str, command: Command) -> Outcome {
         let w = &mut self.world;
         match command {
@@ -566,7 +585,7 @@ impl Host for WorldServer {
     fn command(&mut self, actor: &str, command: Command) -> Outcome {
         self.next_request += 1;
         let request = format!("worker-{}-{}", self.world.state.revision, self.next_request);
-        self.apply(actor, &request, command)
+        self.apply_batched(actor, &request, command)
     }
 
     fn max_stack(&self, item: &str) -> i32 { self.world.max_stack(item) }

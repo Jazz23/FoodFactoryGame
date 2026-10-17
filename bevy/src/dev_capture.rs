@@ -266,11 +266,12 @@ fn autopilot(
         "topdown" => rigs.iter_mut().for_each(|mut r| r.top_down = !r.top_down),
         "key" => match parts.get(1).copied().unwrap_or("") {
             "inventory" => actions.inventory_pressed = true,
+            "interact" => actions.interact_pressed = true,
             "phone" => actions.phone_pressed = true,
             "map" => actions.map_pressed = true,
             "build" => actions.build_pressed = true,
-            "place" => actions.place_pressed = true,
-            "remove" => actions.remove_pressed = true,
+            "place" => { actions.place_pressed = true; actions.pointer_place_pressed = true; }
+            "remove" => { actions.remove_pressed = true; actions.pointer_remove_pressed = true; }
             "rotate" => actions.rotate_pressed = true,
             "floorup" => actions.floor_up_pressed = true,
             "floordown" => actions.floor_down_pressed = true,

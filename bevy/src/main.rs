@@ -104,8 +104,9 @@ fn spawn_sun(mut commands: Commands) {
     ));
 }
 
-// Shows the smoothed frame rate in the window title, refreshed twice a second.
-fn show_fps(time: Res<Time>, diagnostics: Res<DiagnosticsStore>, mut window: Query<&mut Window, With<PrimaryWindow>>, mut since_update: Local<f32>) {
+// Shows the smoothed frame rate and the entity count in the window title, refreshed twice a second; a count that keeps
+// climbing while the game sits idle points at a leak.
+fn show_fps(time: Res<Time>, diagnostics: Res<DiagnosticsStore>, mut window: Query<&mut Window, With<PrimaryWindow>>, entities: Query<Entity>, mut since_update: Local<f32>) {
     *since_update += time.delta_secs();
     if *since_update < 0.5 {
         return;
@@ -113,6 +114,6 @@ fn show_fps(time: Res<Time>, diagnostics: Res<DiagnosticsStore>, mut window: Que
     *since_update = 0.0;
     let Some(fps) = diagnostics.get(&FrameTimeDiagnosticsPlugin::FPS).and_then(|fps| fps.smoothed()) else { return };
     if let Ok(mut window) = window.single_mut() {
-        window.title = format!("Food Factory ({fps:.0} FPS)");
+        window.title = format!("Food Factory ({fps:.0} FPS, {} entities)", entities.iter().count());
     }
 }

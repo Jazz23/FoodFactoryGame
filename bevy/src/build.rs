@@ -317,7 +317,7 @@ fn orders(mut build: ResMut<Build>, actions: Res<PlayerActions>, mut session: Re
     let mut sends = vec![];
     let cell = build.cell;
     // Left: start, then order on release.
-    if actions.place_pressed && !over_ui {
+    if actions.pointer_place_pressed && !over_ui {
         if let (Some(cell), true) = (cell, build.tool != Tool::None && build.tool != Tool::Sell) {
             build.drag_start = Some(cell);
         }
@@ -357,7 +357,7 @@ fn orders(mut build: ResMut<Build>, actions: Res<PlayerActions>, mut session: Re
     }
     // Right: hold still to remove, move to tilt; once removing, sweep the same family.
     let mut command = None;
-    if actions.remove_pressed && !over_ui {
+    if actions.pointer_remove_pressed && !over_ui {
         build.remove_press = Some((pointer, 0.0, false));
         build.sweeping = None;
         build.swept.clear();

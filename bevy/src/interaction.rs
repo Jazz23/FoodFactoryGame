@@ -1,6 +1,6 @@
 // The local player's world controls (Unity EquipmentInteraction and its Hover part): the aim ray from the crosshair (or the
 // free pointer in the top-down view) names the machine, belt or employee under it and the floor cell on the avatar's level.
-// E opens what is aimed at within reach, or the inventory; a hotbar key puts a held machine on the cursor, shown as a ghost
+// Interact (E) opens what is aimed at within reach and Inventory (Tab) the inventory; a hotbar key puts a held machine on the cursor, shown as a ghost
 // on its footprint (green where the server's own placement rule passes, red otherwise); R turns it, left click places it,
 // Q empties the cursor; left click with an empty cursor opens the aimed machine. C opens the phone and L its logistics.
 // Every change is a request: the ghost and hints are previews, the server re-checks each command.
@@ -23,13 +23,16 @@ pub struct InteractionPlugin;
 
 impl Plugin for InteractionPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<Aim>().init_resource::<Cursor>().init_resource::<Hotbar>().add_systems(Update, (aim, hover_outline, pick_outlines, hotbar, act, show_ghost, hint).chain().after(crate::player::PlayerSet::Move));
+        app.init_resource::<Aim>().init_resource::<Cursor>().init_resource::<Hotbar>().add_systems(Update, (aim, hover_outline, pick_outlines, hotbar, act, show_ghost, hint).chain().after(crate::player::PlayerSet::Move).after(crate::panels::close_keys));
     }
 }
 
 pub const HOTBAR_SIZE: usize = 9;
 const MAX_RAY: f32 = 100.0;
 pub const REACH: f32 = 2.5;
+/// Height of the crosshair as a fraction of the screen from its top (Unity EquipmentInteraction.CrosshairViewportY 0.6 from
+/// the bottom): above centre, so it aims further ahead of the avatar.
+pub const CROSSHAIR_FROM_TOP: f32 = 0.4;
 
 /// What the aim ray is on this frame.
 #[derive(Resource, Default, Clone, Debug)]
@@ -191,11 +194,10 @@ fn aim(
         return;
     };
     let Some((camera, transform)) = cameras.iter().next() else { return };
-    let free_pointer = window.single().ok().filter(|(_, c)| c.grab_mode == CursorGrabMode::None).and_then(|(w, _)| w.cursor_position());
-    let ray = match free_pointer {
-        Some(pointer) => camera.viewport_to_world(transform, pointer).ok().map(|r| (r.origin, *r.direction)),
-        None => Some((transform.translation(), *transform.forward())),
-    };
+    let Ok((window, cursor)) = window.single() else { return };
+    // A locked pointer aims through the crosshair, above the middle of the screen; a free one through the pointer.
+    let point = if cursor.grab_mode == CursorGrabMode::None { window.cursor_position() } else { Some(Vec2::new(window.width() * 0.5, window.height() * CROSSHAIR_FROM_TOP)) };
+    let ray = point.and_then(|p| camera.viewport_to_world(transform, p).ok()).map(|r| (r.origin, *r.direction));
     let Some((origin, direction)) = ray else { return };
     let site = indoors.site.clone().unwrap_or_else(|| world.site.clone());
     let level = indoors.level;
@@ -346,7 +348,7 @@ fn act(
     }
     // Picking a task target: a click or E on a valid machine in reach hands its ID back to the employee screen.
     if let Some(pick) = panels.picking.clone() {
-        if actions.place_pressed || actions.inventory_pressed {
+        if actions.place_pressed || actions.interact_pressed {
             if let (Some(Pick::Equipment(id)), true, Some(world)) = (&aim.pick, aim.in_reach, session.joined()) {
                 if crate::panels::pick_targets(world, &pick).contains(id) {
                     let role = match pick.role { crate::panels::PickRole::Source => "src", crate::panels::PickRole::Destination => "dst", crate::panels::PickRole::Machine => "machine" };
@@ -377,12 +379,19 @@ fn act(
         _ => None,
     };
     if actions.inventory_pressed {
-        panels.open = Some(match (aimed_machine, aimed_employee, aim.property.clone()) {
-            (Some(id), _, _) if openable(&session, &content, &id) => Panel::Machine(id),
-            (_, Some(id), _) => Panel::Employee(id),
-            (_, _, Some(lot)) => Panel::Property(lot),
-            _ => Panel::Inventory,
-        });
+        panels.open = Some(Panel::Inventory);
+        return;
+    }
+    if actions.interact_pressed {
+        let target = match (aimed_machine, aimed_employee, aim.property.clone()) {
+            (Some(id), _, _) if openable(&session, &content, &id) => Some(Panel::Machine(id)),
+            (_, Some(id), _) => Some(Panel::Employee(id)),
+            (_, _, Some(lot)) => Some(Panel::Property(lot)),
+            _ => None,
+        };
+        if target.is_some() {
+            panels.open = target;
+        }
         return;
     }
     if !actions.place_pressed || cursor.item.is_some() {
@@ -485,11 +494,12 @@ fn show_ghost(
 }
 
 /// The HUD hint for what the aim names.
-fn hint(aim: Res<Aim>, session: Res<Session>, content: Res<Content>, cursor: Res<Cursor>, mut hud: ResMut<HudLines>, panels: Res<Panels>) {
+fn hint(aim: Res<Aim>, session: Res<Session>, content: Res<Content>, cursor: Res<Cursor>, mut hud: ResMut<HudLines>, panels: Res<Panels>, bindings: Res<crate::actions::Bindings>) {
     let Some(world) = session.joined() else { return };
+    let e = crate::settings::label_of(bindings.interact);
     let text = if let Some(pick) = &panels.picking {
         let aimed = match (&aim.pick, aim.in_reach) {
-            (Some(Pick::Equipment(id)), true) if crate::panels::pick_targets(world, pick).contains(id) => " - click or E to choose this one".to_string(),
+            (Some(Pick::Equipment(id)), true) if crate::panels::pick_targets(world, pick).contains(id) => format!(" - click or {e} to choose this one"),
             (Some(Pick::Equipment(_)), true) => " - this one cannot be chosen".to_string(),
             _ => String::new(),
         };
@@ -509,15 +519,15 @@ fn hint(aim: Res<Aim>, session: Res<Session>, content: Res<Content>, cursor: Res
         match &aim.pick {
             Some(Pick::Equipment(id)) => {
                 let kind = world.views.values().find_map(|v| v.equipment.iter().find(|e| &e.id == id)).map(|e| content.0.equipment_name(&e.kind)).unwrap_or_default();
-                if aim.in_reach { format!("E  {kind}") } else { format!("{kind} (too far)") }
+                if aim.in_reach { format!("{e}  {kind}") } else { format!("{kind} (too far)") }
             }
             Some(Pick::Employee(id)) => {
                 let name = world.employees.iter().find(|e| &e.id == id).map(|e| e.name.clone()).unwrap_or_default();
-                if aim.in_reach { format!("E  {name}") } else { name }
+                if aim.in_reach { format!("{e}  {name}") } else { name }
             }
             Some(Pick::Belt(_)) => "Conveyor belt (F takes an item off it)".into(),
             None => match aim.property.as_ref().and_then(|lot| world.offers_by_lot.get(lot)) {
-                Some(offer) => format!("E  {}: price and owner", offer.building_id),
+                Some(offer) => format!("{e}  {}: price and owner", offer.building_id),
                 None => String::new(),
             },
         }

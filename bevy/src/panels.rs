@@ -166,9 +166,10 @@ impl Panels {
     pub fn any_open(&self) -> bool { self.open.is_some() && self.open != Some(Panel::Build) }
 }
 
-/// Esc closes any screen; E closes the inventory and machine screens, C the phone.
+/// Esc closes any screen; the Inventory and Interact keys close the inventory and the screens opened from the world, C the
+/// phone. A key that closes a screen is consumed, so the world controls (which run after this) do not reopen one with it.
 #[allow(clippy::too_many_arguments)]
-fn close_keys(actions: Res<PlayerActions>, mut panels: ResMut<Panels>, typing: Res<crate::actions::UiTyping>, mut focus: ResMut<UiFocus>, mut screen: ResMut<Screen>, cursor: Res<Cursor>, settings: Res<crate::settings::SettingsScreen>) {
+pub fn close_keys(mut actions: ResMut<PlayerActions>, mut panels: ResMut<Panels>, typing: Res<crate::actions::UiTyping>, mut focus: ResMut<UiFocus>, mut screen: ResMut<Screen>, cursor: Res<Cursor>, settings: Res<crate::settings::SettingsScreen>) {
     if settings.open {
         return;
     }
@@ -209,11 +210,14 @@ fn close_keys(actions: Res<PlayerActions>, mut panels: ResMut<Panels>, typing: R
     let close = match &panels.open {
         Some(Panel::Build) => false,
         Some(_) if actions.close_pressed => true,
-        Some(Panel::Inventory | Panel::Machine(_)) if actions.inventory_pressed && !typing.0 => true,
+        Some(Panel::Inventory | Panel::Machine(_) | Panel::Employee(_) | Panel::Property(_)) if (actions.inventory_pressed || actions.interact_pressed) && !typing.0 => true,
         Some(Panel::Phone(_)) if actions.phone_pressed && !typing.0 => true,
         _ => false,
     };
     if close {
+        actions.inventory_pressed = false;
+        actions.interact_pressed = false;
+        actions.phone_pressed = false;
         panels.open = None;
         panels.problem.clear();
         panels.confirming = None;

@@ -1,6 +1,6 @@
 // Action map: gameplay reads named actions from `PlayerActions`, never raw devices. Bindings mirror the Unity project's
 // Player map (InputSystem_Actions): WASD/arrows move, Space jump, Left Shift sprint (and quick transfer), mouse look, scroll
-// zoom, E inventory/interact, C phone, M map, L logistics, B build, X clear cursor, R rotate, F take item, Z place item,
+// zoom, E interact, Tab inventory, C phone, M map, L logistics, B build, X clear cursor, R rotate, F take item, Z place item,
 // V flip lift, PgUp/PgDn floors, Enter confirm, left click place, right click remove (and camera tilt in build mode),
 // middle click pick block, 1-9 hotbar, Esc close.
 use bevy::input::mouse::{AccumulatedMouseMotion, AccumulatedMouseScroll};
@@ -41,6 +41,7 @@ pub struct UiTyping(pub bool);
 
 #[derive(Resource)]
 pub struct Bindings {
+    pub interact: KeyCode,
     pub inventory: KeyCode,
     pub rotate: KeyCode,
     pub clear: KeyCode,
@@ -69,7 +70,8 @@ pub struct Bindings {
 impl Default for Bindings {
     fn default() -> Self {
         Self {
-            inventory: KeyCode::KeyE,
+            interact: KeyCode::KeyE,
+            inventory: KeyCode::Tab,
             rotate: KeyCode::KeyR,
             clear: KeyCode::KeyX,
             phone: KeyCode::KeyC,
@@ -98,6 +100,7 @@ impl Default for Bindings {
 // This frame's action values. Look and zoom are zero while the cursor is free, so the camera only turns when captured.
 #[derive(Resource, Default)]
 pub struct PlayerActions {
+    pub interact_pressed: bool,
     pub inventory_pressed: bool,
     pub rotate_pressed: bool,
     pub clear_pressed: bool,
@@ -118,6 +121,10 @@ pub struct PlayerActions {
     pub close_pressed: bool,
     pub place_pressed: bool,
     pub remove_pressed: bool,
+    /// Left and right click even while a screen holds focus, for screens that work on the world under the free pointer (build
+    /// mode); the reader checks that the pointer is not over UI.
+    pub pointer_place_pressed: bool,
+    pub pointer_remove_pressed: bool,
     pub quick_transfer: bool,
     pub hotbar: Option<usize>,
     // Ground move input, x right and y forward, clamped to length 1.
@@ -177,6 +184,7 @@ fn read_actions(
         .single()
         .is_ok_and(|cursor| cursor.grab_mode != CursorGrabMode::None);
     *actions = PlayerActions {
+        interact_pressed: keys.just_pressed(bindings.interact),
         inventory_pressed: keys.just_pressed(bindings.inventory),
         rotate_pressed: keys.just_pressed(bindings.rotate),
         clear_pressed: keys.just_pressed(bindings.clear),
@@ -196,6 +204,8 @@ fn read_actions(
         close_pressed: keys.any_just_pressed(bindings.release_cursor.iter().copied()),
         place_pressed: mouse.just_pressed(MouseButton::Left),
         remove_pressed: mouse.just_pressed(MouseButton::Right),
+        pointer_place_pressed: mouse.just_pressed(MouseButton::Left),
+        pointer_remove_pressed: mouse.just_pressed(MouseButton::Right),
         quick_transfer: keys.any_pressed(bindings.sprint.iter().copied()),
         hotbar: [KeyCode::Digit1, KeyCode::Digit2, KeyCode::Digit3, KeyCode::Digit4,
             KeyCode::Digit5, KeyCode::Digit6, KeyCode::Digit7, KeyCode::Digit8, KeyCode::Digit9]

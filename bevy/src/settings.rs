@@ -71,9 +71,9 @@ pub struct SettingsScreen {
 }
 
 /// Rebindable actions: (key, label).
-const ACTIONS: [(&str, &str); 22] = [
+const ACTIONS: [(&str, &str); 23] = [
     ("up", "Move forward"), ("down", "Move back"), ("left", "Move left"), ("right", "Move right"), ("jump", "Jump"), ("sprint", "Sprint"),
-    ("inventory", "Inventory / interact"), ("take_item", "Take item"), ("place_item", "Place item"), ("clear", "Clear cursor"), ("rotate", "Rotate"),
+    ("interact", "Interact"), ("inventory", "Inventory"), ("take_item", "Take item"), ("place_item", "Place item"), ("clear", "Clear cursor"), ("rotate", "Rotate"),
     ("build", "Build mode"), ("phone", "Phone"), ("map", "Map"), ("logistics", "Logistics"), ("flip_lift", "Flip lift"), ("floor_up", "Floor up"),
     ("floor_down", "Floor down"), ("release_cursor", "Close screen"), ("confirm", "Confirm build"), ("hotbar", "Hotbar (fixed: 1-9)"), ("zoom", "Zoom (fixed: scroll)"),
 ];
@@ -88,6 +88,7 @@ fn binding<'a>(bindings: &'a mut Bindings, action: &str) -> Option<&'a mut KeyCo
         "sprint" => bindings.sprint.first_mut()?,
         "release_cursor" => bindings.release_cursor.first_mut()?,
         "confirm" => bindings.confirm.first_mut()?,
+        "interact" => &mut bindings.interact,
         "inventory" => &mut bindings.inventory,
         "take_item" => &mut bindings.take_item,
         "place_item" => &mut bindings.place_item,
@@ -152,6 +153,10 @@ fn load(settings: Res<Settings>, mut commands: Commands, mut bindings: ResMut<Bi
                 *slot = key;
             }
         }
+    }
+    // Saves from before Interact and Inventory were split bound both to E; the inventory falls back to its own default.
+    if bindings.inventory == bindings.interact {
+        bindings.inventory = if bindings.interact == KeyCode::Tab { KeyCode::KeyI } else { KeyCode::Tab };
     }
     bindings.sensitivity = prefs.sensitivity;
     if !prefs.name.is_empty() {
@@ -298,7 +303,7 @@ fn apply_anti_aliasing(mut commands: Commands, prefs: Option<Res<Prefs>>, camera
 
 /// The keybind groups as the settings screen lays them out in two columns.
 const GROUPS: [&[(&str, &[&str])]; 2] = [
-    &[("Movement", &["up", "down", "left", "right", "jump", "sprint"]), ("Interaction", &["inventory", "take_item", "place_item", "clear", "release_cursor"])],
+    &[("Movement", &["up", "down", "left", "right", "jump", "sprint"]), ("Interaction", &["interact", "inventory", "take_item", "place_item", "clear", "release_cursor"])],
     &[("Building", &["build", "rotate", "confirm", "flip_lift", "floor_up", "floor_down"]), ("Camera and screens", &["phone", "map", "logistics", "zoom"]), ("Hotbar", &["hotbar"])],
 ];
 

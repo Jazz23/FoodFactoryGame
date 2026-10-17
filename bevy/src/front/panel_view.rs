@@ -1,14 +1,32 @@
 // The open in-world panel (inventory, a machine, an employee's tasks, the phone, build mode's catalog), drawn from the game's
 // UiModel in the "Food Factory UI" design's style: a dark card over a dimmed world, item slots in a ten-wide grid, icon cards
 // for things to buy or place, and plain or accent buttons. Every button sends its action; panel buttons also take right
-// clicks and slot drags. A rebuild waits while a slot is being dragged, so the drag reaches its drop.
+// clicks and slot drags. A rebuild waits while a slot is being dragged, so the drag reaches its drop. A change to the footer
+// alone (build mode's per-cell preview) rewrites that one text, so the panel is not rebuilt under a moving pointer.
 
 use super::*;
 use crate::ui::UiEntry;
 
-pub(super) fn draw_panel(mut commands: Commands, ui: Ui, roots: Res<Roots>, model: Res<UiModel>, dragging: Res<Dragging>, mut last: Local<Option<UiModel>>) {
+/// The panel's footer text, rewritten in place when only it changes.
+#[derive(Component)]
+pub(super) struct PanelFooter;
+
+pub(super) fn draw_panel(
+    mut commands: Commands, ui: Ui, roots: Res<Roots>, model: Res<UiModel>, dragging: Res<Dragging>, mut last: Local<Option<UiModel>>,
+    mut footers: Query<&mut Text, With<PanelFooter>>,
+) {
     if dragging.0 || last.as_ref() == Some(&*model) {
         return;
+    }
+    if let Some(previous) = last.as_mut() {
+        let same_body = UiModel { footer: String::new(), ..previous.clone() } == UiModel { footer: String::new(), ..model.clone() };
+        if same_body && !previous.footer.is_empty() && !model.footer.is_empty() && !footers.is_empty() {
+            for mut footer in &mut footers {
+                footer.0 = model.footer.clone();
+            }
+            previous.footer = model.footer.clone();
+            return;
+        }
     }
     *last = Some(model.clone());
     rebuild(&mut commands, roots.panel, |p| {
@@ -52,7 +70,7 @@ fn inner(p: &mut Kids, ui: &Ui, model: &UiModel, closable: bool) {
             }
         });
         if !model.footer.is_empty() {
-            text(p, ui, &model.footer, Face::Regular, 12.0, MUTED);
+            text(p, ui, &model.footer, Face::Regular, 12.0, MUTED).insert(PanelFooter);
         }
     });
 }
