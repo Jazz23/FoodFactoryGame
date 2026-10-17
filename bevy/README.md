@@ -26,12 +26,24 @@ is different and no importer exists.
 
 ```powershell
 cargo test --test world --test server
+cargo test --test site_walk --test presentation --test multiplayer
 ```
 
 The tests use their own temporary directories. `tools/capture.sh OUT_DIR "SCRIPT"` runs the client in capture mode
 (`src/dev_capture.rs`): it hosts an isolated world under `OUT_DIR/../capture-data`, waits for the city, runs the script
 (`shot NAME`, `wait S`, `walk X Y S`, `tp X Z`, `yaw`, `pitch`, `zoom`, `key ACTION`, `hotbar N`, `intent ACTION`,
-`bcell X Z`, `where`) and saves screenshots. Capture runs keep vsync on.
+`bcell X Z`, `where`, `ui TEXT` / `uialt` / `uishift` / `uidrag A|B` to click or drag buttons by label, `dump` to log the open
+screen, `property CATEGORY`, `gotoprop [LOT]`, `elevator`, `competitor [near]`, `junction`) and saves screenshots. Capture runs keep vsync on.
+
+Customer figures follow the site's open ground cells from the street through front doors to their queue and table.
+Back doors block customers; queues follow the route back toward the street. Routes refresh when the layout changes,
+and unreachable figures wait. Departing customers walk back out to the street. Skeletal sitting poses still need parity work.
+
+For a repeatable customer presentation capture, create a **new absolute scratch directory** with
+`cargo run --example customer_capture -- ABSOLUTE_SCRATCH_ROOT/data/Saves/customer-walk`, then run the client with
+`FF_DATA_ROOT=ABSOLUTE_SCRATCH_ROOT/data`, `FF_CAPTURE_WORLD=customer-walk`, `FF_CAPTURE_DIR=ABSOLUTE_SCRATCH_ROOT/shots`
+and a capture script. The example refuses existing directories and seeds synthetic customer records in an isolated
+SQLite world; it verifies presentation, not purchasing. Create the screenshot directory before launching.
 
 ## Regenerating content
 

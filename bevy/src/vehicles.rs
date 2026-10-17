@@ -4,8 +4,7 @@
 // their dock; parked in their restaurant's service yard. The cab paint (VH_Body) is the company colour: this client's company
 // green, others a colour from the company ID. City cars are a deterministic function of the layout and the world clock: each
 // lane of each direction near the avatar is a stream of cars at the headway the server's background flow implies for the
-// hour, at that road's speed, so every client shows the same traffic. Simplification: city cars drive through junctions
-// without queueing at stop lines or lights.
+// hour, with stop-line/light discharge and queues behind trucks and people. No traffic presentation changes the simulation.
 use std::collections::{HashMap, HashSet};
 use std::f32::consts::PI;
 
@@ -24,7 +23,9 @@ pub struct VehiclesPlugin;
 
 impl Plugin for VehiclesPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<Vehicles>().add_systems(Update, (load_models, trucks, city_cars, drive, bodies).chain());
+        app.init_resource::<Vehicles>().init_resource::<TrafficClock>().init_resource::<TrafficPositions>()
+            .add_systems(PreUpdate, traffic_clock)
+            .add_systems(Update, (load_models, trucks, city_cars, drive, bodies).chain());
     }
 }
 
@@ -41,6 +42,20 @@ const CAR_COLOURS: [Color; 8] = [
     Color::srgb(0.75, 0.12, 0.12), Color::srgb(0.12, 0.25, 0.6), Color::srgb(0.85, 0.85, 0.85), Color::srgb(0.12, 0.12, 0.13),
     Color::srgb(0.55, 0.57, 0.6), Color::srgb(0.2, 0.45, 0.3), Color::srgb(0.85, 0.6, 0.15), Color::srgb(0.4, 0.25, 0.15),
 ];
+
+#[derive(Resource, Default)]
+pub struct TrafficClock { pub seconds: f64, baseline: i64, received: f64, world: String }
+#[derive(Resource, Default)]
+pub struct TrafficPositions(pub Vec<Vec2>);
+
+fn traffic_clock(time: Res<Time>, session: Res<Session>, mut clock: ResMut<TrafficClock>) {
+    let Some(world) = session.joined() else { *clock = TrafficClock::default(); return };
+    let seconds = world.view().map_or(0, |v| v.clock_seconds);
+    if clock.baseline != seconds || clock.world != world.world_id {
+        clock.baseline = seconds; clock.received = time.elapsed_secs_f64(); clock.world = world.world_id.clone();
+    }
+    clock.seconds = seconds as f64 + (time.elapsed_secs_f64() - clock.received).clamp(0.0, 1.25);
+}
 
 struct Model {
     parts: Vec<Part>,
@@ -103,6 +118,10 @@ fn load_models(
         vehicles.models.insert(name.to_string(), Model { parts: parts.clone(), min, max });
     }
 }
+
+/// A drawn vehicle's engine loop (Unity VehicleEngineAudio.AddTo): level, base pitch and hearing distance in metres.
+#[derive(Component, Clone, Copy)]
+pub struct Engine { pub volume: f32, pub pitch: f32, pub hearing: f32 }
 
 fn spawn_vehicle(commands: &mut Commands, model: &Model, tint: Option<Handle<StandardMaterial>>, position: Vec3, yaw: f32, name: String) -> Entity {
     let half = Vec2::new((model.max.x - model.min.x) * 0.5, (model.max.z - model.min.z) * 0.5);
@@ -278,6 +297,7 @@ fn trucks(mut commands: Commands, time: Res<Time>, session: Res<Session>, space:
         let material = tint(&mut vehicles, &mut materials, format!("company:{}", truck.company_id), colour);
         let Some(model) = vehicles.models.get(TRUCK_NAME) else { continue };
         let entity = spawn_vehicle(&mut commands, model, Some(material), position, yaw, format!("Truck {}", truck.name));
+        commands.entity(entity).insert(Engine { volume: 0.4, pitch: 1.0, hearing: 30.0 });
         vehicles.trucks.insert(truck.id.clone(), entity);
     }
     let stale: Vec<String> = vehicles.trucks.keys().filter(|k| !keep.contains(*k)).cloned().collect();
@@ -289,7 +309,8 @@ fn trucks(mut commands: Commands, time: Res<Time>, session: Res<Session>, space:
 }
 
 #[allow(clippy::too_many_arguments)]
-fn city_cars(mut commands: Commands, time: Res<Time>, session: Res<Session>, space: Option<Res<Space>>, mut vehicles: ResMut<Vehicles>, mut materials: ResMut<Assets<StandardMaterial>>, mut drives: Query<&mut Drive>, player: Query<&Transform, With<crate::player::Player>>, mut clock: Local<(i64, f32)>) {
+fn city_cars(mut commands: Commands, session: Res<Session>, space: Option<Res<Space>>, mut vehicles: ResMut<Vehicles>, mut materials: ResMut<Assets<StandardMaterial>>, mut drives: Query<&mut Drive>, player: Query<&Transform, With<crate::player::Player>>, clock: Res<TrafficClock>, people: Query<&GlobalTransform, With<crate::sites::DoorOpener>>, mut positions: ResMut<TrafficPositions>) {
+    positions.0.clear();
     let (Some(world), Some(space), Ok(player)) = (session.joined(), space, player.single()) else {
         for (_, e) in vehicles.cars.drain() {
             commands.entity(e).despawn();
@@ -299,13 +320,7 @@ fn city_cars(mut commands: Commands, time: Res<Time>, session: Res<Session>, spa
     if vehicles.models.len() < CAR_NAMES.len() {
         return;
     }
-    // The world clock, carried on smoothly between baselines.
-    let now = time.elapsed_secs();
-    let seconds = world.view().map_or(0, |v| v.clock_seconds);
-    if clock.0 != seconds {
-        *clock = (seconds, now);
-    }
-    let t = seconds as f32 + (now - clock.1).min(1.5);
+    let t = clock.seconds;
     let (px, pz, _) = space.to_map(player.translation);
     let here = Vec2::new(px, pz);
     let network = &world.roads;
@@ -319,35 +334,37 @@ fn city_cars(mut commands: Commands, time: Res<Time>, session: Res<Session>, spa
         if dx.max(dz) > CAR_RADIUS {
             continue;
         }
-        let load = roads::background_percent(segment, seconds).max(3) as f32;
-        let speed = roads::speed_metres_per_second(segment.kind) as f32 * 0.85;
-        let spacing = (roads::CAPACITY_SPACING_METRES as f32 * 100.0 / load).max(12.0);
         for forward in [true, false] {
             for lane in 0..segment.lanes_per_direction {
-                let seed = random::fnv1a(&format!("{}:{forward}:{lane}", segment.id));
-                let phase = (seed % 1000) as f32 / 1000.0 * spacing;
-                let head = t * speed + phase;
-                let first = (head / spacing).floor() as i64;
                 let length = segment.length as f32;
-                let mut n = first;
-                loop {
-                    let along_lane = head - n as f32 * spacing;
-                    if along_lane > length {
-                        n += 1;
-                        continue;
+                let mut cars = food_factory_bevy::traffic::lane(network, segment.index, forward, lane, t, stop_back(network, segment.index, forward));
+                if lane == 0 {
+                    for view in world.views.values() {
+                        for truck in view.trucks.iter().chain(&view.road_trucks).filter(|truck| truck.on_road() && truck.leg_segment_id == segment.id && (truck.leg_to >= truck.leg_from) == forward) {
+                            let offset = truck_offset(network, segment.index, truck, (t - view.clock_seconds as f64).clamp(0.0, 1.25) as f32, 3.5);
+                            food_factory_bevy::traffic::hold_behind(&mut cars, if forward { offset } else { length - offset }, 10.5, 7.0);
+                        }
                     }
-                    if along_lane < 0.0 {
-                        break;
+                }
+                let (start, heading) = along(network, segment.index, if forward { 0.0 } else { length }, forward, lane);
+                let right = Vec2::new(heading.y, -heading.x);
+                for person in &people {
+                    let (x, z, _) = space.to_map(person.translation());
+                    let relative = Vec2::new(x, z) - start;
+                    let at = relative.dot(heading);
+                    if at >= 0.0 && at <= length && relative.dot(right).abs() <= LANE_WIDTH as f32 / 2.0 + 0.1 {
+                        food_factory_bevy::traffic::hold_behind(&mut cars, at, 4.5, 1.0);
                     }
-                    let offset = if forward { along_lane } else { length - along_lane };
+                }
+                for car in cars {
+                    let offset = if forward { car.along } else { length - car.along };
                     let (point, heading) = along(network, segment.index, offset, forward, lane);
                     let distance = point.distance(here);
                     if distance < CAR_RADIUS {
-                        let id = format!("{}:{forward}:{lane}:{n}", segment.id);
-                        let model = (random::mix(seed ^ n as u64) % CAR_NAMES.len() as u64) as usize;
+                        let id = format!("{}:{forward}:{lane}:{}", segment.id, car.key);
+                        let model = car.key as usize % CAR_NAMES.len();
                         wanted.push((distance, id, point, heading.x.atan2(heading.y).to_degrees(), model));
                     }
-                    n += 1;
                 }
             }
         }
@@ -356,6 +373,7 @@ fn city_cars(mut commands: Commands, time: Res<Time>, session: Res<Session>, spa
     wanted.truncate(MAX_CARS);
     let mut keep = HashSet::new();
     for (_, id, point, yaw, model_index) in wanted {
+        positions.0.push(point);
         keep.insert(id.clone());
         // Cars avoid drawn lots (a road never runs through one, but its kerb lane may graze an apron).
         let position = space.to_scene(point.x, point.y, space.land(point.x, point.y));
@@ -371,6 +389,7 @@ fn city_cars(mut commands: Commands, time: Res<Time>, session: Res<Session>, spa
         let material = colour.map(|c| tint(&mut vehicles, &mut materials, format!("car:{c:?}"), c));
         let Some(model) = vehicles.models.get(name) else { continue };
         let entity = spawn_vehicle(&mut commands, model, material, position, yaw, format!("Car {id}"));
+        commands.entity(entity).insert(Engine { volume: 0.18, pitch: 1.2 + (food_factory_bevy::world::random::fnv1a(&id) % 1000) as f32 / 1000.0 * 0.3, hearing: 22.0 });
         vehicles.cars.insert(id, entity);
     }
     let stale: Vec<String> = vehicles.cars.keys().filter(|k| !keep.contains(*k)).cloned().collect();

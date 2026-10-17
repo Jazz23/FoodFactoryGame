@@ -156,6 +156,63 @@ pub struct HudLines {
     pub hint: String,
 }
 
+/// The HUD's restaurant card (Unity PlayerHud.WorldText): what stops sales or that it is open, the warnings, recent money.
+pub fn readiness_card(ready: &food_factory_bevy::goods::readiness::Readiness, content: &food_factory_bevy::content::GameContent, menu: &[&food_factory_bevy::goods::RecipeDefinition]) -> String {
+    use food_factory_bevy::goods::readiness::*;
+    let mut lines = vec![match ready.blocker {
+        None => format!("Open: {} queued, {} eating", ready.queued, ready.eating),
+        Some(blocker) => format!("Not selling: {}", blocker_text(blocker, ready, content, menu)),
+    }];
+    let warnings: Vec<String> = ready.warnings.iter().map(|w| match *w {
+        NO_REACHABLE_SEAT => "takeaway only: no seat customers can reach".to_string(),
+        DOCK_NOT_BESIDE_BACK_DOOR => "a dock is not beside a back door".to_string(),
+        STOCK_SPOILS_SOON => format!("{} in a register spoils in {}", content.item_name(&ready.spoiling_item_id), format_duration(ready.spoiling_seconds, false)),
+        other => reason_text(other),
+    }).collect();
+    if !warnings.is_empty() { lines.push(warnings.join(", ")); }
+    lines.push(format!("Last {}: {} sale{} {}, spent {}", format_duration(RECENT_SECONDS, true), ready.recent_sales, if ready.recent_sales == 1 { "" } else { "s" },
+        money(ready.recent_sales_cents), money(ready.recent_spend_cents)));
+    lines.join("
+")
+}
+
+pub fn blocker_text(blocker: &str, ready: &food_factory_bevy::goods::readiness::Readiness, content: &food_factory_bevy::content::GameContent, menu: &[&food_factory_bevy::goods::RecipeDefinition]) -> String {
+    use food_factory_bevy::goods::readiness::*;
+    match blocker {
+        NO_CUSTOMER_DOOR => "the restaurant has no customer door (add a door in build mode, B)".into(),
+        NO_REACHABLE_REGISTER if ready.registers == 0 => "no register (buy one in build mode, B)".into(),
+        NO_REACHABLE_REGISTER => "customers cannot reach a register from the front door".into(),
+        NO_STAFFED_REGISTER => "nobody works a register (open it and choose Work this register)".into(),
+        NO_EDIBLE_MENU_ITEM => {
+            let mut foods: Vec<String> = vec![];
+            for item in menu.iter().flat_map(|r| &r.inputs).map(|i| content.item_name(&i.item_id)) { if !foods.contains(&item) { foods.push(item); } }
+            let food = if foods.is_empty() { "food".to_string() } else if foods.len() <= 3 { foods.join(" or ") } else { "menu food".to_string() };
+            format!("no {food} in a worked register (put some in its input)")
+        }
+        other => reason_text(other),
+    }
+}
+
+/// Game seconds as Unity's PlayerHud.FormatDuration writes them: compact "10m", or "10m 05s", "2h 03m", "1d 4h".
+pub fn format_duration(seconds: i64, compact: bool) -> String {
+    let s = seconds.max(0);
+    if compact {
+        return if s < 60 { format!("{s}s") } else if s < 3600 { format!("{}m", s / 60) } else if s < 86400 { format!("{}h", s / 3600) } else { format!("{}d", s / 86400) };
+    }
+    if s < 60 { format!("{s}s") } else if s < 3600 { format!("{}m {:02}s", s / 60, s % 60) } else if s < 86400 { format!("{}h {:02}m", s / 3600, s / 60 % 60) } else { format!("{}d {}h", s / 86400, s / 3600 % 24) }
+}
+
+/// A ledger entry's kind as shown to players (Unity PlayerHud.LedgerKind).
+pub fn ledger_kind(kind: &str) -> String {
+    use food_factory_bevy::goods::company::*;
+    match kind {
+        LEDGER_SALE => "Sale", LEDGER_SUPPLIER_GOODS => "Supplier goods", LEDGER_SUPPLIER_EQUIPMENT => "Supplier equipment", LEDGER_TRUCK => "Truck",
+        LEDGER_PROPERTY => "Property", LEDGER_FLOOR => "Factory floor", LEDGER_FURNISH => "Build: furnishing", LEDGER_SELL_BACK => "Sold back",
+        LEDGER_SHELL => "Build: walls and doors", LEDGER_ADJUSTMENT => "Adjustment", LEDGER_WAGE => "Wages", LEDGER_FARM_GOODS => "Farm goods",
+        LEDGER_FARM_DELIVERY => "Farm delivery", LEDGER_FARM_REFUND => "Farm refund", other => other,
+    }.to_string()
+}
+
 fn clock_text(seconds: i64) -> String {
     let day = seconds / food_factory_bevy::world::clock::DAY_SECONDS + 1;
     let hour = seconds % food_factory_bevy::world::clock::DAY_SECONDS / food_factory_bevy::world::clock::HOUR_SECONDS;
@@ -166,6 +223,7 @@ fn clock_text(seconds: i64) -> String {
 fn draw_screen(
     session: Res<Session>, screen: Res<Screen>, mut model: ResMut<UiModel>, map: Res<MapState>, hud: Res<HudLines>, panels: Res<Panels>, mut focus: ResMut<UiFocus>,
     mut worlds: Local<Option<(f64, Vec<String>)>>, time: Res<Time>, settings_screen: Res<crate::settings::SettingsScreen>, prefs: Option<Res<crate::settings::Prefs>>,
+    content: Res<Content>, mut card: Local<(String, i64, String)>,
 ) {
     let now = time.elapsed_secs_f64();
     if worlds.as_ref().is_none_or(|(at, _)| now - at > 3.0) {
@@ -232,7 +290,17 @@ fn draw_screen(
                 Some(world) if map.built => {
                     let site = world.view().and_then(|v| v.sites.iter().find(|s| s.id == world.site)).map(|s| s.name.clone()).unwrap_or_else(|| world.site.clone());
                     let clock = world.view().map(|v| clock_text(v.clock_seconds)).unwrap_or_default();
-                    (format!("{site}   {}", money(world.cash())), clock)
+                    // Unity PlayerHud.Readiness: the client site's readout, recomputed once per baseline revision.
+                    let revision = world.view().map_or(-1, |v| v.revision);
+                    if card.0 != world.site || card.1 != revision {
+                        let menu: Vec<&food_factory_bevy::goods::RecipeDefinition> = content.0.recipes.values().filter(|r| food_factory_bevy::goods::rules::is_menu_item(r)).collect();
+                        let text = world.view().and_then(|v| food_factory_bevy::goods::readiness::evaluate(v, &world.site, world.offers.get(&world.site), menu.iter().copied()))
+                            .map(|ready| readiness_card(&ready, &content.0, &menu)).unwrap_or_default();
+                        *card = (world.site.clone(), revision, text);
+                    }
+                    let status = if card.2.is_empty() { clock } else { format!("{clock}
+{}", card.2) };
+                    (format!("{site}   {}", money(world.cash())), status)
                 }
                 Some(_) => ("Food Factory".into(), map.progress.clone()),
                 None => ("Food Factory".into(), session.status.clone()),

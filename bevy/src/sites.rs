@@ -29,8 +29,9 @@ impl Plugin for SitesPlugin {
             .init_resource::<Solids>()
             .init_resource::<Indoors>()
             .init_resource::<EditedSite>()
+            .init_resource::<TableSeats>()
             .add_systems(Startup, setup_materials)
-            .add_systems(Update, (choose_drawn, build_buildings, build_equipment, build_belts, rebuild_solids, find_indoors, show_storeys, glide_items, swing_doors).chain());
+            .add_systems(Update, (choose_drawn, build_buildings, build_equipment, build_belts, rebuild_solids, find_indoors, show_storeys, show_fill, collect_table_seats, glide_items, swing_doors).chain());
     }
 }
 
@@ -49,7 +50,17 @@ const ITEM_SIZE: f32 = 0.42;
 const DOOR_OPEN_DEGREES: f32 = 95.0;
 const DOOR_DEGREES_PER_SECOND: f32 = 300.0;
 const DOOR_REACH: f32 = 1.8;
+// Unity's size-based LOD cutoffs amount to roughly these ranges for ordinary-sized site pieces.
+const SHELL_DRAW_DISTANCE: f32 = 140.0;
+const MACHINE_DRAW_DISTANCE: f32 = 70.0;
 const DIRECTIONS: [(i32, i32); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
+
+const STORAGE_SHELF: &str = "models/Restaurant/Models/Service/RT_StorageShelf_1_2m.glb";
+const STORAGE_BOXES: &str = "models/Restaurant/Models/Service/RT_StorageShelf_Boxes.glb";
+
+/// The box-stack scene of a storage piece (by equipment ID); its nodes `Boxes_1`.. are the stages, bottom deck first.
+#[derive(Component)]
+struct FillStages(String);
 
 pub const BELT_STRAIGHT: &str = "models/Models/Belt/Conveyor_Straight_1m.glb";
 pub const BELT_LEFT: &str = "models/Models/Belt/Conveyor_Corner_Left_90.glb";
@@ -656,6 +667,11 @@ fn build_equipment(
             let entity = commands.spawn((Name::new(format!("Equipment {}", piece.id)), transform, Visibility::default())).id();
             let child = commands.spawn((WorldAssetRoot(assets.load(GltfAssetLabel::Scene(0).from_asset(kind.model.clone()))), model)).id();
             commands.entity(entity).add_child(child);
+            // Unity StorageFillDisplay: the shelf's box stacks, authored at the shelf's own origin, shown as it fills.
+            if kind.model == STORAGE_SHELF {
+                let boxes = commands.spawn((WorldAssetRoot(assets.load(GltfAssetLabel::Scene(0).from_asset(STORAGE_BOXES))), model, FillStages(piece.id.clone()), Name::new("Fill stages"))).id();
+                commands.entity(entity).add_child(boxes);
+            }
             commands.entity(root).add_child(entity);
             let height = bounds.size(&kind.model).y;
             visuals.equipment.insert(piece.id.clone(), EquipmentView { root: entity, kind: piece.kind.clone(), site: site.clone(), level: piece.level, height });
@@ -947,10 +963,12 @@ fn find_indoors(session: Res<Session>, space: Option<Res<Space>>, player: Query<
 /// Roofs hide over the local building and the edited site; storeys above the local level hide; the ceiling shows inside in
 /// the third-person view only.
 fn show_storeys(
-    visuals: Res<SiteVisuals>, indoors: Res<Indoors>, edited: Res<EditedSite>, camera: Query<&crate::camera::OrbitCamera>, mut visibility: Query<&mut Visibility>,
+    visuals: Res<SiteVisuals>, indoors: Res<Indoors>, edited: Res<EditedSite>, camera: Query<&crate::camera::OrbitCamera>, player: Query<&Transform, With<crate::player::Player>>,
+    globals: Query<&GlobalTransform>, mut visibility: Query<&mut Visibility>,
     session: Res<Session>,
 ) {
     let top_down = camera.iter().next().is_some_and(|c| c.top_down);
+    let player_position = player.single().ok().map(|p| p.translation);
     let mut set = |entity: Entity, shown: bool| {
         if let Ok(mut v) = visibility.get_mut(entity) {
             let target = if shown { Visibility::Inherited } else { Visibility::Hidden };
@@ -971,16 +989,94 @@ fn show_storeys(
         for (level, storey) in shell.storeys.iter().enumerate() {
             set(*storey, editing || !local || level as i32 <= indoors.level);
         }
+        let distance = player_position.zip(globals.get(shell.root).ok()).map_or(0.0, |(p, t)| p.distance(t.translation()));
+        set(shell.root, shell_visible(distance));
     }
     let Some(world) = session.joined() else { return };
     let local_building = indoors.building.as_ref().and_then(|id| indoors.site.as_ref().and_then(|s| world.view_of(s)).and_then(|v| v.buildings.iter().find(|b| &b.id == id)));
     for (_, view) in &visuals.equipment {
         let hidden = local_building.is_some_and(|b| b.site_id == view.site && view.level > indoors.level);
-        set(view.root, !hidden);
+        let distance = player_position.zip(globals.get(view.root).ok()).map_or(0.0, |(p, t)| p.distance(t.translation()));
+        set(view.root, equipment_visible(distance, !hidden));
     }
     for (_, view) in &visuals.belts {
         let hidden = local_building.is_some_and(|b| b.site_id == view.site && indoors.level == 0 && view.lift == 0 && false);
         set(view.root, !hidden);
+    }
+}
+
+/// Where each drawn table's built-in seats are (Unity CustomerPresenter.SeatParts): the scene centres of its model's "Seat"
+/// nodes in name order, by equipment ID. Empty for a table whose model has none or is not drawn yet.
+#[derive(Resource, Default)]
+pub struct TableSeats(pub HashMap<String, Vec<Vec3>>);
+
+fn collect_table_seats(
+    visuals: Res<SiteVisuals>, mut seats: ResMut<TableSeats>, nodes: Query<(Entity, &Name)>, parents: Query<&ChildOf>, children: Query<&Children>,
+    boxes: Query<(&bevy::camera::primitives::Aabb, &GlobalTransform)>,
+) {
+    let roots: HashMap<Entity, &str> = visuals.equipment.iter().filter(|(_, v)| goods::TABLE_KIND == v.kind || v.kind.contains("table")).map(|(id, v)| (v.root, id.as_str())).collect();
+    let mut found: HashMap<String, Vec<(String, Vec3)>> = HashMap::new();
+    for (entity, name) in &nodes {
+        let name = name.as_str();
+        if name != "Seat" && !name.starts_with("Seat.") { continue; }
+        let Some(id) = parents.iter_ancestors(entity).find_map(|a| roots.get(&a)) else { continue };
+        let centre = std::iter::once(entity).chain(children.iter_descendants(entity)).find_map(|e| boxes.get(e).ok())
+            .map(|(aabb, global)| global.transform_point(Vec3::from(aabb.center)));
+        if let Some(centre) = centre { found.entry(id.to_string()).or_default().push((name.to_string(), centre)); }
+    }
+    let next: HashMap<String, Vec<Vec3>> = found.into_iter().map(|(id, mut list)| { list.sort_by(|a, b| a.0.cmp(&b.0)); (id, list.into_iter().map(|x| x.1).collect()) }).collect();
+    if seats.0 != next { seats.0 = next; }
+}
+
+/// Stages shown for a fill (Unity StorageFillDisplay.StagesFor): any goods show one, a full buffer shows them all.
+fn stages_for(slots_used: i32, capacity: i32, stage_count: i32) -> i32 {
+    if slots_used <= 0 || capacity <= 0 || stage_count <= 0 { return 0; }
+    ((slots_used as f32 * stage_count as f32 / capacity as f32).ceil() as i32).clamp(1, stage_count)
+}
+
+/// Shows each storage piece's box stages from its input buffer's used slots.
+fn show_fill(
+    session: Res<Session>, content: Res<Content>, roots: Query<&FillStages>, mut nodes: Query<(Entity, &Name, &mut Visibility)>, parents: Query<&ChildOf>,
+) {
+    let Some(world) = session.joined() else { return };
+    for (entity, name, mut visibility) in &mut nodes {
+        let Some(stage) = name.as_str().strip_prefix("Boxes_").and_then(|n| n.parse::<i32>().ok()) else { continue };
+        let Some(id) = parents.iter_ancestors(entity).find_map(|a| roots.get(a).ok()).map(|f| &f.0) else { continue };
+        let Some((view, piece)) = world.views.values().find_map(|v| v.equipment.iter().find(|e| &e.id == id).map(|e| (v, e))) else { continue };
+        let capacity = view.locations.iter().find(|l| l.id == piece.input_location_id()).map_or(0, |l| l.capacity);
+        let used = rules::slots_used(view.lots.iter().filter(|l| l.location_id == piece.input_location_id()), |item| content.0.max_stack(item));
+        let target = if stage <= stages_for(used, capacity, 8) { Visibility::Inherited } else { Visibility::Hidden };
+        if *visibility != target { *visibility = target; }
+    }
+}
+
+fn within_cull_range(distance: f32, range: f32) -> bool { distance <= range }
+fn shell_visible(distance: f32) -> bool { within_cull_range(distance, SHELL_DRAW_DISTANCE) }
+fn equipment_visible(distance: f32, storey_visible: bool) -> bool { storey_visible && within_cull_range(distance, MACHINE_DRAW_DISTANCE) }
+
+#[cfg(test)]
+mod visibility_tests {
+    use super::*;
+
+    #[test]
+    fn storage_stages_round_up_and_cap_at_full() {
+        assert_eq!(stages_for(0, 16, 8), 0);
+        assert_eq!(stages_for(1, 16, 8), 1);
+        assert_eq!(stages_for(3, 16, 8), 2);
+        assert_eq!(stages_for(16, 16, 8), 8);
+        assert_eq!(stages_for(20, 16, 8), 8);
+        assert_eq!(stages_for(5, 0, 8), 0);
+    }
+
+    #[test]
+    fn far_shells_and_machines_are_culled_at_their_separate_ranges() {
+        assert!(shell_visible(139.0));
+        assert!(!shell_visible(141.0));
+        assert!(within_cull_range(69.0, MACHINE_DRAW_DISTANCE));
+        assert!(!within_cull_range(71.0, MACHINE_DRAW_DISTANCE));
+        assert!(!equipment_visible(20.0, false));
+        assert!(!equipment_visible(71.0, true));
+        assert!(equipment_visible(20.0, true));
     }
 }
 

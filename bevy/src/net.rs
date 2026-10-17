@@ -132,7 +132,10 @@ pub fn connect(address: &str) -> (Sender<ClientMessage>, Receiver<ServerMessage>
                         break;
                     }
                 }
-                Err(_) => break,
+                Err(error) => {
+                    let _ = server_tx.send(ServerMessage::Rejected { reason: format!("Invalid server frame: {error}") });
+                    break;
+                }
             }
         }
         let _ = server_tx.send(ServerMessage::Rejected { reason: "Disconnected from the server.".into() });

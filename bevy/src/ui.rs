@@ -19,6 +19,10 @@ impl Plugin for GameUiPlugin {
 #[derive(Resource, Default)]
 pub struct UiIntents(pub Vec<String>);
 
+/// A button's action, so a drag that ends on another button knows what was dragged.
+#[derive(Component)]
+pub struct UiAction(pub String);
+
 #[derive(Resource, Default)]
 pub struct UiFields(pub BTreeMap<String, String>);
 
@@ -29,11 +33,15 @@ pub struct UiEntry {
     pub action: Option<String>,
     pub input: Option<String>,
     pub icon: Option<String>,
+    /// An icon rendered at runtime (structure cards), drawn like `icon`.
+    pub icon_image: Option<Handle<Image>>,
     pub multiline: bool,
     /// A row of entries side by side (slots, tabs, button groups).
     pub row: Vec<UiEntry>,
     /// Highlighted (the selected tab, the active recipe, a full slot).
     pub selected: bool,
+    /// Drawn as an inventory slot (a fixed square, icon over a count), filled or empty.
+    pub slot: bool,
     /// A picture drawn at this size (the phone's map).
     pub picture: Option<(Handle<Image>, f32)>,
 }
@@ -52,7 +60,15 @@ impl UiEntry {
         self.icon = (!path.is_empty()).then_some(path);
         self
     }
+    pub fn with_icon_image(mut self, image: Option<Handle<Image>>) -> Self {
+        self.icon_image = image;
+        self
+    }
     pub fn picture(id: impl Into<String>, image: Handle<Image>, size: f32) -> Self { Self { id: id.into(), picture: Some((image, size)), ..default() } }
+    pub fn as_slot(mut self) -> Self {
+        self.slot = true;
+        self
+    }
     pub fn selected(mut self, selected: bool) -> Self {
         self.selected = selected;
         self
@@ -86,8 +102,8 @@ fn text_focus(focus: Res<bevy::input_focus::InputFocus>, fields: Query<(), With<
     }
 }
 
-fn scroll(mouse: Res<bevy::input::mouse::AccumulatedMouseScroll>, mut roots: Query<(&mut ScrollPosition, &ComputedNode), With<UiRoot>>, model: Res<UiModel>) {
-    if !model.open {
+fn scroll(mouse: Res<bevy::input::mouse::AccumulatedMouseScroll>, mut roots: Query<(&mut ScrollPosition, &ComputedNode), With<UiRoot>>, model: Res<UiModel>, maps: Query<&bevy::ui::RelativeCursorPosition, With<crate::phone_map::MapSurface>>) {
+    if !model.open || maps.iter().any(|p| p.cursor_over()) {
         return;
     }
     for (mut position, node) in &mut roots {
@@ -113,7 +129,7 @@ fn text(commands: &mut Commands, parent: Entity, id: &str, value: &str, size: f3
 
 fn same_layout(a: &[UiEntry], b: &[UiEntry]) -> bool {
     a.len() == b.len()
-        && a.iter().zip(b).all(|(a, b)| a.id == b.id && a.action == b.action && a.icon == b.icon && a.input.is_some() == b.input.is_some() && a.selected == b.selected && a.picture == b.picture && same_layout(&a.row, &b.row))
+        && a.iter().zip(b).all(|(a, b)| a.id == b.id && a.action == b.action && a.icon == b.icon && a.icon_image == b.icon_image && a.slot == b.slot && a.input.is_some() == b.input.is_some() && a.selected == b.selected && a.picture == b.picture && same_layout(&a.row, &b.row))
 }
 
 fn find<'a>(entries: &'a [UiEntry], id: &str) -> Option<&'a UiEntry> {
@@ -123,6 +139,7 @@ fn find<'a>(entries: &'a [UiEntry], id: &str) -> Option<&'a UiEntry> {
 fn entry(commands: &mut Commands, assets: &AssetServer, fields: &UiFields, parent: Entity, entry: &UiEntry) {
     if let Some((image, size)) = &entry.picture {
         let picture = commands.spawn((ImageNode::new(image.clone()), Node { width: px(*size), height: px(*size), flex_shrink: 0.0, ..default() })).id();
+        if entry.id == "phone-map" { commands.entity(picture).insert((crate::phone_map::MapSurface, bevy::ui::RelativeCursorPosition::default())); }
         commands.entity(parent).add_child(picture);
         return;
     }
@@ -154,13 +171,14 @@ fn entry(commands: &mut Commands, assets: &AssetServer, fields: &UiFields, paren
         return;
     };
     let action = action.clone();
-    let slot = entry.icon.is_some();
+    let slot = entry.slot || entry.icon.is_some() || entry.icon_image.is_some();
     let button = commands
         .spawn((
             Button,
             Node {
-                min_height: px(32),
-                min_width: if slot { px(64) } else { auto() },
+                min_height: if entry.slot { px(68) } else { px(32) },
+                min_width: if entry.slot { px(68) } else if slot { px(64) } else { auto() },
+                justify_content: if entry.slot { JustifyContent::Center } else { JustifyContent::default() },
                 padding: UiRect::all(px(6)),
                 flex_direction: if slot { FlexDirection::Column } else { FlexDirection::Row },
                 align_items: AlignItems::Center,
@@ -171,11 +189,30 @@ fn entry(commands: &mut Commands, assets: &AssetServer, fields: &UiFields, paren
             },
             BackgroundColor(if entry.selected { SELECTED } else { BUTTON }),
         ))
-        .observe(move |_: On<Activate>, mut intents: ResMut<UiIntents>| intents.0.push(action.clone()))
+        .observe({ let action = action.clone(); move |_: On<Activate>, mut intents: ResMut<UiIntents>| intents.0.push(action.clone()) })
+        // A slot dragged onto another sends `drag>SOURCE>TARGET` (Unity's slot drag and drop).
+        .observe({ let action = action.clone(); move |drop: On<bevy::picking::events::PointerDragDrop>, actions: Query<&UiAction>, parents: Query<&ChildOf>, mut intents: ResMut<UiIntents>| {
+            let mut source = Some(drop.event().dropped);
+            while let Some(entity) = source {
+                if let Ok(dragged) = actions.get(entity) {
+                    if dragged.0.starts_with("p:slot|") && dragged.0 != action && (action.starts_with("p:slot|") || action.starts_with("p:drop|")) {
+                        intents.0.push(format!("drag>{}>{action}", dragged.0));
+                    }
+                    break;
+                }
+                source = parents.get(entity).ok().map(|p| p.parent());
+            }
+        }})
+        // A right click sends the same action marked `|alt` (Unity's right click on a slot takes half its stack).
+        .observe(move |click: On<bevy::picking::events::PointerClick>, mut intents: ResMut<UiIntents>| {
+            if click.event().button == bevy::picking::pointer::PointerButton::Secondary { intents.0.push(format!("{action}|alt")); }
+        })
         .id();
+    commands.entity(button).insert(UiAction(entry.action.clone().unwrap_or_default()));
     commands.entity(parent).add_child(button);
-    if let Some(path) = &entry.icon {
-        let image = commands.spawn((ImageNode::new(assets.load(path.clone())), Node { width: px(40), height: px(40), ..default() })).id();
+    let icon = entry.icon_image.clone().or_else(|| entry.icon.as_ref().map(|path| assets.load(path.clone())));
+    if let Some(icon) = icon {
+        let image = commands.spawn((ImageNode::new(icon), Node { width: px(40), height: px(40), ..default() })).id();
         commands.entity(button).add_child(image);
     }
     let size = if slot { 13.0 } else { 16.0 };

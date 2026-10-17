@@ -1,8 +1,7 @@
 // The phone's world map picture (Unity PhoneMapView, decision 0047): the layout's districts, rivers, roads and every lot from
 // above, coloured by what the lot is and who owns it (yours green, for sale yellow, competitors red, farms brown, stations and
 // scenery grey), with the avatar as a white dot and the company's trucks as blue dots. Map x runs right and z up. Redrawn twice
-// a second while the phone's map tab is open. Presentation only. Simplification: no zoom, pan or click-to-select on the
-// picture itself; the places list beside it opens each lot.
+// a second while the phone's map tab is open. Scroll zooms at the pointer; dragging pans; clicking selects a lot.
 use bevy::asset::RenderAssetUsages;
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
@@ -17,11 +16,14 @@ pub struct PhoneMapPlugin;
 
 impl Plugin for PhoneMapPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<PhoneMap>().add_systems(Update, draw_map);
+        app.init_resource::<PhoneMap>().add_systems(Update, (navigate, draw_map).chain());
     }
 }
 
 pub const MAP_PIXELS: u32 = 480;
+
+#[derive(Component)]
+pub struct MapSurface;
 
 #[derive(Resource, Default)]
 pub struct PhoneMap {
@@ -30,6 +32,91 @@ pub struct PhoneMap {
     /// The map area drawn: centre (map metres) and half size.
     pub centre: Vec2,
     pub half: f32,
+    world: String,
+    drag: Option<(Vec2, Vec2, bool)>,
+}
+
+impl PhoneMap {
+    fn point(&self, relative: Vec2) -> Vec2 { self.centre + Vec2::new(relative.x, -relative.y) * self.half * 2.0 }
+    fn zoom(&mut self, relative: Vec2, factor: f32, limit: f32) {
+        let anchor = self.point(relative);
+        self.half = (self.half * factor).clamp(20.0, limit);
+        self.centre += anchor - self.point(relative);
+        self.timer = 0.0;
+    }
+}
+
+fn navigate(mut map: ResMut<PhoneMap>, session: Res<Session>, panels: Res<Panels>, surfaces: Query<&bevy::ui::RelativeCursorPosition, With<MapSurface>>,
+    mouse: Res<ButtonInput<MouseButton>>, wheel: Res<bevy::input::mouse::AccumulatedMouseScroll>, mut intents: ResMut<crate::ui::UiIntents>) {
+    let Some(world) = session.joined() else { map.world.clear(); map.drag = None; return };
+    let limit = world.layout.city_half_size as f32 + 120.0;
+    if map.world != world.world_id { map.world = world.world_id.clone(); map.centre = Vec2::ZERO; map.half = limit; map.timer = 0.0; }
+    if panels.open != Some(Panel::Phone(PhoneTab::Map)) { map.drag = None; return; }
+    let actions = intents.0.iter().filter(|a| a.starts_with("map:")).cloned().collect::<Vec<_>>();
+    intents.0.retain(|a| !a.starts_with("map:"));
+    for action in actions {
+        match action.as_str() {
+            "map:in" => map.zoom(Vec2::ZERO, 0.5, limit),
+            "map:out" => map.zoom(Vec2::ZERO, 2.0, limit),
+            "map:reset" => { map.centre = Vec2::ZERO; map.half = limit; },
+            "map:left" => { let half = map.half; map.centre.x -= half * 0.5; },
+            "map:right" => { let half = map.half; map.centre.x += half * 0.5; },
+            "map:up" => { let half = map.half; map.centre.y += half * 0.5; },
+            "map:down" => { let half = map.half; map.centre.y -= half * 0.5; },
+            _ => {},
+        }
+        map.timer = 0.0;
+    }
+    if let Ok(cursor) = surfaces.single() {
+        if let Some(p) = cursor.normalized {
+            if cursor.cursor_over() && wheel.delta.y != 0.0 { map.zoom(p, (-wheel.delta.y * 0.18).exp(), limit); }
+            if cursor.cursor_over() && mouse.just_pressed(MouseButton::Left) { map.drag = Some((p, map.centre, false)); }
+            if let Some((start, centre, dragged)) = map.drag {
+                let dragged = dragged || (p - start).length() * MAP_PIXELS as f32 > 4.0;
+                if mouse.pressed(MouseButton::Left) && dragged {
+                    map.centre = centre - Vec2::new(p.x - start.x, start.y - p.y) * map.half * 2.0;
+                    map.timer = 0.0;
+                }
+                map.drag = Some((start, centre, dragged));
+                if mouse.just_released(MouseButton::Left) {
+                    if !dragged && cursor.cursor_over() {
+                        let at = map.point(p);
+                        let reach = 6.0 * map.half * 2.0 / MAP_PIXELS as f32;
+                        let truck = truck_points(world).into_iter().map(|(id, p)| (p.distance(at), id)).filter(|(d, _)| *d <= reach).min_by(|a, b| a.0.total_cmp(&b.0));
+                        if let Some((_, id)) = truck {
+                            intents.0.push(format!("p:select-truck|{id}"));
+                        } else if let Some(lot) = lot_at(&world.layout.lots, at) {
+                            intents.0.push(format!("p:property|{}", lot.id));
+                        }
+                    }
+                    map.drag = None;
+                }
+            }
+        }
+    }
+    map.centre = map.centre.clamp(Vec2::splat(-limit), Vec2::splat(limit));
+}
+
+/// The lot under a point in map metres (x east, y north).
+fn lot_at(lots: &[food_factory_bevy::world::layout::WorldLot], at: Vec2) -> Option<&food_factory_bevy::world::layout::WorldLot> {
+    lots.iter().find(|l| at.x >= l.x as f32 && at.x < (l.x + l.width) as f32 && at.y >= l.z as f32 && at.y < (l.z + l.depth) as f32)
+}
+
+/// Where each company truck shows on the map, in map metres: on its road leg while driving, else at its site's lot centre.
+pub fn truck_points(world: &crate::session::Joined) -> Vec<(String, Vec2)> {
+    let Some(view) = world.view() else { return vec![] };
+    let Some(own) = world.company().map(|c| c.id.clone()) else { return vec![] };
+    view.trucks.iter().filter(|t| t.company_id == own && !t.supplier).filter_map(|truck| {
+        let at = if truck.on_road() {
+            let segment = world.roads.segment_named(&truck.leg_segment_id)?;
+            let (x, z) = world.roads.position(segment, truck.leg_to as f64);
+            Vec2::new(x as f32, z as f32)
+        } else {
+            let lot = world.layout.lots.iter().find(|l| l.site_id == truck.site_id)?;
+            Vec2::new(lot.x as f32 + lot.width as f32 * 0.5, lot.z as f32 + lot.depth as f32 * 0.5)
+        };
+        Some((truck.id.clone(), at))
+    }).collect()
 }
 
 struct Canvas {
@@ -55,14 +142,23 @@ impl Canvas {
 
     fn rect(&mut self, x0: f32, z0: f32, x1: f32, z1: f32, colour: [u8; 4]) {
         let (a, b) = (self.pixel(x0, z1), self.pixel(x1, z0));
-        for y in a.1..=b.1.max(a.1) {
-            for x in a.0..=b.0.max(a.0) {
+        for y in a.1.max(0)..=b.1.max(a.1).min(MAP_PIXELS as i32 - 1) {
+            for x in a.0.max(0)..=b.0.max(a.0).min(MAP_PIXELS as i32 - 1) {
                 self.put(x, y, colour);
             }
         }
     }
 
     fn line(&mut self, from: Vec2, to: Vec2, width: f32, colour: [u8; 4]) {
+        let delta = to - from;
+        let mut near = 0.0f32; let mut far = 1.0f32;
+        for axis in 0..2 {
+            let lo = self.centre[axis] - self.half - width; let hi = self.centre[axis] + self.half + width;
+            if delta[axis].abs() < 1e-6 { if from[axis] < lo || from[axis] > hi { return; } }
+            else { let a = (lo - from[axis]) / delta[axis]; let b = (hi - from[axis]) / delta[axis]; near = near.max(a.min(b)); far = far.min(a.max(b)); }
+        }
+        if near > far { return; }
+        let (from, to) = (from + delta * near, from + delta * far);
         let length = from.distance(to);
         let metres_per_pixel = 2.0 * self.half / MAP_PIXELS as f32;
         let steps = (length / metres_per_pixel).ceil().max(1.0) as i32;
@@ -109,10 +205,10 @@ fn draw_map(time: Res<Time>, panels: Res<Panels>, session: Res<Session>, space: 
     }
     map.timer = 0.5;
     let layout = &world.layout;
-    let half = layout.city_half_size as f32 + 120.0;
-    let mut canvas = Canvas { data: vec![0; (MAP_PIXELS * MAP_PIXELS * 4) as usize], centre: Vec2::ZERO, half };
+    let half = map.half.max(20.0);
+    let mut canvas = Canvas { data: vec![0; (MAP_PIXELS * MAP_PIXELS * 4) as usize], centre: map.centre, half };
     // Ground and districts.
-    canvas.rect(-half, -half, half, half, [124, 160, 96, 255]);
+    canvas.rect(map.centre.x - half, map.centre.y - half, map.centre.x + half, map.centre.y + half, [124, 160, 96, 255]);
     for district in &layout.districts {
         let colour = match district.kind {
             DistrictKind::Downtown => [176, 170, 160, 255],
@@ -155,14 +251,11 @@ fn draw_map(time: Res<Time>, panels: Res<Panels>, session: Res<Session>, space: 
         };
         canvas.rect(lot.x as f32, lot.z as f32, (lot.x + lot.width) as f32, (lot.z + lot.depth) as f32, colour);
     }
-    // The company's trucks on the road.
-    if let Some(view) = view {
-        for truck in view.trucks.iter().filter(|t| t.company_id == own && t.on_road()) {
-            if let Some(segment) = world.roads.segment_named(&truck.leg_segment_id) {
-                let (x, z) = world.roads.position(segment, truck.leg_to as f64);
-                canvas.dot(x as f32, z as f32, 2, [70, 140, 240, 255], [20, 30, 60, 255]);
-            }
-        }
+    // The company's fleet (Unity LogisticsPanel feeding PhoneMapView.SetTrucks): road trucks on their leg, others at their
+    // site; the truck selected on the Trucks tab is drawn larger and outlined.
+    for (id, at) in truck_points(world) {
+        let selected = panels.selected_truck.as_deref() == Some(id.as_str());
+        canvas.dot(at.x, at.y, if selected { 4 } else { 2 }, [70, 140, 240, 255], if selected { [255, 220, 60, 255] } else { [20, 30, 60, 255] });
     }
     if let Ok(player) = player.single() {
         let (x, z, _) = space.to_map(player.translation);
@@ -179,5 +272,24 @@ fn draw_map(time: Res<Time>, panels: Res<Panels>, session: Res<Session>, space: 
             }
         }
         None => map.image = Some(images.add(image)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use food_factory_bevy::world::{generator, settings::WorldSettings};
+
+    /// A click (centre-origin normalized pointer, +y down) lands on the lot drawn under it, zoomed and panned.
+    #[test]
+    fn click_on_a_drawn_lot_selects_that_lot() {
+        let layout = generator::generate("phone-map", 20260927, &WorldSettings::default()).unwrap().layout;
+        let lot = &layout.lots[layout.lots.len() / 2];
+        let middle = Vec2::new(lot.x as f32 + lot.width as f32 * 0.5, lot.z as f32 + lot.depth as f32 * 0.5);
+        let map = PhoneMap { centre: middle + Vec2::new(30.0, -45.0), half: 120.0, ..default() };
+        let canvas = Canvas { data: vec![], centre: map.centre, half: map.half };
+        let (u, v) = canvas.pixel(middle.x, middle.y);
+        let pointer = Vec2::new((u as f32 + 0.5) / MAP_PIXELS as f32 - 0.5, (v as f32 + 0.5) / MAP_PIXELS as f32 - 0.5);
+        assert_eq!(lot_at(&layout.lots, map.point(pointer)).map(|l| &l.id), Some(&lot.id));
     }
 }

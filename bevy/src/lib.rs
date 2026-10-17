@@ -7,4 +7,7 @@ pub mod net;
 pub mod persistence;
 pub mod protocol;
 pub mod server;
+pub mod site_walk;
+pub mod traffic;
+pub mod recipes;
 pub mod world;

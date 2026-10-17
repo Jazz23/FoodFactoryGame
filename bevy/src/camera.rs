@@ -161,7 +161,14 @@ fn follow(player: Query<&Transform, (With<Player>, Without<OrbitCamera>)>, mut r
         }
         let focus = target.translation + Vec3::Y * FOCUS_HEIGHT;
         let blend = rig.blend * rig.blend * (3.0 - 2.0 * rig.blend);
-        let shoulder = focus + rig.yaw_rotation() * Vec3::X * SHOULDER_OFFSET * (1.0 - blend);
+        // The shoulder offset stops short of a wall beside the avatar, so the arm never starts inside one (a cast ignores
+        // boxes it starts in, and a camera inside a wall sees through it).
+        let side = rig.yaw_rotation() * Vec3::X;
+        let mut offset = SHOULDER_OFFSET * (1.0 - blend);
+        if let Some(hit) = wall_hit(focus, side, offset + CAST_RADIUS, &solids) {
+            offset = offset.min((hit - CAST_RADIUS).max(0.0));
+        }
+        let shoulder = focus + side * offset;
         let pitch = rig.pitch + (90.0 - rig.pitch) * blend;
         let rotation = rig.yaw_rotation() * Quat::from_rotation_x(-pitch.to_radians());
         let mut distance = if rig.pitch < 0.0 { rig.distance.min((FOCUS_HEIGHT - FLOOR_CLEARANCE).max(0.0) / (-rig.pitch).to_radians().sin()) } else { rig.distance };

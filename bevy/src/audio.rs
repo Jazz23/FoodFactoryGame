@@ -22,7 +22,7 @@ pub struct GameAudioPlugin;
 
 impl Plugin for GameAudioPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<AudioState>().add_systems(Startup, setup).add_systems(Update, (listener, master, music_and_beds, incidentals, clicks, till, placements, footsteps, machines));
+        app.init_resource::<AudioState>().add_systems(Startup, setup).add_systems(Update, (listener, master, music_and_beds, incidentals, clicks, till, placements, footsteps, machines, engines));
     }
 }
 
@@ -268,5 +268,100 @@ fn machines(mut commands: Commands, prefs: Option<Res<Prefs>>, assets: Res<Asset
         if let Some(e) = state.machines.remove(&id) {
             commands.entity(e).despawn();
         }
+    }
+}
+
+const ENGINE_TOP_SPEED: f32 = 14.0;
+const ENGINE_MAX_AUDIBLE: usize = 10;
+const ENGINE_FADE_RATE: f32 = 2.5;
+const ENGINE_MIN_HEARING: f32 = 30.0;
+const ENGINE_TELEPORT: f32 = 4.0;
+
+/// One vehicle's engine voice: smoothed velocity, fade gain and its looping player, if audible.
+#[derive(Default)]
+struct EngineVoice { last: Option<Vec3>, velocity: Vec3, gain: f32, player: Option<Entity> }
+
+/// Level against distance as a fraction of the hearing distance (Unity's custom rolloff): loud close, a faint hush far off.
+fn engine_rolloff(fraction: f32) -> f32 {
+    const KEYS: [(f32, f32); 6] = [(0.0, 1.0), (0.08, 0.75), (0.2, 0.4), (0.45, 0.13), (0.75, 0.035), (1.0, 0.0)];
+    let f = fraction.clamp(0.0, 1.0);
+    KEYS.windows(2).find(|w| f <= w[1].0).map_or(0.0, |w| w[0].1 + (w[1].1 - w[0].1) * (f - w[0].0) / (w[1].0 - w[0].0))
+}
+
+/// Unity VehicleEngineAudio: the nearest drawn vehicles within their hearing distance play the engine loop, pitch and level
+/// following how fast the model moves (a jump counts as a teleport), with a mild clamped Doppler; the rest fade out and stop.
+#[allow(clippy::too_many_arguments)]
+fn engines(
+    mut commands: Commands, time: Res<Time>, prefs: Option<Res<Prefs>>, assets: Res<AssetServer>, mut state: ResMut<AudioState>,
+    vehicles: Query<(Entity, &GlobalTransform, &crate::vehicles::Engine)>, listener: Query<&GlobalTransform, With<SpatialListener>>,
+    mut sinks: Query<&mut bevy::audio::SpatialAudioSink>, mut voices: Local<HashMap<Entity, EngineVoice>>,
+) {
+    let dt = time.delta_secs();
+    if dt <= 0.0 { return; }
+    let ear = listener.iter().next().map(|t| t.translation());
+    voices.retain(|entity, voice| {
+        let alive = vehicles.contains(*entity);
+        if !alive { if let Some(player) = voice.player { commands.entity(player).despawn(); } }
+        alive
+    });
+    let mut near: Vec<(f32, Entity)> = vec![];
+    for (entity, transform, engine) in &vehicles {
+        let position = transform.translation();
+        let voice = voices.entry(entity).or_default();
+        voice.velocity = match voice.last {
+            Some(last) if last.distance(position) < ENGINE_TELEPORT => voice.velocity.lerp((position - last) / dt, 1.0 - (-4.0 * dt).exp()),
+            _ => Vec3::ZERO,
+        };
+        voice.last = Some(position);
+        if let Some(ear) = ear {
+            let distance = ear.distance(position);
+            if distance <= engine.hearing.max(ENGINE_MIN_HEARING) { near.push((distance, entity)); }
+        }
+    }
+    near.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let audible: HashSet<Entity> = near.iter().take(ENGINE_MAX_AUDIBLE).map(|n| n.1).collect();
+    let effects = channel(&prefs, |p| p.effects);
+    for (entity, transform, engine) in &vehicles {
+        let Some(voice) = voices.get_mut(&entity) else { continue };
+        let target = if audible.contains(&entity) { 1.0 } else { 0.0 };
+        voice.gain = if voice.gain < target { (voice.gain + ENGINE_FADE_RATE * dt).min(target) } else { (voice.gain - ENGINE_FADE_RATE * dt).max(target) };
+        if voice.gain <= 0.0 {
+            if let Some(player) = voice.player.take() { commands.entity(player).despawn(); }
+            continue;
+        }
+        let player = *voice.player.get_or_insert_with(|| {
+            let clip = state.clip(&assets, "engine");
+            // Start somewhere in the loop so a row of cars does not run in lockstep.
+            let start = std::time::Duration::from_millis(random::fnv1a(&format!("{entity:?}")) % 2000);
+            let child = commands.spawn((AudioPlayer::new(clip), PlaybackSettings { mode: PlaybackMode::Loop, volume: Volume::Linear(0.0), spatial: true,
+                spatial_scale: Some(SpatialScale::new(0.05)), start_position: Some(start), ..default() }, Transform::default())).id();
+            commands.entity(entity).add_child(child);
+            child
+        });
+        let Ok(mut sink) = sinks.get_mut(player) else { continue };
+        let position = transform.translation();
+        let load = (Vec2::new(voice.velocity.x, voice.velocity.z).length() / ENGINE_TOP_SPEED).clamp(0.0, 1.0);
+        let (distance, doppler) = ear.map_or((0.0, 1.0), |ear| {
+            let to = ear - position;
+            let d = to.length();
+            (d, if d < 0.01 { 1.0 } else { 1.0 + (voice.velocity.dot(to / d) * 0.008).clamp(-0.1, 0.1) })
+        });
+        let hearing = engine.hearing.max(ENGINE_MIN_HEARING);
+        sink.set_speed(engine.pitch * (0.85 + 0.45 * load) * doppler);
+        sink.set_volume(Volume::Linear(engine.volume * (0.35 + 0.65 * load) * voice.gain * effects * engine_rolloff(distance / hearing)));
+    }
+}
+
+#[cfg(test)]
+mod engine_tests {
+    use super::engine_rolloff;
+
+    #[test]
+    fn rolloff_follows_unity_keys() {
+        assert_eq!(engine_rolloff(0.0), 1.0);
+        assert!((engine_rolloff(0.2) - 0.4).abs() < 1e-6);
+        assert!((engine_rolloff(0.1) - (0.75 - 0.35 * 0.02 / 0.12)).abs() < 1e-6);
+        assert_eq!(engine_rolloff(1.0), 0.0);
+        assert_eq!(engine_rolloff(2.0), 0.0);
     }
 }

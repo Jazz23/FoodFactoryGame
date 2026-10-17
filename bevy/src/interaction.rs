@@ -23,7 +23,7 @@ pub struct InteractionPlugin;
 
 impl Plugin for InteractionPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<Aim>().init_resource::<Cursor>().init_resource::<Hotbar>().add_systems(Update, (aim, hotbar, act, show_ghost, hint).chain().after(crate::player::PlayerSet::Move));
+        app.init_resource::<Aim>().init_resource::<Cursor>().init_resource::<Hotbar>().add_systems(Update, (aim, hover_outline, pick_outlines, hotbar, act, show_ghost, hint).chain().after(crate::player::PlayerSet::Move));
     }
 }
 
@@ -39,6 +39,8 @@ pub struct Aim {
     pub floor: Option<(String, i32, Vec2)>,
     /// The avatar is within reach of the aimed pick.
     pub in_reach: bool,
+    /// A purchasable map building (Unity PropertyMarker) aimed at within reach across the ground, by lot, when nothing nearer is.
+    pub property: Option<String>,
 }
 
 /// What the cursor carries in the world: a held machine (by ID) or an item of the inventory (belts, lifts, goods for a belt),
@@ -71,6 +73,90 @@ pub struct Hotbar {
     pub entries: Vec<HotbarEntry>,
 }
 
+#[derive(Component)]
+struct HoverOutlineEdge;
+
+/// The twelve edges of a box as unit-cube transforms.
+fn box_edges(centre: Vec3, size: Vec3, thickness: f32) -> Vec<Transform> {
+    let mut edges = Vec::with_capacity(12);
+    for x in [-1.0, 1.0] { for y in [-1.0, 1.0] {
+        edges.push(Transform::from_translation(centre + Vec3::new(x * size.x * 0.5, y * size.y * 0.5, 0.0)).with_scale(Vec3::new(thickness, thickness, size.z + thickness)));
+    }}
+    for x in [-1.0, 1.0] { for z in [-1.0, 1.0] {
+        edges.push(Transform::from_translation(centre + Vec3::new(x * size.x * 0.5, 0.0, z * size.z * 0.5)).with_scale(Vec3::new(thickness, size.y + thickness, thickness)));
+    }}
+    for y in [-1.0, 1.0] { for z in [-1.0, 1.0] {
+        edges.push(Transform::from_translation(centre + Vec3::new(0.0, y * size.y * 0.5, z * size.z * 0.5)).with_scale(Vec3::new(size.x + thickness, thickness, thickness)));
+    }}
+    edges
+}
+
+/// While a task target is being picked, every valid target gets a thin light-green outline (Unity's pick tint).
+fn pick_outlines(
+    mut commands: Commands, panels: Res<Panels>, session: Res<Session>, solids: Res<Solids>, mut drawn: Local<(Vec<Entity>, Vec<(Vec3, Vec3)>)>,
+    mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<StandardMaterial>>, mut handles: Local<Option<(Handle<Mesh>, Handle<StandardMaterial>)>>,
+) {
+    let targets: Vec<(Vec3, Vec3)> = match (&panels.picking, session.joined()) {
+        (Some(pick), Some(world)) => {
+            let valid = crate::panels::pick_targets(world, pick);
+            solids.picks.iter().filter(|b| matches!(&b.pick, Pick::Equipment(id) if valid.contains(id))).map(|b| (b.min, b.max)).collect()
+        }
+        _ => vec![],
+    };
+    if targets == drawn.1 { return; }
+    for entity in drawn.0.drain(..) { commands.entity(entity).despawn(); }
+    let (mesh, material) = handles.get_or_insert_with(|| {
+        let material = materials.add(StandardMaterial { base_color: Color::srgb(0.55, 0.9, 0.55), unlit: true, ..default() });
+        (meshes.add(Cuboid::new(1.0, 1.0, 1.0)), material)
+    }).clone();
+    for (min, max) in &targets {
+        for transform in box_edges((*min + *max) * 0.5, *max - *min + Vec3::splat(0.06), 0.015) {
+            drawn.0.push(commands.spawn((Mesh3d(mesh.clone()), MeshMaterial3d(material.clone()), transform, bevy::light::NotShadowCaster, Name::new("Pick outline"))).id());
+        }
+    }
+    drawn.1 = targets;
+}
+
+/// A lightweight bounds outline for the currently aimed, usable equipment or employee.
+fn hover_outline(
+    mut commands: Commands, aim: Res<Aim>, solids: Res<Solids>, mut edges: Local<Vec<Entity>>, mut shown: Local<Option<Pick>>,
+    mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<StandardMaterial>>, mut handles: Local<Option<(Handle<Mesh>, Handle<StandardMaterial>)>>,
+    mut transforms: Query<&mut Transform, With<HoverOutlineEdge>>, panels: Res<Panels>,
+) {
+    // Drawn only while no screen is open (Unity HoverOutline).
+    let target = if aim.in_reach && panels.open.is_none() { aim.pick.as_ref().filter(|p| matches!(p, Pick::Equipment(_) | Pick::Employee(_))) } else { None };
+    let bounds = target.and_then(|pick| solids.picks.iter().chain(&solids.moving).find(|b| &b.pick == pick));
+    if shown.as_ref() != target {
+        for entity in edges.drain(..) { commands.entity(entity).despawn(); }
+        *shown = target.cloned();
+    }
+    let Some(bounds) = bounds else { return };
+    let centre = (bounds.min + bounds.max) * 0.5;
+    let size = bounds.max - bounds.min;
+    let (mesh, material) = handles.get_or_insert_with(|| {
+        let material = materials.add(StandardMaterial { base_color: Color::srgb(0.33, 0.62, 0.38), unlit: true, ..default() });
+        (meshes.add(Cuboid::new(1.0, 1.0, 1.0)), material)
+    }).clone();
+    let edge_transforms = box_edges(centre, size, 0.025);
+    if edges.len() != edge_transforms.len() {
+        for transform in edge_transforms {
+            edges.push(commands.spawn((HoverOutlineEdge, Mesh3d(mesh.clone()), MeshMaterial3d(material.clone()), transform, bevy::light::NotShadowCaster, Name::new("Hover outline"))).id());
+        }
+    } else {
+        for (entity, transform) in edges.iter().copied().zip(edge_transforms) {
+            if let Ok(mut current) = transforms.get_mut(entity) { *current = transform; }
+        }
+    }
+}
+
+/// Scene bounds of a map building: its footprint from its floor to about its roof.
+fn property_box(space: &Space, building: &food_factory_bevy::world::layout::WorldBuilding) -> (Vec3, Vec3) {
+    let floor = building.elevation_cm as f32 / 100.0;
+    let a = space.to_scene(building.x as f32, building.z as f32, floor);
+    let b = space.to_scene((building.x + building.width) as f32, (building.z + building.depth) as f32, floor + building.floors.max(1) as f32 * 3.5 + 1.5);
+    (a.min(b), a.max(b))
+}
+
 fn ray_box(origin: Vec3, direction: Vec3, min: Vec3, max: Vec3) -> Option<f32> {
     let mut near = 0.0f32;
     let mut far = MAX_RAY;
@@ -98,7 +184,7 @@ fn ray_box(origin: Vec3, direction: Vec3, min: Vec3, max: Vec3) -> Option<f32> {
 #[allow(clippy::too_many_arguments)]
 fn aim(
     session: Res<Session>, space: Option<Res<Space>>, solids: Res<Solids>, indoors: Res<Indoors>, cameras: Query<(&Camera, &GlobalTransform)>, window: Query<(&Window, &CursorOptions), With<PrimaryWindow>>,
-    player: Query<&Transform, With<crate::player::Player>>, mut aim: ResMut<Aim>,
+    player: Query<&Transform, With<crate::player::Player>>, mut aim: ResMut<Aim>, drawn: Res<crate::map::DrawnSites>,
 ) {
     let (Some(space), Some(world), Ok(player)) = (space, session.joined(), player.single()) else {
         *aim = Aim::default();
@@ -136,8 +222,25 @@ fn aim(
         let nearest = feet.clamp(p.min, p.max);
         Vec2::new(nearest.x - feet.x, nearest.z - feet.z).length() <= REACH && (p.level == level || p.site != site)
     });
-    let next = Aim { pick: best.map(|(_, p)| p.pick.clone()), floor, in_reach };
-    if aim.pick != next.pick || aim.floor != next.floor || aim.in_reach != next.in_reach {
+    // Map buildings are aimed at from the street: the same reach, measured across the ground, no floor check.
+    let mut property: Option<(f32, String)> = None;
+    if world.offers_by_lot.len() > 0 {
+        // A site drawn as a shell (its own walls and machines) is not aimed at as a map building.
+        let wanted: std::collections::HashMap<&str, &str> = world.offers_by_lot.values().filter(|o| !drawn.sites.contains(&o.site_id))
+            .map(|o| (o.building_id.as_str(), o.lot_id.as_str())).collect();
+        for building in world.layout.buildings.iter() {
+            let Some(lot) = wanted.get(building.id.as_str()) else { continue };
+            let (min, max) = property_box(&space, building);
+            let Some(t) = ray_box(origin, direction, min, max) else { continue };
+            if best.is_some_and(|b| b.0 <= t) || property.as_ref().is_some_and(|p| p.0 <= t) { continue; }
+            let nearest = feet.clamp(min, max);
+            if Vec2::new(nearest.x - feet.x, nearest.z - feet.z).length() <= REACH { property = Some((t, lot.to_string())); }
+        }
+    }
+    let property = property.map(|p| p.1);
+    let pick = if property.is_some() { None } else { best.map(|(_, p)| p.pick.clone()) };
+    let next = Aim { pick, floor, in_reach, property };
+    if aim.pick != next.pick || aim.floor != next.floor || aim.in_reach != next.in_reach || aim.property != next.property {
         *aim = next;
     }
 }
@@ -223,8 +326,10 @@ pub fn placement(aim: &Aim, footprint: (i32, i32)) -> Option<(String, i32, i32, 
 }
 
 #[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments)]
 fn act(
     time: Res<Time>, actions: Res<PlayerActions>, mut session: ResMut<Session>, aim: Res<Aim>, mut cursor: ResMut<Cursor>, mut panels: ResMut<Panels>, screen: Res<Screen>, content: Res<Content>, build: Res<crate::build::Build>,
+    mut intents: ResMut<crate::ui::UiIntents>,
 ) {
     if *screen != Screen::Playing || session.joined().is_none() {
         return;
@@ -237,6 +342,18 @@ fn act(
         cursor.lift_down = !cursor.lift_down;
     }
     if panels.open.is_some() {
+        return;
+    }
+    // Picking a task target: a click or E on a valid machine in reach hands its ID back to the employee screen.
+    if let Some(pick) = panels.picking.clone() {
+        if actions.place_pressed || actions.inventory_pressed {
+            if let (Some(Pick::Equipment(id)), true, Some(world)) = (&aim.pick, aim.in_reach, session.joined()) {
+                if crate::panels::pick_targets(world, &pick).contains(id) {
+                    let role = match pick.role { crate::panels::PickRole::Source => "src", crate::panels::PickRole::Destination => "dst", crate::panels::PickRole::Machine => "machine" };
+                    intents.0.push(format!("p:task-set|{role}|{}|{id}", pick.index));
+                }
+            }
+        }
         return;
     }
     if actions.phone_pressed {
@@ -260,9 +377,10 @@ fn act(
         _ => None,
     };
     if actions.inventory_pressed {
-        panels.open = Some(match (aimed_machine, aimed_employee) {
-            (Some(id), _) if openable(&session, &content, &id) => Panel::Machine(id),
-            (_, Some(id)) => Panel::Employee(id),
+        panels.open = Some(match (aimed_machine, aimed_employee, aim.property.clone()) {
+            (Some(id), _, _) if openable(&session, &content, &id) => Panel::Machine(id),
+            (_, Some(id), _) => Panel::Employee(id),
+            (_, _, Some(lot)) => Panel::Property(lot),
             _ => Panel::Inventory,
         });
         return;
@@ -286,6 +404,8 @@ fn act(
         panels.open = Some(Panel::Machine(id));
     } else if let Some(id) = aimed_employee {
         panels.open = Some(Panel::Employee(id));
+    } else if let Some(lot) = aim.property.clone() {
+        panels.open = Some(Panel::Property(lot));
     }
 }
 
@@ -367,7 +487,14 @@ fn show_ghost(
 /// The HUD hint for what the aim names.
 fn hint(aim: Res<Aim>, session: Res<Session>, content: Res<Content>, cursor: Res<Cursor>, mut hud: ResMut<HudLines>, panels: Res<Panels>) {
     let Some(world) = session.joined() else { return };
-    let text = if panels.open.is_some() {
+    let text = if let Some(pick) = &panels.picking {
+        let aimed = match (&aim.pick, aim.in_reach) {
+            (Some(Pick::Equipment(id)), true) if crate::panels::pick_targets(world, pick).contains(id) => " - click or E to choose this one".to_string(),
+            (Some(Pick::Equipment(_)), true) => " - this one cannot be chosen".to_string(),
+            _ => String::new(),
+        };
+        format!("Choose the {} for task {}: aim at an outlined machine{aimed} (Esc cancels)", pick.role.noun(), pick.index + 1)
+    } else if panels.open.is_some() {
         String::new()
     } else if let Some(item) = &cursor.item {
         match item.as_str() {
@@ -389,7 +516,10 @@ fn hint(aim: Res<Aim>, session: Res<Session>, content: Res<Content>, cursor: Res
                 if aim.in_reach { format!("E  {name}") } else { name }
             }
             Some(Pick::Belt(_)) => "Conveyor belt (F takes an item off it)".into(),
-            None => String::new(),
+            None => match aim.property.as_ref().and_then(|lot| world.offers_by_lot.get(lot)) {
+                Some(offer) => format!("E  {}: price and owner", offer.building_id),
+                None => String::new(),
+            },
         }
     };
     if hud.hint != text {

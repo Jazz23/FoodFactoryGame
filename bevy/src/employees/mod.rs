@@ -315,6 +315,42 @@ fn tidy(message: &str) -> String {
 /// Parses a program without running it: None when it would load, or the error with its line.
 pub fn check_syntax(source: &str) -> Option<String> { Script::new(source).err() }
 
+/// Local authoring check with typical stand-in results, no Host and no world access. A bounded prefix is not proof that a
+/// program will succeed against real stock/geometry; errors retain script line numbers. Infinite loops finish at the budget.
+pub fn dry_run(source: &str) -> Result<String, String> {
+    let script = Script::new(source)?;
+    script.lua.set_memory_limit(8 * 1024 * 1024).map_err(|e| tidy(&e.to_string()))?;
+    let calls = Arc::new(AtomicU32::new(0));
+    let count = calls.clone();
+    script.lua.set_interrupt(move |_| {
+        if count.fetch_add(1, Ordering::Relaxed) >= 400 { Ok(VmState::Yield) } else { Ok(VmState::Continue) }
+    });
+    let result: mlua::Result<()> = (|| {
+        let globals = script.lua.globals();
+        for name in OPERATIONS {
+            globals.set(name, script.lua.create_function(move |_, _: MultiValue| {
+                Ok(if matches!(name, "take" | "put") { Value::Integer(1) } else { Value::Boolean(true) })
+            })?)?;
+        }
+        for name in QUERIES {
+            globals.set(name, script.lua.create_function(move |lua, _: MultiValue| {
+                Ok(match name {
+                    "count" | "carrying" | "room" => Value::Integer(1),
+                    "is_on" => Value::Boolean(true),
+                    "find" | "holding" | "accepts" => { let table = lua.create_table()?; table.set(1, "example")?; Value::Table(table) },
+                    "position" => { let table = lua.create_table()?; table.set(1, 0)?; table.set(2, 0)?; table.set("x", 0)?; table.set("z", 0)?; Value::Table(table) },
+                    _ => Value::Nil,
+                })
+            })?)?;
+        }
+        globals.set("print", globals.get::<mlua::Function>("say")?)?;
+        script.thread.resume::<MultiValue>(())?;
+        Ok(())
+    })();
+    result.map_err(|e| tidy(&e.to_string()))?;
+    Ok(if calls.load(Ordering::Relaxed) >= 400 { "Checked a bounded prefix (400 interrupts); no error found." } else { "Dry run completed; no error found." }.into())
+}
+
 /// What a `begin` call asked for, kept until the step that turns it into an operation.
 #[derive(Clone, Debug)]
 struct Request {

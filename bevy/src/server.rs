@@ -111,7 +111,7 @@ pub fn start_offer(layout: &WorldLayout) -> Result<PropertyOffer, String> {
 }
 
 /// Players arrive on the starting lot's apron two cells out from its first door, facing it, spread along the wall.
-pub fn apron_spawn(offer: &PropertyOffer, index: usize) -> Pose {
+pub fn apron_spawn(offer: &PropertyOffer, index: usize, elevation: f32) -> Pose {
     let door = offer.doors[0];
     let outward = if door.z == offer.building_z + offer.building_depth - 1 {
         (0, 1)
@@ -128,7 +128,7 @@ pub fn apron_spawn(offer: &PropertyOffer, index: usize) -> Pose {
     let x = (door.x + outward.0 * 2 + along.0 * offset).clamp(0, offer.width - 1);
     let z = (door.z + outward.1 * 2 + along.1 * offset).clamp(0, offer.depth - 1);
     let yaw = (-outward.0 as f32).atan2(-outward.1 as f32).to_degrees();
-    Pose { x: (offer.lot_x + x) as f32 + 0.5, y: f32::NAN, z: (offer.lot_z + z) as f32 + 0.5, yaw }
+    Pose { x: (offer.lot_x + x) as f32 + 0.5, y: elevation, z: (offer.lot_z + z) as f32 + 0.5, yaw }
 }
 
 impl WorldServer {
@@ -253,7 +253,7 @@ impl WorldServer {
                 }
             }
             (ClientMessage::Pose { pose }, Some(_)) => {
-                if pose.x.is_finite() && pose.z.is_finite() && pose.y.is_finite() {
+                if pose.x.is_finite() && pose.z.is_finite() && pose.y.is_finite() && pose.yaw.is_finite() {
                     if let Some(p) = self.connections.get_mut(&connection).and_then(|c| c.player.as_mut()) {
                         p.pose = Some(pose);
                     }
@@ -383,7 +383,9 @@ impl WorldServer {
         let site = self.world.carried_site_of(&identity.player_id).unwrap_or(primary);
         let spawn = self.registry.pose_of(&identity.player_id).map(|p| Pose { x: p[0], y: p[1], z: p[2], yaw: p[3] }).unwrap_or_else(|| {
             let index = self.connections.values().filter(|c| c.player.is_some()).count();
-            apron_spawn(self.offers.get(&site).unwrap_or(&self.start), index)
+            let offer = self.offers.get(&site).unwrap_or(&self.start);
+            let elevation = self.layout.building(&offer.building_id).map_or(0.0, |b| b.elevation_cm as f32 / 100.0);
+            apron_spawn(offer, index, elevation)
         });
         let wage_warning = self.registry.wage_warning(&identity.player_id);
         if let Some(c) = self.connections.get_mut(&connection) {

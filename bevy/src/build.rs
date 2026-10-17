@@ -497,7 +497,7 @@ fn category(content: &Content, kind: &str) -> &'static str {
     }
 }
 
-fn draw_catalog(build: Res<Build>, session: Res<Session>, content: Res<Content>, mut model: ResMut<UiModel>) {
+fn draw_catalog(build: Res<Build>, session: Res<Session>, content: Res<Content>, mut model: ResMut<UiModel>, mut icons: ResMut<crate::structure_icons::StructureIcons>, mut images: ResMut<Assets<Image>>) {
     if build.active.is_none() {
         return;
     }
@@ -515,14 +515,18 @@ fn draw_catalog(build: Res<Build>, session: Res<Session>, content: Res<Content>,
         UiEntry::button("b:add-floor", "Add a floor"),
         UiEntry::button("b:leave", "Done"),
     ]));
+    let mut icon = |tool: &str, style: &str| {
+        let pieces = crate::structure_icons::StructureIcons::pieces(styles, tool, style);
+        icons.icon(&mut images, &format!("{tool}:{style}"), pieces)
+    };
     if filter == "All" || filter == "Structure" {
-        let walls: Vec<UiEntry> = styles.walls.iter().map(|w| UiEntry::button(format!("b:wall|{}", w.style), format!("Wall: {}\n{} / m", w.display_name, money(buildings::SHELL_WALL_CELL_CENTS))).selected(build.tool == Tool::Wall(w.style.clone()))).collect();
+        let walls: Vec<UiEntry> = styles.walls.iter().map(|w| UiEntry::button(format!("b:wall|{}", w.style), format!("Wall: {}\n{} / m", w.display_name, money(buildings::SHELL_WALL_CELL_CENTS))).with_icon_image(icon("wall", &w.style)).selected(build.tool == Tool::Wall(w.style.clone()))).collect();
         next.entries.push(UiEntry::row("walls", walls));
-        let mut doors: Vec<UiEntry> = styles.doors.iter().map(|d| UiEntry::button(format!("b:door|{}", d.style), format!("Door: {}\n{}", d.display_name, money(buildings::SHELL_DOOR_CENTS))).selected(build.tool == Tool::Door(d.style.clone()))).collect();
-        doors.extend(styles.doors.iter().take(1).map(|d| UiEntry::button(format!("b:backdoor|{}", d.style), format!("Back door\n{}", money(buildings::SHELL_DOOR_CENTS))).selected(build.tool == Tool::BackDoor(d.style.clone()))));
+        let mut doors: Vec<UiEntry> = styles.doors.iter().map(|d| UiEntry::button(format!("b:door|{}", d.style), format!("Door: {}\n{}", d.display_name, money(buildings::SHELL_DOOR_CENTS))).with_icon_image(icon("door", &d.style)).selected(build.tool == Tool::Door(d.style.clone()))).collect();
+        doors.extend(styles.doors.iter().take(1).map(|d| UiEntry::button(format!("b:backdoor|{}", d.style), format!("Back door\n{}", money(buildings::SHELL_DOOR_CENTS))).with_icon_image(icon("backdoor", &d.style)).selected(build.tool == Tool::BackDoor(d.style.clone()))));
         next.entries.push(UiEntry::row("doors", doors));
-        next.entries.push(UiEntry::row("windows", styles.windows.iter().map(|w| UiEntry::button(format!("b:window|{}", w.style), format!("Window: {}\n{}", w.display_name, money(buildings::SHELL_WINDOW_CENTS))).selected(build.tool == Tool::Window(w.style.clone()))).collect()));
-        next.entries.push(UiEntry::row("finishes", styles.walls.iter().map(|w| UiEntry::button(format!("b:finish|{}", w.style), format!("Finish: {}", w.display_name)).selected(build.tool == Tool::Finish(w.style.clone()))).collect()));
+        next.entries.push(UiEntry::row("windows", styles.windows.iter().map(|w| UiEntry::button(format!("b:window|{}", w.style), format!("Window: {}\n{}", w.display_name, money(buildings::SHELL_WINDOW_CENTS))).with_icon_image(icon("window", &w.style)).selected(build.tool == Tool::Window(w.style.clone()))).collect()));
+        next.entries.push(UiEntry::row("finishes", styles.walls.iter().map(|w| UiEntry::button(format!("b:finish|{}", w.style), format!("Finish: {}", w.display_name)).with_icon_image(icon("finish", &w.style)).selected(build.tool == Tool::Finish(w.style.clone()))).collect()));
     }
     let mut items: Vec<UiEntry> = vec![];
     for offer in &content.0.offers {

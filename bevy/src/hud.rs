@@ -6,14 +6,16 @@ use bevy::window::{CursorGrabMode, CursorOptions, PrimaryWindow};
 use food_factory_bevy::goods::EquipmentState;
 
 use crate::interaction::{Cursor, Hotbar, HotbarEntry, HOTBAR_SIZE};
+use crate::interaction::Aim;
 use crate::screens::Screen;
 use crate::session::{Content, Session};
+use crate::sites::Pick;
 
 pub struct HudPlugin;
 
 impl Plugin for HudPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, spawn_hud).add_systems(Update, update_hud);
+        app.add_systems(Startup, spawn_hud).add_systems(Update, (update_hud, update_cursor_tooltip));
     }
 }
 
@@ -32,12 +34,25 @@ struct HotbarIcon(usize);
 #[derive(Component)]
 struct HotbarLabel(usize);
 
+#[derive(Component)]
+struct CursorTooltip;
+
 fn spawn_hud(mut commands: Commands) {
     commands.spawn((
         Crosshair,
         Node { position_type: PositionType::Absolute, left: percent(50), top: percent(50), width: px(6), height: px(6), margin: UiRect::all(px(-3)), border_radius: BorderRadius::all(px(3)), ..default() },
         BackgroundColor(Color::srgba(1.0, 1.0, 1.0, 0.85)),
         Visibility::Hidden,
+    ));
+    commands.spawn((
+        CursorTooltip,
+        Text::new(""),
+        TextFont { font_size: FontSize::Px(14.0), ..default() },
+        TextColor(Color::srgb(0.94, 0.95, 0.91)),
+        Node { position_type: PositionType::Absolute, left: px(0), top: px(0), padding: UiRect::axes(px(9), px(5)), ..default() },
+        BackgroundColor(Color::srgba(0.04, 0.06, 0.08, 0.86)),
+        Visibility::Hidden,
+        Name::new("Cursor tooltip"),
     ));
     let strip = commands
         .spawn((
@@ -59,6 +74,34 @@ fn spawn_hud(mut commands: Commands) {
         commands.entity(slot).add_children(&[icon, label]);
         commands.entity(strip).add_child(slot);
     }
+}
+
+/// Names a usable hover target beside the free pointer; the crosshair HUD hint remains the locked-pointer fallback.
+fn update_cursor_tooltip(
+    aim: Res<Aim>, session: Res<Session>, content: Res<Content>, screen: Res<Screen>,
+    window: Query<(&Window, &CursorOptions), With<PrimaryWindow>>,
+    mut tooltip: Query<(&mut Text, &mut Node, &mut Visibility), With<CursorTooltip>>,
+) {
+    let Ok((mut text, mut node, mut visibility)) = tooltip.single_mut() else { return };
+    let Some((window, _cursor)) = window.single().ok().filter(|(_, c)| c.grab_mode == CursorGrabMode::None) else {
+        *visibility = Visibility::Hidden;
+        return;
+    };
+    let Some(world) = session.joined() else { *visibility = Visibility::Hidden; return };
+    let picked = if aim.in_reach { match aim.pick.as_ref() {
+        Some(Pick::Equipment(id)) => world.views.values().find_map(|v| v.equipment.iter().find(|e| &e.id == id)).map(|e| content.0.equipment_name(&e.kind)),
+        Some(Pick::Employee(id)) => world.employees.iter().find(|e| &e.id == id).map(|e| e.name.clone()),
+        _ => None,
+    }} else { None };
+    let Some(label) = picked.filter(|_| *screen == Screen::Playing).zip(window.cursor_position()) else {
+        *visibility = Visibility::Hidden;
+        return;
+    };
+    let value = format!("E  {}", label.0);
+    if text.0 != value { text.0 = value; }
+    node.left = px((label.1.x + 16.0).min(window.width() - 160.0).max(4.0));
+    node.top = px((label.1.y + 18.0).min(window.height() - 42.0).max(4.0));
+    *visibility = Visibility::Inherited;
 }
 
 #[allow(clippy::too_many_arguments)]

@@ -285,7 +285,12 @@ impl GameContent {
     pub fn equipment_name(&self, kind: &str) -> String {
         match kind {
             goods::COUNTER_KIND => "Register".to_string(),
-            _ => self.equipment.get(kind).map(|e| e.display_name.clone()).unwrap_or_else(|| kind.to_string()),
+            _ => {
+                // First letter upper case, as Unity's MachineName does ("dock" reads "Dock").
+                let name = self.equipment.get(kind).map(|e| e.display_name.clone()).filter(|n| !n.is_empty()).unwrap_or_else(|| kind.to_string());
+                let mut chars = name.chars();
+                chars.next().map_or(String::new(), |first| first.to_uppercase().collect::<String>() + chars.as_str())
+            }
         }
     }
 

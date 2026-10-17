@@ -30,3 +30,29 @@ fn several_seeds_generate() {
         generator::generate(&seed.to_string(), seed, &settings).expect("valid world");
     }
 }
+
+#[test]
+fn full_validator_passes_generated_worlds_and_catches_broken_ones() {
+    use food_factory_bevy::world::{layout::JunctionControl, validator};
+    let settings = WorldSettings::default();
+    for seed in ["1", "2", "3"] {
+        let layout = generator::generate(seed, 20260927, &settings).unwrap().layout;
+        assert_eq!(validator::validate(&layout, &settings), Vec::<String>::new(), "seed {seed}");
+    }
+    let good = generator::generate("1", 20260927, &settings).unwrap().layout;
+    let has = |layout: &food_factory_bevy::world::layout::WorldLayout, needle: &str| validator::validate(layout, &settings).iter().any(|p| p.contains(needle));
+    // A junction without a control, a dropped level crossing, a tree inside a building, a shared ID.
+    let mut broken = good.clone();
+    let junction = broken.nodes.iter_mut().find(|n| n.control != JunctionControl::None).unwrap();
+    junction.control = JunctionControl::None;
+    assert!(has(&broken, "control None at"));
+    let mut broken = good.clone();
+    if !broken.crossings.is_empty() { broken.crossings.remove(0); assert!(has(&broken, "without a level crossing")); }
+    let mut broken = good.clone();
+    let b = broken.buildings[0].clone();
+    broken.trees[0].x = b.x; broken.trees[0].z = b.z;
+    assert!(has(&broken, "trees: 1 misplaced"));
+    let mut broken = good.clone();
+    broken.roads[1].id = broken.roads[0].id.clone();
+    assert!(has(&broken, "id: blank, spaced or duplicate"));
+}
