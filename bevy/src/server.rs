@@ -443,6 +443,7 @@ impl WorldServer {
         let w = &mut self.world;
         match command {
             Command::Transfer { lot, destination, quantity } => w.transfer(actor, request, &lot, &destination, quantity, ""),
+            Command::Discard { lot, quantity } => w.discard(actor, request, &lot, quantity),
             Command::PickUp { equipment } => w.pick_up(actor, request, &equipment),
             Command::Place { equipment, x, z, rotation, level } => w.place(actor, request, &equipment, x, z, rotation, level),
             Command::Give { equipment, employee } => w.give(actor, request, &equipment, &employee),

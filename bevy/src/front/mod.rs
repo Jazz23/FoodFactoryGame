@@ -22,6 +22,7 @@ use crate::ui::{UiFields, UiIntents, UiModel};
 mod hud_view;
 mod menu_view;
 mod panel_view;
+mod pointer_view;
 mod settings_view;
 
 pub use hud_view::{AlertDto, HotbarSlotDto, HudFrame, KeyHintDto, TooltipFrame};
@@ -48,8 +49,8 @@ impl Plugin for FrontPlugin {
             .add_observer(drag_end)
             .add_observer(field_press)
             .add_observer(slider_press)
-            .add_systems(Startup, mount)
-            .add_systems(Update, (fit_scale, ease_looks, field_frames, sync_fields, keep_focus, placeholders, drive_sliders, show_sliders, remember_scrolls))
+            .add_systems(Startup, (mount, pointer_view::mount))
+            .add_systems(Update, (fit_scale, ease_looks, field_frames, sync_fields, keep_focus, placeholders, drive_sliders, show_sliders, remember_scrolls, pointer_view::follow_pointer))
             .add_systems(
                 PostUpdate,
                 (hud_view::draw_hud, hud_view::draw_tooltip, panel_view::draw_panel, menu_view::draw_menu, settings_view::draw_settings).before(UiSystems::Layout),
@@ -337,7 +338,7 @@ fn drag_drop(drop: On<PointerDragDrop>, clicks: Query<&Click>, parents: Query<&C
         entity = parent.parent();
     }
     let Some(source) = source else { return };
-    if source.starts_with("p:slot|") && source != target && (target.starts_with("p:slot|") || target.starts_with("p:drop|")) {
+    if source.starts_with("p:slot|") && source != target && (target.starts_with("p:slot|") || target.starts_with("p:drop|") || target == "p:trash") {
         intents.0.push(format!("drag>{source}>{target}"));
     }
 }

@@ -33,7 +33,6 @@ const MODELS: &str = "models/Vehicles/Models/Vehicles.glb";
 const CAR_NAMES: [&str; 5] = ["Vehicle_Hatchback", "Vehicle_Sedan", "Vehicle_Taxi", "Vehicle_Pickup", "Vehicle_Van"];
 const TRUCK_NAME: &str = "Vehicle_BoxTruck";
 const BODY_MATERIAL: &str = "VH_Body";
-const KERB_METRES: f32 = 1.0;
 const MAX_EXTRAPOLATION: f32 = 1.25;
 const CAR_RADIUS: f32 = 220.0;
 const MAX_CARS: usize = 150;
@@ -80,6 +79,8 @@ struct Vehicles {
     /// When each truck's latest baseline arrived (its revision and the local time).
     seen: HashMap<String, (i64, f32)>,
     tints: HashMap<String, Handle<StandardMaterial>>,
+    /// The painted-body detail texture under every tint.
+    paint: Handle<Image>,
 }
 
 /// Where a vehicle is heading (scene) and its yaw; it eases there and snaps across long jumps.
@@ -108,6 +109,7 @@ fn load_models(
 ) {
     if !vehicles.requested {
         library.request(&assets, MODELS);
+        vehicles.paint = crate::textures::detail_texture(&assets, "plastic");
         vehicles.requested = true;
     }
     if !vehicles.models.is_empty() {
@@ -158,11 +160,24 @@ fn spawn_vehicle(commands: &mut Commands, model: &Model, tint: Option<Handle<Sta
 }
 
 fn tint(vehicles: &mut Vehicles, materials: &mut Assets<StandardMaterial>, key: String, colour: Color) -> Handle<StandardMaterial> {
-    vehicles.tints.entry(key).or_insert_with(|| materials.add(StandardMaterial { base_color: colour, perceptual_roughness: 0.35, metallic: 0.2, ..default() })).clone()
+    let paint = vehicles.paint.clone();
+    vehicles.tints.entry(key).or_insert_with(|| materials.add(StandardMaterial { base_color: colour, base_color_texture: Some(paint), perceptual_roughness: 0.35, metallic: 0.2, ..default() })).clone()
 }
 
-/// Lane centre distance right of a segment's centreline (right-hand traffic), lane 0 at the kerb.
-fn lane_offset(segment: &roads::Segment, lane: i32) -> f32 { (segment.width as f32 / 2.0 - KERB_METRES - LANE_WIDTH as f32 * (lane as f32 + 0.5)).max(0.75) }
+/// Lane centre distance right of a segment's centreline (right-hand traffic), lane 0 at the kerb: the middle of the lane the
+/// road tile paints (its texture at 64 px per metre: a local road's edge line 3.2 m out; an arterial's 0.12 m double centre
+/// line, lane divider at 2.5 m and edge line at 4.64 m; a rural road's edge line 2.9 m out). Tiles are drawn at their own
+/// width, so a road of another width keeps these lanes.
+fn lane_offset(segment: &roads::Segment, lane: i32) -> f32 {
+    let lanes: &[f32] = match segment.kind {
+        RoadKind::Arterial => &[3.57, 1.31],
+        RoadKind::Local => &[1.6],
+        RoadKind::Rural => &[1.45],
+    };
+    let at = (lane.max(0) as usize).min(lanes.len() - 1);
+    // More lanes than the paint shows (a wider custom road): further lanes step out by a lane width.
+    lanes[at] + (lane.max(0) as usize - at) as f32 * LANE_WIDTH as f32
+}
 
 /// Map position and heading `offset` metres along a segment driven forward or back, in a lane.
 fn along(network: &RoadNetwork, segment: usize, offset: f32, forward: bool, lane: i32) -> (Vec2, Vec2) {
@@ -387,7 +402,7 @@ fn city_cars(
                     let relative = Vec2::new(x, z) - start;
                     let at = relative.dot(heading);
                     if at >= 0.0 && at <= length && relative.dot(right).abs() <= LANE_WIDTH as f32 / 2.0 + 0.1 {
-                        food_factory_bevy::traffic::hold_behind(&mut cars, at, 4.5, 1.0);
+                        food_factory_bevy::traffic::hold_behind(&mut cars, at, 4.5, 2.0);
                     }
                 }
                 for car in cars {
@@ -434,13 +449,34 @@ fn city_cars(
         commands.entity(entity).insert(CarMotion::default()).insert(Engine { volume: 0.18, pitch: 1.2 + (food_factory_bevy::world::random::fnv1a(&id) % 1000) as f32 / 1000.0 * 0.3, hearing: 22.0 });
         vehicles.cars.insert(id, entity);
     }
+    // A car whose lane no longer lists it drives on along its heading until out of sight, but it still stops for people and
+    // for any car close ahead in its path, so it neither runs anyone down nor drives through the crossing stream.
+    let people_at: Vec<Vec2> = people.iter().map(|p| { let (x, z, _) = space.to_map(p.translation()); Vec2::new(x, z) }).collect();
+    let listed: Vec<Vec2> = positions.0.clone();
     let unlisted: Vec<(String, Entity)> = vehicles.cars.iter().filter(|(k, _)| !keep.contains(*k)).map(|(k, e)| (k.clone(), *e)).collect();
+    let mut coasting: Vec<Vec2> = vec![];
     for (id, e) in unlisted {
         let gone = match cars_drawn.get_mut(e) {
             Ok((mut drive, mut motion, transform)) => {
                 motion.unlisted += dt;
-                drive.position += motion.velocity * dt;
+                let (cx, cz, _) = space.to_map(drive.position);
+                let at = Vec2::new(cx, cz);
+                let step = space.to_map(drive.position + motion.velocity);
+                let heading = (Vec2::new(step.0, step.1) - at).normalize_or_zero();
+                let blocked = |other: &Vec2, reach: f32, side: f32| {
+                    let relative = *other - at;
+                    let ahead = relative.dot(heading);
+                    ahead > 0.5 && ahead < reach && relative.perp_dot(heading).abs() < side
+                };
+                let stop = heading != Vec2::ZERO
+                    && (people_at.iter().any(|p| blocked(p, food_factory_bevy::traffic::CAR_HALF_LENGTH + 3.5, 1.6))
+                        || listed.iter().chain(&coasting).any(|c| blocked(c, food_factory_bevy::traffic::GAP, 1.8)));
+                if !stop {
+                    drive.position += motion.velocity * dt;
+                }
                 let (x, z, _) = space.to_map(drive.position);
+                coasting.push(Vec2::new(x, z));
+
                 drive.position.y = space.to_scene(x, z, space.land(x, z)).y;
                 positions.0.push(Vec2::new(x, z));
                 filling || motion.unlisted > COAST_SECONDS || !seen(transform.translation) || Vec2::new(x, z).distance(here) > CAR_RADIUS

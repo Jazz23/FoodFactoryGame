@@ -127,7 +127,7 @@ fn elevator_target(building: &food_factory_bevy::goods::Building, cell: (i32, i3
 
 fn move_player(
     time: Res<Time>, actions: Res<PlayerActions>, rig: Query<&OrbitCamera>, mut players: Query<(&mut Player, &mut Transform, &mut GroundHeight)>, solids: Res<Solids>,
-    space: Option<Res<Space>>,
+    space: Option<Res<Space>>, map_solids: Res<crate::map::MapSolids>,
 ) {
     let delta = time.delta_secs().min(0.1);
     let yaw = rig.single().map(OrbitCamera::yaw_rotation).unwrap_or_default();
@@ -146,9 +146,12 @@ fn move_player(
     let speed = if actions.sprint { SPRINT_SPEED } else { SPEED };
     let displacement = (direction * speed + Vec3::Y * player.vertical_speed) * delta;
     let mut position = transform.translation;
-    let near: Vec<&(Vec3, Vec3)> = solids.boxes.iter().chain(&solids.moving_boxes).filter(|(min, max)| {
+    let close = |(min, max): &&(Vec3, Vec3)| {
         position.x + 3.0 > min.x && position.x - 3.0 < max.x && position.z + 3.0 > min.z && position.z - 3.0 < max.z && position.y + 4.0 > min.y && position.y - 4.0 < max.y
-    }).collect();
+    };
+    // Static geometry: site walls and machines plus the city's scenery (houses, trees, signs).
+    let statics: Vec<(Vec3, Vec3)> = solids.boxes.iter().chain(map_solids.near(position, 4.0)).filter(close).copied().collect();
+    let near: Vec<&(Vec3, Vec3)> = statics.iter().chain(solids.moving_boxes.iter().filter(close)).collect();
     player.grounded = false;
     // Axis-separated swept bounds avoid tunnelling across thin walls during a slow frame.
     for axis in [0, 2, 1] {
@@ -186,7 +189,7 @@ fn move_player(
     let (correction, shove, centres) = vehicle_bump(position, delta, &solids.moving_boxes, &player.previous_vehicle_centres, player.vehicle_shove);
     player.previous_vehicle_centres = centres;
     player.vehicle_shove = shove;
-    position = sweep_horizontal(position, correction + shove * delta, &solids.boxes);
+    position = sweep_horizontal(position, correction + shove * delta, &statics);
     // The land (and each lot's levelled floor) is the lowest ground; a low box under the feet is stood on.
     let mut ground = space.ground(position);
     for (min, max) in &near {

@@ -1,15 +1,18 @@
 // Presentation-only sound (Unity GameAudio, AmbienceDirector, AudioZones, EquipmentRunningAudio and FootstepAudio): menu
-// music while no world runs (the constant city, farmland and factory beds were dropped as too loud and monotonous); inside
-// one, occasional horns, birds and clanks around the avatar; a click for every button, the till when the company makes a sale, a thud when a piece lands on a drawn site, footsteps while
-// the avatar walks, and each running machine's positional loop (sizzle, hum, mixer). Nothing here reads or changes gameplay
-// state beyond what the baselines show, and a missing clip only makes that sound silent.
+// music while no world runs; inside one, quiet ambience beds that follow where the avatar is and the time of day (city,
+// farmland and factory beds kept low and slowly breathing so they never drone, wind outdoors, crickets at night, the murmur of
+// a busy restaurant indoors), occasional sounds around the avatar (horns, sparrows, a distant bell, a plane high over, birds
+// over farmland, clanks by a factory, cutlery while people eat); a click for every button, the till when the company makes a
+// sale, a thud when a piece lands on a drawn site, footsteps while the avatar walks, and each running machine's positional
+// loop (sizzle, hum, mixer). Nothing here reads or changes gameplay state beyond what the baselines show, and a missing clip
+// only makes that sound silent. The extra clips come from tools/ambient_sounds.py.
 use std::collections::{HashMap, HashSet};
 
 use bevy::audio::{PlaybackMode, SpatialScale, Volume};
 use bevy::prelude::*;
 use bevy::ui_widgets::Button;
 
-use food_factory_bevy::goods::{company, JobState};
+use food_factory_bevy::goods::{self, company, JobState};
 use food_factory_bevy::world::layout::BuildingCategory;
 use food_factory_bevy::world::random;
 
@@ -21,7 +24,7 @@ pub struct GameAudioPlugin;
 
 impl Plugin for GameAudioPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<AudioState>().add_systems(Startup, setup).add_systems(Update, (listener, master, music, incidentals, clicks, till, placements, footsteps, machines, engines));
+        app.init_resource::<AudioState>().add_systems(Startup, setup).add_systems(Update, (listener, master, music, beds, incidentals, table_sounds, clicks, till, placements, footsteps, machines, engines));
     }
 }
 
@@ -43,7 +46,101 @@ struct AudioState {
     step_index: u64,
     last_step: u64,
     incidental_timer: f32,
+    table_timer: f32,
     machines: HashMap<String, Entity>,
+    /// The ambience beds by clip name: their looping player and current level.
+    beds: HashMap<&'static str, (Entity, f32)>,
+}
+
+/// Each bed's loudest level, before the ambience channel.
+const BEDS: [(&str, f32); 6] = [("city", 0.10), ("farm", 0.10), ("factory", 0.08), ("wind", 0.09), ("crickets", 0.12), ("murmur", 0.22)];
+
+/// Whether the world's clock reads night (21:00 to 05:59).
+fn night(world: &crate::session::Joined) -> bool {
+    use food_factory_bevy::world::clock::{DAY_SECONDS, HOUR_SECONDS};
+    let hour = world.view().map_or(12, |v| v.clock_seconds % DAY_SECONDS / HOUR_SECONDS);
+    !(6..21).contains(&hour)
+}
+
+/// The ambience beds follow the avatar: the zone mix outdoors (muffled indoors), wind outside and stronger over farmland,
+/// crickets outdoors at night, and indoors at a restaurant a murmur as busy as its tables and queue. Each level drifts slowly
+/// with its own breathing so no bed sits flat.
+#[allow(clippy::too_many_arguments)]
+fn beds(
+    mut commands: Commands, time: Res<Time>, prefs: Option<Res<Prefs>>, assets: Res<AssetServer>, mut state: ResMut<AudioState>, session: Res<Session>,
+    space: Option<Res<Space>>, player: Query<&Transform, With<crate::player::Player>>, indoors: Option<Res<crate::sites::Indoors>>, mut sinks: Query<&mut AudioSink>,
+) {
+    let mut targets: HashMap<&str, f32> = HashMap::new();
+    if let (Some(world), Some(space), Ok(player)) = (session.joined(), space.as_ref(), player.single()) {
+        let (x, z, _) = space.to_map(player.translation);
+        let [city, farm, factory] = zones(world, x, z);
+        let inside = indoors.as_ref().is_some_and(|i| i.building.is_some());
+        let muffle = if inside { 0.35 } else { 1.0 };
+        let dark = night(world);
+        targets.insert("city", city * muffle * if dark { 0.6 } else { 1.0 });
+        targets.insert("farm", farm * muffle * if dark { 0.3 } else { 1.0 });
+        targets.insert("factory", factory * muffle);
+        targets.insert("wind", if inside { 0.1 } else { 0.55 + 0.45 * farm });
+        targets.insert("crickets", if dark && !inside { 0.4 + 0.6 * farm.max(0.3) } else { 0.0 });
+        let busy = indoors.as_ref().and_then(|i| i.site.as_ref()).filter(|_| inside).and_then(|site| world.view_of(site)).map_or(0.0, |view| {
+            let people = view.customers.iter().filter(|c| matches!(c.state, goods::CustomerState::Eating | goods::CustomerState::Queued | goods::CustomerState::Ordering)).count();
+            (people as f32 / 6.0).min(1.0)
+        });
+        targets.insert("murmur", busy);
+    }
+    let t = time.elapsed_secs();
+    let ambience = live(&prefs, |p| p.ambience);
+    for (index, (name, loudest)) in BEDS.iter().enumerate() {
+        let breath = 0.78 + 0.22 * (t * (0.045 + index as f32 * 0.013) + index as f32 * 1.7).sin();
+        let target = targets.get(name).copied().unwrap_or(0.0) * loudest * breath;
+        let entry = state.beds.get(name).copied();
+        let level = entry.map_or(0.0, |e| e.1).move_towards(target, time.delta_secs() * loudest / 3.0);
+        match entry {
+            None if target > 0.001 => {
+                let clip = state.clip(&assets, name);
+                let entity = looped(&mut commands, clip, 0.0);
+                state.beds.insert(*name, (entity, level));
+            }
+            None => {}
+            Some((entity, _)) if level <= 0.0005 && target <= 0.001 => {
+                commands.entity(entity).despawn();
+                state.beds.remove(name);
+            }
+            Some((entity, _)) => {
+                if let Ok(mut sink) = sinks.get_mut(entity) {
+                    sink.set_volume(Volume::Linear(level * ambience));
+                }
+                state.beds.insert(*name, (entity, level));
+            }
+        }
+    }
+}
+
+/// Cutlery and dishes now and then at a table where someone is eating, near the avatar.
+#[allow(clippy::too_many_arguments)]
+fn table_sounds(mut commands: Commands, prefs: Option<Res<Prefs>>, time: Res<Time>, assets: Res<AssetServer>, mut state: ResMut<AudioState>, player: Query<&Transform, With<crate::player::Player>>, session: Res<Session>, space: Option<Res<Space>>) {
+    let (Ok(player), Some(world), Some(space)) = (player.single(), session.joined(), space) else { return };
+    state.table_timer -= time.delta_secs();
+    if state.table_timer > 0.0 {
+        return;
+    }
+    let roll = random::mix((time.elapsed_secs() * 1000.0) as u64 ^ 0x5eed);
+    state.table_timer = 1.5 + (roll % 350) as f32 / 100.0;
+    let mut tables: Vec<Vec3> = vec![];
+    for (site, view) in &world.views {
+        for customer in view.customers.iter().filter(|c| c.state == goods::CustomerState::Eating) {
+            let Some(table) = view.equipment.iter().find(|e| e.id == customer.table_id && e.placed()) else { continue };
+            let (w, d) = table.footprint();
+            let at = space.site_point(site, table.cell_x as f32 + w as f32 * 0.5, table.cell_z as f32 + d as f32 * 0.5, table.level) + Vec3::Y * 0.8;
+            if at.distance(player.translation) < 16.0 { tables.push(at); }
+        }
+    }
+    if tables.is_empty() {
+        return;
+    }
+    let at = tables[(roll >> 8) as usize % tables.len()];
+    let clip = state.clip(&assets, &format!("clink_{}", 1 + (roll >> 4) % 3));
+    one_shot(&mut commands, clip, 0.35 * channel(&prefs, |p| p.ambience), Some(at));
 }
 
 impl AudioState {
@@ -121,22 +218,29 @@ fn incidentals(mut commands: Commands, prefs: Option<Res<Prefs>>, time: Res<Time
         return;
     }
     let roll = random::mix((time.elapsed_secs() * 1000.0) as u64);
-    state.incidental_timer = 6.0 + (roll % 900) as f32 / 100.0;
+    state.incidental_timer = 4.0 + (roll % 700) as f32 / 100.0;
     let (x, z, _) = space.to_map(player.translation);
     let weights = zones(world, x, z);
     let pick = weights.iter().enumerate().max_by(|a, b| a.1.total_cmp(b.1)).map_or(0, |(i, _)| i);
     if weights[pick] < 0.15 {
         return;
     }
-    let name = match pick {
-        0 => format!("honk_{}", 1 + roll % 3),
-        1 => format!("bird_{}", 1 + roll % 3),
-        _ => format!("clank_{}", 1 + roll % 3),
+    let dark = night(world);
+    let kind = (roll >> 12) % 10;
+    // Mostly the zone's own sound; now and then a sparrow in town by day, a distant bell, or a plane high over.
+    let (name, level, distance, height) = match pick {
+        _ if kind == 0 => ("plane".to_string(), 0.45, 40.0, 60.0),
+        0 if kind == 1 => ("bell".to_string(), 0.4, 70.0, 10.0),
+        0 if !dark && kind < 6 => (format!("chirp_{}", 1 + roll % 3), 0.35, 9.0, 4.0),
+        0 => (format!("honk_{}", 1 + roll % 3), 0.5, 18.0, 2.0),
+        1 if dark => (format!("chirp_{}", 1 + roll % 3), 0.15, 25.0, 3.0),
+        1 => (format!("bird_{}", 1 + roll % 3), 0.5, 18.0, 4.0),
+        _ => (format!("clank_{}", 1 + roll % 3), 0.5, 18.0, 2.0),
     };
     let angle = (roll % 360) as f32 * std::f32::consts::PI / 180.0;
-    let at = player.translation + Vec3::new(angle.cos() * 18.0, 2.0, angle.sin() * 18.0);
+    let at = player.translation + Vec3::new(angle.cos() * distance, height, angle.sin() * distance);
     let clip = state.clip(&assets, &name);
-    one_shot(&mut commands, clip, 0.5 * channel(&prefs, |p| p.ambience), Some(at));
+    one_shot(&mut commands, clip, level * channel(&prefs, |p| p.ambience), Some(at));
 }
 
 fn clicks(mut commands: Commands, prefs: Option<Res<Prefs>>, assets: Res<AssetServer>, mut state: ResMut<AudioState>, buttons: Query<(), (Added<bevy::ui::Pressed>, With<Button>)>) {

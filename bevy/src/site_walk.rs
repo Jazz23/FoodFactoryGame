@@ -1,5 +1,6 @@
 // Presentation-only customer routes over replicated ground cells (Unity SiteWalk). Four-way paths enter from the street,
-// queue back along the way in, and never substitute a straight walk through walls when no route exists.
+// queue back along the way in, and never substitute a straight walk through walls when no route exists. A found grid path is
+// pulled straight wherever a figure-wide line stays on open cells, so figures walk the direct way instead of grid elbows.
 use std::collections::{HashMap, VecDeque};
 
 use crate::goods::{Equipment, PropertyOffer, Snapshot, grid, rules::{self, Walk}};
@@ -91,7 +92,48 @@ impl SiteWalk {
             && (self.walk.get(x, z) || STEPS.iter().any(|&(dx, dz)| self.walk.get(x + dx, z + dz)))
     }
 
+    /// The path without its first point (where the figure stands), cut short wherever a straight walk is open: from each kept
+    /// point, the furthest later point in clear sight.
+    fn pull_straight(&self, path: &[Point]) -> Vec<Point> {
+        // A closed goal (a seat) is only approached from its open neighbour, so that last step is never cut.
+        let goal = path.last().map(|&p| cell_of(p));
+        let end = if goal.is_some_and(|c| !self.walk.get(c.0, c.1)) && path.len() > 2 { path.len() - 1 } else { path.len() };
+        let mut points = vec![];
+        let mut at = 0;
+        while at + 1 < end {
+            let mut next = at + 1;
+            for later in (at + 2..end).rev() {
+                if self.clear(path[at], path[later]) { next = later; break; }
+            }
+            points.push(path[next]);
+            at = next;
+        }
+        points.extend_from_slice(&path[end..]);
+        points
+    }
+
+
+    /// Whether a figure (about half a metre wide) can walk straight from one point to another over open cells. The two end
+    /// cells may be closed (a seat in a table's footprint, a figure standing up from one).
+    fn clear(&self, a: Point, b: Point) -> bool {
+        let (dx, dz) = (b.0 - a.0, b.1 - a.1);
+        let length = (dx * dx + dz * dz).sqrt();
+        if length < 1e-4 { return true; }
+        let (ux, uz) = (dx / length, dz / length);
+        let (ends_a, ends_b) = (cell_of(a), cell_of(b));
+        let steps = (length / 0.2).ceil() as i32;
+        (0..=steps).all(|i| {
+            let t = length * i as f32 / steps as f32;
+            [-0.25f32, 0.0, 0.25].iter().all(|side| {
+                let p = (a.0 + ux * t - uz * side, a.1 + uz * t + ux * side);
+                let c = cell_of(p);
+                c == ends_a || c == ends_b || self.walk.get(c.0, c.1)
+            })
+        })
+    }
+
     /// Seats may occupy one blocked destination cell; only its cardinal open neighbour can approach it.
+
     pub fn route(&self, from: Point, to: Point, seat: bool) -> Option<Vec<Point>> {
         let start_cell = cell_of(from);
         let goal_cell = cell_of(to);
@@ -122,16 +164,9 @@ impl SiteWalk {
                 let mut at = cell;
                 while at != start { at = parents[&at]; cells.push(at); }
                 cells.reverse();
-                let mut points = vec![];
-                for (i, &c) in cells.iter().enumerate() {
-                    if i > 0 && i + 1 < cells.len() {
-                        let (a, b) = (cells[i - 1], cells[i + 1]);
-                        if (c.0 - a.0, c.1 - a.1) == (b.0 - c.0, b.1 - c.1) { continue; }
-                    }
-                    points.push(center(c));
-                }
-                points.push(to);
-                return Some(points);
+                let mut path: Vec<Point> = std::iter::once(from).chain(cells.iter().map(|&c| center(c))).chain(std::iter::once(to)).collect();
+                path.dedup_by(|a, b| distance(*a, *b) < 1e-6);
+                return Some(self.pull_straight(&path));
             }
             for (dx, dz) in STEPS {
                 let next = (cell.0 + dx, cell.1 + dz);

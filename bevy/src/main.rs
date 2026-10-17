@@ -25,6 +25,7 @@ mod settings;
 mod sites;
 mod space;
 mod structure_icons;
+mod textures;
 mod ui;
 mod vehicles;
 mod window_icon;
@@ -71,7 +72,7 @@ fn main() {
         ))
         .add_plugins(SoundPlugin)
         .add_plugins(front::FrontPlugin)
-        .add_plugins((belt_controls::BeltControlsPlugin, build::BuildPlugin, vehicles::VehiclesPlugin, settings::SettingsPlugin, phone_map::PhoneMapPlugin, structure_icons::StructureIconsPlugin, window_icon::WindowIconPlugin, FrameTimeDiagnosticsPlugin::default()))
+        .add_plugins((belt_controls::BeltControlsPlugin, build::BuildPlugin, vehicles::VehiclesPlugin, settings::SettingsPlugin, phone_map::PhoneMapPlugin, structure_icons::StructureIconsPlugin, window_icon::WindowIconPlugin, textures::SurfaceTexturesPlugin, FrameTimeDiagnosticsPlugin::default()))
         .add_systems(Startup, spawn_sun)
         .add_systems(Update, show_fps)
         .run();

@@ -1081,13 +1081,6 @@
    "spoilAfterSeconds": 7200
   },
   {
-   "id": "supplier-belt-10",
-   "priceCents": 500,
-   "itemId": "belt",
-   "quantity": 10,
-   "spoilAfterSeconds": 1000000000000
-  },
-  {
    "id": "supplier-counter",
    "priceCents": 5000,
    "equipmentKind": "counter"
@@ -1328,7 +1321,7 @@
    "kind": "counter",
    "width": 2,
    "depth": 1,
-   "inputCapacity": 25,
+   "inputCapacity": 30,
    "outputCapacity": 1,
    "inputRefrigerated": false,
    "outputRefrigerated": false,

@@ -16,7 +16,7 @@ use crate::interaction::Cursor;
 use crate::screens::{reason_text, Screen};
 use crate::session::{money, Content, Joined, Session, SessionEvent};
 use crate::space::Space;
-use crate::ui::{UiEntry, UiFields, UiIntents, UiModel};
+use crate::ui::{Style, UiEntry, UiFields, UiIntents, UiModel};
 
 pub struct PanelsPlugin;
 
@@ -29,7 +29,6 @@ impl Plugin for PanelsPlugin {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PhoneTab {
     Map,
-    Shop,
     Staff,
     Places,
     Ledger,
@@ -39,17 +38,28 @@ pub enum PhoneTab {
 }
 
 impl PhoneTab {
-    const ALL: [PhoneTab; 8] = [PhoneTab::Map, PhoneTab::Shop, PhoneTab::Staff, PhoneTab::Places, PhoneTab::Ledger, PhoneTab::Trucks, PhoneTab::Farms, PhoneTab::Recipes];
+    const ALL: [PhoneTab; 7] = [PhoneTab::Map, PhoneTab::Staff, PhoneTab::Places, PhoneTab::Ledger, PhoneTab::Trucks, PhoneTab::Farms, PhoneTab::Recipes];
     fn name(self) -> &'static str {
         match self {
             PhoneTab::Map => "Map",
-            PhoneTab::Shop => "Shop",
             PhoneTab::Staff => "Staff",
             PhoneTab::Places => "Places",
             PhoneTab::Ledger => "Ledger",
             PhoneTab::Trucks => "Trucks",
             PhoneTab::Farms => "Farms",
             PhoneTab::Recipes => "Recipes",
+        }
+    }
+    /// The app's icon on the phone's dock.
+    fn glyph(self) -> &'static str {
+        match self {
+            PhoneTab::Map => "map",
+            PhoneTab::Staff => "users",
+            PhoneTab::Places => "home",
+            PhoneTab::Ledger => "list",
+            PhoneTab::Trucks => "truck",
+            PhoneTab::Farms => "leaf",
+            PhoneTab::Recipes => "book",
         }
     }
 }
@@ -99,6 +109,57 @@ pub struct Panels {
     pub selected_truck: Option<String>,
     /// Picking a task target in the world (Unity InteractionScreen.PickPosition): the screen is hidden meanwhile.
     pub picking: Option<TaskPick>,
+    /// The HUD's wage warning threshold in game hours (the Staff app's picker): none is the default two, zero is off.
+    pub wage_warning: Option<i64>,
+}
+
+impl Panels {
+    /// Hours of wages the cash must cover before the HUD warns; 0 never warns.
+    pub fn wage_warning_hours(&self) -> i64 { self.wage_warning.unwrap_or(2) }
+}
+
+/// The phone's frame around an app: the dock of apps, the status bar's time, and the place and cash under the heading.
+fn phone_frame(next: &mut UiModel, world: &Joined, view: &Snapshot, tab: Option<PhoneTab>) {
+    use food_factory_bevy::world::clock::{DAY_SECONDS, HOUR_SECONDS};
+    next.phone = true;
+    next.phone_time = format!("{:02}:{:02}", view.clock_seconds % DAY_SECONDS / HOUR_SECONDS, view.clock_seconds % HOUR_SECONDS);
+    let site = view.sites.iter().find(|s| s.id == world.site).map_or(world.site.clone(), |s| s.name.clone());
+    next.status = format!("{site} · cash {}", money(world.cash()));
+    next.tabs = PhoneTab::ALL.iter().map(|t| {
+        let on = Some(*t) == tab;
+        UiEntry::button(format!("p:tab|{}", t.name()), t.name()).selected(on).glyph(format!("{}-{}", t.glyph(), if on { "f2a33a" } else { "a8a49b" }))
+    }).collect();
+}
+
+/// The slot legend under an inventory grid.
+fn legend() -> UiEntry {
+    UiEntry::group("legend", Style::Legend, vec![
+        UiEntry::label("legend-chilled", "Chilled: timer paused").dot("#7CC8F0"),
+        UiEntry::label("legend-soon", "Spoils soon").dot("#FF9A6B"),
+        UiEntry::label("legend-spoiled", "Spoiled").dot("#E5644E"),
+    ])
+}
+
+/// Hired against the cap, the company's wages and how long its cash covers them (the design's Staff tiles).
+fn staff_stats(world: &Joined, view: &Snapshot, panels: &Panels) -> UiEntry {
+    let count = world.employees.iter().filter(|e| e.site == world.site).count();
+    let cap = goods::employees::employee_cap(view, &world.site);
+    let wages = view.company_wage_cents_per_hour;
+    let hours = if wages > 0 { world.cash().max(0) / wages } else { 0 };
+    let threshold = panels.wage_warning_hours();
+    let low = wages > 0 && threshold > 0 && hours < threshold;
+    UiEntry::group("staff-stats", Style::Stats, vec![
+        UiEntry::label("stat-hired", format!("Hired\n{count} / {cap}")).styled(Style::Stat),
+        UiEntry::label("stat-wages", format!("Wages\n{} / h", money(wages))).styled(Style::Stat),
+        UiEntry::label("stat-covers", format!("Cash covers\n{}", if wages > 0 { format!("{hours} h") } else { "—".to_string() })).styled(Style::Stat).dot(if low { "#FF9A6B" } else { "" }),
+    ])
+}
+
+/// A stack's spoil timer and its colour: chilled (paused), soon, or plain; none when it never spoils.
+fn spoil_timer(lots: &[&Lot], chilled: bool) -> Option<(String, &'static str)> {
+    let left = lots.iter().filter(|l| !l.spoiled && l.spoil_after_seconds > 0).map(|l| (l.spoil_after_seconds - l.exposure_seconds).max(0)).min()?;
+    let text = if left >= 3600 { format!("{}h", left / 3600) } else { format!("{}:{:02}", left / 60, left % 60) };
+    Some((text, if chilled { "#7CC8F0" } else if left < 120 { "#FF9A6B" } else { "#A8A49B" }))
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -135,6 +196,19 @@ pub fn stack_transfers(view: &Snapshot, content: &food_factory_bevy::content::Ga
         let take = free.min(lot.quantity as i64);
         free -= take;
         commands.push(Command::Transfer { lot: lot.id.clone(), destination: destination.to_string(), quantity: take as i32 });
+    }
+    commands
+}
+
+/// The discards that destroy up to `quantity` of a stack in the player's carried inventory (the inventory's trash can).
+fn stack_discards(view: &Snapshot, source: &str, item: &str, spoiled: bool, quantity: i32) -> Vec<Command> {
+    let mut left = quantity.max(0);
+    let mut commands = vec![];
+    for lot in view.lots.iter().filter(|l| l.location_id == source && l.item_id == item && l.spoiled == spoiled && l.quantity > 0) {
+        if left <= 0 { break; }
+        let take = left.min(lot.quantity);
+        left -= take;
+        commands.push(Command::Discard { lot: lot.id.clone(), quantity: take });
     }
     commands
 }
@@ -393,11 +467,27 @@ fn grid(panels: &Panels, content: &Content, view: &Snapshot, location: &str, cap
         let definition = content.0.items.get(item);
         let name = definition.map_or(item.to_string(), |i| i.display_name.clone());
         let holding = panels.held.as_ref().is_some_and(|h| h.location == location && h.item == item && h.spoiled == spoiled);
+        // The part on the cursor follows the pointer; the slots keep what is left, and an emptied slot still takes it back.
+        let lifted = panels.held.as_ref().filter(|_| holding).map_or(0, |h| h.quantity as i64);
+        let total = (total - lifted).max(0);
+        if total == 0 {
+            let mut entry = UiEntry::button(format!("p:slot|{location}|{first_lot}"), "").as_slot().selected(true);
+            entry.id = format!("slot-{location}-{item}-{spoiled}-0");
+            slots.push(entry);
+            continue;
+        }
         let pieces = (total + max - 1) / max;
+        let chilled = view.locations.iter().any(|l| l.id == location && l.refrigerated);
+        let stack: Vec<&Lot> = lots.iter().copied().filter(|l| l.item_id == item && l.spoiled == spoiled).collect();
+        let timer = spoil_timer(&stack, chilled);
         for k in 0..pieces {
             let count = max.min(total - k * max);
             let mut entry = UiEntry::button(format!("p:slot|{location}|{first_lot}"), format!("{name}\n{count}{}", if spoiled { " spoiled" } else { "" }))
                 .with_icon(definition.map(|i| i.icon.clone()).unwrap_or_default()).as_slot().selected(holding);
+            if let Some((text, colour)) = &timer {
+                entry = entry.glyph(text.clone()).dot(*colour);
+            }
+
             entry.id = format!("slot-{location}-{item}-{spoiled}-{k}");
             slots.push(entry);
         }
@@ -468,7 +558,7 @@ fn draft_of<'a>(panels: &'a mut Panels, world: &Joined, employee: &str) -> &'a m
 #[allow(clippy::too_many_arguments)]
 #[allow(clippy::too_many_arguments)]
 fn handle(
-    time: Res<Time>, content: Res<Content>, mut intents: ResMut<UiIntents>, mut panels: ResMut<Panels>, mut session: ResMut<Session>, mut fields: ResMut<UiFields>, mut cursor: ResMut<Cursor>,
+    time: Res<Time>, content: Res<Content>, mut intents: ResMut<UiIntents>, mut panels: ResMut<Panels>, mut session: ResMut<Session>, mut fields: ResMut<UiFields>,
     space: Option<Res<Space>>, mut players: Query<&mut Transform, With<crate::player::Player>>, keys: Res<PlayerActions>,
 ) {
     let drags: Vec<String> = intents.0.iter().filter(|a| a.starts_with("drag>")).cloned().collect();
@@ -479,6 +569,14 @@ fn handle(
         let (Some(source), Some(target)) = (pieces.next(), pieces.next()) else { continue };
         let source: Vec<&str> = source.trim_start_matches("p:").split('|').collect();
         let target: Vec<&str> = target.trim_start_matches("p:").split('|').collect();
+        if let (["slot", from, lot_id, ..], ["trash"]) = (source.as_slice(), target.as_slice()) {
+            let Some(view) = world.view_of(&world.site) else { continue };
+            if *from != world.inventory() { panels.problem = "Only goods you carry can go in the trash.".into(); continue; }
+            let Some(lot) = view.lots.iter().find(|l| l.id == *lot_id) else { continue };
+            let total: i32 = view.lots.iter().filter(|l| l.location_id == *from && l.item_id == lot.item_id && l.spoiled == lot.spoiled).map(|l| l.quantity).sum();
+            for command in stack_discards(view, from, &lot.item_id, lot.spoiled, total) { session.command(command, time.elapsed_secs_f64()); }
+            continue;
+        }
         let (["slot", from, lot_id, ..], [verb @ ("slot" | "drop"), to, rest @ ..]) = (source.as_slice(), target.as_slice()) else { continue };
         let Some((view, lot)) = world.views.values().find_map(|v| v.lots.iter().find(|l| l.id == *lot_id).map(|l| (v, l))) else { continue };
         let key = (lot.item_id.clone(), lot.spoiled);
@@ -586,6 +684,21 @@ fn handle(
                 }
                 None
             }
+            ["trash"] => {
+                match panels.held.take() {
+                    Some(held) if held.location == inventory => {
+                        if let Some(view) = world.view_of(&world.site) {
+                            for command in stack_discards(view, &held.location, &held.item, held.spoiled, held.quantity) { session.command(command, now); }
+                        }
+                    }
+                    Some(held) => {
+                        panels.held = Some(held);
+                        panels.problem = "Only goods you carry can go in the trash.".into();
+                    }
+                    None => panels.problem = "Pick a stack up (or drag one here) to throw it away.".into(),
+                }
+                None
+            }
             ["take", lot] => {
                 let quantity = world.views.values().find_map(|v| v.lots.iter().find(|l| l.id == *lot)).map_or(0, |l| l.quantity);
                 Some(Command::Transfer { lot: lot.to_string(), destination: inventory.clone(), quantity })
@@ -594,12 +707,6 @@ fn handle(
                 let quantity = world.views.values().find_map(|v| v.lots.iter().find(|l| l.id == *lot)).map_or(0, |l| l.quantity);
                 Some(Command::Transfer { lot: lot.to_string(), destination: destination.to_string(), quantity })
             }
-            ["hold", equipment] => {
-                cursor.machine = Some(equipment.to_string());
-                panels.open = None;
-                None
-            }
-            ["pickup", equipment] => Some(Command::PickUp { equipment: equipment.to_string() }),
             ["sell", equipment] => Some(Command::Sell { equipment: equipment.to_string() }),
             ["recipe", equipment, recipe] => Some(Command::SelectRecipe { equipment: equipment.to_string(), recipe: recipe.to_string() }),
             ["start", station, recipe] => Some(Command::StartJob { station: station.to_string(), recipe: recipe.to_string() }),
@@ -669,6 +776,39 @@ fn handle(
                         _ => {}
                     }
                 }
+                None
+            }
+            // The design's task card: the type picker, the filter mode, item chips and the power picker.
+            ["task-type", index, _] | ["task-white", index, _] | ["task-item-del", index, _] | ["task-power-set", index, _] | ["task-item-add", index] => {
+                let verb = parts[0];
+                let value = parts.get(2).copied().unwrap_or_default();
+                let typed = fields.0.get(&format!("task-search-{index}")).cloned().unwrap_or_default().trim().to_lowercase();
+                let found = (!typed.is_empty()).then(|| {
+                    let mut items: Vec<(&String, String)> = content.0.items.iter().map(|(id, i)| (id, i.display_name.to_lowercase())).collect();
+                    items.sort_by(|a, b| a.1.cmp(&b.1));
+                    items.iter().find(|(_, n)| *n == typed).or_else(|| items.iter().find(|(_, n)| n.starts_with(&typed))).or_else(|| items.iter().find(|(_, n)| n.contains(&typed))).map(|(id, _)| (*id).clone())
+                }).flatten();
+                if verb == "task-item-add" && found.is_none() {
+                    panels.problem = if typed.is_empty() { "Type an item's name to add it.".into() } else { format!("No item is called \"{typed}\".") };
+                    continue;
+                }
+                if let (Some(Panel::Employee(employee)), Ok(index)) = (panels.open.clone(), index.parse::<usize>()) {
+                    let draft = draft_of(&mut panels, world, &employee);
+                    if let Some(task) = draft.tasks.get_mut(index) {
+                        match verb {
+                            "task-type" => task.task_type = match value { "Power" => EmployeeTaskType::Power, "Work" => EmployeeTaskType::Work, "Recipe" => EmployeeTaskType::Recipe, _ => EmployeeTaskType::Move },
+                            "task-white" => task.whitelist = value == "1",
+                            "task-item-del" => task.items.retain(|i| i != value),
+                            "task-power-set" => task.power = match value { "Off" => EmployeeTaskPower::Off, "Toggle" => EmployeeTaskPower::Toggle, _ => EmployeeTaskPower::On },
+                            _ => if let Some(item) = found { if !task.items.contains(&item) { task.items.push(item); } },
+                        }
+                    }
+                    if verb == "task-item-add" { fields.0.insert(format!("task-search-{index}"), String::new()); }
+                }
+                None
+            }
+            ["wage-warn", hours] => {
+                panels.wage_warning = Some(hours.parse::<i64>().unwrap_or(2).max(0));
                 None
             }
             ["task-pick", role, index] => {
@@ -902,73 +1042,66 @@ fn draw(panels: Res<Panels>, session: Res<Session>, content: Res<Content>, mut m
     let Some(view) = world.view() else { return };
     let mut next = UiModel { open: true, ..default() };
     let inventory = world.inventory();
+    let mut footer_note: Option<String> = None;
     match &open {
         Panel::Inventory => {
             next.heading = "Inventory".into();
-            next.status = format!("Cash {}", money(world.cash()));
             let lots = lots_in(view, &inventory);
             let used = rules::slots_used(lots.iter().copied(), |i| content.0.max_stack(i));
             let capacity = view.locations.iter().find(|l| l.id == inventory).map_or(0, |l| l.capacity);
-            next.entries.push(UiEntry::label("carried", format!("Carried goods ({used}/{capacity} slots)")));
+            next.status = format!("{used} / {capacity} slots · cash {}", money(world.cash()));
+            next.header = vec![UiEntry::button("p:tab|Staff", "Staff").styled(Style::Pick)];
             next.entries.push(UiEntry::row("inventory-slots", grid(&panels, &content, view, &inventory, capacity)));
+            next.entries.push(legend());
+            next.entries.push(UiEntry::group("inventory-trash-row", Style::Inline, vec![
+                UiEntry::button("p:trash", "Trash").as_slot().cols(1),
+                UiEntry::label("trash-note", "Drop a stack on the trash to throw it away. Shift-click moves a stack across.").styled(Style::Note).grow(),
+            ]));
             let held: Vec<&goods::Equipment> = view.equipment.iter().filter(|e| e.state == EquipmentState::Held && e.holder_id == world.player).collect();
-            next.entries.push(UiEntry::label("held", if held.is_empty() { "No machines held. Buy them on the phone (C).".to_string() } else { "Held machines (pick one to place it; hotbar keys 1-9 do the same)".to_string() }));
-            next.entries.push(UiEntry::row("held-slots", held.iter().map(|e| {
-                let kind = content.0.equipment.get(&e.kind);
-                UiEntry::button(format!("p:hold|{}", e.id), kind.map_or(e.kind.clone(), |k| k.display_name.clone())).with_icon(kind.map(|k| k.icon.clone()).unwrap_or_default())
-            }).collect()));
+            next.entries.push(UiEntry::label("held", "HELD MACHINES"));
+            if held.is_empty() {
+                next.entries.push(UiEntry::label("held-none", "No machines held. Machines are bought and placed in build mode (B).").styled(Style::Note));
+            } else {
+                next.entries.push(UiEntry::row("held-slots", held.iter().map(|e| {
+                    let kind = content.0.equipment.get(&e.kind);
+                    UiEntry::button(format!("p:sell|{}", e.id), format!("{}\nSell", kind.map_or(e.kind.clone(), |k| k.display_name.clone()))).with_icon(kind.map(|k| k.icon.clone()).unwrap_or_default())
+                }).collect()));
+            }
             // Unity PlayerHud.ConstructionWindow: inside a factory, its floors and the price of the next.
             if let Some(building) = indoors.building.as_ref().and_then(|id| view.buildings.iter().find(|b| &b.id == id)).filter(|b| b.kind == goods::FACTORY_KIND) {
                 let max = food_factory_bevy::content::FLOOR_OFFER.max_floors;
-                next.entries.push(UiEntry::label("floors", format!("CONSTRUCTION  Floors: {} of {max}", building.floors)));
-                if building.floors >= max {
-                    next.entries.push(UiEntry::label("top-floor", "This factory has as many floors as it can."));
-                } else {
+                next.entries.push(UiEntry::label("floors", "CONSTRUCTION"));
+                let mut row = vec![];
+                if building.floors < max {
                     let price = goods::buildings::floor_price_cents(building, Some(&food_factory_bevy::content::FLOOR_OFFER));
-                    next.entries.push(UiEntry::button("b:add-floor", format!("Add a floor, {}", money(price))));
-                    if !building.has_elevator() { next.entries.push(UiEntry::label("elevator-note", "The first extra floor brings an elevator; stand on it and press PageUp or PageDown.")); }
+                    row.push(UiEntry::button("b:add-floor", format!("Add a floor · {}", money(price))).styled(Style::Accent));
                 }
+                let note = if building.floors >= max { "This factory has as many floors as it can.".to_string() }
+                    else if !building.has_elevator() { "The first extra floor brings an elevator; stand on it and press PageUp or PageDown.".to_string() } else { String::new() };
+                next.entries.push(UiEntry::label("floors-line", format!("Floors\n{} of {max}{}{note}", building.floors, if note.is_empty() { "" } else { " · " })).styled(Style::Line).glyph("factory-f2a33a").with_row(row));
             }
-            // Unity PlayerHud's inventory screen also carries the Supplier (packs and machines; trucks are on the logistics
-            // screen, furnishings in build mode) and this place's Staff summary.
+            // Unity PlayerHud's inventory screen also carries the Supplier (ingredient packs only; machines and furnishings
+            // are bought in build mode, trucks on the phone's Trucks tab) and this place's Staff summary.
             next.entries.push(UiEntry::label("supplier", "SUPPLIER"));
             let offers: Vec<UiEntry> = content.0.offers.iter().filter_map(|offer| {
-                let (label, icon) = match &offer.kind {
-                    OfferKind::Goods(g) => (format!("{} x{}
-{}", content.0.item_name(&g.item_id), g.quantity, money(offer.price_cents)), content.0.items.get(&g.item_id).map(|i| i.icon.clone()).unwrap_or_default()),
-                    OfferKind::Equipment(e) if content.0.equipment.get(&e.equipment.kind).is_none_or(|k| k.category.is_empty()) => (format!("{}
-{}", content.0.equipment_name(&e.equipment.kind), money(offer.price_cents)), content.0.equipment.get(&e.equipment.kind).map(|k| k.icon.clone()).unwrap_or_default()),
-                    _ => return None,
-                };
+                let OfferKind::Goods(g) = &offer.kind else { return None };
+                // Belts and lifts are build-menu pieces, never supplier goods.
+                if g.item_id == goods::BELT_ITEM_ID || g.item_id == goods::LIFT_ITEM_ID { return None; }
+                let label = format!("{} x{}\n{}", content.0.item_name(&g.item_id), g.quantity, money(offer.price_cents));
+                let icon = content.0.items.get(&g.item_id).map(|i| i.icon.clone()).unwrap_or_default();
                 Some(UiEntry::button(format!("p:buy|{}", offer.id), label).with_icon(icon))
             }).collect();
             next.entries.push(UiEntry::row("supplier-offers", offers));
-            if let Some(company) = world.company() {
-                let count = world.employees.iter().filter(|e| e.site == world.site).count();
-                let cap = goods::employees::employee_cap(view, &world.site);
-                let wages = view.company_wage_cents_per_hour;
-                let covers = if wages > 0 { format!("{} h", company.cash / wages) } else { "-".to_string() };
-                next.entries.push(UiEntry::label("staff-summary", format!("STAFF  Employees: {count} of {cap}, {} per game hour each. Wages {} / h; cash covers {covers}.",
-                    money(goods::employees::WAGE_CENTS_PER_HOUR), money(wages))));
-                if (count as i32) < cap { next.entries.push(UiEntry::button("p:hire", format!("Hire, {} / h", money(goods::employees::WAGE_CENTS_PER_HOUR)))); }
+            if world.company().is_some() {
+                next.entries.push(UiEntry::label("staff-caption", "STAFF"));
+                next.entries.push(staff_stats(world, view, &panels));
             }
         }
         Panel::Machine(id) => {
             let Some((site_view, piece)) = view_of_equipment(world, id) else { return };
             let kind = content.0.equipment.get(&piece.kind);
-            next.wide = true;
             next.heading = content.0.equipment_name(&piece.kind);
             let job = site_view.jobs.iter().find(|j| j.station_id == piece.id);
-            let mut status = match job {
-                Some(job) if job.state == goods::JobState::Running => format!("Making {} ({} s left)", content.0.recipe_name(&job.recipe_id), job.remaining_seconds),
-                Some(job) => format!("Blocked: {} waits for room in the output", content.0.recipe_name(&job.recipe_id)),
-                None if piece.input_capacity > 0 && piece.output_capacity == 0 => "Storage".to_string(),
-                None => "Idle".to_string(),
-            };
-            if kind.is_some_and(|k| k.manual_power) {
-                status.push_str(if piece.powered_on { "   Power on" } else { "   Power off" });
-            }
-            next.status = status;
             let input = piece.input_location_id();
             let output = piece.output_location_id();
             // Unity PlayerHud: a kind without recipes is storage (its grid alone); a sale station shows what it will sell and
@@ -976,163 +1109,271 @@ fn draw(panels: Res<Panels>, session: Res<Session>, content: Res<Content>, mut m
             let kind_recipes: Vec<&goods::RecipeDefinition> = content.0.recipes.values().filter(|r| r.station_kind == piece.kind).collect();
             let storage = kind_recipes.is_empty();
             let sales: Vec<&goods::RecipeDefinition> = kind_recipes.iter().copied().filter(|r| r.is_sale()).collect();
-            // A table's screen is its seats and standing only (Unity PlayerHud.TableWindow).
             let table = goods::is_table(piece);
-            if piece.input_capacity > 0 && !table {
-                let lots = lots_in(site_view, &input);
-                let used = rules::slots_used(lots.iter().copied(), |i| content.0.max_stack(i));
-                let dock = piece.kind == goods::DOCK_KIND;
-                let caption = if dock { "Outgoing: trucks load" } else if storage { if piece.input_refrigerated { "Refrigerated storage" } else { "Storage" } } else if !sales.is_empty() { "To sell" } else { "Input" };
-                next.entries.push(UiEntry::label("input", format!("{caption} ({used}/{} slots)", piece.input_capacity)));
-                next.entries.push(UiEntry::row("input-slots", grid(&panels, &content, site_view, &input, piece.input_capacity)));
-                if !sales.is_empty() {
-                    next.entries.push(UiEntry::label("sale-value", format!("Sale value {}", money(sale_value_cents(&lots, &sales)))));
+            let dock = piece.kind == goods::DOCK_KIND;
+            let flows = piece.input_capacity > 0 && piece.output_capacity > 0 && !table && !dock && !storage && sales.is_empty();
+            let active = content.0.recipes.get(&piece.recipe_id).or_else(|| job.and_then(|j| content.0.recipes.get(&j.recipe_id)));
+            next.status = match (job, active) {
+                (Some(job), _) if job.state != goods::JobState::Running => format!("Blocked: {} waits for room in the output", content.0.recipe_name(&job.recipe_id)),
+                (_, Some(recipe)) if !recipe.is_sale() => {
+                    let inputs: Vec<String> = recipe.inputs.iter().map(|i| content.0.item_name(&i.item_id)).collect();
+                    format!("{} → {} · {} s per batch", inputs.join(" + "), content.0.item_name(&recipe.output_item_id), recipe.duration_seconds)
                 }
-            }
-            if piece.output_capacity > 0 && !table && (piece.kind == goods::DOCK_KIND || (!storage && sales.is_empty())) {
-                let used = rules::slots_used(lots_in(site_view, &output), |i| content.0.max_stack(i));
-                let caption = if piece.kind == goods::DOCK_KIND { "Incoming: trucks unload" } else { "Output" };
-                next.entries.push(UiEntry::label("output", format!("{caption} ({used}/{} slots)", piece.output_capacity)));
-                next.entries.push(UiEntry::row("output-slots", grid(&panels, &content, site_view, &output, piece.output_capacity)));
-            }
+                _ if storage && piece.input_refrigerated => "Refrigerated".to_string(),
+                _ if storage => "Storage".to_string(),
+                _ if !sales.is_empty() => "Sells what its input holds".to_string(),
+                _ => "Idle".to_string(),
+            };
+            if storage && piece.input_refrigerated { next.dot = "#7CC8F0".into(); }
+            let wide_bins = piece.input_capacity.max(piece.output_capacity) > 4;
+            next.width = if flows { if wide_bins { 600.0 } else { 460.0 } } else { 556.0 };
+            // The carried inventory as its own card beside the machine (the design's machine and storage screens).
             if piece.input_capacity > 0 && !table && piece.site_id == world.site {
-                next.entries.push(UiEntry::label("carried", "Your goods (click picks a stack up, right click half, Shift+click moves it across)"));
                 let capacity = view.locations.iter().find(|l| l.id == inventory).map_or(0, |l| l.capacity);
-                next.entries.push(UiEntry::row("inventory-slots", grid(&panels, &content, view, &inventory, capacity)));
+                let used = rules::slots_used(lots_in(view, &inventory).into_iter(), |i| content.0.max_stack(i));
+                next.side_heading = "Inventory".into();
+                next.side_status = format!("{used} / {capacity} slots");
+                next.side.push(UiEntry::row("inventory-slots", grid(&panels, &content, view, &inventory, capacity)));
+                next.side.push(legend());
+                next.side.push(UiEntry::label("carried-help", "Click picks a stack up, right click takes half, Shift-click moves it to the other side.").styled(Style::Note));
             }
-            let recipes: Vec<&goods::RecipeDefinition> = content.0.recipes.values().filter(|r| r.station_kind == piece.kind).collect();
-            if !recipes.is_empty() {
-                next.entries.push(UiEntry::label("recipes", if piece.kind == goods::COUNTER_KIND { "Menu" } else { "Recipes" }));
-                for recipe in &recipes {
-                    let inputs: Vec<String> = recipe.inputs.iter().map(|i| format!("{} {}", i.quantity, content.0.item_name(&i.item_id))).collect();
-                    let output = if recipe.is_sale() { format!("sells for {}", money(recipe.sale_cents)) } else { format!("{} {}", recipe.output_quantity, content.0.item_name(&recipe.output_item_id)) };
-                    let label = format!("{}: {} -> {} ({} s)", content.0.recipe_name(&recipe.id), inputs.join(", "), output, recipe.duration_seconds);
-                    let selected = piece.recipe_id == recipe.id;
-                    let mut row = vec![UiEntry::button(format!("p:recipe|{}|{}", piece.id, recipe.id), label).selected(selected)];
-                    if !recipe.is_sale() {
-                        row.push(UiEntry::button(format!("p:start|{}|{}", piece.id, recipe.id), "Start"));
+            if flows {
+                let fill = job.map_or(0.0, |j| 1.0 - j.remaining_seconds as f32 / j.duration_seconds.max(1) as f32);
+                let label = match job {
+                    Some(j) if j.state == goods::JobState::Running => format!("{}% · {} left", (fill * 100.0).round() as i32, crate::screens::format_duration(j.remaining_seconds, false)),
+                    Some(_) => "Output full".to_string(),
+                    None if kind.is_some_and(|k| k.manual_power) && !piece.powered_on => "Switched off".to_string(),
+                    None => "Waiting for input".to_string(),
+                };
+                let cols = if wide_bins { 3 } else { 2 };
+                next.entries.push(UiEntry::group("flow", Style::Flow, vec![
+                    UiEntry::label("flow-in", "In").styled(Style::Bin).cols(cols).with_row(grid(&panels, &content, site_view, &input, piece.input_capacity)),
+                    UiEntry::label("flow-progress", label).styled(Style::Progress).fill(fill).grow().dot(if job.is_some_and(|j| j.state != goods::JobState::Running) { "#FF9A6B" } else { "" }),
+                    UiEntry::label("flow-out", "Out").styled(Style::Bin).cols(cols).with_row(grid(&panels, &content, site_view, &output, piece.output_capacity)),
+                ]));
+            } else {
+                if piece.input_capacity > 0 && !table {
+                    let lots = lots_in(site_view, &input);
+                    let used = rules::slots_used(lots.iter().copied(), |i| content.0.max_stack(i));
+                    let caption = if dock { "OUTGOING: TRUCKS LOAD" } else if storage { "STORED" } else if !sales.is_empty() { "TO SELL" } else { "INPUT" };
+                    next.entries.push(UiEntry::label("input", format!("{caption}  {used} / {}", piece.input_capacity)));
+                    next.entries.push(UiEntry::row("input-slots", grid(&panels, &content, site_view, &input, piece.input_capacity)));
+                    if !sales.is_empty() {
+                        next.entries.push(UiEntry::label("sale-value", format!("Sale value {}", money(sale_value_cents(&lots, &sales)))));
                     }
-                    next.entries.push(UiEntry::row(format!("recipe-{}", recipe.id), row));
+                }
+                if piece.output_capacity > 0 && !table && (dock || (!storage && sales.is_empty())) {
+                    let used = rules::slots_used(lots_in(site_view, &output), |i| content.0.max_stack(i));
+                    next.entries.push(UiEntry::label("output", format!("{}  {used} / {}", if dock { "INCOMING: TRUCKS UNLOAD" } else { "OUTPUT" }, piece.output_capacity)));
+                    next.entries.push(UiEntry::row("output-slots", grid(&panels, &content, site_view, &output, piece.output_capacity)));
+                }
+                if storage && !table && piece.input_capacity > 0 {
+                    next.entries.push(UiEntry::label("storage-help", "Shift-click a stack to move it to the other side.").styled(Style::Note));
                 }
             }
             if kind.is_some_and(|k| k.manual_power) {
-                next.entries.push(UiEntry::button(format!("p:power|{}|{}", piece.id, if piece.powered_on { "off" } else { "on" }), if piece.powered_on { "Switch off" } else { "Switch on" }));
+                let hint = if piece.powered_on { if flows { "Working while switched on" } else { "Switched on" } } else { "Off: nothing is made" };
+                next.entries.push(UiEntry::button(format!("p:power|{}|{}", piece.id, if piece.powered_on { "off" } else { "on" }), format!("Power\n{hint}")).styled(Style::Toggle).selected(piece.powered_on));
+            }
+            // A register sells whatever its input holds, so its screen carries no menu.
+            if !kind_recipes.is_empty() && piece.kind != goods::COUNTER_KIND {
+                next.entries.push(UiEntry::label("recipes", "RECIPES"));
+                let mut recipes = kind_recipes.clone();
+                recipes.sort_by_key(|r| content.0.recipe_name(&r.id));
+                for recipe in recipes {
+                    let inputs: Vec<String> = recipe.inputs.iter().map(|i| format!("{} {}", i.quantity, content.0.item_name(&i.item_id))).collect();
+                    let output = if recipe.is_sale() { format!("sells for {}", money(recipe.sale_cents)) } else { format!("{} {}", recipe.output_quantity, content.0.item_name(&recipe.output_item_id)) };
+                    let selected = piece.recipe_id == recipe.id;
+                    let icon_item = if recipe.is_sale() { recipe.inputs.first().map_or("", |i| i.item_id.as_str()) } else { recipe.output_item_id.as_str() };
+                    let mut row = vec![UiEntry::button(format!("p:recipe|{}|{}", piece.id, recipe.id), if selected { "In use" } else { "Use" }).styled(Style::Pick).selected(selected)];
+                    if !recipe.is_sale() {
+                        row.push(UiEntry::button(format!("p:start|{}|{}", piece.id, recipe.id), "Start").styled(Style::Pick).glyph("play-f2a33a"));
+                    }
+                    next.entries.push(UiEntry::label(format!("recipe-{}", recipe.id), format!("{} · {} s\n{} → {output}", content.0.recipe_name(&recipe.id), recipe.duration_seconds, if inputs.is_empty() { "Nothing".to_string() } else { inputs.join(" + ") }))
+                        .styled(Style::Line).selected(selected).with_icon(content.0.items.get(icon_item).map(|i| i.icon.clone()).unwrap_or_default()).with_row(row));
+                }
             }
             if piece.kind == goods::COUNTER_KIND || kind.is_some_and(|k| k.worker_bound) {
-                let staff = if piece.staff_id.is_empty() { "nobody".to_string() } else if piece.staff_id == world.player { "you".to_string() } else {
-                    site_view.employees.iter().find(|e| e.id == piece.staff_id).map(|e| e.name.clone()).unwrap_or_else(|| piece.staff_id.clone())
-                };
-                next.entries.push(UiEntry::label("staff", format!("Staffed by {staff}")));
-                let mut row = vec![UiEntry::button(format!("p:staff|{}|{}", piece.id, world.player), "Staff it yourself"), UiEntry::button(format!("p:staff|{}|", piece.id), "Nobody")];
+                next.entries.push(UiEntry::label("staff", "STAFFED BY"));
+                let mut row = vec![
+                    UiEntry::button(format!("p:staff|{}|{}", piece.id, world.player), "You").selected(piece.staff_id == world.player),
+                    UiEntry::button(format!("p:staff|{}|", piece.id), "Nobody").selected(piece.staff_id.is_empty()),
+                ];
                 for employee in site_view.employees.iter().filter(|e| e.site_id == piece.site_id) {
                     row.push(UiEntry::button(format!("p:staff|{}|{}", piece.id, employee.id), employee.name.clone()).selected(piece.staff_id == employee.id));
                 }
-                next.entries.push(UiEntry::row("staff-row", row));
+                next.entries.push(UiEntry::group("staff-row", Style::Segmented, row));
             }
             // Unity PlayerHud.DockWindow: who serves the dock, and whether a restaurant dock stands by a back door.
-            if piece.kind == goods::DOCK_KIND {
+            if dock {
                 let mut lines: Vec<String> = site_view.trucks.iter().filter_map(|t| {
                     let route = site_view.routes.iter().find(|r| !t.route_id.is_empty() && r.id == t.route_id)?;
                     if route.pickup_dock_id == piece.id { Some(format!("{}: picks up here", t.name)) } else if route.dropoff_dock_id == piece.id { Some(format!("{}: delivers here", t.name)) } else { None }
                 }).collect();
                 lines.extend(site_view.farm_orders.iter().filter(|o| o.dock_id == piece.id).map(|o| format!("Farm order: {} {} on the way ({} unloaded)", o.units, content.0.item_name(&o.item_id), o.unloaded_units)));
-                next.entries.push(UiEntry::label("dock-trucks", if lines.is_empty() { "No truck serves this dock; press L to set up a route, or C to order from a farm.".to_string() } else { lines.join("\n") }));
+                next.entries.push(UiEntry::label("dock-trucks", if lines.is_empty() { "No truck serves this dock; set up a route or order from a farm on the phone.".to_string() } else { lines.join("\n") }).styled(Style::Note).glyph("truck-a8a49b"));
                 if rules::is_restaurant_site(site_view, &piece.site_id) {
                     if let Some(building) = site_view.buildings.iter().find(|b| b.site_id == piece.site_id && b.kind == goods::RESTAURANT_KIND) {
-                        if !rules::beside_back_door_of(site_view, building, piece) { next.entries.push(UiEntry::label("dock-back-door", "This dock is not beside a back door.")); }
+                        if !rules::beside_back_door_of(site_view, building, piece) { next.entries.push(UiEntry::label("dock-back-door", "This dock is not beside a back door.").styled(Style::Note).glyph("warning-ffc170").dot("#FFC170")); }
                     }
                 }
             }
-            if goods::is_table(piece) {
+            if table {
                 // Unity PlayerHud.TableWindow: seats taken and how the restaurant stands with its customers.
                 let seated = site_view.customers.iter().filter(|c| c.table_id == piece.id).count();
-                next.entries.push(UiEntry::label("seats", format!("Seats taken: {seated}/{}", piece.seats)));
-                next.entries.push(UiEntry::label("standing", match site_view.diners.first() {
-                    Some(d) => format!("Served {}, walked out {}, reputation {:+}", d.served, d.walked_out, d.reputation),
-                    None => "No customers yet.".to_string(),
-                }));
+                let mut stats = vec![UiEntry::label("seats", format!("Seats taken\n{seated} / {}", piece.seats)).styled(Style::Stat)];
+                if let Some(d) = site_view.diners.iter().find(|d| d.restaurant_id == piece.site_id).or(site_view.diners.first()) {
+                    stats.push(UiEntry::label("served", format!("Served\n{}", d.served)).styled(Style::Stat));
+                    stats.push(UiEntry::label("walked", format!("Walked out\n{}", d.walked_out)).styled(Style::Stat).dot(if d.walked_out > 0 { "#FF9A6B" } else { "" }));
+                    stats.push(UiEntry::label("reputation", format!("Reputation\n{:+}", d.reputation)).styled(Style::Stat).dot(if d.reputation >= 0 { "#FFC170" } else { "#FF8A78" }));
+                }
+                next.entries.push(UiEntry::group("table-stats", Style::Stats, stats));
             }
             if piece.site_id == world.site {
-                next.entries.push(UiEntry::row("machine-actions", vec![UiEntry::button(format!("p:pickup|{}", piece.id), "Pick up"), UiEntry::button(format!("p:sell|{}", piece.id), "Sell back")]));
+                next.actions = vec![
+                    UiEntry::button(format!("p:sell|{}", piece.id), "Sell back").styled(Style::Danger),
+                ];
             }
         }
         Panel::Phone(tab) => {
-            next.wide = true;
-            next.heading = "Phone".into();
-            next.status = format!("{}   Cash {}", world.view().and_then(|v| v.sites.iter().find(|s| s.id == world.site)).map_or(world.site.clone(), |s| s.name.clone()), money(world.cash()));
-            next.entries.push(UiEntry::row("tabs", PhoneTab::ALL.iter().map(|t| UiEntry::button(format!("p:tab|{}", t.name()), t.name()).selected(t == tab)).collect()));
+            phone_frame(&mut next, world, view, Some(*tab));
+            next.heading = tab.name().into();
             phone(&mut next, *tab, world, view, &content, &panels, space.as_deref(), players.single().ok(), phone_map.image.clone());
         }
         Panel::Employee(id) => {
-            next.wide = true;
+            next.width = 760.0;
+            next.height = 820.0;
+            next.avatar = true;
             let state = world.employees.iter().find(|e| &e.id == id);
             let record = world.views.values().find_map(|v| v.employees.iter().find(|e| &e.id == id));
             let name = state.map(|e| e.name.clone()).or_else(|| record.map(|e| e.name.clone())).unwrap_or_else(|| id.clone());
             next.heading = name.clone();
             let detail = world.details.get(id);
+            let running = state.is_some_and(|s| s.running);
+            let saved = detail.map(|d| d.tasks.clone()).filter(|t| !t.is_empty()).or_else(|| record.map(|r| r.tasks.clone())).unwrap_or_default();
+            let list = panels.draft.as_ref().filter(|d| &d.0 == id).map(|d| d.1.clone()).unwrap_or_else(|| EmployeeTaskList::from_json(&saved));
             next.status = match (state, detail) {
-                (Some(s), _) if s.unpaid => "Unpaid: waits outside until wages can be paid.".to_string(),
+                (Some(s), _) if s.unpaid => "Unpaid: waits outside until wages can be paid".to_string(),
+                (Some(s), _) if s.running && !s.status.is_empty() => format!("Running · {}", s.status),
+                (Some(s), _) if s.running => format!("Running · {} task{}", list.tasks.len(), if list.tasks.len() == 1 { "" } else { "s" }),
                 (_, Some(d)) if !d.status.is_empty() => d.status.clone(),
-                (Some(s), _) => if s.running { format!("Running. {}", s.status) } else { "Idle".to_string() },
-                _ => String::new(),
+                _ => "Stopped".to_string(),
             };
-            next.entries.push(UiEntry::row("name-row", vec![UiEntry::field(format!("name-{id}"), name), UiEntry::button(format!("p:rename-employee|{id}"), "Rename")]));
-            next.entries.push(UiEntry::row("employee-tabs", vec![
+            next.dot = if state.is_some_and(|s| s.unpaid) { "#E5644E".into() } else if running { "#6FCB86".into() } else { "#8F8B83".into() };
+            // The employee's hands: what it carries, a click takes it.
+            let hands = goods::inventory_location_id(id);
+            let carried: Vec<&Lot> = world.views.values().flat_map(|v| v.lots.iter().filter(|l| l.location_id == hands && l.quantity > 0)).collect();
+            let mut hand = UiEntry::label("hands", carried.first().map_or(String::new(), |l| carried.iter().filter(|x| x.item_id == l.item_id).map(|x| x.quantity).sum::<i32>().to_string())).styled(Style::Hand);
+            if let Some(lot) = carried.first() {
+                hand = hand.with_icon(content.0.items.get(&lot.item_id).map(|i| i.icon.clone()).unwrap_or_default());
+                hand.action = Some(format!("p:take|{}", lot.id));
+            }
+            next.header = vec![UiEntry::label("hands-caption", "HANDS"), hand];
+            next.tabs = vec![
                 UiEntry::button("p:etab|tasks", "Tasks").selected(!panels.employee_program),
-                UiEntry::button("p:etab|program", "Program").selected(panels.employee_program),
-            ]));
+                UiEntry::button("p:etab|program", "Lua source").selected(panels.employee_program),
+            ];
             if panels.employee_program {
-                next.entries.push(UiEntry::label("script-label", "Luau: move_to(place), take(place, item, n), put(place), work(machine), wait(s), say(text). Dry run uses stand-ins, not real stock or paths."));
+                next.entries.push(UiEntry::group("lua-head", Style::Inline, vec![
+                    UiEntry::label("lua-note", "Generated from the task list. Editing it by hand detaches it from the tasks. API: move_to, take, put, work, wait, say.").styled(Style::Note).grow(),
+                    UiEntry::button(format!("p:dry-run|{id}"), "Dry run").styled(Style::Pick),
+                ]));
                 let source = detail.map(|d| d.source.clone()).or_else(|| record.map(|r| r.script.clone())).unwrap_or_default();
                 next.entries.push(UiEntry::area(format!("script-{id}"), source));
-                next.entries.push(UiEntry::row("script-actions", vec![UiEntry::button(format!("p:dry-run|{id}"), "Dry run"), UiEntry::button(format!("p:run|{id}"), "Run"), UiEntry::button(format!("p:stop|{id}"), "Stop"), UiEntry::button(format!("p:fire|{id}"), confirm_label(&panels, "fire", id, "Fire"))]));
             } else {
-                let saved = detail.map(|d| d.tasks.clone()).filter(|t| !t.is_empty()).or_else(|| record.map(|r| r.tasks.clone())).unwrap_or_default();
-                let list = panels.draft.as_ref().filter(|d| &d.0 == id).map(|d| d.1.clone()).unwrap_or_else(|| EmployeeTaskList::from_json(&saved));
-                let name_of = |place: &str| -> String {
-                    if place.is_empty() { return "(choose)".into(); }
-                    if place == "hands" { return "hands".into(); }
-                    world.views.values().find_map(|v| v.equipment.iter().find(|e| e.id == place)).map_or(place.to_string(), |e| format!("{} ({}, {})", content.0.equipment_name(&e.kind), e.cell_x, e.cell_z))
+                let place_of = |place: &str| -> (String, String) {
+                    if place.is_empty() { return ("Not set".into(), String::new()); }
+                    if place == "hands" { return ("Hands".into(), String::new()); }
+                    world.views.values().find_map(|v| v.equipment.iter().find(|e| e.id == place)).map_or((place.to_string(), String::new()), |e| {
+                        let same: Vec<&goods::Equipment> = world.views.values().flat_map(|v| v.equipment.iter().filter(|x| x.kind == e.kind && x.site_id == e.site_id)).collect();
+                        let number = same.iter().position(|x| x.id == e.id).map_or(String::new(), |n| if same.len() > 1 { format!(" {}", n + 1) } else { String::new() });
+                        (format!("{}{number}", content.0.equipment_name(&e.kind)), content.0.equipment.get(&e.kind).map(|k| k.icon.clone()).unwrap_or_default())
+                    })
                 };
-                next.entries.push(UiEntry::label("tasks-help", "The employee repeats these in order. Run sends them as its program."));
+                let place_box = |caption: &str, place: &str, cycle: String, pick: String, pick_label: &str| -> UiEntry {
+                    let (name, icon) = place_of(place);
+                    let mut e = UiEntry::button(cycle, format!("{caption}\n{name}")).styled(Style::Place).grow().with_icon(icon)
+                        .with_row(vec![UiEntry::button(pick, pick_label).styled(Style::Pick).glyph("target-ff8a78")]);
+                    e.id = format!("{caption}-{place}");
+                    e
+                };
+                next.entries.push(UiEntry::label("tasks-help", "Repeats forever, top to bottom: one trip or one switch per task each pass.").styled(Style::Note).glyph("repeat-a8a49b"));
                 for (index, task) in list.tasks.iter().enumerate() {
-                    let mut row = vec![UiEntry::label(format!("task-{index}"), format!("{}. {}", index + 1, tasks::describe(task)))];
+                    let types = [(EmployeeTaskType::Move, "Move"), (EmployeeTaskType::Power, "Power"), (EmployeeTaskType::Work, "Work"), (EmployeeTaskType::Recipe, "Recipe")];
+                    let type_labels = [tasks::MOVE_LABEL, tasks::POWER_LABEL, tasks::WORK_LABEL, tasks::RECIPE_LABEL];
+                    let mut head = vec![UiEntry::label(format!("task-num-{index}"), (index + 1).to_string()).styled(Style::Badge)];
+                    head.push(UiEntry::group(format!("task-type-{index}"), Style::Segmented, types.iter().zip(type_labels).map(|((t, key), label)| {
+                        UiEntry::button(format!("p:task-type|{index}|{key}"), if *t == task.task_type { label.to_string() } else { key.to_string() }).selected(*t == task.task_type)
+                    }).collect()).grow());
+                    if index > 0 { head.push(UiEntry::button(format!("p:task-up|{index}"), "Up").styled(Style::Pick)); }
+                    head.push(UiEntry::button(format!("p:task-del|{index}"), "").styled(Style::Pick).glyph("close-a8a49b"));
+                    let mut card = vec![UiEntry::group(format!("task-head-{index}"), Style::Inline, head)];
                     match task.task_type {
                         EmployeeTaskType::Move => {
-                            row.push(UiEntry::button(format!("p:task-src|{index}"), format!("From {}", name_of(&task.source))));
-                            row.push(UiEntry::button(format!("p:task-pick|{}|{index}", PickRole::Source.key()), "Pick"));
-                            row.push(UiEntry::button(format!("p:task-dst|{index}"), format!("To {}", name_of(&task.destination))));
-                            row.push(UiEntry::button(format!("p:task-pick|{}|{index}", PickRole::Destination.key()), "Pick"));
-                            row.push(UiEntry::button(format!("p:task-any|{index}"), if task.any_item { "Any item" } else { "Only" }));
+                            card.push(UiEntry::group(format!("task-places-{index}"), Style::Inline, vec![
+                                place_box("From", &task.source, format!("p:task-src|{index}"), format!("p:task-pick|{}|{index}", PickRole::Source.key()), "Set source"),
+                                UiEntry::label(format!("task-arrow-{index}"), "→").dot("#6A675F"),
+                                place_box("To", &task.destination, format!("p:task-dst|{index}"), format!("p:task-pick|{}|{index}", PickRole::Destination.key()), "Set destination"),
+                            ]));
+                            let mut filter = vec![UiEntry::button(format!("p:task-any|{index}"), "Move any valid item").styled(Style::Check).selected(task.any_item)];
                             if !task.any_item {
-                                row.push(UiEntry::button(format!("p:task-item|{index}"), task.items.first().map_or("(item)".to_string(), |i| content.0.item_name(i))));
+                                filter.push(UiEntry::group(format!("task-mode-{index}"), Style::Segmented, vec![
+                                    UiEntry::button(format!("p:task-white|{index}|1"), "Only these").selected(task.whitelist),
+                                    UiEntry::button(format!("p:task-white|{index}|0"), "All except these").selected(!task.whitelist),
+                                ]).selected(true));
+                            }
+                            card.push(UiEntry::group(format!("task-filter-{index}"), Style::Inline, filter).selected(true));
+                            if !task.any_item {
+                                let mut chips: Vec<UiEntry> = task.items.iter().map(|item| {
+                                    let mut chip = UiEntry::button(format!("p:task-item-del|{index}|{item}"), content.0.item_name(item)).styled(Style::Chip)
+                                        .with_icon(content.0.items.get(item).map(|i| i.icon.clone()).unwrap_or_default());
+                                    chip.id = format!("chip-{index}-{item}");
+                                    chip
+                                }).collect();
+                                let mut search = UiEntry::field(format!("task-search-{index}"), "").grow();
+                                search.label = "Add item…".into();
+                                chips.push(search);
+                                chips.push(UiEntry::button(format!("p:task-item-add|{index}"), "Add").styled(Style::Pick).glyph("plus-ece8e1"));
+                                card.push(UiEntry::group(format!("task-chips-{index}"), Style::ChipBox, chips));
                             }
                         }
                         EmployeeTaskType::Power => {
-                            row.push(UiEntry::button(format!("p:task-machine|{index}"), name_of(&task.machine)));
-                            row.push(UiEntry::button(format!("p:task-pick|{}|{index}", PickRole::Machine.key()), "Pick"));
-                            row.push(UiEntry::button(format!("p:task-power|{index}"), format!("{:?}", task.power)));
+                            card.push(UiEntry::group(format!("task-power-row-{index}"), Style::Inline, vec![
+                                place_box("Machine", &task.machine, format!("p:task-machine|{index}"), format!("p:task-pick|{}|{index}", PickRole::Machine.key()), "Select machine"),
+                                UiEntry::group(format!("task-power-{index}"), Style::Segmented, [(EmployeeTaskPower::On, "On"), (EmployeeTaskPower::Off, "Off"), (EmployeeTaskPower::Toggle, "Toggle")].iter().map(|(p, l)| {
+                                    UiEntry::button(format!("p:task-power-set|{index}|{l}"), *l).selected(task.power == *p)
+                                }).collect()).selected(true),
+                            ]));
                         }
                         EmployeeTaskType::Work | EmployeeTaskType::Recipe => {
-                            row.push(UiEntry::button(format!("p:task-machine|{index}"), name_of(&task.machine)));
-                            row.push(UiEntry::button(format!("p:task-pick|{}|{index}", PickRole::Machine.key()), "Pick"));
-                            row.push(UiEntry::button(format!("p:task-recipe|{index}"), if task.recipe.is_empty() { "Any recipe".to_string() } else { content.0.recipe_name(&task.recipe) }));
+                            let caption = if task.task_type == EmployeeTaskType::Work { "Counter or machine" } else { "Machine" };
+                            card.push(UiEntry::group(format!("task-work-row-{index}"), Style::Inline, vec![
+                                place_box(caption, &task.machine, format!("p:task-machine|{index}"), format!("p:task-pick|{}|{index}", PickRole::Machine.key()), "Select machine"),
+                                UiEntry::button(format!("p:task-recipe|{index}"), if task.recipe.is_empty() { "Any recipe".to_string() } else { content.0.recipe_name(&task.recipe) }).styled(Style::Pick).glyph("repeat-a8a49b"),
+                            ]));
                         }
                     }
-                    row.push(UiEntry::button(format!("p:task-up|{index}"), "Up"));
-                    row.push(UiEntry::button(format!("p:task-del|{index}"), "Remove"));
-                    next.entries.push(UiEntry::row(format!("task-row-{index}"), row));
+                    next.entries.push(UiEntry::group(format!("task-card-{index}"), Style::Card, card));
                 }
-                next.entries.push(UiEntry::row("task-add", vec![
-                    UiEntry::button("p:task-add|Move", tasks::MOVE_LABEL),
-                    UiEntry::button("p:task-add|Power", tasks::POWER_LABEL),
-                    UiEntry::button("p:task-add|Work", tasks::WORK_LABEL),
-                    UiEntry::button("p:task-add|Recipe", tasks::RECIPE_LABEL),
+                next.entries.push(UiEntry::group("task-add", Style::Inline, vec![
+                    UiEntry::button("p:task-add|Move", "Move task").styled(Style::Dashed).grow(),
+                    UiEntry::button("p:task-add|Power", "Power task").styled(Style::Dashed).grow(),
+                    UiEntry::button("p:task-add|Work", "Work task").styled(Style::Dashed).grow(),
+                    UiEntry::button("p:task-add|Recipe", "Recipe task").styled(Style::Dashed).grow(),
                 ]));
-                next.entries.push(UiEntry::row("task-actions", vec![UiEntry::button(format!("p:task-run|{id}"), "Run tasks"), UiEntry::button(format!("p:stop|{id}"), "Stop"), UiEntry::button(format!("p:fire|{id}"), confirm_label(&panels, "fire", id, "Fire"))]));
+                next.entries.push(UiEntry::label("name-caption", "NAME"));
+                next.entries.push(UiEntry::group("name-row", Style::Inline, vec![UiEntry::field(format!("name-{id}"), name).grow(), UiEntry::button(format!("p:rename-employee|{id}"), "Rename").styled(Style::Pick)]));
             }
+            let run = if panels.employee_program { format!("p:run|{id}") } else { format!("p:task-run|{id}") };
+            next.actions = vec![
+                UiEntry::button(format!("p:fire|{id}"), confirm_label(&panels, "fire", id, "Fire")).styled(Style::Danger),
+                UiEntry::button(format!("p:stop|{id}"), "Stop").styled(Style::Ghost),
+                UiEntry::button(run, "Run").styled(Style::Accent).glyph("play-16171a"),
+            ];
+            footer_note = Some(if running { "Changes apply when you press Run.".into() } else { "Stopped. Press Run to start the loop.".into() });
         }
         Panel::Property(lot) => {
+            phone_frame(&mut next, world, view, Some(PhoneTab::Map));
             let offer = world.offers_by_lot.get(lot);
             next.heading = offer.map_or("Property".to_string(), |o| format!("{} lot", o.category));
             let owner = view.properties.iter().find(|p| &p.lot_id == lot).map(|p| p.company_id.clone());
@@ -1145,30 +1386,35 @@ fn draw(panels: Res<Panels>, session: Res<Session>, content: Res<Content>, mut m
                 _ => "Not for sale".to_string(),
             };
             next.status = match competitor { Some(c) => format!("{} ({}). {state}", c.name, c.cuisine), None => state };
+            next.header = vec![UiEntry::button("p:tab|Map", "Back to the map").styled(Style::Pick).glyph("chevron-left-ece8e1")];
             let reason = match (&owner, offer) {
                 (Some(owner), _) if world.company().is_some_and(|c| &c.id == owner) => Some("Your company already owns this place."),
                 (Some(_), _) => Some("Owned by a competitor: another company bought it."),
                 (None, Some(o)) if !o.for_sale => Some("Not for sale: this building is never sold."),
                 _ => None,
             };
-            if let Some(reason) = reason { next.entries.push(UiEntry::label("why", reason)); }
+            if let Some(reason) = reason { next.entries.push(UiEntry::label("why", reason).styled(Style::Note).glyph("home-a8a49b")); }
             // The company's own places: rename and Teleport (Unity PhonePanel's lot card).
             let ours = owner.as_ref().is_some_and(|o| world.company().is_some_and(|c| &c.id == o));
             if let (true, Some(o)) = (ours, offer) {
                 let name = world.views.values().find_map(|v| v.sites.iter().find(|s| s.id == o.site_id)).map_or(o.site_id.clone(), |s| s.name.clone());
-                next.entries.push(UiEntry::row("lot-rename", vec![UiEntry::field(format!("site-name-{}", o.site_id), name), UiEntry::button(format!("p:rename-site|{}", o.site_id), "Rename")]));
-                next.entries.push(UiEntry::button(format!("p:teleport|{lot}"), "Teleport"));
+                next.entries.push(UiEntry::group("lot-rename", Style::Inline, vec![UiEntry::field(format!("site-name-{}", o.site_id), name).grow(), UiEntry::button(format!("p:rename-site|{}", o.site_id), "Rename").styled(Style::Pick)]));
+                next.actions.push(UiEntry::button(format!("p:teleport|{lot}"), "Teleport").styled(Style::Accent));
             }
             if let Some(o) = offer {
-                next.entries.push(UiEntry::label("size", format!("Lot {} x {} m, building {} x {} m, {} floor(s)", o.width, o.depth, o.building_width, o.building_depth, o.floors.max(1))));
+                next.entries.push(UiEntry::group("lot-stats", Style::Stats, vec![
+                    UiEntry::label("lot-size", format!("Lot\n{} × {} m", o.width, o.depth)).styled(Style::Stat),
+                    UiEntry::label("lot-building", format!("Building\n{} × {} m", o.building_width, o.building_depth)).styled(Style::Stat),
+                    UiEntry::label("lot-floors", format!("Floors\n{}", o.floors.max(1))).styled(Style::Stat),
+                    UiEntry::label("lot-price", format!("Price\n{}", if o.for_sale { money(o.price_cents) } else { "—".into() })).styled(Style::Stat),
+                ]));
                 if owner.is_none() && o.for_sale {
-                    next.entries.push(UiEntry::button(format!("p:buy-property|{lot}"), format!("Buy for {}", money(o.price_cents))));
+                    next.actions.push(UiEntry::button(format!("p:buy-property|{lot}"), format!("Buy for {}", money(o.price_cents))).styled(Style::Accent));
                 }
                 if o.category == goods::FARM_CATEGORY {
                     farm_card(&mut next, world, view, &content, &panels, o);
                 }
             }
-            next.entries.push(UiEntry::button("p:tab|Map", "Back to the map"));
         }
         Panel::Build => {}
     }
@@ -1177,6 +1423,8 @@ fn draw(panels: Res<Panels>, session: Res<Session>, content: Res<Content>, mut m
     } else if let Some(held) = &panels.held {
         format!("Holding {} {}{}: click a slot in another container to put it there; its own container takes it back.",
             held.quantity, content.0.item_name(&held.item), if held.spoiled { " (spoiled)" } else { "" })
+    } else if let Some(note) = footer_note {
+        note
     } else {
         "Esc closes".into()
     };
@@ -1316,38 +1564,10 @@ Needs {needs}
             }
         }
         PhoneTab::Map => {
-            next.entries.push(UiEntry::row("map-controls", vec![UiEntry::button("map:in", "+"), UiEntry::button("map:out", "-"), UiEntry::button("map:left", "West"), UiEntry::button("map:right", "East"), UiEntry::button("map:up", "North"), UiEntry::button("map:down", "South"), UiEntry::button("map:reset", "Reset")]));
             next.entries.push(UiEntry::label("map-controls-help", "Scroll to zoom, drag to pan, click a lot to select it."));
             if let Some(image) = map_image {
                 next.entries.push(UiEntry::picture("phone-map", image, 480.0));
                 next.entries.push(UiEntry::label("map-key", "White: you. Green: yours. Yellow: for sale. Red: competitors. Brown: farms."));
-            }
-            next.entries.push(UiEntry::label("map-help", "Places near you (open one to see its price)"));
-            let owned: Vec<&str> = view.properties.iter().map(|p| p.lot_id.as_str()).collect();
-            let mut offers: Vec<(f32, &goods::PropertyOffer)> = world.offers_by_lot.values().filter(|o| o.category != goods::FARM_CATEGORY || o.for_sale).map(|o| {
-                let centre = Vec2::new(o.lot_x as f32 + o.width as f32 * 0.5, o.lot_z as f32 + o.depth as f32 * 0.5);
-                (centre.distance(here), o)
-            }).collect();
-            offers.sort_by(|a, b| a.0.total_cmp(&b.0));
-            for (distance, offer) in offers.into_iter().take(14) {
-                let state = if owned.contains(&offer.lot_id.as_str()) { "owned".to_string() } else if offer.for_sale { money(offer.price_cents) } else { "not for sale".to_string() };
-                next.entries.push(UiEntry::button(format!("p:property|{}", offer.lot_id), format!("{} {} - {:.0} m - {state}", offer.category, offer.building_id, distance)));
-            }
-        }
-        PhoneTab::Shop => {
-            for (heading, wanted) in [("Ingredients", 0), ("Machines and furniture", 1), ("Trucks", 2)] {
-                next.entries.push(UiEntry::label(format!("shop-{wanted}"), heading));
-                let mut row = vec![];
-                for offer in &content.0.offers {
-                    let (label, icon) = match (&offer.kind, wanted) {
-                        (OfferKind::Goods(g), 0) => (format!("{} x{}\n{}", content.0.item_name(&g.item_id), g.quantity, money(offer.price_cents)), content.0.items.get(&g.item_id).map(|i| i.icon.clone()).unwrap_or_default()),
-                        (OfferKind::Equipment(e), 1) => (format!("{}\n{}", content.0.equipment_name(&e.equipment.kind), money(offer.price_cents)), content.0.equipment.get(&e.equipment.kind).map(|k| k.icon.clone()).unwrap_or_default()),
-                        (OfferKind::Truck(t), 2) => (format!("{} ({} slots)\n{}", t.name, t.cargo_slots, money(offer.price_cents)), String::new()),
-                        _ => continue,
-                    };
-                    row.push(UiEntry::button(format!("p:buy|{}", offer.id), label).with_icon(icon));
-                }
-                next.entries.push(UiEntry::row(format!("shop-row-{wanted}"), row));
             }
         }
         PhoneTab::Staff => {
@@ -1355,33 +1575,47 @@ Needs {needs}
             let here: Vec<&food_factory_bevy::protocol::EmployeeState> = world.employees.iter().filter(|e| e.site == world.site).collect();
             let cap = goods::employees::employee_cap(view, &world.site);
             let place = view.sites.iter().find(|s| s.id == world.site).map_or(world.site.clone(), |s| s.name.clone());
-            next.entries.push(UiEntry::label("staff-site", place));
+            next.status = format!("{place} · 1 employee per 25 floor cells");
             if company.is_none() {
-                next.entries.push(UiEntry::label("staff-count", "This place belongs to no company; nobody can be hired here."));
+                next.entries.push(UiEntry::label("staff-count", "This place belongs to no company; nobody can be hired here.").styled(Style::Note).glyph("warning-ffc170"));
             } else {
-                next.entries.push(UiEntry::label("staff-count", format!("Employees here: {} of {cap}, {} per game hour each, wages {} / h for the company",
-                    here.len(), money(goods::employees::WAGE_CENTS_PER_HOUR), money(view.company_wage_cents_per_hour))));
-                if (here.len() as i32) < cap {
-                    next.entries.push(UiEntry::button("p:hire", format!("Hire, {} / h", money(goods::employees::WAGE_CENTS_PER_HOUR))));
-                } else {
-                    next.entries.push(UiEntry::label("staff-full", "This place has as many employees as it can take."));
-                }
+                next.entries.push(staff_stats(world, view, panels));
             }
-            if here.is_empty() { next.entries.push(UiEntry::label("staff-none", "Nobody works here yet. Staff are hired for the place you stand in.")); }
-            for employee in here {
+            if here.is_empty() { next.entries.push(UiEntry::label("staff-none", "Nobody works here yet. Staff are hired for the place you stand in.").styled(Style::Note).glyph("users-a8a49b")); }
+            for employee in here.iter() {
                 let hands = goods::inventory_location_id(&employee.id);
-                let holding = view.lots.iter().any(|l| l.location_id == hands) || view.equipment.iter().any(|e| e.state == EquipmentState::Held && e.holder_id == employee.id);
-                let pay = if employee.unpaid { "Unpaid, waiting outside" } else if holding { "Holding goods (empty its hands to fire)" } else { "Paid" };
-                let doing = if employee.status.is_empty() { String::new() } else { format!(", {}", employee.status) };
-                let running = if employee.running { "
-Running tasks" } else { "" };
-                next.entries.push(UiEntry::row(format!("staff-{}", employee.id), vec![
-                    UiEntry::label(format!("staff-name-{}", employee.id), format!("{}
-{pay}{doing}{running}", employee.name)),
-                    UiEntry::button(format!("p:employee|{}", employee.id), "Tasks"),
-                    UiEntry::button(format!("p:fire|{}", employee.id), confirm_label(&panels, "fire", &employee.id, "Fire")),
+                let carried: Vec<&Lot> = view.lots.iter().filter(|l| l.location_id == hands && l.quantity > 0).collect();
+                let holding = !carried.is_empty() || view.equipment.iter().any(|e| e.state == EquipmentState::Held && e.holder_id == employee.id);
+                let (status, dot) = if employee.unpaid { ("Unpaid · waiting outside".to_string(), "#E5644E") }
+                    else if employee.running { (if employee.status.is_empty() { "Working".to_string() } else { format!("Working · {}", employee.status) }, "#6FCB86") }
+                    else { ("Idle".to_string(), "#8F8B83") };
+                let count: i32 = carried.first().map_or(0, |l| carried.iter().filter(|x| x.item_id == l.item_id).map(|x| x.quantity).sum());
+                let mut hand = UiEntry::label(format!("hand-{}", employee.id), format!("{}\nHand", if count > 0 { count.to_string() } else { String::new() })).styled(Style::Hand);
+                if let Some(lot) = carried.first() { hand = hand.with_icon(content.0.items.get(&lot.item_id).map(|i| i.icon.clone()).unwrap_or_default()); }
+                let fire = if holding {
+                    UiEntry::label(format!("fire-{}", employee.id), "Fire\nEmpty hand first").styled(Style::Danger)
+                } else {
+                    UiEntry::button(format!("p:fire|{}", employee.id), confirm_label(panels, "fire", &employee.id, "Fire")).styled(Style::Danger)
+                };
+                let mut row = UiEntry::label(format!("staff-{}", employee.id), format!("{}\n{status}", employee.name)).styled(Style::Person).dot(dot)
+                    .with_row(vec![hand, UiEntry::button(format!("p:employee|{}", employee.id), "Tasks").styled(Style::Pick), fire]);
+                row.id = format!("staff-{}", employee.id);
+                next.entries.push(row);
+            }
+            if company.is_some() {
+                let full = here.len() as i32 >= cap;
+                let left = if full { "No room left. Add floor space to hire more.".to_string() } else { format!("{} more can be hired here.", cap - here.len() as i32) };
+                let mut hire = UiEntry::button("p:hire", format!("Hire · {} / h", money(goods::employees::WAGE_CENTS_PER_HOUR))).styled(Style::Accent);
+                if full { hire.action = None; }
+                next.entries.push(UiEntry::group("hire-row", Style::Inline, vec![UiEntry::label("slots-left", left).styled(Style::Note).grow(), hire]).selected(true));
+                let picked = panels.wage_warning_hours();
+                next.entries.push(UiEntry::label("wage-warning", "Wage warning\nShow the HUD warning when cash covers less than").styled(Style::Line).with_row(vec![
+                    UiEntry::group("wage-thresholds", Style::Segmented, [(0, "Off"), (1, "1 h"), (2, "2 h"), (6, "6 h")].iter().map(|(h, l)| {
+                        UiEntry::button(format!("p:wage-warn|{h}"), *l).selected(picked == *h)
+                    }).collect()).selected(true),
                 ]));
             }
+
         }
         PhoneTab::Places => {
             for site in world.company_sites() {
@@ -1409,14 +1643,17 @@ Running tasks" } else { "" };
             if entries.is_empty() {
                 next.entries.push(UiEntry::label("ledger-empty", "No cash changes recorded yet."));
             } else {
-                next.entries.push(UiEntry::label("ledger-header", format!("{:<9} {:<34} {:<18} {:>12}", "Time", "What", "Place", "Amount")));
+                next.entries.push(UiEntry::label("ledger-header", "LATEST CASH CHANGES"));
+
             }
             for entry in entries {
                 let what = ledger_what(&content, entry);
                 let place = world.view().and_then(|v| v.sites.iter().find(|s| s.id == entry.site_id)).map_or(entry.site_id.clone(), |s| s.name.clone());
                 let amount = format!("{}{}", if entry.cents > 0 { "+" } else { "-" }, money(entry.cents.abs()));
-                next.entries.push(UiEntry::label(format!("ledger-{}", entry.id),
-                    format!("{:<9} {:<34} {:<18} {:>12}", crate::screens::format_duration(entry.clock_seconds, false), what, place, amount)));
+                let mut line = UiEntry::label(format!("ledger-{}", entry.id), format!("{what}\n{} · {place}", crate::screens::format_duration(entry.clock_seconds, false))).styled(Style::Line)
+                    .with_row(vec![UiEntry::label(format!("ledger-amount-{}", entry.id), amount).dot(if entry.cents > 0 { "#6FCB86" } else { "#FF9A6B" })]);
+                line.id = format!("ledger-{}", entry.id);
+                next.entries.push(line);
             }
             next.entries.push(UiEntry::label("ledger-totals", format!("Opening {}, earlier entries {}, now {}", money(company.opening_cents), money(company.ledger_carried_cents), money(company.cash))));
         }
@@ -1433,7 +1670,13 @@ Running tasks" } else { "" };
             routes.sort_by(|a, b| a.id.cmp(&b.id));
             next.entries.push(UiEntry::label("trucks", "TRUCKS"));
             let trucks: Vec<&goods::Truck> = view.trucks.iter().filter(|t| company.is_some_and(|c| c.id == t.company_id) && !t.supplier).collect();
-            if trucks.is_empty() { next.entries.push(UiEntry::label("no-trucks", "No trucks yet: buy one in the Shop.")); }
+            let truck_offers: Vec<UiEntry> = content.0.offers.iter().filter_map(|offer| match &offer.kind {
+                OfferKind::Truck(t) => Some(UiEntry::button(format!("p:buy|{}", offer.id), format!("Buy {} ({} slots)
+{}", t.name, t.cargo_slots, money(offer.price_cents)))),
+                _ => None,
+            }).collect();
+            if !truck_offers.is_empty() { next.entries.push(UiEntry::row("truck-offers", truck_offers)); }
+            if trucks.is_empty() { next.entries.push(UiEntry::label("no-trucks", "No trucks yet: buy one above.")); }
             for truck in trucks {
                 let marker = if panels.selected_truck.as_deref() == Some(truck.id.as_str()) { "> " } else { "" };
                 next.entries.push(UiEntry::label(format!("truck-{}", truck.id), format!("{marker}{}\n{}\n{}\n{}\n{}", truck.name, truck_status(world, view, &content, truck),

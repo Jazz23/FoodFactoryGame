@@ -32,6 +32,9 @@ pub const EMPLOYEE_PREFIX: &str = "employee-";
 pub const AUTOMATIC_STARTER: &str = "automatic";
 pub const BELT_ITEM_ID: &str = "belt";
 pub const LIFT_ITEM_ID: &str = "lift";
+/// Build-menu prices charged to the site company per belt or lift and refunded when it is taken up.
+pub const BELT_PRICE_CENTS: i64 = 50;
+pub const LIFT_PRICE_CENTS: i64 = 250;
 pub const BELT_LOCATION_KIND: &str = "belt";
 pub const VEHICLE_LOCATION_KIND: &str = "vehicle";
 pub const ROAD_SITE_ID: &str = "road";
@@ -610,6 +613,28 @@ impl GoodsWorld {
         }
         self.start_ready_jobs();
         self.record(request, player, true, "transferred", &moved)
+    }
+
+    /// Destroys part or all of a lot in the player's own carried inventory (the inventory's trash can). Reserved units
+    /// stay; nothing else can be thrown away this way.
+    pub fn discard(&mut self, player: &str, request: &str, lot_id: &str, quantity: i32) -> Outcome {
+        if let Some(done) = self.begin(player, request) {
+            return done;
+        }
+        let Some(lot) = self.state.lot(lot_id).cloned() else { return self.record(request, player, false, "forbidden", "") };
+        if lot.location_id != inventory_location_id(player) || !self.allowed(player, &lot.location_id) {
+            return self.record(request, player, false, "forbidden", "");
+        }
+        if quantity <= 0 || quantity > self.available(&lot) {
+            return self.record(request, player, false, "quantity-or-reservation", "");
+        }
+        let index = self.state.lots.iter().position(|x| x.id == lot_id).expect("discarded lot exists");
+        if quantity == self.state.lots[index].quantity {
+            self.state.lots.remove(index);
+        } else {
+            self.state.lots[index].quantity -= quantity;
+        }
+        self.record(request, player, true, "discarded", lot_id)
     }
 
     /// Moves `quantity` of a lot to a location (re-owned when owner is given), keeping its ID when all of it moves and

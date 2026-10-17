@@ -31,7 +31,7 @@ impl Plugin for SitesPlugin {
             .init_resource::<EditedSite>()
             .init_resource::<TableSeats>()
             .add_systems(Startup, setup_materials)
-            .add_systems(Update, (choose_drawn, build_buildings, build_equipment, build_belts, rebuild_solids, find_indoors, show_storeys, show_fill, collect_table_seats, glide_items, swing_doors).chain());
+            .add_systems(Update, (choose_drawn, build_buildings, build_equipment, build_belts, rebuild_solids, find_indoors, show_storeys, show_fill, collect_table_seats, glide_items, swing_doors, glow_working_stations).chain());
     }
 }
 
@@ -164,15 +164,18 @@ pub struct SiteMaterials {
     icons: HashMap<String, Handle<StandardMaterial>>,
 }
 
-fn setup_materials(mut commands: Commands, mut materials: ResMut<Assets<StandardMaterial>>, mut meshes: ResMut<Assets<Mesh>>) {
-    let plain = |materials: &mut Assets<StandardMaterial>, color: Color, roughness: f32| materials.add(StandardMaterial { base_color: color, perceptual_roughness: roughness, ..default() });
+fn setup_materials(mut commands: Commands, mut materials: ResMut<Assets<StandardMaterial>>, mut meshes: ResMut<Assets<Mesh>>, assets: Res<AssetServer>) {
+    // Each surface carries its baked detail texture (tools/blender_surface_textures.py) under its colour.
+    let mut plain = |color: Color, roughness: f32, detail: &str| materials.add(StandardMaterial {
+        base_color: color, perceptual_roughness: roughness, base_color_texture: Some(crate::textures::detail_texture(&assets, detail)), ..default()
+    });
     commands.insert_resource(SiteMaterials {
-        wall: plain(&mut materials, Color::srgb(0.86, 0.83, 0.77), 0.9),
-        floor: plain(&mut materials, Color::srgb(0.62, 0.55, 0.47), 0.8),
-        roof: plain(&mut materials, Color::srgb(0.33, 0.33, 0.36), 0.9),
-        ceiling: plain(&mut materials, Color::srgb(0.93, 0.92, 0.89), 0.95),
-        elevator: plain(&mut materials, Color::srgb(0.95, 0.75, 0.2), 0.6),
-        post: plain(&mut materials, Color::srgb(0.35, 0.37, 0.4), 0.5),
+        wall: plain(Color::srgb(0.86, 0.83, 0.77), 0.9, "plaster"),
+        floor: plain(Color::srgb(0.62, 0.55, 0.47), 0.8, "planks"),
+        roof: plain(Color::srgb(0.33, 0.33, 0.36), 0.9, "concrete"),
+        ceiling: plain(Color::srgb(0.93, 0.92, 0.89), 0.95, "plaster"),
+        elevator: plain(Color::srgb(0.95, 0.75, 0.2), 0.6, "metal"),
+        post: plain(Color::srgb(0.35, 0.37, 0.4), 0.5, "metal"),
         cube: meshes.add(Cuboid::new(1.0, 1.0, 1.0)),
         quad: meshes.add(Rectangle::new(1.0, 1.0)),
         icons: HashMap::new(),
@@ -843,6 +846,57 @@ fn build_belts(
     }
     if changed {
         visuals.revision += 1;
+    }
+}
+
+/// Equipment that heats while it works (by kind ID fragment) and so lights up during a running job.
+const HEATED_KINDS: [&str; 4] = ["oven", "stove", "grill", "fryer"];
+
+/// A warm light in front of a heated station whose job is running (Unity's oven glow while baking); it flickers gently.
+fn glow_working_stations(
+    mut commands: Commands, time: Res<Time>, session: Res<Session>, content: Res<Content>, bounds: Res<Bounds>, visuals: Res<SiteVisuals>,
+    mut glows: Local<HashMap<String, Entity>>, mut lights: Query<&mut PointLight>,
+) {
+    let Some(world) = session.joined() else { return };
+    let mut working: HashSet<String> = HashSet::new();
+    for (id, view) in &visuals.equipment {
+        if !HEATED_KINDS.iter().any(|k| view.kind.contains(k)) {
+            continue;
+        }
+        let Some(snapshot) = world.view_of(&view.site) else { continue };
+        if !snapshot.jobs.iter().any(|j| &j.station_id == id && j.state == goods::JobState::Running) {
+            continue;
+        }
+        working.insert(id.clone());
+        if glows.get(id).is_some_and(|e| commands.get_entity(*e).is_ok()) {
+            continue;
+        }
+        let Some(kind) = content.0.equipment.get(&view.kind) else { continue };
+        let size = bounds.size(&kind.model);
+        // The model's front faces the root's -Z; a backed piece sits pushed toward its wall.
+        let back = if kind.mount == Mount::Backed { (kind.depth as f32 * 0.5 - size.z * 0.5).max(0.0) } else { 0.0 };
+        let at = Vec3::new(0.0, size.y * 0.45, back - size.z * 0.5 - 0.35);
+        let light = commands.spawn((
+            PointLight { color: Color::srgb(1.0, 0.55, 0.2), intensity: 60_000.0, range: 4.0, shadow_maps_enabled: false, ..default() },
+            Transform::from_translation(at), Name::new("Station glow"),
+        )).id();
+        commands.entity(view.root).add_child(light);
+        glows.insert(id.clone(), light);
+    }
+    glows.retain(|id, entity| {
+        if working.contains(id) {
+            return true;
+        }
+        if let Ok(mut e) = commands.get_entity(*entity) {
+            e.despawn();
+        }
+        false
+    });
+    let t = time.elapsed_secs();
+    for (i, entity) in glows.values().enumerate() {
+        if let Ok(mut light) = lights.get_mut(*entity) {
+            light.intensity = 60_000.0 * (0.9 + 0.1 * (t * 7.0 + i as f32 * 1.7).sin() * (t * 3.1 + i as f32).cos());
+        }
     }
 }
 

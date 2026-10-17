@@ -1,8 +1,9 @@
 // Customers (Unity GoodsWorld.Customers.cs and .Crowd.cs, decision 0024). Districts create customers at their rate per game hour;
 // each customer scores the restaurants in range once (and again after walking out of a queue), travels there, queues, buys a
-// menu item once it can be served (and, to dine in, once a seat is free), then eats or leaves with takeaway. A purchase takes the
-// goods from a register's input and pays the site's company inside the clock tick. Competitors are fixed AI restaurants with
-// unlimited stock and no cash. Customers advance in one-second sub-steps so a long step matches many short ones.
+// menu item once it can be served (and, to dine in, once a seat is free), then eats or leaves with takeaway. Customers line up at
+// any register stocked with their order, but only a staffed one sells; with nobody at any register they give up after two
+// minutes. A purchase takes the goods from a register's input and pays the site's company inside the clock tick. Competitors
+// are fixed AI restaurants with unlimited stock and no cash. Customers advance in one-second sub-steps so a long step matches many short ones.
 use std::collections::{HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
@@ -22,6 +23,8 @@ const REPUTATION_DRIFT_SECONDS: i64 = 60;
 const WALK_OUT_REPUTATION: i32 = -40;
 const MIN_PATIENCE_SECONDS: i64 = 90;
 const MAX_PATIENCE_SECONDS: i64 = 240;
+/// How long a customer waits in the queue of a restaurant with nobody at any register before walking away.
+const UNSTAFFED_PATIENCE_SECONDS: i64 = 120;
 const MIN_EAT_SECONDS: i64 = 120;
 const MAX_EAT_SECONDS: i64 = 300;
 pub const PICKY_WEALTH_PERCENT: i32 = 70;
@@ -53,6 +56,7 @@ pub(crate) struct DinerEntry {
     pub counters: Vec<Equipment>,
     pub tables_by_counter: HashMap<String, Vec<Equipment>>,
     pub entry_seconds: i64,
+    /// Registers with a paid staffer; customers queue at unstaffed registers that hold stock but are only served here.
     pub servers: i32,
     pub service_seconds: i64,
     pub seats: i32,
@@ -185,7 +189,8 @@ impl GoodsWorld {
         for site in self.state.sites.clone() {
             let mut placed: Vec<Equipment> = self.state.equipment.iter().filter(|x| x.site_id == site.id && x.placed()).cloned().collect();
             placed.sort_by(|a, b| a.id.cmp(&b.id));
-            let mut counters: Vec<Equipment> = placed.iter().filter(|x| x.kind == COUNTER_KIND && !x.staff_id.is_empty() && !self.unpaid(&x.staff_id)).cloned().collect();
+            // Every register counts: customers come for stock in an unstaffed one too, but only a staffed one sells.
+            let mut counters: Vec<Equipment> = placed.iter().filter(|x| x.kind == COUNTER_KIND).cloned().collect();
             if menu.is_empty() || counters.is_empty() || self.company_of_site(&site.id).is_none() {
                 continue;
             }
@@ -200,9 +205,10 @@ impl GoodsWorld {
             let tables_by_counter = rules::tables_by_register(walk.as_ref(), &reached, &counters, &placed);
             let seating: HashSet<String> = tables_by_counter.values().flatten().map(|t| t.id.clone()).collect();
             let seats: i32 = placed.iter().filter(|x| seating.contains(&x.id)).map(|x| x.seats).sum();
+            let staffed = counters.iter().filter(|x| self.staffed(x)).count() as i32;
             let entry_steps = counters.iter().map(|c| rules::cells_beside(&reached, c).iter().map(|cell| steps[cell]).min().unwrap_or(0)).min().unwrap_or(0);
             diners.push(DinerEntry {
-                id: site.id.clone(), player: true, map_x: site.map_x, map_z: site.map_z, menu: menu.clone(), servers: counters.len() as i32,
+                id: site.id.clone(), player: true, map_x: site.map_x, map_z: site.map_z, menu: menu.clone(), servers: staffed,
                 counters, tables_by_counter,
                 entry_seconds: ENTRY_MARGIN_SECONDS + ((entry_steps + 1) as f64 * CELL_SIZE as f64 / WALK_METRES_PER_SECOND as f64).ceil() as i64,
                 service_seconds: menu[0].duration_seconds, seats, ambience: rules::ambience(&self.state, &site.id), ..Default::default()
@@ -268,10 +274,13 @@ impl GoodsWorld {
                     }
                     let ticket = self.state.next_customer_number;
                     self.state.next_customer_number += 1;
+                    // The register it lines up at: one holding its order, a staffed one first.
+                    let register = diner.and_then(|d| self.queue_register(d, &self.state.customers[i].recipe_id));
                     let customer = &mut self.state.customers[i];
                     customer.state = CustomerState::Queued;
                     customer.queued_at_seconds = now;
                     customer.ticket = ticket;
+                    customer.counter_id = register.unwrap_or_default();
                     if let Some(d) = diner {
                         let diners = self.diners.diners.as_mut().expect("built");
                         enqueue(&mut diners[d], &self.state.customers[i], &self.state.customers, &second.index);
@@ -314,7 +323,9 @@ impl GoodsWorld {
                 }
                 CustomerState::Queued => {
                     let customer = &self.state.customers[i];
-                    if now - customer.queued_at_seconds < customer.patience_seconds {
+                    let unstaffed = diner.is_some_and(|d| { let e = &self.diners.diners.as_ref().expect("built")[d]; e.player && e.servers == 0 });
+                    let patience = if unstaffed { customer.patience_seconds.min(UNSTAFFED_PATIENCE_SECONDS) } else { customer.patience_seconds };
+                    if now - customer.queued_at_seconds < patience {
                         continue;
                     }
                     if let Some(d) = diner {
@@ -389,6 +400,22 @@ impl GoodsWorld {
         }).unwrap_or_default();
         self.diners.candidates.insert(district.id.clone(), nearby.clone());
         nearby
+    }
+
+    /// Whether a register has a paid staffer to sell at it.
+    fn staffed(&self, counter: &Equipment) -> bool { !counter.staff_id.is_empty() && !self.unpaid(&counter.staff_id) }
+
+    /// The register of a player restaurant whose input holds a whole `recipe_id` purchase, preferring a staffed one.
+    fn queue_register(&self, diner: usize, recipe_id: &str) -> Option<String> {
+        let entry = &self.diners.diners.as_ref()?[diner];
+        if !entry.player {
+            return None;
+        }
+        let recipe = self.content.recipes.get(recipe_id)?;
+        let stocked: Vec<&Equipment> = entry.counters.iter().filter(|c| {
+            self.state.stations.iter().find(|s| s.id == c.id).is_some_and(|station| input_plan(&self.state, station, recipe).is_some())
+        }).collect();
+        stocked.iter().find(|c| self.staffed(c)).or_else(|| stocked.first()).map(|c| c.id.clone())
     }
 
     /// A player restaurant's menu items in stock for one whole purchase at one of its registers.
@@ -467,6 +494,7 @@ impl GoodsWorld {
             customer.state = CustomerState::Travelling;
             customer.restaurant_id = entry.id.clone();
             customer.recipe_id = recipe_id;
+            customer.counter_id.clear();
             customer.remaining_seconds = (walk_metres(&district, distance) as i64 / WALK_METRES_PER_SECOND).max(1) + entry.entry_seconds;
             customer.queued_at_seconds = 0;
             return true;
@@ -510,7 +538,7 @@ impl GoodsWorld {
                 let dine_in = self.state.customers[ci].dine_in;
                 let mut chosen: Option<(Equipment, Option<Equipment>)> = None;
                 for candidate in &entry.counters {
-                    if entry.busy_counters.contains(&candidate.id) {
+                    if entry.busy_counters.contains(&candidate.id) || !self.staffed(candidate) {
                         continue;
                     }
                     let mut free = None;

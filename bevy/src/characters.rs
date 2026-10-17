@@ -339,8 +339,22 @@ fn site_customer_place(view: &goods::Snapshot, site: &str, walk: &SiteWalk, line
             let out = Vec2::new(fx as f32, fz as f32);
             let line = lines.entry(counter.id.clone()).or_insert_with(|| walk.service_line(counter));
             let index = if customer.state == CustomerState::Ordering { 0 } else { queue_index + 1 };
-            let spot = line.get(index).or_else(|| line.last())?;
-            let yaw = (-out.x).atan2(-out.y).to_degrees();
+            let at = index.min(line.len().checked_sub(1)?);
+            let mut spot = line[at];
+            let (w, d) = counter.footprint();
+            let centre = Vec2::new(counter.cell_x as f32 + w as f32 * 0.5, counter.cell_z as f32 + d as f32 * 0.5);
+            if at == 0 {
+                // Square in front of the register's middle (a front cell's centre sits half a cell aside on a two-wide one),
+                // when that place is open; a side cell keeps its own spot.
+                let reach = if fx != 0 { w } else { d } as f32 * 0.5 + 0.5;
+                let front = centre + out * reach;
+                let in_front = (Vec2::new(spot.0, spot.1) - centre).dot(out) > 0.5;
+                if in_front && walk.walk.get(front.x.floor() as i32, front.y.floor() as i32) { spot = (front.x, front.y); }
+            }
+            // The one ordering faces the register; the queue faces the one ahead of it.
+            let ahead = if at == 0 { centre } else { Vec2::new(line[at - 1].0, line[at - 1].1) };
+            let look = ahead - Vec2::new(spot.0, spot.1);
+            let yaw = if look.length_squared() > 1e-4 { look.x.atan2(look.y).to_degrees() } else { (-out.x).atan2(-out.y).to_degrees() };
             Some((spot.0, spot.1, yaw, false))
         }
         CustomerState::Eating => {
@@ -504,7 +518,7 @@ fn sync_customers(
                     } else if let Some(mut route) = route {
                         let mut from = transform.translation;
                         let left: f32 = route.points.iter().map(|&p| { let d = p.distance(from); from = p; d }).sum();
-                        route.speed = if remaining > 0 { (left / (remaining as f32 - 0.5).max(0.5)).clamp(2.0, 4.4) } else if !seated && left > 3.0 { 3.0 } else { 2.0 };
+                        route.speed = if remaining > 0 { (left / (remaining as f32 - 0.5).max(0.5)).clamp(1.6, 3.2) } else if !seated && left > 3.0 { 2.4 } else { 1.8 };
                     }
                     target.yaw = yaw;
                     continue;
@@ -670,7 +684,9 @@ fn animate(time: Res<Time>, mut walkers: Query<(&mut Walker, &Transform)>, mut p
         let measured = walker.last.map_or(0.0, |last| Vec2::new(position.x - last.x, position.z - last.z).length() / delta);
         walker.last = Some(position);
         walker.speed += (measured - walker.speed) * (1.0 - (-8.0 * delta).exp());
-        let walk = (walker.speed / WALK_SPEED).clamp(0.0, 1.0);
+        // Any real motion plays the walk in full, at the pace the figure covers ground, so its feet keep to the floor.
+        let walk = (walker.speed / 0.5).clamp(0.0, 1.0);
+        let pace = (walker.speed / WALK_SPEED).clamp(0.6, 2.4);
         let carry = walker.carrying;
         for entity in walker.boxes.clone() {
             if let Ok(mut v) = visibility.get_mut(entity) {
@@ -683,11 +699,16 @@ fn animate(time: Res<Time>, mut walkers: Query<(&mut Walker, &Transform)>, mut p
         let Some(player) = walker.player else { continue };
         let Ok(mut player) = players.get_mut(player) else { continue };
         let weights = if carry { [0.0, 0.0, 1.0 - walk, walk] } else { [1.0 - walk, walk, 0.0, 0.0] };
-        for (node, weight) in nodes.iter().zip(weights) {
+        for (index, (node, weight)) in nodes.iter().zip(weights).enumerate() {
             if let Some(active) = player.animation_mut(*node) {
                 active.set_weight(weight);
+                // The walk and carry-walk clips (odd nodes) are authored at WALK_SPEED.
+                if index % 2 == 1 && (active.speed() - pace).abs() > 0.02 {
+                    active.set_speed(pace);
+                }
             }
         }
+
     }
 }
 

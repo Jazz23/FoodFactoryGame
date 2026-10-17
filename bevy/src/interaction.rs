@@ -1,23 +1,20 @@
 // The local player's world controls (Unity EquipmentInteraction and its Hover part): the aim ray from the crosshair (or the
 // free pointer in the top-down view) names the machine, belt or employee under it and the floor cell on the avatar's level.
-// Interact (E) opens what is aimed at within reach and Inventory (Tab) the inventory; a hotbar key puts a held machine on the cursor, shown as a ghost
-// on its footprint (green where the server's own placement rule passes, red otherwise); R turns it, left click places it,
-// Q empties the cursor; left click with an empty cursor opens the aimed machine. C opens the phone and L its logistics.
+// Interact (E) opens what is aimed at within reach and Inventory (Tab) the inventory; left click opens the aimed machine.
+// Nothing carried is placed from the world: machines, furnishings, belts and lifts are only built from the build menu (B).
+// C opens the phone and L its logistics.
 // Every change is a request: the ghost and hints are previews, the server re-checks each command.
 use bevy::prelude::*;
 use bevy::window::{CursorGrabMode, CursorOptions, PrimaryWindow};
-use bevy::world_serialization::WorldAssetRoot;
 
-use food_factory_bevy::goods::{self, rules, EquipmentState};
-use food_factory_bevy::protocol::Command;
+use food_factory_bevy::goods::{self, EquipmentState};
 
 use crate::actions::PlayerActions;
-use crate::models::{fitted, Bounds, Fit};
 use crate::panels::{Panel, Panels};
 use crate::screens::{HudLines, Screen};
 use crate::session::{Content, Session};
 use crate::sites::{Indoors, Pick, Solids};
-use crate::space::{grid_rotation, Space, LEVEL_HEIGHT};
+use crate::space::Space;
 
 pub struct InteractionPlugin;
 
@@ -26,7 +23,7 @@ pub struct InteractionSet;
 
 impl Plugin for InteractionPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<Aim>().init_resource::<Cursor>().init_resource::<Hotbar>().add_systems(Update, (aim, hover_outline, pick_outlines, hotbar, act, show_ghost, hint).chain().after(crate::player::PlayerSet::Move).after(crate::panels::close_keys).in_set(InteractionSet));
+        app.init_resource::<Aim>().init_resource::<Cursor>().init_resource::<Hotbar>().add_systems(Update, (aim, hover_outline, pick_outlines, hotbar, act, hint).chain().after(crate::player::PlayerSet::Move).after(crate::panels::close_keys).in_set(InteractionSet));
     }
 }
 
@@ -49,18 +46,15 @@ pub struct Aim {
     pub property: Option<String>,
 }
 
-/// What the cursor carries in the world: a held machine (by ID) or an item of the inventory (belts, lifts, goods for a belt),
-/// the rotation either would be placed at, and whether a lift goes down.
+/// What the cursor carries in the world: goods to put on a belt. Nothing on it is ever placed; buildables come only from
+/// the build menu.
 #[derive(Resource, Default, Clone, Debug)]
 pub struct Cursor {
     pub machine: Option<String>,
     pub item: Option<String>,
-    pub rotation: i32,
-    pub lift_down: bool,
 }
 
 impl Cursor {
-    pub fn empty(&self) -> bool { self.machine.is_none() && self.item.is_none() }
     pub fn clear(&mut self) {
         self.machine = None;
         self.item = None;
@@ -140,7 +134,7 @@ fn hover_outline(
     let centre = (bounds.min + bounds.max) * 0.5;
     let size = bounds.max - bounds.min;
     let (mesh, material) = handles.get_or_insert_with(|| {
-        let material = materials.add(StandardMaterial { base_color: Color::srgb(0.33, 0.62, 0.38), unlit: true, ..default() });
+        let material = materials.add(StandardMaterial { base_color: Color::srgb(0.5, 0.82, 0.55), unlit: true, ..default() });
         (meshes.add(Cuboid::new(1.0, 1.0, 1.0)), material)
     }).clone();
     let edge_transforms = box_edges(centre, size, 0.025);
@@ -250,19 +244,11 @@ fn aim(
     }
 }
 
-/// Held machine kinds and conveyor items of this player, in hotbar order.
+/// Hotbar entries of this player, in hotbar order. Nothing carried can be placed in the world (buildables come only from
+/// the build menu), so held machines and conveyor items no longer take hotbar slots.
 fn hotbar_entries(session: &Session, hotbar: &mut Hotbar) -> Vec<HotbarEntry> {
-    let Some(world) = session.joined() else { return vec![] };
-    let Some(view) = world.view() else { return vec![] };
-    let mut entries: Vec<HotbarEntry> = view.equipment.iter().filter(|e| e.state == EquipmentState::Held && e.holder_id == world.player).map(|e| HotbarEntry::Machine(e.kind.clone())).collect();
-    entries.sort_by(|a, b| format!("{a:?}").cmp(&format!("{b:?}")));
-    entries.dedup();
-    let inventory = world.inventory();
-    for item in [goods::BELT_ITEM_ID, goods::LIFT_ITEM_ID] {
-        if view.lots.iter().any(|l| l.location_id == inventory && l.item_id == item && l.quantity > 0) {
-            entries.push(HotbarEntry::Item(item.to_string()));
-        }
-    }
+    if session.joined().and_then(|w| w.view()).is_none() { return vec![] }
+    let entries: Vec<HotbarEntry> = vec![];
     for entry in &entries {
         if !hotbar.entries.contains(entry) {
             hotbar.entries.push(entry.clone());
@@ -322,29 +308,13 @@ fn hotbar(actions: Res<PlayerActions>, session: Res<Session>, mut bar: ResMut<Ho
     }
 }
 
-/// The anchor cell, level and site that would centre the cursor machine's footprint on the aimed floor point.
-pub fn placement(aim: &Aim, footprint: (i32, i32)) -> Option<(String, i32, i32, i32)> {
-    let (site, level, point) = aim.floor.as_ref()?;
-    let x = (point.x - footprint.0 as f32 * 0.5).round() as i32;
-    let z = (point.y - footprint.1 as f32 * 0.5).round() as i32;
-    Some((site.clone(), x, z, *level))
-}
-
-#[allow(clippy::too_many_arguments)]
 #[allow(clippy::too_many_arguments)]
 fn act(
-    time: Res<Time>, actions: Res<PlayerActions>, mut session: ResMut<Session>, aim: Res<Aim>, mut cursor: ResMut<Cursor>, mut panels: ResMut<Panels>, screen: Res<Screen>, content: Res<Content>, build: Res<crate::build::Build>,
+    actions: Res<PlayerActions>, session: Res<Session>, aim: Res<Aim>, mut panels: ResMut<Panels>, screen: Res<Screen>, content: Res<Content>, build: Res<crate::build::Build>,
     mut intents: ResMut<crate::ui::UiIntents>,
 ) {
     if *screen != Screen::Playing || session.joined().is_none() {
         return;
-    }
-    let now = time.elapsed_secs_f64();
-    if actions.rotate_pressed && cursor.machine.is_some() {
-        cursor.rotation = (cursor.rotation + 1) & 3;
-    }
-    if actions.flip_lift_pressed && cursor.item.as_deref() == Some(goods::LIFT_ITEM_ID) {
-        cursor.lift_down = !cursor.lift_down;
     }
     if panels.open.is_some() {
         return;
@@ -397,19 +367,7 @@ fn act(
         }
         return;
     }
-    if !actions.place_pressed || cursor.item.is_some() {
-        return;
-    }
-    if let Some(machine) = cursor.machine.clone() {
-        let Some(world) = session.joined() else { return };
-        let Some(piece) = world.view().and_then(|v| v.equipment.iter().find(|e| e.id == machine)) else { return };
-        let footprint = goods::grid::footprint(piece.width, piece.depth, cursor.rotation);
-        let Some((site, x, z, level)) = placement(&aim, footprint) else { return };
-        if site != world.site {
-            return;
-        }
-        let rotation = cursor.rotation;
-        session.command(Command::Place { equipment: machine, x, z, rotation, level }, now);
+    if !actions.place_pressed {
         return;
     }
     if let Some(id) = aimed_machine.filter(|id| openable(&session, &content, id)) {
@@ -427,77 +385,8 @@ fn openable(session: &Session, content: &Content, id: &str) -> bool {
     content.0.equipment.get(&piece.kind).is_some_and(|k| k.opens_screen) || piece.input_capacity > 0 || piece.output_capacity > 0 || goods::is_table(piece)
 }
 
-#[derive(Component)]
-struct Ghost {
-    kind: String,
-}
-
-#[allow(clippy::too_many_arguments)]
-fn show_ghost(
-    mut commands: Commands, session: Res<Session>, cursor: Res<Cursor>, aim: Res<Aim>, space: Option<Res<Space>>, content: Res<Content>, assets: Res<AssetServer>, bounds: Res<Bounds>,
-    mut ghosts: Query<(Entity, &Ghost, &mut Transform, &Children)>, mut materials: ResMut<Assets<StandardMaterial>>, mut meshes: ResMut<Assets<Mesh>>,
-    mut pads: Query<&mut MeshMaterial3d<StandardMaterial>>, mut colours: Local<Option<(Handle<StandardMaterial>, Handle<StandardMaterial>, Handle<Mesh>)>>,
-) {
-    let piece = session.joined().zip(cursor.machine.as_ref()).and_then(|(w, id)| w.view().and_then(|v| v.equipment.iter().find(|e| &e.id == id)).map(|e| (w, e)));
-    let (Some((world, piece)), Some(space)) = (piece, space) else {
-        for (entity, ..) in &ghosts {
-            commands.entity(entity).despawn();
-        }
-        return;
-    };
-    let (valid, invalid, quad) = colours.get_or_insert_with(|| {
-        let tint = |c: Color| StandardMaterial { base_color: c, alpha_mode: AlphaMode::Blend, unlit: true, ..default() };
-        (materials.add(tint(Color::srgba(0.2, 0.85, 0.3, 0.45))), materials.add(tint(Color::srgba(0.9, 0.2, 0.15, 0.45))), meshes.add(Plane3d::default().mesh().size(1.0, 1.0)))
-    }).clone();
-    let footprint = goods::grid::footprint(piece.width, piece.depth, cursor.rotation);
-    let target = placement(&aim, footprint);
-    let Some((site, x, z, level)) = target else {
-        for (entity, ..) in &ghosts {
-            commands.entity(entity).despawn();
-        }
-        return;
-    };
-    let offer = world.offers.get(&site);
-    let problem = world.view_of(&site).map_or(Some("no-site"), |view| {
-        if site != world.site {
-            return Some("not-current-site");
-        }
-        let mut at = piece.clone();
-        at.site_id = site.clone();
-        goods::grid::placement_problem(view, &at, x, z, cursor.rotation, level).or_else(|| rules::placement_problem(view, &at, x, z, cursor.rotation, offer))
-    });
-    let centre = space.site_point(&site, x as f32 + footprint.0 as f32 * 0.5, z as f32 + footprint.1 as f32 * 0.5, level) + Vec3::Y * 0.0;
-    let transform = Transform::from_translation(centre).with_rotation(grid_rotation(cursor.rotation));
-    let material = if problem.is_none() { valid } else { invalid };
-    let existing = ghosts.iter_mut().next();
-    match existing {
-        Some((entity, ghost, mut t, children)) if ghost.kind == piece.kind => {
-            *t = transform;
-            if let Some(pad) = children.first() {
-                if let Ok(mut current) = pads.get_mut(*pad) {
-                    if current.0 != material {
-                        current.0 = material;
-                    }
-                }
-            }
-            let _ = entity;
-        }
-        other => {
-            if let Some((entity, ..)) = other {
-                commands.entity(entity).despawn();
-            }
-            let Some(kind) = content.0.equipment.get(&piece.kind) else { return };
-            let root = commands.spawn((Ghost { kind: piece.kind.clone() }, transform, Visibility::default(), Name::new("Ghost"))).id();
-            let pad = commands.spawn((Mesh3d(quad), MeshMaterial3d(material), Transform::from_xyz(0.0, 0.03, 0.0).with_scale(Vec3::new(piece.width as f32, 1.0, piece.depth as f32)))).id();
-            let model = commands.spawn((WorldAssetRoot(assets.load(GltfAssetLabel::Scene(0).from_asset(kind.model.clone()))), fitted(&bounds, &kind.model, Fit::Natural))).id();
-            commands.entity(root).add_children(&[pad, model]);
-        }
-    }
-    let _ = LEVEL_HEIGHT;
-}
-
 /// The HUD hint for what the aim names.
-fn hint(aim: Res<Aim>, session: Res<Session>, content: Res<Content>, cursor: Res<Cursor>, mut hud: ResMut<HudLines>, panels: Res<Panels>, bindings: Res<crate::actions::Bindings>) {
+fn hint(aim: Res<Aim>, session: Res<Session>, content: Res<Content>, mut hud: ResMut<HudLines>, panels: Res<Panels>, bindings: Res<crate::actions::Bindings>) {
     let Some(world) = session.joined() else { return };
     let e = crate::settings::label_of(bindings.interact);
     let text = if let Some(pick) = &panels.picking {
@@ -509,15 +398,6 @@ fn hint(aim: Res<Aim>, session: Res<Session>, content: Res<Content>, cursor: Res
         format!("Choose the {} for task {}: aim at an outlined machine{aimed} (Esc cancels)", pick.role.noun(), pick.index + 1)
     } else if panels.open.is_some() {
         String::new()
-    } else if let Some(item) = &cursor.item {
-        match item.as_str() {
-            goods::BELT_ITEM_ID => "Belts: hold left click and move to lay a line, R turns, hold right click on a belt to take it up".to_string(),
-            goods::LIFT_ITEM_ID => format!("Lift ({}): left click to place, R turns, V flips", if cursor.lift_down { "down" } else { "up" }),
-            other => format!("{}: Z puts one on the aimed belt", content.0.item_name(other)),
-        }
-    } else if let Some(id) = &cursor.machine {
-        let kind = world.view().and_then(|v| v.equipment.iter().find(|e| &e.id == id)).map(|e| content.0.equipment_name(&e.kind)).unwrap_or_default();
-        format!("{kind}: left click to place, R to turn, Q to put away")
     } else {
         match &aim.pick {
             Some(Pick::Equipment(id)) => {

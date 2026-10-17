@@ -12,8 +12,8 @@ see [architecture and status](docs/architecture.md) for what is simplified or mi
 host a saved world, join a server by address, change settings, or resume the last session.
 
 Controls (rebindable in Settings): WASD/arrows move, Space jump, Left Shift sprint, mouse look, scroll zoom, E inventory
-or the aimed machine/employee, 1-9 hotbar, left click place or open, R rotate, X clear the cursor, F take an item off a
-belt, Z put one on, V flip a lift, C phone, L logistics, B build mode (left click place/draw, hold right click remove,
+or the aimed machine/employee, left click open, R turn the aimed belt, F take an item off a belt, C phone, L logistics,
+B build mode (the only way to place anything, belts and lifts included: left click place/draw, hold right click remove,
 PgUp/PgDn floors, middle click pick), Esc close or pause.
 
 ## Interface

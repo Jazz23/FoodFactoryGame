@@ -19,7 +19,7 @@ pub struct MapPlugin;
 
 impl Plugin for MapPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<MapState>().init_resource::<DrawnSites>().add_systems(Update, (start_map, build_map, tint_awnings, hide_drawn_shells).chain());
+        app.init_resource::<MapState>().init_resource::<DrawnSites>().init_resource::<MapSolids>().add_systems(Update, (start_map, build_map, tint_awnings, hide_drawn_shells).chain());
     }
 }
 
@@ -56,6 +56,34 @@ pub struct MapState {
     pub shells: HashMap<String, Vec<Entity>>,
     pub awnings: HashMap<String, (Entity, Handle<StandardMaterial>)>,
     pub progress: String,
+}
+
+/// Scene-space collision boxes for scenery (houses, apartments, offices, barns, tree trunks, stop signs), bucketed by
+/// `MapSolids::BUCKET` metres so the avatar only tests what is near it.
+#[derive(Resource, Default)]
+pub struct MapSolids {
+    buckets: HashMap<(i32, i32), Vec<(Vec3, Vec3)>>,
+}
+
+impl MapSolids {
+    const BUCKET: f32 = 16.0;
+
+    fn key(x: f32, z: f32) -> (i32, i32) { ((x / Self::BUCKET).floor() as i32, (z / Self::BUCKET).floor() as i32) }
+
+    fn add(&mut self, min: Vec3, max: Vec3) {
+        let (a, b) = (Self::key(min.x, min.z), Self::key(max.x, max.z));
+        for i in a.0..=b.0 {
+            for j in a.1..=b.1 {
+                self.buckets.entry((i, j)).or_default().push((min, max));
+            }
+        }
+    }
+
+    /// Boxes whose bucket lies within `reach` of `position` (a box spanning buckets may repeat).
+    pub fn near(&self, position: Vec3, reach: f32) -> impl Iterator<Item = &(Vec3, Vec3)> {
+        let (a, b) = (Self::key(position.x - reach, position.z - reach), Self::key(position.x + reach, position.z + reach));
+        (a.0..=b.0).flat_map(move |i| (a.1..=b.1).map(move |j| (i, j))).filter_map(|k| self.buckets.get(&k)).flatten()
+    }
 }
 
 /// Every world piece the map merges.
@@ -95,7 +123,7 @@ fn textured(assets: &AssetServer, materials: &mut Assets<StandardMaterial>, name
 
 fn start_map(
     mut commands: Commands, mut events: MessageReader<SessionEvent>, session: Res<Session>, mut state: ResMut<MapState>, assets: Res<AssetServer>,
-    mut library: ResMut<Library>, mut materials: ResMut<Assets<StandardMaterial>>,
+    mut library: ResMut<Library>, mut materials: ResMut<Assets<StandardMaterial>>, mut map_solids: ResMut<MapSolids>,
 ) {
     let joined = events.read().any(|e| matches!(e, SessionEvent::Joined));
     let Some(world) = session.joined() else {
@@ -104,6 +132,7 @@ fn start_map(
                 commands.entity(root).despawn();
             }
             *state = MapState::default();
+            *map_solids = MapSolids::default();
             commands.remove_resource::<Space>();
         }
         return;
@@ -234,7 +263,7 @@ fn build_map(
     mut commands: Commands, session: Res<Session>, mut state: ResMut<MapState>, space: Option<Res<Space>>, covers: Option<Res<Covers>>,
     mut library: ResMut<Library>, bounds: Res<Bounds>, assets: Res<AssetServer>, gltfs: Res<Assets<Gltf>>, nodes: Res<Assets<GltfNode>>,
     gltf_meshes: Res<Assets<GltfMesh>>, gltf_materials: Res<Assets<GltfMaterial>>, mut materials: ResMut<Assets<StandardMaterial>>,
-    mut meshes: ResMut<Assets<Mesh>>, images: Res<Assets<Image>>,
+    mut meshes: ResMut<Assets<Mesh>>, images: Res<Assets<Image>>, mut map_solids: ResMut<MapSolids>,
 ) {
     if !state.building {
         return;
@@ -249,6 +278,12 @@ fn build_map(
     let origin = space.origin;
     let scene = |x: f32, z: f32, h: f32| Vec3::new(x - origin.x, h - origin.y, -(z - origin.z));
     let mut buffers = Buffers::default();
+    let mut colliders = MapSolids::default();
+    // A site-metre box (x, z corners; floor and height in metres) in scene space.
+    let mut collide = |x0: f32, z0: f32, x1: f32, z1: f32, floor: f32, height: f32| {
+        let (a, b) = (scene(x0, z0, floor), scene(x1, z1, floor + height));
+        colliders.add(a.min(b), a.max(b));
+    };
     let root = commands.spawn((Name::new("City"), Transform::default(), Visibility::default())).id();
 
     // ------------------------------------------------------------------ land
@@ -600,6 +635,9 @@ fn build_map(
             // Facing the traffic: the sign's front looks back along the approach.
             let yaw = (-d.x).atan2(-d.y).to_degrees();
             let ground = land.height(position.x, position.y);
+            if name == "Stop_Sign" {
+                collide(position.x - 0.15, position.y - 0.15, position.x + 0.15, position.y + 0.15, ground - 0.2, bounds.size(&piece_path(name)).y + 0.2);
+            }
             merge(&mut buffers, name, standing(&bounds, &piece_path(name), scene(position.x, position.y, ground), yaw, Vec3::ONE), Drape::None, meshes_ref);
         }
     }
@@ -641,6 +679,7 @@ fn build_map(
                 let barn_floor = [land.height(x - 8.0, z - 8.0), land.height(x + 8.0, z - 8.0), land.height(x - 8.0, z + 8.0), land.height(x + 8.0, z + 8.0)].into_iter().fold(f32::MIN, f32::max) + 0.1;
                 foundation(&mut buffers, x - 8.0, z - 8.0, 16.0, 16.0, barn_floor);
                 let name = format!("Barn_{variant}");
+                collide(x - 8.0, z - 8.0, x + 8.0, z + 8.0, barn_floor - 0.5, bounds.size(&piece_path(&name)).y + 0.5);
                 merge(&mut buffers, &name, standing(&bounds, &piece_path(&name), scene(x, z, barn_floor), yaw, Vec3::ONE), Drape::None, meshes_ref);
             }
             BuildingCategory::Apartment | BuildingCategory::Office => {
@@ -655,6 +694,8 @@ fn build_map(
                     merge(&mut buffers, &middle, standing(&bounds, &piece_path(&middle), centre + Vec3::Y * level as f32 * storey, yaw, scale), Drape::None, meshes_ref);
                 }
                 let roof = format!("{prefix}_Roof");
+                let height = floors as f32 * storey + bounds.size(&piece_path(&roof)).y;
+                collide(building.x as f32, building.z as f32, (building.x + building.width) as f32, (building.z + building.depth) as f32, floor - 0.5, height + 0.5);
                 merge(&mut buffers, &roof, standing(&bounds, &piece_path(&roof), centre + Vec3::Y * floors as f32 * storey, yaw, scale), Drape::None, meshes_ref);
             }
             _ => {
@@ -670,6 +711,9 @@ fn build_map(
                 let scale = Vec3::new(along / size.x, 1.0, deep / size.z);
                 let matrix = standing(&bounds, &path, centre, yaw, scale);
                 if !building.is_shell() {
+                    if building.category != BuildingCategory::Station {
+                        collide(building.x as f32, building.z as f32, (building.x + building.width) as f32, (building.z + building.depth) as f32, floor - 0.5, size.y + 0.5);
+                    }
                     merge(&mut buffers, &name, matrix, Drape::None, meshes_ref);
                     continue;
                 }
@@ -707,9 +751,16 @@ fn build_map(
             TreeKind::Bush => &["Tree_Bush"],
         }
     };
+    // Older layouts planted street trees on the sidewalk, in the walkers' way: a tree on any road's width (sidewalks included) is left out.
+    let on_road = |x: f32, z: f32| layout.roads.iter().any(|road| {
+        let (a, b) = (node_pos[road.from_id.as_str()], node_pos[road.to_id.as_str()]);
+        let half = road.width as f32 / 2.0 + 0.3;
+        let (across, along, from, to) = if a.0 == b.0 { (x - a.0 as f32, z, a.1.min(b.1), a.1.max(b.1)) } else { (z - a.1 as f32, x, a.0.min(b.0), a.0.max(b.0)) };
+        across.abs() < half && along >= from as f32 - half && along <= to as f32 + half
+    });
     for tree in &layout.trees {
         let (x, z) = (tree.x as f32 + 0.5, tree.z as f32 + 0.5);
-        if on_lot(x, z) {
+        if on_lot(x, z) || on_road(x, z) {
             continue;
         }
         let hash = random::mix(((tree.x as u32 as u64) << 32) ^ tree.z as u32 as u64);
@@ -717,7 +768,11 @@ fn build_map(
         let name = options[(hash % options.len() as u64) as usize];
         let yaw = ((hash >> 8) % 360) as f32;
         let ground = land.height(x, z);
-        merge(&mut buffers, name, standing(&bounds, &piece_path(name), scene(x, z, ground), yaw, Vec3::splat(tree.scale as f32 / 100.0)), Drape::None, meshes_ref);
+        let scale = tree.scale as f32 / 100.0;
+        // The trunk (or a bush's whole body) blocks; the canopy overhead does not.
+        let half = if tree.kind == TreeKind::Bush { 0.5 * scale } else { 0.25 * scale };
+        collide(x - half, z - half, x + half, z + half, ground - 0.2, (bounds.size(&piece_path(name)).y * scale).min(4.0) + 0.2);
+        merge(&mut buffers, name, standing(&bounds, &piece_path(name), scene(x, z, ground), yaw, Vec3::splat(scale)), Drape::None, meshes_ref);
     }
 
     // ------------------------------------------------------------------ flush
@@ -747,6 +802,7 @@ fn build_map(
         let child = commands.spawn((Mesh3d(mesh), MeshMaterial3d(material), Transform::default())).id();
         commands.entity(root).add_child(child);
     }
+    *map_solids = colliders;
     state.shells = shells;
     state.awnings = awnings;
     state.root = Some(root);

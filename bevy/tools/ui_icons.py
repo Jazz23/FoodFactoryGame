@@ -31,6 +31,14 @@ ICONS = {
     "target": ('<circle cx="12" cy="12" r="8"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>', 2.4, False),
     "arrow": ('<path d="M2 10h34M28 3l8 7-8 7"/>', 2, False, 40, 20),
     "arrow-short": ('<path d="M2 8h22M18 3l6 5-6 5"/>', 2, False, 28, 16),
+    "star": ('<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>', 1.8, False),
+    "map": ('<path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14"/><path d="M15 6v14"/>', 1.8, False),
+    "list": ('<path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/>', 2, False),
+    "truck": ('<path d="M2 6h12v10H2z"/><path d="M14 9h4l4 4v3h-8z"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/>', 1.8, False),
+    "leaf": ('<path d="M5 19c0-9 6-14 15-14 0 9-5 15-14 15"/><path d="M5 19l7-7"/>', 1.8, False),
+    "book": ('<path d="M4 4h6a3 3 0 013 3v13a2 2 0 00-2-2H4z"/><path d="M20 4h-6a3 3 0 00-3 3v13a2 2 0 012-2h7z"/>', 1.8, False),
+    "battery": ('<rect x="2" y="7" width="18" height="10" rx="2"/><path d="M22 11v2"/><path d="M5 10v4M8 10v4M11 10v4M14 10v4"/>', 1.8, False),
+    "signal": ('<path d="M4 20v-3"/><path d="M9 20v-7"/><path d="M14 20v-11"/><path d="M19 20V5"/>', 2.4, False),
 }
 
 # Each icon in the colours the designs draw it in.
@@ -38,8 +46,11 @@ VARIANTS = {
     "factory": ["F2A33A"], "play": ["F2A33A", "16171A"], "home": ["A8A49B", "CFCBC3", "ECE8E1"], "server": ["A8A49B"],
     "sliders": ["A8A49B"], "chevron-right": ["6A675F"], "chevron-left": ["ECE8E1"], "chevron-down": ["A8A49B"], "quit": ["A8A49B"],
     "plus": ["ECE8E1", "CFCBC3"], "reset": ["ECE8E1"], "warning": ["FFC170", "F2A33A"], "user": ["ECE8E1"], "users": ["F2A33A"],
-    "check": ["F2A33A"], "clock": ["A8A49B"], "close": ["ECE8E1", "A8A49B"], "person": ["ECE8E1"], "repeat": ["A8A49B"],
+    "check": ["F2A33A", "16171A"], "clock": ["A8A49B"], "close": ["ECE8E1", "A8A49B", "FF8A78"], "person": ["ECE8E1"], "repeat": ["A8A49B"],
     "target": ["FF8A78"], "arrow": ["6A675F"], "arrow-short": ["6A675F"],
+    "star": ["FFC170", "FF8A78", "A8A49B"], "map": ["A8A49B", "F2A33A"], "list": ["A8A49B", "F2A33A"], "truck": ["A8A49B", "F2A33A"],
+    "leaf": ["A8A49B", "F2A33A"], "book": ["A8A49B", "F2A33A"], "battery": ["ECE8E1"], "signal": ["ECE8E1"],
+    "users": ["F2A33A", "A8A49B"], "home": ["A8A49B", "CFCBC3", "ECE8E1", "F2A33A"],
 }
 
 SCALE = 4

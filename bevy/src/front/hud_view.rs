@@ -16,6 +16,11 @@ pub struct HudFrame {
     pub rate_up: bool,
     pub day: String,
     pub clock: String,
+    /// The restaurant's reputation here (-1000 to 1000), shown under the clock; empty where no restaurant runs.
+    pub reputation: String,
+    /// Reputation as 0..1 along its bar.
+    pub reputation_fill: f32,
+    pub reputation_up: bool,
     pub alerts: Vec<AlertDto>,
     pub prompt_key: String,
     pub prompt: String,
@@ -110,6 +115,16 @@ pub(super) fn draw_hud(mut commands: Commands, ui: Ui, roots: Res<Roots>, hud: R
                         text(p, &ui, "·", Face::Regular, 13.0, FAINT);
                         text(p, &ui, &hud.clock, Face::Mono, 13.0, TEXT_2);
                     });
+                    if !hud.reputation.is_empty() {
+                        div(p, Node { column_gap: px(8.0), ..row() }).with_children(|p| {
+                            icon(p, &ui, "star", 14.0, if hud.reputation_up { "ffc170" } else { "ff8a78" });
+                            text(p, &ui, "Reputation", Face::Regular, 13.0, TEXT_2).insert(Node { flex_grow: 1.0, ..default() });
+                            text(p, &ui, &hud.reputation, Face::Mono, 13.0, if hud.reputation_up { AMBER } else { ORANGE });
+                        });
+                        boxed(p, Node { height: px(4.0), border_radius: radius(2.0), ..default() }, RAISED, CLEAR).with_children(|p| {
+                            boxed(p, Node { width: pct(hud.reputation_fill.clamp(0.0, 1.0) * 100.0), height: px(4.0), border_radius: radius(2.0), ..default() }, if hud.reputation_up { AMBER } else { ORANGE }, CLEAR);
+                        });
+                    }
                 });
                 for alert in &hud.alerts {
                     alert_card(p, &ui, alert);

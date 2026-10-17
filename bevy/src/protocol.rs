@@ -12,6 +12,8 @@ pub const PROTOCOL_VERSION: u32 = 1;
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Command {
     Transfer { lot: String, destination: String, quantity: i32 },
+    /// Destroys goods from the player's own carried inventory.
+    Discard { lot: String, quantity: i32 },
     PickUp { equipment: String },
     Place { equipment: String, x: i32, z: i32, rotation: i32, level: i32 },
     Give { equipment: String, employee: String },

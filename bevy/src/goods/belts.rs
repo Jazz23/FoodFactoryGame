@@ -1,16 +1,18 @@
-// Conveyor belts and lifts (Unity GoodsWorld.Belts.cs). A placed belt is a one-cell, stable-ID site object made from one
-// "belt" item, with one location holding the single-unit lots riding on it. Belts move their items on the world clock, so a
-// line runs whether or not anyone watches. A lift is a belt made from one "lift" item whose front end is one storey up or down.
+// Conveyor belts and lifts (Unity GoodsWorld.Belts.cs). A placed belt is a one-cell, stable-ID site object bought from the
+// build menu for the site company's cash (never an inventory item), with one location holding the single-unit lots riding on
+// it; taking it up refunds that price. Belts move their items on the world clock, so a line runs whether or not anyone
+// watches. A lift is a belt whose front end is one storey up or down.
 use std::collections::{HashMap, HashSet};
 
 use super::grid;
 use super::rules::{self, ITEM_SPACING, SUB_STEPS_PER_SECOND, UNITS_PER_SECOND, UNITS_PER_TILE};
 use super::state::*;
-use super::{inventory_location_id, GoodsWorld, BELT_ITEM_ID, BELT_LOCATION_KIND, LIFT_ITEM_ID, NON_PERISHABLE_SECONDS};
+use super::company::{LEDGER_FURNISH, LEDGER_SELL_BACK};
+use super::{inventory_location_id, CashNote, GoodsWorld, BELT_LOCATION_KIND, BELT_PRICE_CENTS, LIFT_PRICE_CENTS};
 
 impl GoodsWorld {
-    /// An empty cell takes a new belt made from one belt item in the actor's inventory; a cell that already holds a belt
-    /// is turned to the requested direction at no cost.
+    /// An empty cell takes a new belt charged to the site company; a cell that already holds a belt is turned to the
+    /// requested direction at no cost.
     pub fn place_belt(&mut self, player: &str, request: &str, site_id: &str, x: i32, z: i32, direction: i32, level: i32) -> Outcome {
         self.place_conveyor(player, request, site_id, x, z, direction, level, 0, false)
     }
@@ -46,22 +48,13 @@ impl GoodsWorld {
         if let Some(problem) = problem {
             return self.record(request, player, false, problem, "");
         }
-        let item = if lift == 0 { BELT_ITEM_ID } else { LIFT_ITEM_ID };
-        let inventory = inventory_location_id(player);
-        if self.state.location(&inventory).map(|l| l.site_id.as_str()) != Some(site_id) {
-            return self.record(request, player, false, "no-inventory", "");
-        }
-        let mut sources: Vec<&Lot> = self.state.lots.iter().filter(|l| l.location_id == inventory && l.item_id == item && l.owner_id == site_id && self.available(l) > 0).collect();
-        sources.sort_by(|a, b| a.id.cmp(&b.id));
-        let Some(source) = sources.first().map(|l| l.id.clone()) else {
-            return self.record(request, player, false, if lift == 0 { "no-belts" } else { "no-lifts" }, "");
-        };
-        let index = self.state.lots.iter().position(|l| l.id == source).expect("source lot");
-        self.state.lots[index].quantity -= 1;
-        if self.state.lots[index].quantity == 0 {
-            self.state.lots.remove(index);
+        let price = if lift == 0 { BELT_PRICE_CENTS } else { LIFT_PRICE_CENTS };
+        let Some(company) = self.company_of_site(site_id) else { return self.record(request, player, false, "no-company", "") };
+        if self.cash_of(&company) < price {
+            return self.record(request, player, false, "insufficient-funds", "");
         }
         let id = self.new_unique("belt-");
+        self.try_debit(&company, price, CashNote::new(LEDGER_FURNISH, site_id).request(request).equipment(&id));
         let belt = Belt { id, site_id: site_id.to_string(), cell_x: x, cell_z: z, direction, level, lift };
         self.state.locations.push(Location {
             id: belt.location_id(), site_id: site_id.to_string(), kind: BELT_LOCATION_KIND.into(), capacity: UNITS_PER_TILE / ITEM_SPACING, refrigerated: false,
@@ -70,7 +63,7 @@ impl GoodsWorld {
         self.record(request, player, true, "placed", "")
     }
 
-    /// The belt (or lift) item and every item riding the belt go to the actor's inventory together, or nothing changes.
+    /// Refunds the belt's price; every item riding it goes to the actor's inventory, or nothing changes.
     pub fn remove_belt(&mut self, player: &str, request: &str, belt_id: &str) -> Outcome {
         if let Some(done) = self.begin(player, request) {
             return done;
@@ -80,19 +73,14 @@ impl GoodsWorld {
             return self.record(request, player, false, "forbidden", "");
         }
         let inventory = inventory_location_id(player);
-        if self.state.location(&inventory).map(|l| l.site_id.as_str()) != Some(belt.site_id.as_str()) {
+        let riding: Vec<Lot> = self.state.lots.iter().filter(|l| l.location_id == belt.location_id()).cloned().collect();
+        if !riding.is_empty() && self.state.location(&inventory).map(|l| l.site_id.as_str()) != Some(belt.site_id.as_str()) {
             return self.record(request, player, false, "no-inventory", "");
         }
-        let riding: Vec<Lot> = self.state.lots.iter().filter(|l| l.location_id == belt.location_id()).cloned().collect();
         if riding.iter().any(|l| self.reserved(&l.id)) {
             return self.record(request, player, false, "reserved", "");
         }
-        let item = if belt.lift == 0 { BELT_ITEM_ID } else { LIFT_ITEM_ID };
-        let returned = Lot {
-            id: String::new(), item_id: item.into(), owner_id: belt.site_id.clone(), location_id: inventory.clone(), quantity: 1,
-            spoil_after_seconds: NON_PERISHABLE_SECONDS, ..Default::default()
-        };
-        if !self.fits_all(&inventory, riding.iter().chain(std::iter::once(&returned))) {
+        if !riding.is_empty() && !self.fits_all(&inventory, riding.iter()) {
             return self.record(request, player, false, "capacity", "");
         }
         let location = belt.location_id();
@@ -102,19 +90,9 @@ impl GoodsWorld {
                 lot.belt_position = 0;
             }
         }
-        let mut stacks: Vec<usize> = (0..self.state.lots.len())
-            .filter(|&i| {
-                let l = &self.state.lots[i];
-                l.location_id == inventory && l.item_id == item && l.owner_id == belt.site_id && !l.spoiled && !self.reserved(&l.id)
-            })
-            .collect();
-        stacks.sort_by(|a, b| self.state.lots[*a].id.cmp(&self.state.lots[*b].id));
-        if let Some(&stack) = stacks.first() {
-            self.state.lots[stack].quantity += 1;
-        } else {
-            let mut lot = returned;
-            lot.id = self.new_unique("lot-");
-            self.state.lots.push(lot);
+        let price = if belt.lift == 0 { BELT_PRICE_CENTS } else { LIFT_PRICE_CENTS };
+        if let Some(company) = self.company_of_site(&belt.site_id) {
+            self.try_credit(&company, price, CashNote::new(LEDGER_SELL_BACK, &belt.site_id).request(request).equipment(&belt.id));
         }
         self.state.locations.retain(|l| l.id != location);
         self.state.belts.retain(|b| b.id != belt.id);

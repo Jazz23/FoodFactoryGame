@@ -196,10 +196,14 @@ impl Library {
                                     Some(source) => {
                                         let name = gltf.named_materials.iter().find(|(_, h)| h.id() == handle.id()).map(|(n, _)| n.to_string()).unwrap_or_default();
                                         let world = self.world.get_or_insert_with(world_materials).get(&name).cloned();
-                                        let standard = self.materials.entry(handle.id()).or_insert_with(|| materials.add(match &world {
-                                            Some(world) => world_material(world, assets),
-                                            None => bevy::pbr::gltf::standard_material_from_gltf_material(source),
-                                        })).clone();
+                                        let standard = self.materials.entry(handle.id()).or_insert_with(|| {
+                                            let mut material = match &world {
+                                                Some(world) => world_material(world, assets),
+                                                None => bevy::pbr::gltf::standard_material_from_gltf_material(source),
+                                            };
+                                            crate::textures::add_detail(&mut material, &name, assets);
+                                            materials.add(material)
+                                        }).clone();
                                         (standard, name)
                                     }
                                     None => {
@@ -270,7 +274,13 @@ impl MergeBuffer {
             self.positions.push(point.to_array());
             let n = normals.and_then(|n| n.get(i)).map(|n| (normal_matrix * Vec3::from_array(*n)).normalize_or_zero()).unwrap_or(Vec3::Y);
             self.normals.push(n.to_array());
-            self.uvs.push(uvs.and_then(|u| u.get(i)).copied().unwrap_or([0.0, 0.0]));
+            // A model without UVs gets box-projected ones in its own space, so surface detail has something to follow.
+            let model_normal = normals.and_then(|n| n.get(i)).copied().unwrap_or([0.0, 1.0, 0.0]);
+            let projected = || {
+                let (x, y, z) = (model_normal[0].abs(), model_normal[1].abs(), model_normal[2].abs());
+                if y >= x && y >= z { [p[0], p[2]] } else if x >= z { [p[2], p[1]] } else { [p[0], p[1]] }
+            };
+            self.uvs.push(uvs.and_then(|u| u.get(i)).copied().unwrap_or_else(projected));
         }
         let mut push = |a: u32, b: u32, c: u32| {
             if flip {

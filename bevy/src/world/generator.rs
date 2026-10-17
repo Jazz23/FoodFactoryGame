@@ -947,53 +947,8 @@ impl<'a> Builder<'a> {
     fn trees(&mut self) {
         let mut rng = WorldRandom::fork(self.seed, "trees");
         let woodland_salt = WorldRandom::fork(self.seed, "woodland").next_u64();
-        let nodes = self.node_map();
+        // No street trees: a tree on the sidewalk stands in the walkers' way, so trees grow in yards and the country only.
         let mut trees = vec![];
-        for index in 0..self.layout.roads.len() {
-            let road = &self.layout.roads[index];
-            if road.kind == RoadKind::Rural {
-                continue;
-            }
-            let a = nodes[&road.from_id];
-            let b = nodes[&road.to_id];
-            let vertical = self.road_vertical[index];
-            let from = (if vertical { a.1.min(b.1) } else { a.0.min(b.0) }) + self.s.street_tree_junction_clear;
-            let to = (if vertical { a.1.max(b.1) } else { a.0.max(b.0) }) - self.s.street_tree_junction_clear;
-            let fixed_at = if vertical { a.0 } else { a.1 };
-            let half = road.width / 2;
-            for side in [1, -1] {
-                let mut along = from + rng.range(0, 4);
-                while along <= to {
-                    'body: {
-                        let offset = if side > 0 { fixed_at + half - 1 } else { fixed_at - half };
-                        let x = if vertical { offset } else { along };
-                        let z = if vertical { along } else { offset };
-                        let roll = rng.next(100);
-                        let kind_roll = rng.next(100);
-                        let scale = rng.range(85, 115);
-                        let Some(district) = self.district_at(2 * x + 1, 2 * z + 1) else { break 'body };
-                        if roll >= self.s.profile(district).street_tree_percent {
-                            break 'body;
-                        }
-                        let point = Box2::new(2 * x + 1, 2 * z + 1, 2 * x + 1, 2 * z + 1);
-                        if self.clear.any(&grow(point, 1)) || self.placed.any(&grow(point, 2)) || self.reserved.any(&grow(point, 2)) || self.near_water(x, z) {
-                            break 'body;
-                        }
-                        if self.road_index.overlapping(&grow(point, 1)).iter().any(|r| self.road_vertical[*r] != vertical) {
-                            break 'body;
-                        }
-                        let kind = match district {
-                            DistrictKind::Wealthy => if kind_roll < 70 { TreeKind::Broadleaf } else { TreeKind::Poplar },
-                            DistrictKind::Industrial => if kind_roll < 50 { TreeKind::Broadleaf } else { TreeKind::Poplar },
-                            DistrictKind::Residential => if kind_roll < 85 { TreeKind::Broadleaf } else { TreeKind::Poplar },
-                            DistrictKind::Downtown => TreeKind::Broadleaf,
-                        };
-                        trees.push(WorldTree { x, z, kind, scale });
-                    }
-                    along += self.s.street_tree_spacing + rng.range(-2, 2);
-                }
-            }
-        }
         let yard = self.s.yard_tree_lattice;
         let mut gz = -self.c;
         while gz < self.c {

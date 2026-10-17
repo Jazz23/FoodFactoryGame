@@ -90,6 +90,13 @@ fn emit_hud(
             frame.cash = money(world.cash());
             frame.day = format!("Day {}", view.clock_seconds / DAY_SECONDS + 1);
             frame.clock = format!("{:02}:{:02}", view.clock_seconds % DAY_SECONDS / HOUR_SECONDS, view.clock_seconds % HOUR_SECONDS);
+            // The restaurant's standing with customers (its diner record), beside the cash.
+            if let Some(diner) = view.diners.iter().find(|d| d.restaurant_id == world.site) {
+                let limit = goods::customers::REPUTATION_LIMIT.max(1) as f32;
+                frame.reputation = format!("{:+}", diner.reputation);
+                frame.reputation_fill = (diner.reputation as f32 + limit) / (2.0 * limit);
+                frame.reputation_up = diner.reputation >= 0;
+            }
             if card.site != world.site || card.revision != view.revision {
                 *card = readout(world, &content);
             }
@@ -99,7 +106,8 @@ fn emit_hud(
             }
             // Unity PlayerHud's wage warning: cash covers less than two hours of wages.
             let wages = view.company_wage_cents_per_hour;
-            if wages > 0 && world.cash() < wages * 2 {
+            if wages > 0 && panels.wage_warning_hours() > 0 && world.cash() < wages * panels.wage_warning_hours() {
+
                 let hours = world.cash().max(0) / wages;
                 let employees = wages / goods::employees::WAGE_CENTS_PER_HOUR;
                 frame.alerts.push(AlertDto {
