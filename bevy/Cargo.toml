@@ -1,3 +1,5 @@
+cargo-features = ["codegen-backend"]
+
 [package]
 name = "food_factory_bevy"
 version = "0.1.0"
@@ -6,46 +8,40 @@ edition = "2024"
 [dependencies]
 # Default features pull in audio (ALSA), gamepads (udev) and Wayland, whose system dev libraries are not installed here, so the
 # feature set is the `3d` preset minus those (X11 only; WSLg serves X11). Enable `gamepad` after installing libudev-dev.
-bevy = { version = "0.20", default-features = false, features = [
-    "default_app",
-    "std",
-    "multi_threaded",
-    "bevy_winit",
-    "x11",
-    "3d_bevy_render",
-    "ui",
-    "scene",
-] }
+bevy = { version = "0.20", default-features = false, features = ["default_app", "std", "multi_threaded", "bevy_winit", "x11", "3d_bevy_render", "ui", "scene", "dynamic_linking"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 rusqlite = { version = "0.32", features = ["bundled"] }
 sha2 = "0.10"
 mlua = { version = "0.12.2", features = ["luau", "send"] }
-superui = "0.4"
-
-[build-dependencies]
-# Pre-transpiles the superui .tsx under assets/ui to JS for builds without live reloading.
-supersolid = "0.4"
 
 [features]
 # Dynamic linking makes incremental rebuilds fast; `cargo run --release --no-default-features --features audio` for a standalone build.
 default = ["dev", "audio"]
 # `file_watcher` reloads changed files under assets/ (models, textures) while the game runs.
-dev = ["bevy/dynamic_linking", "bevy/file_watcher", "superui/hmr"]
+dev = ["bevy/dynamic_linking", "bevy/file_watcher"]
 # Live-patches edited system bodies into the running game under `dx serve --hot-patch` (see README). Used without `dev`:
-# dx cannot launch a dynamically linked Bevy on Windows (DioxusLabs/dioxus#4693), and patches only rebuild this crate.
-hotpatch = ["bevy/hotpatching", "bevy/file_watcher", "superui/hmr"]
+# dx cannot launch a dynamically linked Bevy on Windows (DioxusLabs/dioxus#4693), and patches only rebuild this crate. Includes
+# `audio`, which --no-default-features would otherwise drop.
+hotpatch = ["bevy/hotpatching", "bevy/file_watcher", "audio"]
 gamepad = ["bevy/bevy_gilrs"]
 # Sound (WAV clips). On Linux this needs the ALSA development library (libasound2-dev); build with --no-default-features --features dev without it.
 audio = ["bevy/bevy_audio", "bevy/wav"]
 
-# Our code compiles quickly with light optimisation; dependencies are built optimised once and cached.
+# Our code compiles quickly with light optimisation; dependencies are built optimised once and cached, without debug info
+# to keep each cached copy small (our own crate keeps full debug info).
 [profile.dev]
 opt-level = 1
+codegen-backend = "cranelift"
 
 [profile.dev.package."*"]
 opt-level = 3
+debug = false
+codegen-backend = "llvm"
 
 [profile.release]
 codegen-units = 1
 lto = "thin"
+
+[unstable]
+codegen-backend = true

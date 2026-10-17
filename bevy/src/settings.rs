@@ -312,8 +312,8 @@ fn alternate(bindings: &Bindings, action: &str) -> Option<KeyCode> {
     keys.get(1).copied()
 }
 
-fn emit(mut commands: Commands, screen: Res<SettingsScreen>, prefs: Option<Res<Prefs>>, mut bindings: ResMut<Bindings>, session: Res<crate::session::Session>,
-    generation: Res<crate::front::FrontGeneration>, mut sent: Local<crate::front::Sent<SettingsFrame>>) {
+fn emit(screen: Res<SettingsScreen>, prefs: Option<Res<Prefs>>, mut bindings: ResMut<Bindings>, session: Res<crate::session::Session>,
+    mut out: ResMut<SettingsFrame>) {
     let Some(prefs) = prefs else { return };
     let label = |action: &str| ACTIONS.iter().find(|(a, _)| *a == action).map_or(action.to_string(), |(_, l)| l.split(" (fixed").next().unwrap_or(l).to_string());
     // A key bound to two actions is named, as the design's clash notice does.
@@ -348,5 +348,5 @@ fn emit(mut commands: Commands, screen: Res<SettingsScreen>, prefs: Option<Res<P
         notice,
         columns,
     };
-    sent.send(&mut commands, &generation, frame);
+    out.set_if_neq(frame);
 }

@@ -91,6 +91,22 @@ impl Ambient {
         self.walkers = walkers;
     }
 
+    /// How far the paved surface under a map point stands above the land, matching the road pieces as drawn: a junction
+    /// box is flat at 0.025 m, a city street bed at 0.02 m, and its outer 1.5 m each side (kerb and sidewalk) at 0.17 m.
+    pub fn surface_lift(&self, net: &RoadNetwork, point: Vec2) -> f32 {
+        for (node, corner) in self.corners.iter().enumerate() {
+            let d = (point - node_point(net, node)).abs();
+            if corner.span.x > 0.0 && corner.span.y > 0.0 && d.x <= corner.span.x && d.y <= corner.span.y { return 0.025; }
+        }
+        for s in net.segments.iter().filter(|s| s.kind != RoadKind::Rural) {
+            let (a, b) = (node_point(net, s.from), node_point(net, s.to));
+            let half = s.width as f32 * 0.5;
+            let (along, lateral, lo, hi) = if s.dx != 0 { (point.x, (point.y - a.y).abs(), a.x.min(b.x), a.x.max(b.x)) } else { (point.y, (point.x - a.x).abs(), a.y.min(b.y), a.y.max(b.y)) };
+            if along >= lo && along <= hi && lateral <= half { return if lateral >= half - 1.5 { 0.17 } else { 0.02 }; }
+        }
+        0.0
+    }
+
     fn crosses(&self, w: &Pedestrian, m: usize) -> bool {
         let arm = if m == 4 { if w.side.y > 0.0 { 2 } else { 3 } } else if w.side.x > 0.0 { 0 } else { 1 };
         self.corners[w.node].arms[arm].is_some()

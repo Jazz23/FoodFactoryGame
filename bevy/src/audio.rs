@@ -1,7 +1,6 @@
 // Presentation-only sound (Unity GameAudio, AmbienceDirector, AudioZones, EquipmentRunningAudio and FootstepAudio): menu
-// music while no world runs; inside one, the city, farmland and factory beds crossfading by where the avatar stands (a factory
-// nearby takes over first, then farmland or open country, the city has the rest) with occasional horns, birds and clanks; a
-// click for every button, the till when the company makes a sale, a thud when a piece lands on a drawn site, footsteps while
+// music while no world runs (the constant city, farmland and factory beds were dropped as too loud and monotonous); inside
+// one, occasional horns, birds and clanks around the avatar; a click for every button, the till when the company makes a sale, a thud when a piece lands on a drawn site, footsteps while
 // the avatar walks, and each running machine's positional loop (sizzle, hum, mixer). Nothing here reads or changes gameplay
 // state beyond what the baselines show, and a missing clip only makes that sound silent.
 use std::collections::{HashMap, HashSet};
@@ -22,12 +21,11 @@ pub struct GameAudioPlugin;
 
 impl Plugin for GameAudioPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<AudioState>().add_systems(Startup, setup).add_systems(Update, (listener, master, music_and_beds, incidentals, clicks, till, placements, footsteps, machines, engines));
+        app.init_resource::<AudioState>().add_systems(Startup, setup).add_systems(Update, (listener, master, music, incidentals, clicks, till, placements, footsteps, machines, engines));
     }
 }
 
 const MUSIC_LEVEL: f32 = 0.4;
-const BED_LEVEL: f32 = 0.35;
 const FOOTSTEP_SECONDS: f32 = 0.42;
 const MACHINE_HEARING: f32 = 14.0;
 
@@ -37,13 +35,13 @@ fn clip_path(name: &str) -> String { format!("Audio/Resources/Audio/{name}.wav")
 struct AudioState {
     clips: HashMap<String, Handle<AudioSource>>,
     music: Option<Entity>,
-    beds: [Option<Entity>; 3],
-    mix: [f32; 4],
+    music_level: f32,
     sales: usize,
     placed: HashSet<String>,
     placed_sites: HashSet<String>,
     step_timer: f32,
     step_index: u64,
+    last_step: u64,
     incidental_timer: f32,
     machines: HashMap<String, Entity>,
 }
@@ -67,10 +65,6 @@ fn one_shot(commands: &mut Commands, clip: Handle<AudioSource>, volume: f32, at:
 fn setup(mut commands: Commands, assets: Res<AssetServer>, mut state: ResMut<AudioState>) {
     let music = state.clip(&assets, "menu_music");
     state.music = Some(looped(&mut commands, music, MUSIC_LEVEL));
-    for (index, name) in ["city", "farm", "factory"].iter().enumerate() {
-        let clip = state.clip(&assets, name);
-        state.beds[index] = Some(looped(&mut commands, clip, 0.0));
-    }
 }
 
 /// The master volume is the global one.
@@ -82,6 +76,9 @@ fn master(prefs: Option<Res<Prefs>>, mut global: ResMut<GlobalVolume>) {
 }
 
 fn channel(prefs: &Option<Res<Prefs>>, pick: fn(&Prefs) -> f32) -> f32 { prefs.as_ref().map_or(1.0, |p| pick(p)) }
+
+/// A channel level for `AudioSink::set_volume`, which replaces the volume the global one scaled at spawn, so the master is folded back in.
+fn live(prefs: &Option<Res<Prefs>>, pick: fn(&Prefs) -> f32) -> f32 { channel(prefs, |p| p.master) * channel(prefs, pick) }
 
 /// The camera hears positional sounds.
 fn listener(mut commands: Commands, cameras: Query<Entity, (With<Camera3d>, Without<SpatialListener>)>) {
@@ -106,50 +103,29 @@ fn zones(world: &crate::session::Joined, x: f32, z: f32) -> [f32; 3] {
     [1.0 - factory - farm, farm, factory]
 }
 
-#[allow(clippy::too_many_arguments)]
-fn music_and_beds(time: Res<Time>, prefs: Option<Res<Prefs>>, session: Res<Session>, mut state: ResMut<AudioState>, mut sinks: Query<&mut AudioSink>, space: Option<Res<Space>>, player: Query<&Transform, With<crate::player::Player>>, mut lookup: Local<f32>) {
-    let delta = time.delta_secs();
+/// The menu music fades out on joining a world and back in on leaving.
+fn music(time: Res<Time>, prefs: Option<Res<Prefs>>, session: Res<Session>, mut state: ResMut<AudioState>, mut sinks: Query<&mut AudioSink>) {
     let in_world = session.joined().is_some();
-    let music_target = if in_world { 0.0 } else { MUSIC_LEVEL };
-    state.mix[3] = state.mix[3].move_towards(music_target, delta * MUSIC_LEVEL / if in_world { 1.5 } else { 2.5 });
-    let mut target = [0.0f32; 3];
-    *lookup += delta;
-    if let (Some(world), Some(space), Ok(player)) = (session.joined(), space, player.single()) {
-        let (x, z, _) = space.to_map(player.translation);
-        target = zones(world, x, z);
-    }
-    for i in 0..3 {
-        state.mix[i] = state.mix[i].move_towards(target[i] * BED_LEVEL, delta * 0.4 * BED_LEVEL);
-    }
-    let ambience = channel(&prefs, |p| p.ambience);
-    let levels = [state.mix[0] * ambience, state.mix[1] * ambience, state.mix[2] * ambience];
-    if let Some(music) = state.music {
-        if let Ok(mut sink) = sinks.get_mut(music) {
-            sink.set_volume(Volume::Linear(state.mix[3] * ambience));
-        }
-    }
-    for (bed, level) in state.beds.iter().zip(levels) {
-        if let Some(Ok(mut sink)) = bed.map(|b| sinks.get_mut(b)) {
-            sink.set_volume(Volume::Linear(level));
-        }
+    let target = if in_world { 0.0 } else { MUSIC_LEVEL };
+    state.music_level = state.music_level.move_towards(target, time.delta_secs() * MUSIC_LEVEL / if in_world { 1.5 } else { 2.5 });
+    if let Some(Ok(mut sink)) = state.music.map(|m| sinks.get_mut(m)) {
+        sink.set_volume(Volume::Linear(state.music_level * live(&prefs, |p| p.ambience)));
     }
 }
 
 /// Now and then a horn in town, birds over farmland, a clank by a factory, somewhere around the avatar.
-fn incidentals(mut commands: Commands, prefs: Option<Res<Prefs>>, time: Res<Time>, assets: Res<AssetServer>, mut state: ResMut<AudioState>, player: Query<&Transform, With<crate::player::Player>>, session: Res<Session>) {
-    let Ok(player) = player.single() else { return };
-    if session.joined().is_none() {
-        return;
-    }
+fn incidentals(mut commands: Commands, prefs: Option<Res<Prefs>>, time: Res<Time>, assets: Res<AssetServer>, mut state: ResMut<AudioState>, player: Query<&Transform, With<crate::player::Player>>, session: Res<Session>, space: Option<Res<Space>>) {
+    let (Ok(player), Some(world), Some(space)) = (player.single(), session.joined(), space) else { return };
     state.incidental_timer -= time.delta_secs();
     if state.incidental_timer > 0.0 {
         return;
     }
     let roll = random::mix((time.elapsed_secs() * 1000.0) as u64);
     state.incidental_timer = 6.0 + (roll % 900) as f32 / 100.0;
-    let weights = [state.mix[0], state.mix[1], state.mix[2]];
+    let (x, z, _) = space.to_map(player.translation);
+    let weights = zones(world, x, z);
     let pick = weights.iter().enumerate().max_by(|a, b| a.1.total_cmp(b.1)).map_or(0, |(i, _)| i);
-    if weights[pick] < 0.05 {
+    if weights[pick] < 0.15 {
         return;
     }
     let name = match pick {
@@ -220,9 +196,15 @@ fn footsteps(mut commands: Commands, prefs: Option<Res<Prefs>>, time: Res<Time>,
     }
     state.step_timer = FOOTSTEP_SECONDS;
     state.step_index += 1;
-    let name = format!("footstep_{}", 1 + random::mix(state.step_index) % 6);
-    let clip = state.clip(&assets, &name);
-    one_shot(&mut commands, clip, 0.35 * channel(&prefs, |p| p.effects), Some(position));
+    // Like Unity FootstepAudio: never the same clip twice running, and a little pitch and level spread so steps do not repeat.
+    let roll = random::mix(state.step_index);
+    let mut pick = roll % 6;
+    if pick == state.last_step { pick = (pick + 1) % 6; }
+    state.last_step = pick;
+    let clip = state.clip(&assets, &format!("footstep_{}", 1 + pick));
+    let speed = 0.9 + ((roll >> 8) % 200) as f32 / 1000.0;
+    let level = 0.2 * (0.8 + ((roll >> 16) % 200) as f32 / 1000.0) * channel(&prefs, |p| p.effects);
+    commands.spawn((AudioPlayer::new(clip), PlaybackSettings { mode: PlaybackMode::Despawn, volume: Volume::Linear(level), speed, spatial: true, spatial_scale: Some(SpatialScale::new(0.25)), ..default() }, Transform::from_translation(position)));
 }
 
 fn machine_clip(kind: &str) -> Option<&'static str> {
@@ -235,7 +217,7 @@ fn machine_clip(kind: &str) -> Option<&'static str> {
 }
 
 /// Each running machine near the avatar plays its loop where it stands.
-fn machines(mut commands: Commands, prefs: Option<Res<Prefs>>, assets: Res<AssetServer>, mut state: ResMut<AudioState>, session: Res<Session>, space: Option<Res<Space>>, player: Query<&Transform, With<crate::player::Player>>) {
+fn machines(mut commands: Commands, prefs: Option<Res<Prefs>>, assets: Res<AssetServer>, mut state: ResMut<AudioState>, session: Res<Session>, space: Option<Res<Space>>, player: Query<&Transform, With<crate::player::Player>>, mut sinks: Query<&mut AudioSink>) {
     let (Some(world), Some(space), Ok(player)) = (session.joined(), space, player.single()) else {
         for (_, e) in state.machines.drain() {
             commands.entity(e).despawn();
@@ -260,6 +242,8 @@ fn machines(mut commands: Commands, prefs: Option<Res<Prefs>>, assets: Res<Asset
                 let clip = state.clip(&assets, name);
                 let entity = commands.spawn((AudioPlayer::new(clip), PlaybackSettings { mode: PlaybackMode::Loop, volume: Volume::Linear(0.4 * channel(&prefs, |p| p.effects)), spatial: true, spatial_scale: Some(SpatialScale::new(0.25)), ..default() }, Transform::from_translation(at))).id();
                 state.machines.insert(piece.id.clone(), entity);
+            } else if let Some(Ok(mut sink)) = state.machines.get(&piece.id).map(|e| sinks.get_mut(*e)) {
+                sink.set_volume(Volume::Linear(0.4 * live(&prefs, |p| p.effects)));
             }
         }
     }
@@ -320,7 +304,7 @@ fn engines(
     }
     near.sort_by(|a, b| a.0.total_cmp(&b.0));
     let audible: HashSet<Entity> = near.iter().take(ENGINE_MAX_AUDIBLE).map(|n| n.1).collect();
-    let effects = channel(&prefs, |p| p.effects);
+    let effects = live(&prefs, |p| p.effects);
     for (entity, transform, engine) in &vehicles {
         let Some(voice) = voices.get_mut(&entity) else { continue };
         let target = if audible.contains(&entity) { 1.0 } else { 0.0 };

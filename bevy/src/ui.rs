@@ -1,10 +1,9 @@
 // The panel model shared by the in-world screens: a panel describes itself as a UiModel (heading, status, entries: labels,
-// buttons, text fields, rows of icon slots) and the superui front end (front.rs) draws it. Buttons queue their action string
+// buttons, text fields, rows of icon slots) and the front end (front/panel_view.rs) draws it. Buttons queue their action string
 // in UiIntents for the owning screen to handle; fields keep their text in UiFields. Widgets never mutate the simulation.
 use std::collections::BTreeMap;
 
 use bevy::prelude::*;
-use serde::Serialize;
 
 pub struct GameUiPlugin;
 
@@ -80,83 +79,4 @@ pub struct UiModel {
     /// Docked on the right (build mode's catalog), leaving the lot in view.
     pub right: bool,
     pub entries: Vec<UiEntry>,
-}
-
-/// An entry as the front end draws it: icons as asset paths, runtime images (structure cards, the phone map) by key.
-#[derive(Serialize, PartialEq, Clone, Default)]
-pub struct EntryDto {
-    pub id: String,
-    pub label: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub action: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub input: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub icon: Option<String>,
-    /// A runtime image the front end attaches by element id (`rt-<key>`), with its size in pixels.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub image: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub size: Option<f32>,
-    #[serde(skip_serializing_if = "std::ops::Not::not")]
-    pub multiline: bool,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub row: Vec<EntryDto>,
-    #[serde(skip_serializing_if = "std::ops::Not::not")]
-    pub selected: bool,
-    #[serde(skip_serializing_if = "std::ops::Not::not")]
-    pub slot: bool,
-}
-
-#[derive(Serialize, PartialEq, Clone, Default)]
-pub struct PanelDto {
-    pub heading: String,
-    pub status: String,
-    pub footer: String,
-    pub wide: bool,
-    pub right: bool,
-    pub entries: Vec<EntryDto>,
-}
-
-/// Runtime images a panel shows, keyed as its entries name them.
-#[derive(Resource, Default)]
-pub struct RuntimeImages(pub BTreeMap<String, Handle<Image>>);
-
-impl UiModel {
-    /// The open panel as the front end draws it, collecting its runtime images. Field values start from what was typed.
-    pub fn to_dto(&self, fields: &UiFields, images: &mut RuntimeImages) -> PanelDto {
-        fn entry(e: &UiEntry, fields: &UiFields, images: &mut RuntimeImages) -> EntryDto {
-            // A picture is keyed by its entry (the phone map), an icon by its image.
-            let mut image = |key: String, handle: &Handle<Image>| {
-                let key: String = key.chars().filter(|c| c.is_ascii_alphanumeric() || *c == '-').collect();
-                images.0.insert(key.clone(), handle.clone());
-                key
-            };
-            let (picture, size) = match &e.picture {
-                Some((handle, size)) => (Some(image(e.id.clone(), handle)), Some(*size)),
-                None => (e.icon_image.as_ref().map(|h| image(format!("img-{}", h.id()), h)), None),
-            };
-            EntryDto {
-                id: e.id.clone(),
-                label: e.label.clone(),
-                action: e.action.clone(),
-                input: e.input.as_ref().map(|default| fields.0.get(&e.id).cloned().unwrap_or_else(|| default.clone())),
-                icon: e.icon.clone(),
-                image: picture,
-                size,
-                multiline: e.multiline,
-                row: e.row.iter().map(|c| entry(c, fields, images)).collect(),
-                selected: e.selected,
-                slot: e.slot,
-            }
-        }
-        PanelDto {
-            heading: self.heading.clone(),
-            status: self.status.clone(),
-            footer: self.footer.clone(),
-            wide: self.wide,
-            right: self.right,
-            entries: self.entries.iter().map(|e| entry(e, fields, images)).collect(),
-        }
-    }
 }

@@ -1,4 +1,4 @@
-// The in-world HUD's data (Unity PlayerHud), drawn by the superui front end: the site card, cash with its recent rate and the
+// The in-world HUD's data (Unity PlayerHud), drawn by the front end (front/hud_view.rs): the site card, cash with its recent rate and the
 // clock, alerts (why the restaurant is not selling, wages about to run out, stock spoiling, notices), the aimed object's
 // prompt under the crosshair, the hotbar with each held machine kind's icon and count, and a tooltip beside the free pointer.
 // The restaurant readout is recomputed once per baseline revision.
@@ -10,7 +10,7 @@ use food_factory_bevy::goods::{self, EquipmentState};
 use food_factory_bevy::world::clock::{DAY_SECONDS, HOUR_SECONDS};
 
 use crate::actions::Bindings;
-use crate::front::{AlertDto, FrontGeneration, HotbarSlotDto, HudFrame, KeyHintDto, Sent, TooltipFrame};
+use crate::front::{AlertDto, HotbarSlotDto, HudFrame, KeyHintDto, TooltipFrame};
 use crate::interaction::{Aim, Cursor, Hotbar, HotbarEntry, HOTBAR_SIZE};
 use crate::map::MapState;
 use crate::screens::{format_duration, reason_text, HudLines, Screen};
@@ -65,9 +65,9 @@ fn readout(world: &crate::session::Joined, content: &Content) -> Readout {
 
 #[allow(clippy::too_many_arguments)]
 fn emit_hud(
-    mut commands: Commands, session: Res<Session>, screen: Res<Screen>, map: Res<MapState>, hud: Res<HudLines>, hotbar: Res<Hotbar>, cursor: Res<Cursor>,
+    session: Res<Session>, screen: Res<Screen>, map: Res<MapState>, hud: Res<HudLines>, hotbar: Res<Hotbar>, cursor: Res<Cursor>,
     content: Res<Content>, indoors: Res<Indoors>, bindings: Res<Bindings>, window: Query<&CursorOptions, With<PrimaryWindow>>, panels: Res<crate::panels::Panels>,
-    generation: Res<FrontGeneration>, mut card: Local<Readout>, mut sent: Local<Sent<HudFrame>>,
+    mut card: Local<Readout>, mut out: ResMut<HudFrame>,
 ) {
     let playing = *screen == Screen::Playing;
     let mut frame = HudFrame { visible: playing && session.in_world(), ..default() };
@@ -146,13 +146,13 @@ fn emit_hud(
             ];
         }
     }
-    sent.send(&mut commands, &generation, frame);
+    out.set_if_neq(frame);
 }
 
 /// Names a usable hover target beside the free pointer; the crosshair prompt remains the locked-pointer fallback.
 fn emit_tooltip(
-    mut commands: Commands, aim: Res<Aim>, session: Res<Session>, content: Res<Content>, screen: Res<Screen>, window: Query<(&Window, &CursorOptions), With<PrimaryWindow>>,
-    scale: Res<UiScale>, generation: Res<FrontGeneration>, mut sent: Local<Sent<TooltipFrame>>,
+    aim: Res<Aim>, session: Res<Session>, content: Res<Content>, screen: Res<Screen>, window: Query<(&Window, &CursorOptions), With<PrimaryWindow>>,
+    scale: Res<UiScale>, mut out: ResMut<TooltipFrame>,
 ) {
     let mut frame = TooltipFrame::default();
     let free = window.single().ok().filter(|(_, c)| c.grab_mode == CursorGrabMode::None);
@@ -168,5 +168,5 @@ fn emit_tooltip(
             frame = TooltipFrame { text: label, x: at.x.round(), y: at.y.round() };
         }
     }
-    sent.send(&mut commands, &generation, frame);
+    out.set_if_neq(frame);
 }

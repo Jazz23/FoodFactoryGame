@@ -715,7 +715,7 @@ fn sync_pedestrians(
     let mut keep = HashSet::new();
     for (id, point, yaw) in wanted {
         keep.insert(id.clone());
-        let position = space.to_scene(point.x, point.y, space.land(point.x, point.y));
+        let position = space.to_scene(point.x, point.y, space.land(point.x, point.y) + ambient.surface_lift(&world.roads, point));
         if let Some(entity) = figures.pedestrians.get(&id) {
             if let Ok(mut target) = targets.get_mut(*entity) {
                 target.position = position;

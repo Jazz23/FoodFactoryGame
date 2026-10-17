@@ -1,12 +1,2 @@
-# Fast-compile setup from the Bevy setup guide: use LLD instead of each platform's slower default linker.
-# Dynamic linking of Bevy is on by default through the `dev` feature in Cargo.toml.
-[target.x86_64-unknown-linux-gnu]
-linker = "clang"
-rustflags = ["-C", "link-arg=-fuse-ld=lld"]
-
-# Native Windows builds keep MSVC's default link.exe: `dx serve --hot-patch` wraps the configured linker and fails with
-# rust-lld.exe ("lld is a generic driver"), and with Bevy dynamically linked the link step is already short.
-
-# Windows release builds cross-compiled from WSL (apt package mingw-w64).
-[target.x86_64-pc-windows-gnu]
-linker = "x86_64-w64-mingw32-gcc"
+[target.x86_64-pc-windows-msvc]
+linker = "rust-lld.exe"

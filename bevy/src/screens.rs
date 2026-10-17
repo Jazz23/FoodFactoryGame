@@ -9,7 +9,7 @@ use food_factory_bevy::server;
 use crate::actions::UiFocus;
 use crate::panels::Panels;
 use crate::session::{money, Content, Session, SessionEvent};
-use crate::front::{FrontGeneration, MenuFrame, ResumeDto, Sent, WorldDto};
+use crate::front::{MenuFrame, ResumeDto, WorldDto};
 use crate::ui::{UiFields, UiIntents, UiModel};
 
 pub struct ScreensPlugin;
@@ -236,9 +236,9 @@ fn ago(time: std::time::SystemTime) -> String {
 
 #[allow(clippy::too_many_arguments)]
 fn emit_menu(
-    mut commands: Commands, session: Res<Session>, screen: Res<Screen>, mut model: ResMut<UiModel>, panels: Res<Panels>, mut focus: ResMut<UiFocus>,
+    session: Res<Session>, screen: Res<Screen>, mut model: ResMut<UiModel>, panels: Res<Panels>, mut focus: ResMut<UiFocus>,
     mut worlds: Local<WorldList>, time: Res<Time>, settings_screen: Res<crate::settings::SettingsScreen>, prefs: Option<Res<crate::settings::Prefs>>,
-    generation: Res<FrontGeneration>, mut sent: Local<Sent<MenuFrame>>,
+    mut out: ResMut<MenuFrame>,
 ) {
     let now = time.elapsed_secs_f64();
     if worlds.saved.is_empty() && worlds.refreshed == 0.0 || now - worlds.refreshed > 3.0 {
@@ -287,7 +287,7 @@ fn emit_menu(
             None => format!("Playing {}", h.world_name),
         });
     }
-    sent.send(&mut commands, &generation, frame);
+    out.set_if_neq(frame);
     if panels.open.is_some() || settings_screen.open {
         if settings_screen.open && !focus.0 {
             focus.0 = true;

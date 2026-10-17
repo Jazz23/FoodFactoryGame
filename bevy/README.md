@@ -18,11 +18,10 @@ PgUp/PgDn floors, middle click pick), Esc close or pause.
 
 ## Interface
 
-Menus, settings, the HUD and every panel are one [superui](https://github.com/strowk/bevy_superui) page,
-`assets/ui/game` (`index.html`, `style.css`, `app.tsx`), styled after the "Main Menu" and "Food Factory UI" designs.
-Under the default `dev` feature edits to those files hot-reload in the running game; other builds load the JavaScript
-`build.rs` pre-transpiles into `assets/ui/game/.superui/build`. `src/front.rs` bridges it to the game (see
-[architecture](docs/architecture.md)). Its icons are PNGs rasterized from the designs' SVG by `python tools/ui_icons.py`
+Menus, settings, the HUD and every panel are drawn with bevy_ui by `src/front/` (one view per surface: `menu_view.rs`,
+`settings_view.rs`, `hud_view.rs`, `panel_view.rs`), styled after the "Main Menu" and "Food Factory UI" designs. Each
+surface rebuilds when the frame the game writes for it changes (see [architecture](docs/architecture.md)). Its icons,
+`assets/ui/game/icons`, are PNGs rasterized from the designs' SVG by `python tools/ui_icons.py`
 (needs ImageMagick); the fonts (Rubik, JetBrains Mono, SIL Open Font License) are in `assets/fonts`.
 
 ## Saves and settings
@@ -96,7 +95,7 @@ Run every command in PowerShell from this `bevy` folder.
 ### 2. Run with hot patching
 
 ```powershell
-dx serve --hot-patch --no-default-features --features hotpatch,audio
+dx serve --hot-patch --no-default-features --features hotpatch
 ```
 
 The first run compiles all of Bevy and takes about 7 minutes; the progress bar shows how far along it is. Later
@@ -117,7 +116,8 @@ Why the command looks like this:
   linked Bevy on Windows: the game exits with `0xc0000135` (DLL not found,
   [DioxusLabs/dioxus#4693](https://github.com/DioxusLabs/dioxus/issues/4693)). Patches rebuild only this crate, so they
   stay fast without dynamic linking.
-- The `hotpatch` feature turns on Bevy's `hotpatching` and `file_watcher` features, and reads assets straight from
+- The `hotpatch` feature turns on Bevy's `hotpatching` and `file_watcher` features and sound (`audio`, which
+  `--no-default-features` would otherwise drop), and reads assets straight from
   this folder's `assets/`. dx launches the game from `target/dx/...`, so you do not need to set `BEVY_ASSET_ROOT`.
 - dx builds into its own `target/x86_64-pc-windows-msvc/desktop-dev` folder with its own compiler flags, so it does
   not share the `cargo build` cache.
@@ -139,15 +139,6 @@ Bevy is dynamically linked here, so the first build takes about 2.5 minutes and 
 - **Game exits with `0xc0000135`:** the `dev` feature is on under dx. Use the exact command above, including
   `--no-default-features`.
 - **Character missing:** run `git lfs pull` (step 1.3).
-- **`v8` build script fails with `Failed to create symlink`:** the UI's JavaScript engine (V8, via superui) creates a
-  symlink between the cargo registry and `target/` when they are on different drives, which needs Developer Mode. A
-  directory junction needs no privilege; create it once per profile folder (`debug`, `release`), then build again:
-
-  ```powershell
-  $v8 = (Get-ChildItem "$env:USERPROFILE\.cargo
-egistry\src\*8-*" -Directory | Select-Object -Last 1).FullName
-  cmd /c mklink /J target\debug\gn_root "$v8"
-  ```
 
 ## Linux / WSL
 

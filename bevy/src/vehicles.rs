@@ -36,7 +36,13 @@ const BODY_MATERIAL: &str = "VH_Body";
 const KERB_METRES: f32 = 1.0;
 const MAX_EXTRAPOLATION: f32 = 1.25;
 const CAR_RADIUS: f32 = 220.0;
-const MAX_CARS: usize = 70;
+const MAX_CARS: usize = 150;
+/// A drawn car keeps its place against new ones this many metres closer, so the nearest-first cap does not swap cars in and out.
+const KEEP_BIAS: f32 = 40.0;
+/// A car the streams no longer list drives on at most this long before it goes, even in sight.
+const COAST_SECONDS: f32 = 30.0;
+/// While a world is first shown cars appear anywhere; after that only out of sight.
+const FILL_SECONDS: f64 = 0.5;
 const OWN_COLOUR: Color = Color::srgb(0.18, 0.62, 0.32);
 const CAR_COLOURS: [Color; 8] = [
     Color::srgb(0.75, 0.12, 0.12), Color::srgb(0.12, 0.25, 0.6), Color::srgb(0.85, 0.85, 0.85), Color::srgb(0.12, 0.12, 0.13),
@@ -69,6 +75,8 @@ struct Vehicles {
     requested: bool,
     trucks: HashMap<String, Entity>,
     cars: HashMap<String, Entity>,
+    /// The world the cars were first filled for and the time that fill ends.
+    filled: (String, f64),
     /// When each truck's latest baseline arrived (its revision and the local time).
     seen: HashMap<String, (i64, f32)>,
     tints: HashMap<String, Handle<StandardMaterial>>,
@@ -78,6 +86,13 @@ struct Vehicles {
 /// A vehicle's half extents across and along it (for its solid body).
 #[derive(Component)]
 struct Body(Vec2);
+
+/// A city car’s last velocity (scene metres per second), and how long it has driven on unlisted.
+#[derive(Component, Default)]
+struct CarMotion {
+    velocity: Vec3,
+    unlisted: f32,
+}
 
 #[derive(Component)]
 struct Drive {
@@ -309,7 +324,15 @@ fn trucks(mut commands: Commands, time: Res<Time>, session: Res<Session>, space:
 }
 
 #[allow(clippy::too_many_arguments)]
-fn city_cars(mut commands: Commands, session: Res<Session>, space: Option<Res<Space>>, mut vehicles: ResMut<Vehicles>, mut materials: ResMut<Assets<StandardMaterial>>, mut drives: Query<&mut Drive>, player: Query<&Transform, With<crate::player::Player>>, clock: Res<TrafficClock>, people: Query<&GlobalTransform, With<crate::sites::DoorOpener>>, mut positions: ResMut<TrafficPositions>) {
+/// Cars appear and vanish only out of sight (Unity CityTrafficPresenter): a new car is drawn only where no camera sees it
+/// (or while the world is first shown), and one the streams stop listing (its lane ended, or the cap dropped it) drives on
+/// along its last heading until it is out of sight.
+#[allow(clippy::too_many_arguments)]
+fn city_cars(
+    mut commands: Commands, time: Res<Time>, session: Res<Session>, space: Option<Res<Space>>, mut vehicles: ResMut<Vehicles>, mut materials: ResMut<Assets<StandardMaterial>>,
+    mut cars_drawn: Query<(&mut Drive, &mut CarMotion, &Transform)>, player: Query<&Transform, With<crate::player::Player>>, clock: Res<TrafficClock>,
+    people: Query<&GlobalTransform, With<crate::sites::DoorOpener>>, mut positions: ResMut<TrafficPositions>, cameras: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
+) {
     positions.0.clear();
     let (Some(world), Some(space), Ok(player)) = (session.joined(), space, player.single()) else {
         for (_, e) in vehicles.cars.drain() {
@@ -321,6 +344,13 @@ fn city_cars(mut commands: Commands, session: Res<Session>, space: Option<Res<Sp
         return;
     }
     let t = clock.seconds;
+    let now = time.elapsed_secs_f64();
+    let dt = time.delta_secs().max(1e-4);
+    if vehicles.filled.0 != world.world_id {
+        vehicles.filled = (world.world_id.clone(), now + FILL_SECONDS);
+    }
+    let filling = now < vehicles.filled.1;
+    let seen = |p: Vec3| cameras.iter().any(|(camera, at)| camera.is_active && camera.world_to_ndc(at, p + Vec3::Y).is_some_and(|n| n.x.abs() < 1.15 && n.y.abs() < 1.15 && n.z > 0.0));
     let (px, pz, _) = space.to_map(player.translation);
     let here = Vec2::new(px, pz);
     let network = &world.roads;
@@ -369,6 +399,9 @@ fn city_cars(mut commands: Commands, session: Res<Session>, space: Option<Res<Sp
             }
         }
     }
+    for entry in &mut wanted {
+        if vehicles.cars.contains_key(&entry.1) { entry.0 -= KEEP_BIAS; }
+    }
     wanted.sort_by(|a, b| a.0.total_cmp(&b.0));
     wanted.truncate(MAX_CARS);
     let mut keep = HashSet::new();
@@ -378,10 +411,15 @@ fn city_cars(mut commands: Commands, session: Res<Session>, space: Option<Res<Sp
         // Cars avoid drawn lots (a road never runs through one, but its kerb lane may graze an apron).
         let position = space.to_scene(point.x, point.y, space.land(point.x, point.y));
         if let Some(entity) = vehicles.cars.get(&id) {
-            if let Ok(mut drive) = drives.get_mut(*entity) {
+            if let Ok((mut drive, mut motion, _)) = cars_drawn.get_mut(*entity) {
+                motion.velocity = if drive.position.distance(position) < 25.0 { (position - drive.position) / dt } else { Vec3::ZERO };
+                motion.unlisted = 0.0;
                 drive.position = position;
                 drive.yaw = yaw;
             }
+            continue;
+        }
+        if !filling && seen(position) {
             continue;
         }
         let name = CAR_NAMES[model_index];
@@ -389,12 +427,24 @@ fn city_cars(mut commands: Commands, session: Res<Session>, space: Option<Res<Sp
         let material = colour.map(|c| tint(&mut vehicles, &mut materials, format!("car:{c:?}"), c));
         let Some(model) = vehicles.models.get(name) else { continue };
         let entity = spawn_vehicle(&mut commands, model, material, position, yaw, format!("Car {id}"));
-        commands.entity(entity).insert(Engine { volume: 0.18, pitch: 1.2 + (food_factory_bevy::world::random::fnv1a(&id) % 1000) as f32 / 1000.0 * 0.3, hearing: 22.0 });
+        commands.entity(entity).insert(CarMotion::default()).insert(Engine { volume: 0.18, pitch: 1.2 + (food_factory_bevy::world::random::fnv1a(&id) % 1000) as f32 / 1000.0 * 0.3, hearing: 22.0 });
         vehicles.cars.insert(id, entity);
     }
-    let stale: Vec<String> = vehicles.cars.keys().filter(|k| !keep.contains(*k)).cloned().collect();
-    for id in stale {
-        if let Some(e) = vehicles.cars.remove(&id) {
+    let unlisted: Vec<(String, Entity)> = vehicles.cars.iter().filter(|(k, _)| !keep.contains(*k)).map(|(k, e)| (k.clone(), *e)).collect();
+    for (id, e) in unlisted {
+        let gone = match cars_drawn.get_mut(e) {
+            Ok((mut drive, mut motion, transform)) => {
+                motion.unlisted += dt;
+                drive.position += motion.velocity * dt;
+                let (x, z, _) = space.to_map(drive.position);
+                drive.position.y = space.to_scene(x, z, space.land(x, z)).y;
+                positions.0.push(Vec2::new(x, z));
+                filling || motion.unlisted > COAST_SECONDS || !seen(transform.translation) || Vec2::new(x, z).distance(here) > CAR_RADIUS
+            }
+            Err(_) => true,
+        };
+        if gone {
+            vehicles.cars.remove(&id);
             commands.entity(e).despawn();
         }
     }
