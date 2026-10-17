@@ -5,9 +5,9 @@
 // click places one piece, door or window; dragging draws a line of wall, restyles a line or fills an area with a piece, ordered
 // when the button is released; Esc during a drag drops it. Holding right click still on something for half a second removes
 // it (sells a charged piece, picks up an uncharged one, takes up a belt, removes a wall, door or window), and keeping it held
-// sweeps every further thing of the same family; moving the pointer while holding tilts and turns the camera instead. Move
-// pans, Zoom zooms, R turns the piece, PgUp/PgDn change floor, middle click picks what is under the pointer, X clears the
-// tool, B or Esc leaves. Every order is a request; the next baseline shows what the server accepted.
+// sweeps every further thing of the same family; moving the pointer while holding tilts and turns the camera instead. The
+// camera opens straight down and grid-aligned, WASD pans it, T restores that view and scrolling outside the menus zooms. R
+// turns the piece, PgUp/PgDn change floor, middle click picks what is under the pointer, X clears the tool, B or Esc leaves. Every order is a request; the next baseline shows what the server accepted.
 use bevy::input::mouse::AccumulatedMouseMotion;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
@@ -92,7 +92,7 @@ fn enter_leave(
             for mut rig in &mut rigs {
                 rig.build_focus = Some(centre);
                 rig.build_distance = (lot.width.max(lot.depth) as f32 * 1.1).clamp(12.0, 80.0);
-                rig.build_pitch = 62.0;
+                rig.align_build_view();
             }
             build.active = Some(world.site.clone());
             build.level = 0;
@@ -189,12 +189,15 @@ fn pointer(mut build: ResMut<Build>, space: Option<Res<Space>>, cameras: Query<(
         build.tool = Tool::None;
         build.drag_start = None;
     }
+    if actions.top_down_pressed {
+        rigs.iter_mut().for_each(|mut rig| rig.align_build_view());
+    }
     // Holding right click and moving tilts and turns the camera.
     if let Some((_, _, tilting)) = build.remove_press {
         if tilting {
             for mut rig in &mut rigs {
                 rig.yaw = (rig.yaw + motion.delta.x * DEGREES_PER_PIXEL).rem_euclid(360.0);
-                rig.build_pitch = (rig.build_pitch + motion.delta.y * DEGREES_PER_PIXEL).clamp(30.0, 90.0);
+                rig.build_pitch = (rig.build_pitch + motion.delta.y * DEGREES_PER_PIXEL).clamp(crate::camera::MIN_BUILD_PITCH, 90.0);
             }
         }
     }
@@ -203,6 +206,10 @@ fn pointer(mut build: ResMut<Build>, space: Option<Res<Space>>, cameras: Query<(
         return;
     }
     let over_ui = crate::front::pointer_over_ui(&hover, &nodes);
+    // The catalog scrolls under the pointer, so only scrolling over the world zooms.
+    if actions.pointer_zoom != 0.0 && !over_ui {
+        rigs.iter_mut().for_each(|mut rig| rig.zoom_build(actions.pointer_zoom));
+    }
     let (Ok(window), Some((camera, transform))) = (window.single(), cameras.iter().next()) else { return };
     let Some(pointer) = window.cursor_position().filter(|_| !over_ui) else {
         build.cell = None;

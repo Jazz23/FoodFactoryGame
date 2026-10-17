@@ -1,9 +1,9 @@
 // Over-the-shoulder orbit camera (Unity OrbitCameraRig): it follows the avatar's position but never its facing; Look orbits
 // unless a screen is open; looking up shortens the arm so the camera never drops through the floor. The arm never passes
 // through a wall: a ray from the pivot pulls the camera in front of the first collision box at least 1.5 m tall, and indoors
-// it stays under the room's ceiling. The top-down view (straight down, yaw snapped to the grid) is build mode's: while a build
-// focus is set the camera frames that point from the build distance, Move pans it, Zoom changes the distance and holding the
-// right button turns Look into tilt and turn.
+// it stays under the room's ceiling. While a build focus is set the camera frames that point from the build distance, opening
+// straight down with its yaw on a grid axis; only the move keys pan it, build mode's scroll changes the distance and right-drag
+// tilts and turns it (T aligns it again).
 use bevy::prelude::*;
 
 use crate::actions::{PlayerActions, UiFocus};
@@ -33,7 +33,7 @@ const CEILING_GAP: f32 = 0.25;
 const CAST_RADIUS: f32 = 0.2;
 const MIN_BUILD_DISTANCE: f32 = 4.0;
 const MAX_BUILD_DISTANCE: f32 = 90.0;
-const MIN_BUILD_PITCH: f32 = 30.0;
+pub const MIN_BUILD_PITCH: f32 = 30.0;
 const BUILD_PAN_SPEED: f32 = 12.0;
 const BUILD_SPRINT_FACTOR: f32 = 2.5;
 
@@ -56,6 +56,17 @@ pub struct OrbitCamera {
 
 impl OrbitCamera {
     pub fn yaw_rotation(&self) -> Quat { Quat::from_rotation_y(-self.yaw.to_radians()) }
+
+    /// Build view straight down, turned to the nearest grid axis.
+    pub fn align_build_view(&mut self) {
+        self.yaw = ((self.yaw / 90.0).round() * 90.0).rem_euclid(360.0);
+        self.build_pitch = 90.0;
+    }
+
+    /// One build zoom step per scrolling frame, positive scroll moving closer.
+    pub fn zoom_build(&mut self, scroll: f32) {
+        self.build_distance = (self.build_distance - scroll.signum() * ZOOM_STEP * 3.0).clamp(MIN_BUILD_DISTANCE, MAX_BUILD_DISTANCE);
+    }
 }
 
 fn spawn_camera(mut commands: Commands) {
@@ -73,17 +84,10 @@ fn orbit_input(actions: Res<PlayerActions>, focus: Res<UiFocus>, time: Res<Time>
         rig.blend = rig.blend.move_towards(target, time.delta_secs() / 0.4);
         if let Some(mut focus_point) = rig.build_focus {
             let delta = time.delta_secs();
-            if actions.remove_held {
-                rig.yaw = (rig.yaw + actions.look.x * ORBIT_DEGREES_PER_PIXEL).rem_euclid(360.0);
-                rig.build_pitch = (rig.build_pitch + actions.look.y * ORBIT_DEGREES_PER_PIXEL).clamp(MIN_BUILD_PITCH, 90.0);
-            }
             let speed = BUILD_PAN_SPEED * if actions.sprint { BUILD_SPRINT_FACTOR } else { 1.0 } * (rig.build_distance / 30.0).max(0.5);
-            let pan = rig.yaw_rotation() * Vec3::new(actions.movement.x, 0.0, -actions.movement.y) * speed * delta;
+            let pan = rig.yaw_rotation() * Vec3::new(actions.pan.x, 0.0, -actions.pan.y) * speed * delta;
             focus_point += pan;
             rig.build_focus = Some(focus_point);
-            if actions.zoom != 0.0 {
-                rig.build_distance = (rig.build_distance - actions.zoom.signum() * ZOOM_STEP * 3.0).clamp(MIN_BUILD_DISTANCE, MAX_BUILD_DISTANCE);
-            }
             continue;
         }
         if focus.0 {

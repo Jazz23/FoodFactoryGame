@@ -71,10 +71,10 @@ pub struct SettingsScreen {
 }
 
 /// Rebindable actions: (key, label).
-const ACTIONS: [(&str, &str); 23] = [
+const ACTIONS: [(&str, &str); 24] = [
     ("up", "Move forward"), ("down", "Move back"), ("left", "Move left"), ("right", "Move right"), ("jump", "Jump"), ("sprint", "Sprint"),
     ("interact", "Interact"), ("inventory", "Inventory"), ("take_item", "Take item"), ("place_item", "Place item"), ("clear", "Clear cursor"), ("rotate", "Rotate"),
-    ("build", "Build mode"), ("phone", "Phone"), ("map", "Map"), ("logistics", "Logistics"), ("flip_lift", "Flip lift"), ("floor_up", "Floor up"),
+    ("build", "Build mode"), ("phone", "Phone"), ("map", "Map"), ("logistics", "Logistics"), ("flip_lift", "Flip lift"), ("top_down", "Top-down camera"), ("floor_up", "Floor up"),
     ("floor_down", "Floor down"), ("release_cursor", "Close screen"), ("confirm", "Confirm build"), ("hotbar", "Hotbar (fixed: 1-9)"), ("zoom", "Zoom (fixed: scroll)"),
 ];
 
@@ -99,6 +99,7 @@ fn binding<'a>(bindings: &'a mut Bindings, action: &str) -> Option<&'a mut KeyCo
         "map" => &mut bindings.map,
         "logistics" => &mut bindings.logistics,
         "flip_lift" => &mut bindings.flip_lift,
+        "top_down" => &mut bindings.top_down,
         "floor_up" => &mut bindings.floor_up,
         "floor_down" => &mut bindings.floor_down,
         _ => return None,
@@ -304,7 +305,7 @@ fn apply_anti_aliasing(mut commands: Commands, prefs: Option<Res<Prefs>>, camera
 /// The keybind groups as the settings screen lays them out in two columns.
 const GROUPS: [&[(&str, &[&str])]; 2] = [
     &[("Movement", &["up", "down", "left", "right", "jump", "sprint"]), ("Interaction", &["interact", "inventory", "take_item", "place_item", "clear", "release_cursor"])],
-    &[("Building", &["build", "rotate", "confirm", "flip_lift", "floor_up", "floor_down"]), ("Camera and screens", &["phone", "map", "logistics", "zoom"]), ("Hotbar", &["hotbar"])],
+    &[("Building", &["build", "rotate", "confirm", "flip_lift", "top_down", "floor_up", "floor_down"]), ("Camera and screens", &["phone", "map", "logistics", "zoom"]), ("Hotbar", &["hotbar"])],
 ];
 
 /// An action's second key, for the actions that take two (the arrows beside WASD, keypad Enter).

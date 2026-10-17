@@ -1,7 +1,7 @@
 // Action map: gameplay reads named actions from `PlayerActions`, never raw devices. Bindings mirror the Unity project's
 // Player map (InputSystem_Actions): WASD/arrows move, Space jump, Left Shift sprint (and quick transfer), mouse look, scroll
 // zoom, E interact, Tab inventory, C phone, M map, L logistics, B build, X clear cursor, R rotate, F take item, Z place item,
-// V flip lift, PgUp/PgDn floors, Enter confirm, left click place, right click remove (and camera tilt in build mode),
+// V flip lift, T top-down build camera, PgUp/PgDn floors, Enter confirm, left click place, right click remove (and camera tilt in build mode),
 // middle click pick block, 1-9 hotbar, Esc close.
 use bevy::input::mouse::{AccumulatedMouseMotion, AccumulatedMouseScroll};
 use bevy::prelude::*;
@@ -52,6 +52,7 @@ pub struct Bindings {
     pub take_item: KeyCode,
     pub place_item: KeyCode,
     pub flip_lift: KeyCode,
+    pub top_down: KeyCode,
     pub floor_up: KeyCode,
     pub floor_down: KeyCode,
     pub confirm: Vec<KeyCode>,
@@ -81,6 +82,7 @@ impl Default for Bindings {
             take_item: KeyCode::KeyF,
             place_item: KeyCode::KeyZ,
             flip_lift: KeyCode::KeyV,
+            top_down: KeyCode::KeyT,
             floor_up: KeyCode::PageUp,
             floor_down: KeyCode::PageDown,
             confirm: vec![KeyCode::Enter, KeyCode::NumpadEnter],
@@ -111,6 +113,7 @@ pub struct PlayerActions {
     pub take_item_pressed: bool,
     pub place_item_pressed: bool,
     pub flip_lift_pressed: bool,
+    pub top_down_pressed: bool,
     pub floor_up_pressed: bool,
     pub floor_down_pressed: bool,
     pub confirm_pressed: bool,
@@ -129,12 +132,17 @@ pub struct PlayerActions {
     pub hotbar: Option<usize>,
     // Ground move input, x right and y forward, clamped to length 1.
     pub movement: Vec2,
+    /// The move keys even while a screen holds focus, for screens that move the camera over the world (build mode pans).
+    pub pan: Vec2,
     pub jump_pressed: bool,
     pub sprint: bool,
     // Pointer delta in pixels (x right, y down).
     pub look: Vec2,
     // Scroll steps this frame, positive away from the user.
     pub zoom: f32,
+    /// Scroll steps even while the cursor is free, for screens that zoom the world under the pointer (build mode); the reader
+    /// checks that the pointer is not over UI.
+    pub pointer_zoom: f32,
 }
 
 fn capture_cursor(
@@ -195,6 +203,7 @@ fn read_actions(
         take_item_pressed: keys.just_pressed(bindings.take_item),
         place_item_pressed: keys.just_pressed(bindings.place_item),
         flip_lift_pressed: keys.just_pressed(bindings.flip_lift),
+        top_down_pressed: keys.just_pressed(bindings.top_down),
         floor_up_pressed: keys.just_pressed(bindings.floor_up),
         floor_down_pressed: keys.just_pressed(bindings.floor_down),
         confirm_pressed: keys.any_just_pressed(bindings.confirm.iter().copied()),
@@ -215,11 +224,14 @@ fn read_actions(
             axis(&bindings.up, &bindings.down),
         )
         .clamp_length_max(1.0),
+        pan: Vec2::ZERO,
         jump_pressed: keys.any_just_pressed(bindings.jump.iter().copied()),
         sprint: keys.any_pressed(bindings.sprint.iter().copied()),
         look: if captured { motion.delta * bindings.sensitivity } else { Vec2::ZERO },
         zoom: if captured { scroll.delta.y } else { 0.0 },
+        pointer_zoom: scroll.delta.y,
     };
+    actions.pan = actions.movement;
     if focus.0 {
         actions.movement = Vec2::ZERO;
         actions.jump_pressed = false;

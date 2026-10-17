@@ -50,7 +50,9 @@ fn autopilot(
     // The real mouse never steers a capture.
     actions.look = Vec2::ZERO;
     actions.zoom = 0.0;
+    actions.pointer_zoom = 0.0;
     actions.movement = Vec2::ZERO;
+    actions.pan = Vec2::ZERO;
     if !capture.started {
         capture.started = true;
         let world = std::env::var("FF_CAPTURE_WORLD").unwrap_or_else(|_| "capture".into());
