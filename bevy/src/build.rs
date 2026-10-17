@@ -3,9 +3,9 @@
 // wall finishes in every style, the supplier's furnishings and machines, and belts. The pointer's cell shows a ghost tinted by
 // the same pure rules the server applies (plan_shell, furnish_problem), with the charge or the reason it would be refused. A
 // click places one piece, door or window; dragging draws a line of wall, restyles a line or fills an area with a piece, ordered
-// when the button is released; Esc during a drag drops it. Holding right click still on something for half a second removes
-// it (sells a charged piece, picks up an uncharged one, takes up a belt, removes a wall, door or window), and keeping it held
-// sweeps every further thing of the same family; moving the pointer while holding tilts and turns the camera instead. The
+// when the button is released; Esc during a drag drops it. Right clicking something removes it (sells a charged piece, picks up
+// an uncharged one, takes up a belt, removes a wall, door or window); holding right click still for half a second removes it
+// and keeps sweeping every further thing of the same family; moving the pointer while holding tilts and turns the camera instead. The
 // camera opens straight down and grid-aligned, WASD pans it, T restores that view and scrolling outside the menus zooms. R
 // turns the piece, PgUp/PgDn change floor, middle click picks what is under the pointer, X clears the tool, B or Esc leaves. Every order is a request; the next baseline shows what the server accepted.
 use bevy::input::mouse::AccumulatedMouseMotion;
@@ -405,6 +405,10 @@ fn orders(mut build: ResMut<Build>, actions: Res<PlayerActions>, mut session: Re
             }
         }
     } else {
+        // A right click released without tilting or sweeping removes what is under the pointer.
+        if let (Some((_, _, false)), None, Some(cell)) = (build.remove_press, build.sweeping, cell) {
+            command = removal_at(world, build.level, cell, build.tool == Tool::Belts).map(|(c, _)| c);
+        }
         build.remove_press = None;
         build.sweeping = None;
     }

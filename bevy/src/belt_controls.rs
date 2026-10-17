@@ -2,8 +2,8 @@
 // shows the aimed cell in the cursor direction; pressing Place starts a drag that lays belts forward along that direction as
 // the aim moves on (never sideways or back), filling every cell it skips; holding R during a drag turns the line at its head toward
 // the aim and carries on from there, and R without a drag turns the cursor direction (or, with an empty cursor, the aimed
-// belt). Holding Remove on a belt (belts or lifts on the cursor) takes it up after a short hold, then every belt the aim passes
-// over for the rest of the press. With lifts on the cursor a ghost lift shows the aimed cell going up or down one floor; Place
+// belt). Clicking Remove on a belt (belts or lifts on the cursor) takes it up; holding it takes it up after a short hold, then
+// every belt the aim passes over for the rest of the press. With lifts on the cursor a ghost lift shows the aimed cell going up or down one floor; Place
 // puts one there, V flips it. With other goods on the cursor Z puts one unit on the aimed belt; F takes the riding item nearest
 // the aim off the belt. Build mode uses this same line planner with its free pointer and selected floor, keeping its camera.
 // Pending placements reserve inventory and show connected ghosts. Each belt is its own request; the server checks every one.
@@ -127,6 +127,12 @@ fn belt_input(
             }
         }
     } else {
+        // A short Remove click on a belt takes it up on release.
+        if conveyor && !building && !actions.remove_held && drag.remove_held > 0.0 && !drag.sweeping {
+            if let Some(belt) = &aimed_belt {
+                commands.push(Command::RemoveBelt { belt: belt.id.clone() });
+            }
+        }
         drag.remove_held = 0.0;
         drag.sweeping = false;
         drag.removed.clear();
