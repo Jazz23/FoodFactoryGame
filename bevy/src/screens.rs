@@ -7,16 +7,16 @@ use food_factory_bevy::persistence;
 use food_factory_bevy::server;
 
 use crate::actions::UiFocus;
-use crate::map::MapState;
 use crate::panels::Panels;
 use crate::session::{money, Content, Session, SessionEvent};
-use crate::ui::{UiEntry, UiFields, UiIntents, UiModel};
+use crate::front::{FrontGeneration, MenuFrame, ResumeDto, Sent, WorldDto};
+use crate::ui::{UiFields, UiIntents, UiModel};
 
 pub struct ScreensPlugin;
 
 impl Plugin for ScreensPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<Screen>().init_resource::<HudLines>().add_systems(Update, (handle_intents, notices, draw_screen).chain());
+        app.init_resource::<Screen>().init_resource::<HudLines>().add_systems(Update, (handle_intents, notices, emit_menu).chain());
     }
 }
 
@@ -156,26 +156,6 @@ pub struct HudLines {
     pub hint: String,
 }
 
-/// The HUD's restaurant card (Unity PlayerHud.WorldText): what stops sales or that it is open, the warnings, recent money.
-pub fn readiness_card(ready: &food_factory_bevy::goods::readiness::Readiness, content: &food_factory_bevy::content::GameContent, menu: &[&food_factory_bevy::goods::RecipeDefinition]) -> String {
-    use food_factory_bevy::goods::readiness::*;
-    let mut lines = vec![match ready.blocker {
-        None => format!("Open: {} queued, {} eating", ready.queued, ready.eating),
-        Some(blocker) => format!("Not selling: {}", blocker_text(blocker, ready, content, menu)),
-    }];
-    let warnings: Vec<String> = ready.warnings.iter().map(|w| match *w {
-        NO_REACHABLE_SEAT => "takeaway only: no seat customers can reach".to_string(),
-        DOCK_NOT_BESIDE_BACK_DOOR => "a dock is not beside a back door".to_string(),
-        STOCK_SPOILS_SOON => format!("{} in a register spoils in {}", content.item_name(&ready.spoiling_item_id), format_duration(ready.spoiling_seconds, false)),
-        other => reason_text(other),
-    }).collect();
-    if !warnings.is_empty() { lines.push(warnings.join(", ")); }
-    lines.push(format!("Last {}: {} sale{} {}, spent {}", format_duration(RECENT_SECONDS, true), ready.recent_sales, if ready.recent_sales == 1 { "" } else { "s" },
-        money(ready.recent_sales_cents), money(ready.recent_spend_cents)));
-    lines.join("
-")
-}
-
 pub fn blocker_text(blocker: &str, ready: &food_factory_bevy::goods::readiness::Readiness, content: &food_factory_bevy::content::GameContent, menu: &[&food_factory_bevy::goods::RecipeDefinition]) -> String {
     use food_factory_bevy::goods::readiness::*;
     match blocker {
@@ -213,113 +193,109 @@ pub fn ledger_kind(kind: &str) -> String {
     }.to_string()
 }
 
-fn clock_text(seconds: i64) -> String {
-    let day = seconds / food_factory_bevy::world::clock::DAY_SECONDS + 1;
-    let hour = seconds % food_factory_bevy::world::clock::DAY_SECONDS / food_factory_bevy::world::clock::HOUR_SECONDS;
-    format!("Day {day}, {hour:02}:00")
+
+/// What the world list shows for a save, read once per modification time on a worker thread.
+#[derive(Clone, Default)]
+struct WorldSummary {
+    sub: String,
+    day: String,
+    cash: String,
+}
+
+#[derive(Default)]
+struct WorldList {
+    refreshed: f64,
+    saved: Vec<(String, std::time::SystemTime)>,
+    summaries: std::sync::Arc<std::sync::Mutex<std::collections::HashMap<(String, std::time::SystemTime), WorldSummary>>>,
+    pending: std::collections::HashSet<(String, std::time::SystemTime)>,
+}
+
+fn summarize(world: &str) -> WorldSummary {
+    let Some(snapshot) = persistence::peek_snapshot(world) else { return WorldSummary { sub: "Unreadable save".into(), day: "-".into(), cash: "-".into() } };
+    let company = snapshot.companies.first();
+    let sites = company.map_or(0, |c| c.site_ids.len());
+    let staff = snapshot.employees.len();
+    WorldSummary {
+        sub: format!("{sites} site{} · {staff} staff", if sites == 1 { "" } else { "s" }),
+        day: (snapshot.clock_seconds / food_factory_bevy::world::clock::DAY_SECONDS + 1).to_string(),
+        cash: company.map_or("-".into(), |c| money(c.cash)),
+    }
+}
+
+/// "2 h ago", "Yesterday", "3 days ago".
+fn ago(time: std::time::SystemTime) -> String {
+    let seconds = std::time::SystemTime::now().duration_since(time).map_or(0, |d| d.as_secs());
+    match seconds {
+        0..60 => "Just now".into(),
+        60..3600 => format!("{} min ago", seconds / 60),
+        3600..86400 => format!("{} h ago", seconds / 3600),
+        86400..172800 => "Yesterday".into(),
+        _ => format!("{} days ago", seconds / 86400),
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
-fn draw_screen(
-    session: Res<Session>, screen: Res<Screen>, mut model: ResMut<UiModel>, map: Res<MapState>, hud: Res<HudLines>, panels: Res<Panels>, mut focus: ResMut<UiFocus>,
-    mut worlds: Local<Option<(f64, Vec<String>)>>, time: Res<Time>, settings_screen: Res<crate::settings::SettingsScreen>, prefs: Option<Res<crate::settings::Prefs>>,
-    content: Res<Content>, mut card: Local<(String, i64, String)>,
+fn emit_menu(
+    mut commands: Commands, session: Res<Session>, screen: Res<Screen>, mut model: ResMut<UiModel>, panels: Res<Panels>, mut focus: ResMut<UiFocus>,
+    mut worlds: Local<WorldList>, time: Res<Time>, settings_screen: Res<crate::settings::SettingsScreen>, prefs: Option<Res<crate::settings::Prefs>>,
+    generation: Res<FrontGeneration>, mut sent: Local<Sent<MenuFrame>>,
 ) {
     let now = time.elapsed_secs_f64();
-    if worlds.as_ref().is_none_or(|(at, _)| now - at > 3.0) {
-        *worlds = Some((now, persistence::saved_worlds().into_iter().map(|w| w.0).collect()));
+    if worlds.saved.is_empty() && worlds.refreshed == 0.0 || now - worlds.refreshed > 3.0 {
+        worlds.refreshed = now;
+        worlds.saved = persistence::saved_worlds();
+        // Summaries load off the main thread; a save rewritten since gets a new key and is read again.
+        for key in worlds.saved.clone() {
+            if worlds.pending.insert(key.clone()) {
+                let summaries = worlds.summaries.clone();
+                std::thread::spawn(move || {
+                    let summary = summarize(&key.0);
+                    if let Ok(mut map) = summaries.lock() { map.insert(key, summary); }
+                });
+            }
+        }
     }
-    if panels.open.is_some() {
-        return;
+    // Outside a panel or settings the panel model is closed; the menus and HUD draw from their own frames.
+    if panels.open.is_none() && !settings_screen.open && model.open {
+        *model = UiModel::default();
     }
-    if settings_screen.open {
-        if !focus.0 {
+    let summaries = worlds.summaries.lock().map(|m| m.clone()).unwrap_or_default();
+    let summary = |key: &(String, std::time::SystemTime)| summaries.get(key).cloned().unwrap_or_else(|| WorldSummary { sub: "Reading save…".into(), day: "-".into(), cash: "-".into() });
+    let mut frame = MenuFrame {
+        screen: match *screen { Screen::Menu => "menu", Screen::Paused => "paused", Screen::Playing => "hidden" }.into(),
+        status: session.status.clone(),
+        version: format!("v{}", env!("CARGO_PKG_VERSION")),
+        new_name: server::next_world_name(),
+        address: DEFAULT_ADDRESS.into(),
+        host_address: DEFAULT_PORT_ADDRESS.into(),
+        worlds: worlds.saved.iter().map(|key| {
+            let s = summary(key);
+            WorldDto { name: key.0.clone(), sub: s.sub, day: s.day, cash: s.cash, last: ago(key.1) }
+        }).collect(),
+        ..default()
+    };
+    let last = prefs.as_ref().map(|p| p.last_session.clone()).unwrap_or_default();
+    if let Some(key) = last.strip_prefix("world:").and_then(|w| worlds.saved.iter().find(|x| x.0 == w)) {
+        let s = summary(key);
+        frame.resume = Some(ResumeDto { sub: format!("{} · Day {} · Singleplayer", key.0, s.day), ago: ago(key.1) });
+    } else if let Some(address) = last.strip_prefix("server:") {
+        frame.resume = Some(ResumeDto { sub: format!("Join {address}"), ago: String::new() });
+    }
+    if *screen == Screen::Paused {
+        frame.session = session.hosted().map_or("Connected to a server.".to_string(), |h| match &h.listener {
+            Some(l) => format!("Hosting {} on {}", h.world_name, l.address),
+            None => format!("Playing {}", h.world_name),
+        });
+    }
+    sent.send(&mut commands, &generation, frame);
+    if panels.open.is_some() || settings_screen.open {
+        if settings_screen.open && !focus.0 {
             focus.0 = true;
         }
         return;
     }
-    let next = match *screen {
-        Screen::Menu => {
-            let last = prefs.as_ref().map(|p| p.last_session.clone()).unwrap_or_default();
-            let mut entries = vec![];
-            if let Some(world) = last.strip_prefix("world:").filter(|w| worlds.as_ref().is_some_and(|(_, list)| list.iter().any(|x| x == w))) {
-                entries.push(UiEntry::button("menu:resume", format!("Resume {world}")));
-            } else if let Some(address) = last.strip_prefix("server:") {
-                entries.push(UiEntry::button("menu:resume", format!("Resume: join {address}")));
-            }
-            entries.extend([
-                UiEntry::label("name-label", "Your name"),
-                UiEntry::field("player-name", session.display_name.clone()),
-                UiEntry::label("new-label", "New world (name, seed)"),
-                UiEntry::field("world-name", server::next_world_name()),
-                UiEntry::field("seed", ""),
-                UiEntry::button("menu:new", "Create singleplayer world"),
-                UiEntry::button("menu:host-new", "Create and host for others"),
-            ]);
-            let saved = worlds.as_ref().map(|w| w.1.clone()).unwrap_or_default();
-            if !saved.is_empty() {
-                entries.push(UiEntry::label("saved-label", "Saved worlds"));
-                for world in saved.iter().take(8) {
-                    entries.push(UiEntry::button(format!("menu:load:{world}"), format!("Play {world}")));
-                    entries.push(UiEntry::button(format!("menu:host:{world}"), format!("Host {world}")));
-                }
-            }
-            entries.push(UiEntry::label("host-label", "Host address"));
-            entries.push(UiEntry::field("host-address", DEFAULT_PORT_ADDRESS));
-            entries.push(UiEntry::label("join-label", "Join a server"));
-            entries.push(UiEntry::field("address", DEFAULT_ADDRESS));
-            entries.push(UiEntry::button("menu:join", "Join"));
-            entries.push(UiEntry::button("s:open", "Settings"));
-            entries.push(UiEntry::button("menu:quit", "Quit"));
-            let status = if session.status.is_empty() { "Build a food business in a generated city.".to_string() } else { session.status.clone() };
-            UiModel { heading: "Food Factory".into(), status, footer: "Bevy port".into(), open: true, wide: false, right: false, entries }
-        }
-        Screen::Paused => UiModel {
-            heading: "Paused".into(),
-            status: session.hosted().map_or("Connected to a server.".to_string(), |h| match &h.listener {
-                Some(l) => format!("Hosting {} on {}", h.world_name, l.address),
-                None => format!("Playing {}", h.world_name),
-            }),
-            footer: String::new(),
-            open: true,
-            wide: false, right: false,
-            entries: vec![UiEntry::button("menu:resume", "Resume"), UiEntry::button("s:open", "Settings"), UiEntry::button("menu:leave", "Save and leave"), UiEntry::button("menu:quit", "Quit")],
-        },
-        Screen::Playing => {
-            let (heading, status) = match session.joined() {
-                Some(world) if map.built => {
-                    let site = world.view().and_then(|v| v.sites.iter().find(|s| s.id == world.site)).map(|s| s.name.clone()).unwrap_or_else(|| world.site.clone());
-                    let clock = world.view().map(|v| clock_text(v.clock_seconds)).unwrap_or_default();
-                    // Unity PlayerHud.Readiness: the client site's readout, recomputed once per baseline revision.
-                    let revision = world.view().map_or(-1, |v| v.revision);
-                    if card.0 != world.site || card.1 != revision {
-                        let menu: Vec<&food_factory_bevy::goods::RecipeDefinition> = content.0.recipes.values().filter(|r| food_factory_bevy::goods::rules::is_menu_item(r)).collect();
-                        let text = world.view().and_then(|v| food_factory_bevy::goods::readiness::evaluate(v, &world.site, world.offers.get(&world.site), menu.iter().copied()))
-                            .map(|ready| readiness_card(&ready, &content.0, &menu)).unwrap_or_default();
-                        *card = (world.site.clone(), revision, text);
-                    }
-                    let status = if card.2.is_empty() { clock } else { format!("{clock}
-{}", card.2) };
-                    (format!("{site}   {}", money(world.cash())), status)
-                }
-                Some(_) => ("Food Factory".into(), map.progress.clone()),
-                None => ("Food Factory".into(), session.status.clone()),
-            };
-            let mut footer = hud.notices.join("\n");
-            if !hud.hint.is_empty() {
-                if !footer.is_empty() {
-                    footer.push('\n');
-                }
-                footer.push_str(&hud.hint);
-            }
-            UiModel { heading, status, footer, open: false, wide: false, right: false, entries: vec![] }
-        }
-    };
-    if *model != next {
-        *model = next;
-    }
     let wants_focus = *screen != Screen::Playing;
-    if focus.0 != wants_focus && panels.open.is_none() {
+    if focus.0 != wants_focus {
         focus.0 = wants_focus;
     }
 }

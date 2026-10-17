@@ -1,171 +1,172 @@
-// The always-on HUD (Unity PlayerHud crosshair and hotbar): a centre crosshair while the cursor is locked to it, and the nine
-// hotbar slots along the bottom with each held machine kind's icon, its count and the slot on the cursor highlighted.
+// The in-world HUD's data (Unity PlayerHud), drawn by the superui front end: the site card, cash with its recent rate and the
+// clock, alerts (why the restaurant is not selling, wages about to run out, stock spoiling, notices), the aimed object's
+// prompt under the crosshair, the hotbar with each held machine kind's icon and count, and a tooltip beside the free pointer.
+// The restaurant readout is recomputed once per baseline revision.
 use bevy::prelude::*;
 use bevy::window::{CursorGrabMode, CursorOptions, PrimaryWindow};
 
-use food_factory_bevy::goods::EquipmentState;
+use food_factory_bevy::goods::readiness::{self, RECENT_SECONDS};
+use food_factory_bevy::goods::{self, EquipmentState};
+use food_factory_bevy::world::clock::{DAY_SECONDS, HOUR_SECONDS};
 
-use crate::interaction::{Cursor, Hotbar, HotbarEntry, HOTBAR_SIZE};
-use crate::interaction::Aim;
-use crate::screens::Screen;
-use crate::session::{Content, Session};
-use crate::sites::Pick;
+use crate::actions::Bindings;
+use crate::front::{AlertDto, FrontGeneration, HotbarSlotDto, HudFrame, KeyHintDto, Sent, TooltipFrame};
+use crate::interaction::{Aim, Cursor, Hotbar, HotbarEntry, HOTBAR_SIZE};
+use crate::map::MapState;
+use crate::screens::{format_duration, reason_text, HudLines, Screen};
+use crate::session::{money, Content, Session};
+use crate::sites::{Indoors, Pick};
 
 pub struct HudPlugin;
 
 impl Plugin for HudPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, spawn_hud).add_systems(Update, (update_hud, update_cursor_tooltip));
+        app.add_systems(Update, (emit_hud, emit_tooltip));
     }
 }
 
-#[derive(Component)]
-struct Crosshair;
+const WARN: &str = "#E5644E";
+const SOON: &str = "#FF9A6B";
+const QUIET: &str = "#8F8B83";
 
-#[derive(Component)]
-struct HotbarStrip;
-
-#[derive(Component)]
-struct HotbarSlot(usize);
-
-#[derive(Component)]
-struct HotbarIcon(usize);
-
-#[derive(Component)]
-struct HotbarLabel(usize);
-
-#[derive(Component)]
-struct CursorTooltip;
-
-fn spawn_hud(mut commands: Commands) {
-    commands.spawn((
-        Crosshair,
-        Node { position_type: PositionType::Absolute, left: percent(50), top: percent(50), width: px(6), height: px(6), margin: UiRect::all(px(-3)), border_radius: BorderRadius::all(px(3)), ..default() },
-        BackgroundColor(Color::srgba(1.0, 1.0, 1.0, 0.85)),
-        Visibility::Hidden,
-    ));
-    commands.spawn((
-        CursorTooltip,
-        Text::new(""),
-        TextFont { font_size: FontSize::Px(14.0), ..default() },
-        TextColor(Color::srgb(0.94, 0.95, 0.91)),
-        Node { position_type: PositionType::Absolute, left: px(0), top: px(0), padding: UiRect::axes(px(9), px(5)), ..default() },
-        BackgroundColor(Color::srgba(0.04, 0.06, 0.08, 0.86)),
-        Visibility::Hidden,
-        Name::new("Cursor tooltip"),
-    ));
-    let strip = commands
-        .spawn((
-            HotbarStrip,
-            Node { position_type: PositionType::Absolute, bottom: px(14), left: px(0), right: px(0), justify_content: JustifyContent::Center, column_gap: px(6), ..default() },
-            Visibility::Hidden,
-        ))
-        .id();
-    for index in 0..HOTBAR_SIZE {
-        let slot = commands
-            .spawn((
-                HotbarSlot(index),
-                Node { width: px(58), height: px(58), flex_direction: FlexDirection::Column, align_items: AlignItems::Center, justify_content: JustifyContent::Center, border_radius: BorderRadius::all(px(6)), ..default() },
-                BackgroundColor(Color::srgba(0.04, 0.06, 0.08, 0.7)),
-            ))
-            .id();
-        let icon = commands.spawn((HotbarIcon(index), ImageNode::default(), Node { width: px(38), height: px(38), ..default() }, Visibility::Hidden)).id();
-        let label = commands.spawn((HotbarLabel(index), Text::new(format!("{}", index + 1)), TextFont { font_size: FontSize::Px(11.0), ..default() }, TextColor(Color::srgb(0.9, 0.93, 0.95)))).id();
-        commands.entity(slot).add_children(&[icon, label]);
-        commands.entity(strip).add_child(slot);
-    }
+/// The restaurant's readout for the site and revision it was computed at.
+#[derive(Default)]
+struct Readout {
+    site: String,
+    revision: i64,
+    alerts: Vec<AlertDto>,
+    rate_cents: Option<i64>,
 }
 
-/// Names a usable hover target beside the free pointer; the crosshair HUD hint remains the locked-pointer fallback.
-fn update_cursor_tooltip(
-    aim: Res<Aim>, session: Res<Session>, content: Res<Content>, screen: Res<Screen>,
-    window: Query<(&Window, &CursorOptions), With<PrimaryWindow>>,
-    mut tooltip: Query<(&mut Text, &mut Node, &mut Visibility), With<CursorTooltip>>,
-) {
-    let Ok((mut text, mut node, mut visibility)) = tooltip.single_mut() else { return };
-    let Some((window, _cursor)) = window.single().ok().filter(|(_, c)| c.grab_mode == CursorGrabMode::None) else {
-        *visibility = Visibility::Hidden;
-        return;
-    };
-    let Some(world) = session.joined() else { *visibility = Visibility::Hidden; return };
-    let picked = if aim.in_reach { match aim.pick.as_ref() {
-        Some(Pick::Equipment(id)) => world.views.values().find_map(|v| v.equipment.iter().find(|e| &e.id == id)).map(|e| content.0.equipment_name(&e.kind)),
-        Some(Pick::Employee(id)) => world.employees.iter().find(|e| &e.id == id).map(|e| e.name.clone()),
-        _ => None,
-    }} else { None };
-    let Some(label) = picked.filter(|_| *screen == Screen::Playing).zip(window.cursor_position()) else {
-        *visibility = Visibility::Hidden;
-        return;
-    };
-    let value = format!("E  {}", label.0);
-    if text.0 != value { text.0 = value; }
-    node.left = px((label.1.x + 16.0).min(window.width() - 160.0).max(4.0));
-    node.top = px((label.1.y + 18.0).min(window.height() - 42.0).max(4.0));
-    *visibility = Visibility::Inherited;
+fn readout(world: &crate::session::Joined, content: &Content) -> Readout {
+    let mut out = Readout { site: world.site.clone(), revision: world.view().map_or(-1, |v| v.revision), ..default() };
+    let Some(view) = world.view() else { return out };
+    let menu: Vec<&goods::RecipeDefinition> = content.0.recipes.values().filter(|r| goods::rules::is_menu_item(r)).collect();
+    let Some(ready) = readiness::evaluate(view, &world.site, world.offers.get(&world.site), menu.iter().copied()) else { return out };
+    if let Some(blocker) = ready.blocker {
+        out.alerts.push(AlertDto { kind: "warn".into(), title: "Not selling".into(), detail: crate::screens::blocker_text(blocker, &ready, &content.0, &menu), ..default() });
+    } else {
+        out.alerts.push(AlertDto { kind: "dot".into(), title: format!("Open: {} queued, {} eating", ready.queued, ready.eating), colour: "#6FCB86".into(), ..default() });
+    }
+    for warning in &ready.warnings {
+        out.alerts.push(match *warning {
+            readiness::STOCK_SPOILS_SOON => AlertDto {
+                kind: "dot".into(), title: format!("{} spoils soon in a register", content.0.item_name(&ready.spoiling_item_id)),
+                time: format_duration(ready.spoiling_seconds, false), colour: WARN.into(), ..default()
+            },
+            readiness::NO_REACHABLE_SEAT => AlertDto { kind: "dot".into(), title: "Takeaway only: no seat customers can reach".into(), colour: SOON.into(), ..default() },
+            readiness::DOCK_NOT_BESIDE_BACK_DOOR => AlertDto { kind: "dot".into(), title: "A dock is not beside a back door".into(), colour: SOON.into(), ..default() },
+            other => AlertDto { kind: "dot".into(), title: reason_text(other), colour: SOON.into(), ..default() },
+        });
+    }
+    out.rate_cents = Some((ready.recent_sales_cents - ready.recent_spend_cents) * HOUR_SECONDS / RECENT_SECONDS);
+    out
 }
 
 #[allow(clippy::too_many_arguments)]
-fn update_hud(
-    session: Res<Session>, screen: Res<Screen>, hotbar: Res<Hotbar>, cursor: Res<Cursor>, content: Res<Content>, assets: Res<AssetServer>, window: Query<&CursorOptions, With<PrimaryWindow>>,
-    mut crosshair: Query<&mut Visibility, (With<Crosshair>, Without<HotbarStrip>, Without<HotbarIcon>)>, mut strip: Query<&mut Visibility, (With<HotbarStrip>, Without<Crosshair>, Without<HotbarIcon>)>,
-    mut slots: Query<(&HotbarSlot, &mut BackgroundColor)>, mut icons: Query<(&HotbarIcon, &mut ImageNode, &mut Visibility), (Without<Crosshair>, Without<HotbarStrip>)>, mut labels: Query<(&HotbarLabel, &mut Text)>,
+fn emit_hud(
+    mut commands: Commands, session: Res<Session>, screen: Res<Screen>, map: Res<MapState>, hud: Res<HudLines>, hotbar: Res<Hotbar>, cursor: Res<Cursor>,
+    content: Res<Content>, indoors: Res<Indoors>, bindings: Res<Bindings>, window: Query<&CursorOptions, With<PrimaryWindow>>, panels: Res<crate::panels::Panels>,
+    generation: Res<FrontGeneration>, mut card: Local<Readout>, mut sent: Local<Sent<HudFrame>>,
 ) {
-    let playing = *screen == Screen::Playing && session.in_world();
-    let locked = window.single().is_ok_and(|c| c.grab_mode != CursorGrabMode::None);
-    for mut v in &mut crosshair {
-        let want = if playing && locked { Visibility::Inherited } else { Visibility::Hidden };
-        if *v != want {
-            *v = want;
+    let playing = *screen == Screen::Playing;
+    let mut frame = HudFrame { visible: playing && session.in_world(), ..default() };
+    let key = crate::settings::label_of;
+    if let (true, Some(world)) = (frame.visible, session.joined()) {
+        if !map.built {
+            frame.loading = map.progress.clone();
         }
-    }
-    for mut v in &mut strip {
-        let want = if playing { Visibility::Inherited } else { Visibility::Hidden };
-        if *v != want {
-            *v = want;
-        }
-    }
-    let Some(world) = session.joined() else { return };
-    let Some(view) = world.view() else { return };
-    let current = cursor.machine.as_ref().and_then(|id| view.equipment.iter().find(|e| &e.id == id)).map(|e| HotbarEntry::Machine(e.kind.clone())).or_else(|| cursor.item.clone().map(HotbarEntry::Item));
-    for (slot, mut background) in &mut slots {
-        let selected = hotbar.entries.get(slot.0).is_some_and(|k| Some(k) == current.as_ref());
-        let colour = if selected { Color::srgba(0.22, 0.45, 0.38, 0.9) } else { Color::srgba(0.04, 0.06, 0.08, 0.7) };
-        if background.0 != colour {
-            background.0 = colour;
-        }
-    }
-    for (icon, mut image, mut visibility) in &mut icons {
-        let path = hotbar.entries.get(icon.0).map(|entry| match entry {
-            HotbarEntry::Machine(kind) => content.0.equipment.get(kind).map(|k| k.icon.clone()).unwrap_or_default(),
-            HotbarEntry::Item(item) => content.0.items.get(item).map(|i| i.icon.clone()).unwrap_or_default(),
-        });
-        match path {
-            Some(path) if !path.is_empty() => {
-                let handle: Handle<Image> = assets.load(path);
-                if image.image != handle {
-                    image.image = handle;
-                }
-                if *visibility != Visibility::Inherited {
-                    *visibility = Visibility::Inherited;
-                }
+        if let Some(view) = world.view() {
+            let site = view.sites.iter().find(|s| s.id == world.site).map_or(world.site.clone(), |s| s.name.clone());
+            let floor = match (&indoors.building, indoors.level) {
+                (None, _) => "Outside".to_string(),
+                (Some(_), 0) => "Ground floor".to_string(),
+                (Some(_), level) => format!("Floor {}", level + 1),
+            };
+            let staff = world.employees.iter().filter(|e| e.site == world.site).count();
+            let cap = goods::employees::employee_cap(view, &world.site);
+            frame.site = site;
+            frame.sub = format!("{floor} · {staff} of {cap} staff");
+            frame.cash = money(world.cash());
+            frame.day = format!("Day {}", view.clock_seconds / DAY_SECONDS + 1);
+            frame.clock = format!("{:02}:{:02}", view.clock_seconds % DAY_SECONDS / HOUR_SECONDS, view.clock_seconds % HOUR_SECONDS);
+            if card.site != world.site || card.revision != view.revision {
+                *card = readout(world, &content);
             }
-            _ => {
-                if *visibility != Visibility::Hidden {
-                    *visibility = Visibility::Hidden;
-                }
+            if let Some(rate) = card.rate_cents {
+                frame.rate = format!("{}{} / h", if rate < 0 { "-" } else { "+" }, money(rate.abs()));
+                frame.rate_up = rate >= 0;
             }
+            // Unity PlayerHud's wage warning: cash covers less than two hours of wages.
+            let wages = view.company_wage_cents_per_hour;
+            if wages > 0 && world.cash() < wages * 2 {
+                let hours = world.cash().max(0) / wages;
+                let employees = wages / goods::employees::WAGE_CENTS_PER_HOUR;
+                frame.alerts.push(AlertDto {
+                    kind: "warn".into(),
+                    title: if hours == 0 { "Wages run out within the hour".into() } else { format!("Wages run out in about {hours} h") },
+                    detail: format!("{employees} staff at {} / h. Unpaid staff stop and wait outside.", money(goods::employees::WAGE_CENTS_PER_HOUR)),
+                    ..default()
+                });
+            }
+            frame.alerts.extend(card.alerts.iter().cloned());
+            frame.alerts.extend(hud.notices.iter().map(|n| AlertDto { kind: "dot".into(), title: n.clone(), colour: QUIET.into(), ..default() }));
+            // The aimed object's "E  Name" hint becomes the key-cap prompt under the crosshair; other hints sit above the hotbar.
+            match hud.hint.split_once("  ") {
+                Some((cap, rest)) if cap.chars().count() <= 3 && panels.open.is_none() => {
+                    frame.prompt_key = cap.to_string();
+                    frame.prompt = rest.to_string();
+                }
+                _ => frame.hint = hud.hint.clone(),
+            }
+            let locked = window.single().is_ok_and(|c| c.grab_mode != CursorGrabMode::None);
+            frame.crosshair = locked && panels.open.is_none();
+            let inventory = world.inventory();
+            let current = cursor.machine.as_ref().and_then(|id| view.equipment.iter().find(|e| &e.id == id)).map(|e| HotbarEntry::Machine(e.kind.clone())).or_else(|| cursor.item.clone().map(HotbarEntry::Item));
+            frame.hotbar = (0..HOTBAR_SIZE).map(|index| {
+                let entry = hotbar.entries.get(index);
+                let (icon, count) = match entry {
+                    Some(HotbarEntry::Machine(kind)) => (
+                        content.0.equipment.get(kind).map(|k| k.icon.clone()).unwrap_or_default(),
+                        view.equipment.iter().filter(|e| e.state == EquipmentState::Held && e.holder_id == world.player && &e.kind == kind).count(),
+                    ),
+                    Some(HotbarEntry::Item(item)) => (
+                        content.0.items.get(item).map(|i| i.icon.clone()).unwrap_or_default(),
+                        view.lots.iter().filter(|l| l.location_id == inventory && &l.item_id == item).map(|l| l.quantity.max(0) as usize).sum(),
+                    ),
+                    None => (String::new(), 0),
+                };
+                HotbarSlotDto { key: (index + 1).to_string(), icon, count: if count > 0 { count.to_string() } else { String::new() }, selected: entry.is_some_and(|e| Some(e) == current.as_ref()) }
+            }).collect();
+            frame.keys = vec![
+                KeyHintDto { key: key(bindings.inventory), label: "Inventory".into() },
+                KeyHintDto { key: key(bindings.build), label: "Build".into() },
+                KeyHintDto { key: key(bindings.phone), label: "Phone".into() },
+                KeyHintDto { key: key(bindings.logistics), label: "Logistics".into() },
+            ];
         }
     }
-    for (label, mut text) in &mut labels {
-        let inventory = world.inventory();
-        let count = match hotbar.entries.get(label.0) {
-            Some(HotbarEntry::Machine(k)) => view.equipment.iter().filter(|e| e.state == EquipmentState::Held && e.holder_id == world.player && &e.kind == k).count(),
-            Some(HotbarEntry::Item(item)) => view.lots.iter().filter(|l| l.location_id == inventory && &l.item_id == item).map(|l| l.quantity.max(0) as usize).sum(),
-            None => 0,
-        };
-        let value = if count > 0 { format!("{}  x{count}", label.0 + 1) } else { format!("{}", label.0 + 1) };
-        if text.0 != value {
-            text.0 = value;
+    sent.send(&mut commands, &generation, frame);
+}
+
+/// Names a usable hover target beside the free pointer; the crosshair prompt remains the locked-pointer fallback.
+fn emit_tooltip(
+    mut commands: Commands, aim: Res<Aim>, session: Res<Session>, content: Res<Content>, screen: Res<Screen>, window: Query<(&Window, &CursorOptions), With<PrimaryWindow>>,
+    scale: Res<UiScale>, generation: Res<FrontGeneration>, mut sent: Local<Sent<TooltipFrame>>,
+) {
+    let mut frame = TooltipFrame::default();
+    let free = window.single().ok().filter(|(_, c)| c.grab_mode == CursorGrabMode::None);
+    if let (Some((window, _)), Some(world), true) = (free, session.joined(), *screen == Screen::Playing) {
+        let picked = if aim.in_reach { match aim.pick.as_ref() {
+            Some(Pick::Equipment(id)) => world.views.values().find_map(|v| v.equipment.iter().find(|e| &e.id == id)).map(|e| content.0.equipment_name(&e.kind)),
+            Some(Pick::Employee(id)) => world.employees.iter().find(|e| &e.id == id).map(|e| e.name.clone()),
+            _ => None,
+        }} else { None };
+        if let (Some(label), Some(pointer)) = (picked, window.cursor_position()) {
+            // Window pixels to the scaled UI's.
+            let at = Vec2::new((pointer.x + 16.0).min(window.width() - 180.0).max(4.0), (pointer.y + 18.0).min(window.height() - 42.0).max(4.0)) / scale.0;
+            frame = TooltipFrame { text: label, x: at.x.round(), y: at.y.round() };
         }
     }
+    sent.send(&mut commands, &generation, frame);
 }

@@ -1,27 +1,21 @@
-// Native Bevy UI for menus and panels: a screen describes itself as a UiModel (heading, status, entries: labels, buttons,
-// text fields, rows of icon slots) and this draws it, rebuilding only when its layout changes and otherwise updating labels in
-// place. Buttons queue their action string in UiIntents for the owning screen to handle; fields keep their text in UiFields.
-// Widgets never mutate the simulation.
+// The panel model shared by the in-world screens: a panel describes itself as a UiModel (heading, status, entries: labels,
+// buttons, text fields, rows of icon slots) and the superui front end (front.rs) draws it. Buttons queue their action string
+// in UiIntents for the owning screen to handle; fields keep their text in UiFields. Widgets never mutate the simulation.
 use std::collections::BTreeMap;
 
 use bevy::prelude::*;
-use bevy::text::EditableText;
-use bevy::ui_widgets::{Activate, Button, TextInput};
+use serde::Serialize;
 
 pub struct GameUiPlugin;
 
 impl Plugin for GameUiPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<UiModel>().init_resource::<UiIntents>().init_resource::<UiFields>().add_systems(Update, (read_fields, draw, scroll, text_focus).chain());
+        app.init_resource::<UiModel>().init_resource::<UiIntents>().init_resource::<UiFields>();
     }
 }
 
 #[derive(Resource, Default)]
 pub struct UiIntents(pub Vec<String>);
-
-/// A button's action, so a drag that ends on another button knows what was dragged.
-#[derive(Component)]
-pub struct UiAction(pub String);
 
 #[derive(Resource, Default)]
 pub struct UiFields(pub BTreeMap<String, String>);
@@ -88,194 +82,81 @@ pub struct UiModel {
     pub entries: Vec<UiEntry>,
 }
 
-#[derive(Component)]
-struct UiRoot;
-#[derive(Component)]
-struct UiLabel(String);
-#[derive(Component)]
-struct UiField(String);
-
-fn text_focus(focus: Res<bevy::input_focus::InputFocus>, fields: Query<(), With<UiField>>, mut typing: ResMut<crate::actions::UiTyping>) {
-    let now = focus.get().is_some_and(|entity| fields.contains(entity));
-    if typing.0 != now {
-        typing.0 = now;
-    }
+/// An entry as the front end draws it: icons as asset paths, runtime images (structure cards, the phone map) by key.
+#[derive(Serialize, PartialEq, Clone, Default)]
+pub struct EntryDto {
+    pub id: String,
+    pub label: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub action: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub input: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
+    /// A runtime image the front end attaches by element id (`rt-<key>`), with its size in pixels.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub image: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub size: Option<f32>,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub multiline: bool,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub row: Vec<EntryDto>,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub selected: bool,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub slot: bool,
 }
 
-fn scroll(mouse: Res<bevy::input::mouse::AccumulatedMouseScroll>, mut roots: Query<(&mut ScrollPosition, &ComputedNode), With<UiRoot>>, model: Res<UiModel>, maps: Query<&bevy::ui::RelativeCursorPosition, With<crate::phone_map::MapSurface>>) {
-    if !model.open || maps.iter().any(|p| p.cursor_over()) {
-        return;
-    }
-    for (mut position, node) in &mut roots {
-        let max = ((node.content_size().y - node.size().y) * node.inverse_scale_factor()).max(0.0);
-        position.y = (position.y - mouse.delta.y * 32.0).clamp(0.0, max);
-    }
+#[derive(Serialize, PartialEq, Clone, Default)]
+pub struct PanelDto {
+    pub heading: String,
+    pub status: String,
+    pub footer: String,
+    pub wide: bool,
+    pub right: bool,
+    pub entries: Vec<EntryDto>,
 }
 
-fn read_fields(fields: Query<(&UiField, &EditableText), Changed<EditableText>>, mut values: ResMut<UiFields>) {
-    for (field, text) in &fields {
-        values.0.insert(field.0.clone(), text.value().to_string());
-    }
-}
+/// Runtime images a panel shows, keyed as its entries name them.
+#[derive(Resource, Default)]
+pub struct RuntimeImages(pub BTreeMap<String, Handle<Image>>);
 
-const TEXT: Color = Color::srgb(0.91, 0.94, 0.96);
-const BUTTON: Color = Color::srgb(0.12, 0.26, 0.30);
-const SELECTED: Color = Color::srgb(0.22, 0.45, 0.38);
-
-fn text(commands: &mut Commands, parent: Entity, id: &str, value: &str, size: f32) {
-    let child = commands.spawn((Text::new(value), UiLabel(id.into()), TextFont { font_size: FontSize::Px(size), ..default() }, TextColor(TEXT))).id();
-    commands.entity(parent).add_child(child);
-}
-
-fn same_layout(a: &[UiEntry], b: &[UiEntry]) -> bool {
-    a.len() == b.len()
-        && a.iter().zip(b).all(|(a, b)| a.id == b.id && a.action == b.action && a.icon == b.icon && a.icon_image == b.icon_image && a.slot == b.slot && a.input.is_some() == b.input.is_some() && a.selected == b.selected && a.picture == b.picture && same_layout(&a.row, &b.row))
-}
-
-fn find<'a>(entries: &'a [UiEntry], id: &str) -> Option<&'a UiEntry> {
-    entries.iter().find_map(|e| if e.id == id { Some(e) } else { find(&e.row, id) })
-}
-
-fn entry(commands: &mut Commands, assets: &AssetServer, fields: &UiFields, parent: Entity, entry: &UiEntry) {
-    if let Some((image, size)) = &entry.picture {
-        let picture = commands.spawn((ImageNode::new(image.clone()), Node { width: px(*size), height: px(*size), flex_shrink: 0.0, ..default() })).id();
-        if entry.id == "phone-map" { commands.entity(picture).insert((crate::phone_map::MapSurface, bevy::ui::RelativeCursorPosition::default())); }
-        commands.entity(parent).add_child(picture);
-        return;
-    }
-    if !entry.row.is_empty() {
-        let row = commands.spawn(Node { flex_direction: FlexDirection::Row, flex_wrap: FlexWrap::Wrap, column_gap: px(6), row_gap: px(6), flex_shrink: 0.0, ..default() }).id();
-        commands.entity(parent).add_child(row);
-        for child in &entry.row {
-            self::entry(commands, assets, fields, row, child);
-        }
-        return;
-    }
-    if let Some(default_value) = &entry.input {
-        let value = fields.0.get(&entry.id).unwrap_or(default_value);
-        let mut editable = EditableText::new(value.clone());
-        editable.allow_newlines = entry.multiline;
-        let field = commands.spawn((
-            UiField(entry.id.clone()),
-            TextInput,
-            editable,
-            TextFont { font_size: FontSize::Px(if entry.multiline { 15.0 } else { 17.0 }), ..default() },
-            Node { min_height: px(if entry.multiline { 260 } else { 34 }), min_width: px(240), padding: UiRect::all(px(7)), flex_shrink: 0.0, ..default() },
-            BackgroundColor(Color::srgb(0.13, 0.17, 0.21)),
-        )).id();
-        commands.entity(parent).add_child(field);
-        return;
-    }
-    let Some(action) = &entry.action else {
-        text(commands, parent, &entry.id, &entry.label, 16.0);
-        return;
-    };
-    let action = action.clone();
-    let slot = entry.slot || entry.icon.is_some() || entry.icon_image.is_some();
-    let button = commands
-        .spawn((
-            Button,
-            Node {
-                min_height: if entry.slot { px(68) } else { px(32) },
-                min_width: if entry.slot { px(68) } else if slot { px(64) } else { auto() },
-                justify_content: if entry.slot { JustifyContent::Center } else { JustifyContent::default() },
-                padding: UiRect::all(px(6)),
-                flex_direction: if slot { FlexDirection::Column } else { FlexDirection::Row },
-                align_items: AlignItems::Center,
-                column_gap: px(8),
-                flex_shrink: 0.0,
-                border_radius: BorderRadius::all(px(5)),
-                ..default()
-            },
-            BackgroundColor(if entry.selected { SELECTED } else { BUTTON }),
-        ))
-        .observe({ let action = action.clone(); move |_: On<Activate>, mut intents: ResMut<UiIntents>| intents.0.push(action.clone()) })
-        // A slot dragged onto another sends `drag>SOURCE>TARGET` (Unity's slot drag and drop).
-        .observe({ let action = action.clone(); move |drop: On<bevy::picking::events::PointerDragDrop>, actions: Query<&UiAction>, parents: Query<&ChildOf>, mut intents: ResMut<UiIntents>| {
-            let mut source = Some(drop.event().dropped);
-            while let Some(entity) = source {
-                if let Ok(dragged) = actions.get(entity) {
-                    if dragged.0.starts_with("p:slot|") && dragged.0 != action && (action.starts_with("p:slot|") || action.starts_with("p:drop|")) {
-                        intents.0.push(format!("drag>{}>{action}", dragged.0));
-                    }
-                    break;
-                }
-                source = parents.get(entity).ok().map(|p| p.parent());
-            }
-        }})
-        // A right click sends the same action marked `|alt` (Unity's right click on a slot takes half its stack).
-        .observe(move |click: On<bevy::picking::events::PointerClick>, mut intents: ResMut<UiIntents>| {
-            if click.event().button == bevy::picking::pointer::PointerButton::Secondary { intents.0.push(format!("{action}|alt")); }
-        })
-        .id();
-    commands.entity(button).insert(UiAction(entry.action.clone().unwrap_or_default()));
-    commands.entity(parent).add_child(button);
-    let icon = entry.icon_image.clone().or_else(|| entry.icon.as_ref().map(|path| assets.load(path.clone())));
-    if let Some(icon) = icon {
-        let image = commands.spawn((ImageNode::new(icon), Node { width: px(40), height: px(40), ..default() })).id();
-        commands.entity(button).add_child(image);
-    }
-    let size = if slot { 13.0 } else { 16.0 };
-    let child = commands.spawn((Text::new(entry.label.clone()), UiLabel(entry.id.clone()), TextFont { font_size: FontSize::Px(size), ..default() }, TextColor(TEXT))).id();
-    commands.entity(button).add_child(child);
-}
-
-fn draw(
-    mut commands: Commands, assets: Res<AssetServer>, model: Res<UiModel>, fields: Res<UiFields>, roots: Query<Entity, With<UiRoot>>, mut labels: Query<(&UiLabel, &mut Text)>,
-    mut previous: Local<Option<UiModel>>,
-) {
-    if previous.as_ref() == Some(&*model) {
-        return;
-    }
-    let same = previous.as_ref().is_some_and(|old| old.open == model.open && old.wide == model.wide && old.right == model.right && same_layout(&old.entries, &model.entries));
-    if same {
-        for (id, mut label) in &mut labels {
-            let value = match id.0.as_str() {
-                "heading" => Some(model.heading.as_str()),
-                "status" => Some(model.status.as_str()),
-                "footer" => Some(model.footer.as_str()),
-                key => find(&model.entries, key).map(|e| e.label.as_str()),
+impl UiModel {
+    /// The open panel as the front end draws it, collecting its runtime images. Field values start from what was typed.
+    pub fn to_dto(&self, fields: &UiFields, images: &mut RuntimeImages) -> PanelDto {
+        fn entry(e: &UiEntry, fields: &UiFields, images: &mut RuntimeImages) -> EntryDto {
+            // A picture is keyed by its entry (the phone map), an icon by its image.
+            let mut image = |key: String, handle: &Handle<Image>| {
+                let key: String = key.chars().filter(|c| c.is_ascii_alphanumeric() || *c == '-').collect();
+                images.0.insert(key.clone(), handle.clone());
+                key
             };
-            if let Some(value) = value {
-                if label.0 != value {
-                    label.0 = value.into();
-                }
+            let (picture, size) = match &e.picture {
+                Some((handle, size)) => (Some(image(e.id.clone(), handle)), Some(*size)),
+                None => (e.icon_image.as_ref().map(|h| image(format!("img-{}", h.id()), h)), None),
+            };
+            EntryDto {
+                id: e.id.clone(),
+                label: e.label.clone(),
+                action: e.action.clone(),
+                input: e.input.as_ref().map(|default| fields.0.get(&e.id).cloned().unwrap_or_else(|| default.clone())),
+                icon: e.icon.clone(),
+                image: picture,
+                size,
+                multiline: e.multiline,
+                row: e.row.iter().map(|c| entry(c, fields, images)).collect(),
+                selected: e.selected,
+                slot: e.slot,
             }
         }
-        *previous = Some(model.clone());
-        return;
-    }
-    for root in &roots {
-        commands.entity(root).despawn();
-    }
-    let width = if !model.open { px(420) } else if model.wide { px(760) } else { px(600) };
-    let root = commands
-        .spawn((
-            UiRoot,
-            Node {
-                position_type: PositionType::Absolute,
-                left: if model.right { auto() } else { px(20) },
-                right: if model.right { px(20) } else { auto() },
-                top: px(16),
-                width,
-                max_height: percent(88),
-                flex_direction: FlexDirection::Column,
-                row_gap: px(8),
-                padding: UiRect::all(px(if model.open { 18 } else { 12 })),
-                border_radius: BorderRadius::all(px(12)),
-                overflow: Overflow::scroll_y(),
-                ..default()
-            },
-            BackgroundColor(Color::srgba(0.035, 0.055, 0.075, if model.open { 0.96 } else { 0.72 })),
-        ))
-        .id();
-    text(&mut commands, root, "heading", &model.heading, if model.open { 25.0 } else { 19.0 });
-    text(&mut commands, root, "status", &model.status, if model.open { 16.0 } else { 14.0 });
-    if model.open {
-        for item in &model.entries {
-            entry(&mut commands, &assets, &fields, root, item);
+        PanelDto {
+            heading: self.heading.clone(),
+            status: self.status.clone(),
+            footer: self.footer.clone(),
+            wide: self.wide,
+            right: self.right,
+            entries: self.entries.iter().map(|e| entry(e, fields, images)).collect(),
         }
     }
-    text(&mut commands, root, "footer", &model.footer, 13.0);
-    *previous = Some(model.clone());
 }

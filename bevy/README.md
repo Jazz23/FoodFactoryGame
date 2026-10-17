@@ -16,6 +16,15 @@ or the aimed machine/employee, 1-9 hotbar, left click place or open, R rotate, X
 belt, Z put one on, V flip a lift, C phone, L logistics, B build mode (left click place/draw, hold right click remove,
 PgUp/PgDn floors, middle click pick), Esc close or pause.
 
+## Interface
+
+Menus, settings, the HUD and every panel are one [superui](https://github.com/strowk/bevy_superui) page,
+`assets/ui/game` (`index.html`, `style.css`, `app.tsx`), styled after the "Main Menu" and "Food Factory UI" designs.
+Under the default `dev` feature edits to those files hot-reload in the running game; other builds load the JavaScript
+`build.rs` pre-transpiles into `assets/ui/game/.superui/build`. `src/front.rs` bridges it to the game (see
+[architecture](docs/architecture.md)). Its icons are PNGs rasterized from the designs' SVG by `python tools/ui_icons.py`
+(needs ImageMagick); the fonts (Rubik, JetBrains Mono, SIL Open Font License) are in `assets/fonts`.
+
 ## Saves and settings
 
 Worlds, the client identity and settings are SQLite databases under `%APPDATA%\FoodFactoryBevy` (Windows) or the
@@ -130,6 +139,15 @@ Bevy is dynamically linked here, so the first build takes about 2.5 minutes and 
 - **Game exits with `0xc0000135`:** the `dev` feature is on under dx. Use the exact command above, including
   `--no-default-features`.
 - **Character missing:** run `git lfs pull` (step 1.3).
+- **`v8` build script fails with `Failed to create symlink`:** the UI's JavaScript engine (V8, via superui) creates a
+  symlink between the cargo registry and `target/` when they are on different drives, which needs Developer Mode. A
+  directory junction needs no privilege; create it once per profile folder (`debug`, `release`), then build again:
+
+  ```powershell
+  $v8 = (Get-ChildItem "$env:USERPROFILE\.cargo
+egistry\src\*8-*" -Directory | Select-Object -Last 1).FullName
+  cmd /c mklink /J target\debug\gn_root "$v8"
+  ```
 
 ## Linux / WSL
 

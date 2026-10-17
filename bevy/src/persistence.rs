@@ -259,3 +259,11 @@ pub fn saved_worlds() -> Vec<(String, std::time::SystemTime)> {
     worlds.sort_by(|a, b| b.1.cmp(&a.1));
     worlds
 }
+
+/// A saved world's newest snapshot, read without writing to its database (the menu's world list); None when unreadable.
+pub fn peek_snapshot(world: &str) -> Option<Snapshot> {
+    let path = saves_root().join(world).join("world.db");
+    let connection = Connection::open_with_flags(&path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX).ok()?;
+    let payload: Vec<u8> = connection.query_row("SELECT payload FROM snapshots ORDER BY revision DESC LIMIT 1", [], |r| r.get(0)).ok()?;
+    serde_json::from_slice(&payload).ok()
+}

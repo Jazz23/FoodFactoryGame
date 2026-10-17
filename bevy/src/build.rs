@@ -174,7 +174,7 @@ fn catalog_intents(mut intents: ResMut<UiIntents>, mut build: ResMut<Build>, mut
 
 /// The build level's floor cell under the free pointer.
 #[allow(clippy::too_many_arguments)]
-fn pointer(mut build: ResMut<Build>, space: Option<Res<Space>>, cameras: Query<(&Camera, &GlobalTransform)>, window: Query<&Window, With<PrimaryWindow>>, actions: Res<PlayerActions>, motion: Res<AccumulatedMouseMotion>, mut rigs: Query<&mut OrbitCamera>, hover: Res<bevy::picking::hover::HoverMap>, nodes: Query<(), With<Node>>) {
+fn pointer(mut build: ResMut<Build>, space: Option<Res<Space>>, cameras: Query<(&Camera, &GlobalTransform)>, window: Query<&Window, With<PrimaryWindow>>, actions: Res<PlayerActions>, motion: Res<AccumulatedMouseMotion>, mut rigs: Query<&mut OrbitCamera>, hover: Res<bevy::picking::hover::HoverMap>, nodes: Query<Option<&bevy::picking::Pickable>, With<Node>>) {
     let (Some(site), Some(space)) = (build.active.clone(), space) else { return };
     if actions.floor_up_pressed {
         build.level += 1;
@@ -202,7 +202,7 @@ fn pointer(mut build: ResMut<Build>, space: Option<Res<Space>>, cameras: Query<(
         build.cell = Some(cell);
         return;
     }
-    let over_ui = hover.0.values().any(|hits| hits.keys().any(|e| nodes.contains(*e)));
+    let over_ui = crate::front::pointer_over_ui(&hover, &nodes);
     let (Ok(window), Some((camera, transform))) = (window.single(), cameras.iter().next()) else { return };
     let Some(pointer) = window.cursor_position().filter(|_| !over_ui) else {
         build.cell = None;
@@ -299,7 +299,7 @@ fn removal_at(world: &crate::session::Joined, level: i32, cell: (i32, i32)) -> O
 }
 
 #[allow(clippy::too_many_arguments)]
-fn orders(mut build: ResMut<Build>, actions: Res<PlayerActions>, mut session: ResMut<Session>, content: Res<Content>, time: Res<Time>, window: Query<&Window, With<PrimaryWindow>>, mut events: MessageReader<SessionEvent>, hover: Res<bevy::picking::hover::HoverMap>, nodes: Query<(), With<Node>>) {
+fn orders(mut build: ResMut<Build>, actions: Res<PlayerActions>, mut session: ResMut<Session>, content: Res<Content>, time: Res<Time>, window: Query<&Window, With<PrimaryWindow>>, mut events: MessageReader<SessionEvent>, hover: Res<bevy::picking::hover::HoverMap>, nodes: Query<Option<&bevy::picking::Pickable>, With<Node>>) {
     for event in events.read() {
         if let SessionEvent::Outcome { outcome, .. } = event {
             if build.active.is_some() {
@@ -312,7 +312,7 @@ fn orders(mut build: ResMut<Build>, actions: Res<PlayerActions>, mut session: Re
     }
     let now = time.elapsed_secs_f64();
     let pointer = window.single().ok().and_then(|w| w.cursor_position()).unwrap_or_default();
-    let over_ui = hover.0.values().any(|hits| hits.keys().any(|e| nodes.contains(*e)));
+    let over_ui = crate::front::pointer_over_ui(&hover, &nodes);
     let Some(world) = session.joined() else { return };
     let mut sends = vec![];
     let cell = build.cell;

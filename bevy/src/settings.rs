@@ -7,13 +7,14 @@ use bevy::prelude::*;
 
 use crate::actions::Bindings;
 use crate::session::Settings;
-use crate::ui::{UiEntry, UiIntents, UiModel};
+use crate::front::{BindDto, BindGroupDto, SettingsFrame};
+use crate::ui::UiIntents;
 
 pub struct SettingsPlugin;
 
 impl Plugin for SettingsPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<SettingsScreen>().add_systems(Startup, load).add_systems(Update, (escape, intents, rebind, apply_anti_aliasing, draw).chain());
+        app.init_resource::<SettingsScreen>().add_systems(Startup, load).add_systems(Update, (escape, intents, rebind, apply_anti_aliasing, emit).chain());
     }
 }
 
@@ -119,9 +120,18 @@ fn key_name(key: KeyCode) -> String { format!("{key:?}") }
 
 fn parse_key(name: &str) -> Option<KeyCode> { key_codes().into_iter().find(|k| key_name(*k) == name) }
 
-fn label_of(key: KeyCode) -> String {
-    let name = key_name(key);
-    name.strip_prefix("Key").or_else(|| name.strip_prefix("Digit")).unwrap_or(&name).to_string()
+/// A key as players read it: "W", "↑", "L Shift", "Esc", "PgUp".
+pub fn label_of(key: KeyCode) -> String {
+    match key {
+        KeyCode::ArrowUp => "↑".into(), KeyCode::ArrowDown => "↓".into(), KeyCode::ArrowLeft => "←".into(), KeyCode::ArrowRight => "→".into(),
+        KeyCode::ShiftLeft => "L Shift".into(), KeyCode::ShiftRight => "R Shift".into(), KeyCode::ControlLeft => "L Ctrl".into(), KeyCode::ControlRight => "R Ctrl".into(),
+        KeyCode::AltLeft => "L Alt".into(), KeyCode::AltRight => "R Alt".into(), KeyCode::Escape => "Esc".into(), KeyCode::PageUp => "PgUp".into(),
+        KeyCode::PageDown => "PgDn".into(), KeyCode::NumpadEnter => "Num Enter".into(), KeyCode::Delete => "Del".into(), KeyCode::Backspace => "Backspace".into(),
+        _ => {
+            let name = key_name(key);
+            name.strip_prefix("Key").or_else(|| name.strip_prefix("Digit")).unwrap_or(&name).replace("Numpad", "Num ")
+        }
+    }
 }
 
 fn load(settings: Res<Settings>, mut commands: Commands, mut bindings: ResMut<Bindings>, mut session: ResMut<crate::session::Session>) {
@@ -196,6 +206,33 @@ fn intents(mut intents: ResMut<UiIntents>, mut screen: ResMut<SettingsScreen>, p
                 screen.open = false;
                 screen.rebinding = None;
             }
+            // The sliders send the value itself.
+            [key, value] if key.ends_with("-set") => {
+                let value: f32 = value.parse().unwrap_or(f32::NAN);
+                if value.is_finite() {
+                    match key.trim_end_matches("-set") {
+                        "sensitivity" => prefs.sensitivity = value.clamp(0.1, 3.0),
+                        "master" => prefs.master = value.clamp(0.0, 1.0),
+                        "effects" => prefs.effects = value.clamp(0.0, 1.0),
+                        "interface" => prefs.interface = value.clamp(0.0, 1.0),
+                        "ambience" => prefs.ambience = value.clamp(0.0, 1.0),
+                        _ => {}
+                    }
+                }
+            }
+            ["name"] => {
+                if let Some(name) = fields.0.get("settings-name").filter(|n| !n.trim().is_empty()) {
+                    prefs.name = name.trim().to_string();
+                    session.display_name = prefs.name.clone();
+                }
+            }
+            ["cancel"] => screen.rebinding = None,
+            ["defaults"] => {
+                let last_session = prefs.last_session.clone();
+                *prefs = Prefs { name: prefs.name.clone(), last_session, ..Prefs::default() };
+                *bindings = Bindings::default();
+                screen.rebinding = None;
+            }
             ["sensitivity", delta] => prefs.sensitivity = step(prefs.sensitivity, delta.parse().unwrap_or(0.0), 0.1, 3.0),
             ["master", delta] => prefs.master = step(prefs.master, delta.parse().unwrap_or(0.0), 0.0, 1.0),
             ["effects", delta] => prefs.effects = step(prefs.effects, delta.parse().unwrap_or(0.0), 0.0, 1.0),
@@ -259,46 +296,57 @@ fn apply_anti_aliasing(mut commands: Commands, prefs: Option<Res<Prefs>>, camera
     }
 }
 
-fn draw(screen: Res<SettingsScreen>, prefs: Option<Res<Prefs>>, mut bindings: ResMut<Bindings>, mut model: ResMut<UiModel>, session: Res<crate::session::Session>) {
-    if !screen.open {
-        return;
-    }
-    let Some(prefs) = prefs else { return };
-    let mut next = UiModel { open: true, wide: true, heading: "Settings".into(), ..default() };
-    next.status = match screen.rebinding {
-        Some(action) => format!("Press a key for {} (Esc cancels)", ACTIONS.iter().find(|(a, _)| *a == action).map_or(action, |(_, l)| *l)),
-        None => "Changes are saved as you make them.".into(),
+/// The keybind groups as the settings screen lays them out in two columns.
+const GROUPS: [&[(&str, &[&str])]; 2] = [
+    &[("Movement", &["up", "down", "left", "right", "jump", "sprint"]), ("Interaction", &["inventory", "take_item", "place_item", "clear", "release_cursor"])],
+    &[("Building", &["build", "rotate", "confirm", "flip_lift", "floor_up", "floor_down"]), ("Camera and screens", &["phone", "map", "logistics", "zoom"]), ("Hotbar", &["hotbar"])],
+];
+
+/// An action's second key, for the actions that take two (the arrows beside WASD, keypad Enter).
+fn alternate(bindings: &Bindings, action: &str) -> Option<KeyCode> {
+    let keys = match action {
+        "up" => &bindings.up, "down" => &bindings.down, "left" => &bindings.left, "right" => &bindings.right, "jump" => &bindings.jump,
+        "sprint" => &bindings.sprint, "release_cursor" => &bindings.release_cursor, "confirm" => &bindings.confirm,
+        _ => return None,
     };
-    next.entries.push(UiEntry::label("name-label", "Your name"));
-    next.entries.push(UiEntry::field("settings-name", if prefs.name.is_empty() { session.display_name.clone() } else { prefs.name.clone() }));
-    let row = |id: &str, label: String, value: f32| UiEntry::row(id.to_string(), vec![
-        UiEntry::label(format!("{id}-label"), label),
-        UiEntry::button(format!("s:{id}|-0.1"), "-"),
-        UiEntry::label(format!("{id}-value"), format!("{:.0}%", value * 100.0)),
-        UiEntry::button(format!("s:{id}|0.1"), "+"),
-    ]);
-    next.entries.push(row("sensitivity", "Mouse sensitivity".into(), prefs.sensitivity));
-    next.entries.push(row("master", "Master volume".into(), prefs.master));
-    next.entries.push(row("effects", "Effects".into(), prefs.effects));
-    next.entries.push(row("interface", "Interface".into(), prefs.interface));
-    next.entries.push(row("ambience", "Music and ambience".into(), prefs.ambience));
-    next.entries.push(UiEntry::row("aa", vec![
-        UiEntry::label("aa-label", "Anti-aliasing"),
-        UiEntry::button("s:aa|off", "Off").selected(prefs.anti_aliasing == AntiAliasing::Off),
-        UiEntry::button("s:aa|fxaa", "FXAA").selected(prefs.anti_aliasing == AntiAliasing::Fxaa),
-        UiEntry::button("s:aa|msaa4", "MSAA 4x").selected(prefs.anti_aliasing == AntiAliasing::Msaa4),
-    ]));
-    next.entries.push(UiEntry::label("keys-label", "Key bindings"));
-    for (action, label) in ACTIONS {
-        let key = binding(&mut bindings, action).map(|k| label_of(*k));
-        let entry = match key {
-            Some(key) => UiEntry::button(format!("s:rebind|{action}"), if screen.rebinding == Some(action) { "...".to_string() } else { key }).selected(screen.rebinding == Some(action)),
-            None => UiEntry::label(format!("fixed-{action}"), ""),
-        };
-        next.entries.push(UiEntry::row(format!("bind-{action}"), vec![UiEntry::label(format!("bind-label-{action}"), label), entry]));
+    keys.get(1).copied()
+}
+
+fn emit(mut commands: Commands, screen: Res<SettingsScreen>, prefs: Option<Res<Prefs>>, mut bindings: ResMut<Bindings>, session: Res<crate::session::Session>,
+    generation: Res<crate::front::FrontGeneration>, mut sent: Local<crate::front::Sent<SettingsFrame>>) {
+    let Some(prefs) = prefs else { return };
+    let label = |action: &str| ACTIONS.iter().find(|(a, _)| *a == action).map_or(action.to_string(), |(_, l)| l.split(" (fixed").next().unwrap_or(l).to_string());
+    // A key bound to two actions is named, as the design's clash notice does.
+    let mut owners: Vec<(KeyCode, &str)> = vec![];
+    for (action, _) in ACTIONS {
+        if let Some(key) = binding(&mut bindings, action).map(|k| *k) { owners.push((key, action)); }
     }
-    next.entries.push(UiEntry::row("settings-actions", vec![UiEntry::button("s:reset", "Reset keys"), UiEntry::button("s:back", "Back")]));
-    if *model != next {
-        *model = next;
-    }
+    let notice = owners.iter().enumerate().find_map(|(i, (key, action))| {
+        let others: Vec<String> = owners[i + 1..].iter().filter(|(k, _)| k == key).map(|(_, a)| label(a)).collect();
+        (!others.is_empty()).then(|| format!("{} is bound to {} and {}", label_of(*key), label(action), others.join(", ")))
+    }).unwrap_or_default();
+    let columns = GROUPS.iter().map(|groups| groups.iter().map(|(name, actions)| BindGroupDto {
+        name: name.to_string(),
+        rows: actions.iter().map(|action| {
+            let primary = binding(&mut bindings, action).map(|k| label_of(*k));
+            let fixed = primary.is_none();
+            let key = primary.unwrap_or_else(|| match *action { "hotbar" => "1 – 9".into(), "zoom" => "Scroll".into(), _ => "—".into() });
+            let alternate = alternate(&bindings, action).map(label_of).unwrap_or_else(|| "—".into());
+            BindDto { action: action.to_string(), label: label(action), key, alternate, fixed }
+        }).collect(),
+    }).collect()).collect();
+    let frame = SettingsFrame {
+        open: screen.open,
+        name: if prefs.name.is_empty() { session.display_name.clone() } else { prefs.name.clone() },
+        sensitivity: prefs.sensitivity,
+        master: prefs.master,
+        effects: prefs.effects,
+        interface: prefs.interface,
+        ambience: prefs.ambience,
+        anti_aliasing: prefs.anti_aliasing.key().into(),
+        listening: screen.rebinding.map(|a| a.to_string()),
+        notice,
+        columns,
+    };
+    sent.send(&mut commands, &generation, frame);
 }
