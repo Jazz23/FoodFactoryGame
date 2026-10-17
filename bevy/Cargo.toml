@@ -12,6 +12,9 @@ serde_json = "1"
 rusqlite = { version = "0.32", features = ["bundled"] }
 sha2 = "0.10"
 mlua = { version = "0.12.2", features = ["luau", "send"] }
+# The window icon: decoding its embedded PNG and handing it to the winit window (the versions Bevy already uses).
+image = { version = "0.25", default-features = false, features = ["png"] }
+winit = { version = "0.30", default-features = false }
 
 [features]
 # Dynamic linking makes incremental rebuilds fast; `cargo run --release --no-default-features --features audio` for a standalone build.

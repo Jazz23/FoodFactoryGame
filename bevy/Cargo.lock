@@ -2898,11 +2898,13 @@ name = "food_factory_bevy"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "image",
  "mlua",
  "rusqlite",
  "serde",
  "serde_json",
  "sha2",
+ "winit",
 ]
 
 [[package]]

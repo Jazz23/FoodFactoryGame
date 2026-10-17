@@ -79,6 +79,9 @@ pub struct Panels {
     farm_dock: usize,
     farm_truck: Option<String>,
     farm_repeat: Option<i32>,
+    /// The phone map's farm card (Unity PhonePanel.BuildFarm): the chosen good's offer and whether a company truck picks up.
+    farm_good: Option<String>,
+    farm_pickup: bool,
     /// The employee screen's tab (tasks or program) and the task list being edited, by employee.
     employee_program: bool,
     draft: Option<(String, EmployeeTaskList)>,
@@ -422,6 +425,22 @@ fn company_docks(world: &Joined) -> Vec<(String, String)> {
     docks.sort();
     docks.dedup();
     docks
+}
+
+/// Docks a farm order can go to (Unity PhonePanel.Docks): every placed dock of the company, this site's first.
+fn farm_docks(world: &Joined) -> Vec<(String, String)> {
+    let here = |id: &str| world.view().is_some_and(|v| v.equipment.iter().any(|e| e.id == id && e.site_id == world.site));
+    let mut docks = company_docks(world);
+    docks.sort_by_key(|d| !here(&d.0));
+    docks
+}
+
+/// Company trucks free to pick up a farm order (Unity PhonePanel.ParkedTrucks): parked with no order.
+fn parked_trucks(world: &Joined) -> Vec<&goods::Truck> {
+    let Some(company) = world.company() else { return vec![] };
+    let mut trucks: Vec<&goods::Truck> = world.view().map(|v| v.trucks.iter().filter(|t| t.company_id == company.id && !t.supplier && t.state == TruckState::Parked && t.order_id.is_empty()).collect()).unwrap_or_default();
+    trucks.sort_by(|a, b| a.id.cmp(&b.id));
+    trucks
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -812,7 +831,7 @@ fn handle(
             }
             ["farm-repeat"] => { panels.farm_repeat = if panels.farm_repeat.is_some() { None } else { Some(1) }; None }
             ["farm-every", delta] => {
-                if let Some(hours) = panels.farm_repeat.as_mut() { *hours = (*hours + delta.parse::<i32>().unwrap_or(0)).clamp(1, 24); }
+                if let Some(hours) = panels.farm_repeat.as_mut() { *hours = (*hours + delta.parse::<i32>().unwrap_or(0)).clamp(1, farms::MAX_FARM_SCHEDULE_HOURS); }
                 None
             }
             ["farm-order", farm, offer, dock] => {
@@ -822,6 +841,41 @@ fn handle(
                     Some(every_hours) => Command::ScheduleFarmOrder { farm, offer, packs, dock, truck, every_hours },
                     None => Command::OrderFromFarm { farm, offer, packs, dock, truck },
                 })
+            }
+            ["farm-good", offer] => {
+                panels.farm_good = Some(offer.to_string());
+                panels.farm_packs = 1;
+                if panels.farm_pickup && panels.farm_truck.is_none() { panels.farm_truck = parked_trucks(world).first().map(|t| t.id.clone()); }
+                None
+            }
+            ["farm-pickup", on] => {
+                panels.farm_pickup = *on == "1";
+                if panels.farm_pickup && panels.farm_truck.is_none() { panels.farm_truck = parked_trucks(world).first().map(|t| t.id.clone()); }
+                None
+            }
+            ["farm-cycle-truck"] => {
+                let parked: Vec<String> = parked_trucks(world).iter().map(|t| t.id.clone()).collect();
+                let at = panels.farm_truck.as_ref().and_then(|t| parked.iter().position(|p| p == t));
+                panels.farm_truck = if parked.is_empty() { None } else { Some(parked[at.map_or(0, |i| (i + 1) % parked.len())].clone()) };
+                None
+            }
+            // Unity PhonePanel.Order: the map card's form, once or as a repeating order.
+            ["farm-order-now", farm] => {
+                let docks = farm_docks(world);
+                let dock = (!docks.is_empty()).then(|| docks[panels.farm_dock % docks.len()].0.clone());
+                let truck = if panels.farm_pickup { panels.farm_truck.clone().filter(|t| parked_trucks(world).iter().any(|p| &p.id == t)) } else { Some(String::new()) };
+                match (panels.farm_good.clone(), dock, truck) {
+                    (None, ..) => { panels.problem = "Choose what to order first.".into(); None }
+                    (_, None, _) => { panels.problem = "Farm orders need a dock at one of your places.".into(); None }
+                    (_, _, None) => { panels.problem = "No parked truck is free to pick it up.".into(); None }
+                    (Some(offer), Some(dock), Some(truck)) => {
+                        let (farm, packs) = (farm.to_string(), panels.farm_packs.max(1));
+                        Some(match panels.farm_repeat {
+                            Some(every_hours) => Command::ScheduleFarmOrder { farm, offer, packs, dock, truck, every_hours },
+                            None => Command::OrderFromFarm { farm, offer, packs, dock, truck },
+                        })
+                    }
+                }
             }
             ["cancel-schedule", schedule] => Some(Command::CancelFarmSchedule { schedule: schedule.to_string() }),
             other => {
@@ -1110,6 +1164,9 @@ fn draw(panels: Res<Panels>, session: Res<Session>, content: Res<Content>, mut m
                 if owner.is_none() && o.for_sale {
                     next.entries.push(UiEntry::button(format!("p:buy-property|{lot}"), format!("Buy for {}", money(o.price_cents))));
                 }
+                if o.category == goods::FARM_CATEGORY {
+                    farm_card(&mut next, world, view, &content, &panels, o);
+                }
             }
             next.entries.push(UiEntry::button("p:tab|Map", "Back to the map"));
         }
@@ -1126,6 +1183,62 @@ fn draw(panels: Res<Panels>, session: Res<Session>, content: Res<Content>, mut m
     if *model != next {
         *model = next;
     }
+}
+
+/// A farm's goods and the order form (Unity PhonePanel.BuildFarm): choose a good, then packs, delivery or pickup by a parked
+/// company truck, the dock it goes to and whether it repeats, then Order now. Owning the farm halves the goods price.
+fn farm_card(next: &mut UiModel, world: &Joined, view: &Snapshot, content: &Content, panels: &Panels, farm: &goods::PropertyOffer) {
+    let Some(kind) = farms::farm_kinds(world.offers_by_lot.values()).get(&farm.lot_id).copied() else { return };
+    let owned = world.company().is_some_and(|c| farms::owns_lot(view, &c.id, &farm.lot_id));
+    next.heading = farms::farm_name(kind).to_string();
+    next.entries.push(UiEntry::label("farm-sells", if owned { "SELLS - YOUR FARM: HALF PRICE" } else { "SELLS" }));
+    let goods: Vec<_> = farms::farm_items(kind).iter().filter_map(|item| content.0.goods_offer_for(item)).collect();
+    if goods.is_empty() {
+        next.entries.push(UiEntry::label("farm-nothing", "Nothing for sale here."));
+        return;
+    }
+    next.entries.push(UiEntry::row("farm-goods", goods.iter().map(|g| {
+        UiEntry::button(format!("p:farm-good|{}", g.id), format!("{} x{}\n{}", content.0.item_name(&g.item_id), g.quantity, money(farms::farm_goods_cents(g.price_cents, 1, owned))))
+            .with_icon(content.0.items.get(&g.item_id).map(|i| i.icon.clone()).unwrap_or_default())
+            .selected(panels.farm_good.as_deref() == Some(g.id.as_str()))
+    }).collect()));
+    let Some(good) = panels.farm_good.as_ref().and_then(|id| goods.iter().find(|g| &g.id == id)) else {
+        next.entries.push(UiEntry::label("farm-choose", "Choose a good to order it."));
+        return;
+    };
+    let packs = panels.farm_packs.max(1);
+    next.entries.push(UiEntry::row("farm-packs", vec![
+        UiEntry::button("p:packs|-1", "-"),
+        UiEntry::label("farm-packs-label", format!("{packs} pack(s): {} {}", packs * good.quantity, content.0.item_name(&good.item_id))),
+        UiEntry::button("p:packs|1", "+"),
+    ]));
+    next.entries.push(UiEntry::row("farm-mode", vec![
+        UiEntry::button("p:farm-pickup|0", format!("Delivery +{}", money(farms::FARM_DELIVERY_FEE_CENTS))).selected(!panels.farm_pickup),
+        UiEntry::button("p:farm-pickup|1", "Own truck").selected(panels.farm_pickup),
+    ]));
+    if panels.farm_pickup {
+        let parked = parked_trucks(world);
+        let name = panels.farm_truck.as_ref().and_then(|t| parked.iter().find(|p| &p.id == t)).map_or("No parked truck".to_string(), |t| t.name.clone());
+        next.entries.push(UiEntry::row("farm-truck", vec![UiEntry::label("farm-truck-label", "Truck"), UiEntry::button("p:farm-cycle-truck", name)]));
+    }
+    let docks = farm_docks(world);
+    let dock = (!docks.is_empty()).then(|| docks[panels.farm_dock % docks.len()].1.clone());
+    next.entries.push(UiEntry::row("farm-dock", vec![
+        UiEntry::label("farm-dock-label", "Deliver to"),
+        match dock { Some(name) => UiEntry::button("p:farm-dock", name), None => UiEntry::label("farm-no-dock", "No dock: place one in build mode") },
+    ]));
+    next.entries.push(UiEntry::button("p:farm-repeat", if panels.farm_repeat.is_some() { "Repeat order: on" } else { "Repeat order: off" }).selected(panels.farm_repeat.is_some()));
+    if let Some(hours) = panels.farm_repeat {
+        next.entries.push(UiEntry::row("farm-every", vec![
+            UiEntry::button("p:farm-every|-1", "-"),
+            UiEntry::label("farm-every-label", format!("Repeat every {hours} game h (first order at the next game hour)")),
+            UiEntry::button("p:farm-every|1", "+"),
+        ]));
+    }
+    let cents = farms::farm_goods_cents(good.price_cents, packs, owned) + if panels.farm_pickup { 0 } else { farms::FARM_DELIVERY_FEE_CENTS };
+    next.entries.push(UiEntry::label("farm-total", format!("{} {}{}", if panels.farm_repeat.is_some() { "Each order" } else { "Total" }, money(cents),
+        if panels.farm_pickup { " - your truck drives to the farm" } else { " - a farm truck brings it" })));
+    next.entries.push(UiEntry::button(format!("p:farm-order-now|{}", farm.lot_id), "Order now"));
 }
 
 #[allow(clippy::too_many_arguments)]

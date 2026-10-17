@@ -497,7 +497,7 @@ fn category(content: &Content, kind: &str) -> &'static str {
     }
 }
 
-fn draw_catalog(build: Res<Build>, session: Res<Session>, content: Res<Content>, mut model: ResMut<UiModel>, mut icons: ResMut<crate::structure_icons::StructureIcons>, mut images: ResMut<Assets<Image>>) {
+fn draw_catalog(build: Res<Build>, session: Res<Session>, content: Res<Content>, mut model: ResMut<UiModel>, mut icons: ResMut<crate::structure_icons::StructureIcons>, mut images: ResMut<Assets<Image>>, assets: Res<AssetServer>) {
     if build.active.is_none() {
         return;
     }
@@ -517,7 +517,7 @@ fn draw_catalog(build: Res<Build>, session: Res<Session>, content: Res<Content>,
     ]));
     let mut icon = |tool: &str, style: &str| {
         let pieces = crate::structure_icons::StructureIcons::pieces(styles, tool, style);
-        icons.icon(&mut images, &format!("{tool}:{style}"), pieces)
+        icons.icon(&mut images, &assets, &format!("{tool}:{style}"), pieces)
     };
     if filter == "All" || filter == "Structure" {
         let walls: Vec<UiEntry> = styles.walls.iter().map(|w| UiEntry::button(format!("b:wall|{}", w.style), format!("Wall: {}\n{} / m", w.display_name, money(buildings::SHELL_WALL_CELL_CENTS))).with_icon_image(icon("wall", &w.style)).selected(build.tool == Tool::Wall(w.style.clone()))).collect();

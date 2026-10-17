@@ -27,6 +27,7 @@ mod space;
 mod structure_icons;
 mod ui;
 mod vehicles;
+mod window_icon;
 
 use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin};
 use bevy::light::CascadeShadowConfigBuilder;
@@ -42,7 +43,7 @@ fn main() {
                         title: "Food Factory".into(),
                         // Uncapped frame rate: no vsync, falling back to vsync where the platform cannot present without it.
                         // Capture runs (dev_capture) keep vsync so automated checks never drive the GPU flat out.
-                        present_mode: if std::env::var_os("FF_CAPTURE_DIR").is_some() { PresentMode::AutoVsync } else { PresentMode::AutoNoVsync },
+                        present_mode: if std::env::var_os("FF_CAPTURE_DIR").is_some() && std::env::var_os("FF_CAPTURE_UNCAPPED").is_none() { PresentMode::AutoVsync } else { PresentMode::AutoNoVsync },
                         ..default()
                     }),
                     ..default()
@@ -70,7 +71,7 @@ fn main() {
         ))
         .add_plugins(SoundPlugin)
         .add_plugins(front::FrontPlugin)
-        .add_plugins((belt_controls::BeltControlsPlugin, build::BuildPlugin, vehicles::VehiclesPlugin, settings::SettingsPlugin, phone_map::PhoneMapPlugin, structure_icons::StructureIconsPlugin, FrameTimeDiagnosticsPlugin::default()))
+        .add_plugins((belt_controls::BeltControlsPlugin, build::BuildPlugin, vehicles::VehiclesPlugin, settings::SettingsPlugin, phone_map::PhoneMapPlugin, structure_icons::StructureIconsPlugin, window_icon::WindowIconPlugin, FrameTimeDiagnosticsPlugin::default()))
         .add_systems(Startup, spawn_sun)
         .add_systems(Update, show_fps)
         .run();

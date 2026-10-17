@@ -272,9 +272,13 @@ fn trucks(mut commands: Commands, time: Res<Time>, session: Res<Session>, space:
                 (point, heading.x.atan2(heading.y).to_degrees())
             })
         } else if truck.docked || matches!(truck.state, TruckState::Loading | TruckState::Unloading) {
-            // Backed onto the dock: rear at the dock's outer edge, nose out.
-            world.views.values().find_map(|v| v.equipment.iter().find(|e| e.kind == goods::DOCK_KIND && e.placed() && e.site_id == truck.site_id && v.routes.iter().any(|r| r.id == truck.route_id && (r.pickup_dock_id == e.id || r.dropoff_dock_id == e.id)))
-                .or_else(|| v.equipment.iter().find(|e| e.kind == goods::DOCK_KIND && e.placed() && e.site_id == truck.site_id)))
+            // Backed onto the dock: rear at the dock's outer edge, nose out. A farm order's truck uses the order's dock.
+            let order_dock = world.views.values().find_map(|v| v.farm_orders.iter().find(|o| !truck.order_id.is_empty() && o.id == truck.order_id)).map(|o| o.dock_id.clone());
+            let docks = || world.views.values().flat_map(|v| v.equipment.iter().map(move |e| (v, e))).filter(|(_, e)| e.kind == goods::DOCK_KIND && e.placed() && e.site_id == truck.site_id);
+            docks().find(|(_, e)| order_dock.as_ref() == Some(&e.id))
+                .or_else(|| docks().find(|(v, e)| v.routes.iter().any(|r| r.id == truck.route_id && (r.pickup_dock_id == e.id || r.dropoff_dock_id == e.id))))
+                .or_else(|| docks().next())
+                .map(|(_, e)| e)
                 .and_then(|dock| {
                     let lot = space.lots.get(&dock.site_id)?;
                     let (w, d) = dock.footprint();

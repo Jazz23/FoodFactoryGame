@@ -63,6 +63,9 @@ struct Figures {
     departing: Vec<(Entity, f32)>,
     pedestrians: HashMap<String, Entity>,
     walks: HashMap<String, CachedWalk>,
+    /// A travelling customer's arrival path length from the street, for its walk generation and goal cell, so the route is
+    /// searched once rather than every frame while it is still too far out to be drawn.
+    arrivals: HashMap<String, (u64, (i32, i32), Option<f32>)>,
     /// Competitor frontages by lot.
     frontages: HashMap<String, Frontage>,
 }
@@ -78,7 +81,7 @@ fn hide_inside(mut figures: Query<(&CompetitorFigure, &CustomerRoute, &mut Visib
     }
 }
 
-struct CachedWalk { revision: i64, generation: u64, walk: SiteWalk }
+struct CachedWalk { revision: i64, generation: u64, walk: SiteWalk, lines: HashMap<String, Vec<(f32, f32)>> }
 
 #[derive(Component)]
 struct CustomerRoute {
@@ -326,14 +329,15 @@ fn sync_employees(
 }
 
 /// A drawn site customer's place: queued back from its register, ordering at it, or seated at its table.
-fn site_customer_place(view: &goods::Snapshot, site: &str, walk: &SiteWalk, customer: &goods::Customer, queue_index: usize, seat_parts: impl Fn(&str) -> Vec<(f32, f32)>) -> Option<(f32, f32, f32, bool)> {
+/// Register queue lines are cached per walk (`lines`, by register): each one walks every reachable cell of the lot.
+fn site_customer_place(view: &goods::Snapshot, site: &str, walk: &SiteWalk, lines: &mut HashMap<String, Vec<(f32, f32)>>, customer: &goods::Customer, queue_index: usize, seat_parts: impl Fn(&str) -> Vec<(f32, f32)>) -> Option<(f32, f32, f32, bool)> {
     match customer.state {
         CustomerState::Queued | CustomerState::Ordering | CustomerState::Travelling => {
             let counter = view.equipment.iter().find(|e| e.id == customer.counter_id && e.site_id == site && e.placed())
                 .or_else(|| view.equipment.iter().find(|e| e.site_id == site && e.kind == goods::COUNTER_KIND && e.level == 0 && e.placed()))?;
             let (fx, fz) = goods::grid::facing(counter.rotation);
             let out = Vec2::new(fx as f32, fz as f32);
-            let line = walk.service_line(counter);
+            let line = lines.entry(counter.id.clone()).or_insert_with(|| walk.service_line(counter));
             let index = if customer.state == CustomerState::Ordering { 0 } else { queue_index + 1 };
             let spot = line.get(index).or_else(|| line.last())?;
             let yaw = (-out.x).atan2(-out.y).to_degrees();
@@ -400,9 +404,11 @@ fn sync_customers(
             let offer = world.offers_by_lot.values().find(|o| o.site_id == *site);
             let Some(walk) = SiteWalk::new(view, site, offer) else { continue };
             let generation = figures.walks.get(site).map_or(0, |old| old.generation + u64::from(!old.walk.same_ground(&walk)));
-            figures.walks.insert(site.clone(), CachedWalk { revision: view.revision, generation, walk });
+            figures.walks.insert(site.clone(), CachedWalk { revision: view.revision, generation, walk, lines: HashMap::new() });
         }
-        let walk = &figures.walks[site].walk;
+        let figures = &mut *figures;
+        let cached = figures.walks.get_mut(site).expect("inserted above");
+        let (walk, lines, generation) = (&cached.walk, &mut cached.lines, cached.generation);
         let mut queues: HashMap<String, usize> = HashMap::new();
         let mut customers: Vec<&goods::Customer> = view.customers.iter().filter(|c| c.restaurant_id == *site || view.equipment.iter().any(|e| e.id == c.counter_id && &e.site_id == site)).collect();
         customers.sort_by_key(|c| (c.state == CustomerState::Travelling, c.state != CustomerState::Ordering, if c.state == CustomerState::Travelling { c.remaining_seconds } else { c.ticket }, c.id.clone()));
@@ -415,19 +421,29 @@ fn sync_customers(
                 0
             };
             let parts = |table: &str| seats.0.get(table).map(|list| list.iter().map(|p| space.to_site(site, *p)).collect()).unwrap_or_default();
-            if let Some((x, z, yaw, seated)) = site_customer_place(view, site, walk, customer, index, parts) {
+            if let Some((x, z, yaw, seated)) = site_customer_place(view, site, walk, lines, customer, index, parts) {
                 let remaining = if customer.state == CustomerState::Travelling { customer.remaining_seconds } else { 0 };
                 if remaining > 0 && !figures.customers.contains_key(&customer.id) {
-                    let Some(entry) = walk.entrance((x, z)) else { continue };
-                    let Some(path) = walk.route(entry, (x, z), seated) else { continue };
-                    let mut from = entry;
-                    let length: f32 = path.iter().map(|&p| { let d = Vec2::new(p.0 - from.0, p.1 - from.1).length(); from = p; d }).sum();
+                    let goal = (x.floor() as i32, z.floor() as i32);
+                    let known = figures.arrivals.get(&customer.id).filter(|a| a.0 == generation && a.1 == goal).map(|a| a.2);
+                    let length = known.unwrap_or_else(|| {
+                        let length = walk.entrance((x, z)).and_then(|entry| {
+                            let path = walk.route(entry, (x, z), seated)?;
+                            let mut from = entry;
+                            Some(path.iter().map(|&p| { let d = Vec2::new(p.0 - from.0, p.1 - from.1).length(); from = p; d }).sum::<f32>())
+                        });
+                        figures.arrivals.insert(customer.id.clone(), (generation, goal, length));
+                        length
+                    });
+                    let Some(length) = length else { continue };
                     if remaining as f32 > (length / 2.0 + 2.0).max(12.0) { continue; }
                 }
                 wanted.push((customer.id.clone(), customer.appearance, site.clone(), x, z, yaw, seated, Some(remaining)));
             }
         }
     }
+    let travelling: HashSet<&str> = drawn.sites.iter().filter_map(|site| world.view_of(site)).flat_map(|v| v.customers.iter().filter(|c| c.state == CustomerState::Travelling).map(|c| c.id.as_str())).collect();
+    figures.arrivals.retain(|id, _| travelling.contains(id.as_str()));
     // Competitors near the avatar (Unity CompetitorFrontage): figures come from the street, queue along the facade, go in to
     // order and eat, and walk back out to the street.
     let mut competitors: Vec<(String, i32, String, String, Point, f32, bool)> = vec![];

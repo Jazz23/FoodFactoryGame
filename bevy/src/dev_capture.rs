@@ -2,7 +2,7 @@
 // set FF_DATA_ROOT to keep it out of the player's saves), waits until the city is drawn and the avatar placed, then drives the
 // action map through a short script (FF_CAPTURE_SCRIPT, default "look"), saving a screenshot at each step, and exits.
 // Script steps are separated by ';': `shot NAME`, `wait SECONDS`, `walk X Y SECONDS`, `turn DEGREES`, `pitch DEGREES`, `competitor [near]`, `ui TEXT` / `uialt` / `uishift` (click a button by label), `uidrag A|B`, `dump`, `property CATEGORY`, `gotoprop [LOT]`, `elevator`,
-// `zoom STEPS`, `topdown`, `key KEY` (one frame of a bound action: inventory, phone, map, build, place, remove, rotate, close).
+// `stats LABEL` (logs FPS and entity counts; FF_CAPTURE_UNCAPPED=1 turns vsync off so FPS means something), `zoom STEPS`, `topdown`, `key KEY` (one frame of a bound action: inventory, phone, map, build, place, remove, rotate, close).
 use std::collections::VecDeque;
 
 use bevy::prelude::*;
@@ -21,7 +21,10 @@ impl Plugin for DevCapturePlugin {
         let script = std::env::var("FF_CAPTURE_SCRIPT").unwrap_or_else(|_| "wait 2;shot look;turn 180;wait 0.5;shot behind;topdown;wait 1;shot topdown".into());
         let steps = script.split(';').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
         app.insert_resource(Capture { dir: dir.into(), steps, started: false, ready_at: None, busy_until: 0.0, walk: None, lot: None })
-            .add_systems(PreUpdate, autopilot.after(crate::actions::ReadActions));
+            .add_plugins(bevy::render::diagnostic::RenderDiagnosticsPlugin)
+            .init_resource::<StatsRequest>()
+            .add_systems(PreUpdate, autopilot.after(crate::actions::ReadActions))
+            .add_systems(Update, log_stats);
     }
 }
 
@@ -41,7 +44,7 @@ struct Capture {
 fn autopilot(
     mut commands: Commands, time: Res<Time>, mut capture: ResMut<Capture>, mut actions: ResMut<PlayerActions>, mut session: ResMut<Session>, content: Res<Content>,
     map: Res<MapState>, mut players: Query<(&Visibility, &mut Transform), With<crate::player::Player>>, indoors: Res<crate::sites::Indoors>, space: Option<Res<crate::space::Space>>, mut rigs: Query<&mut OrbitCamera>, mut exit: MessageWriter<AppExit>, mut intents: ResMut<crate::ui::UiIntents>, mut build: ResMut<crate::build::Build>,
-    model: Res<crate::ui::UiModel>,
+    model: Res<crate::ui::UiModel>, mut stats: ResMut<StatsRequest>,
 ) {
     let now = time.elapsed_secs_f64();
     // The real mouse never steers a capture.
@@ -92,6 +95,10 @@ fn autopilot(
     let parts: Vec<&str> = step.split_whitespace().collect();
     let number = |i: usize| parts.get(i).and_then(|p| p.parse::<f32>().ok()).unwrap_or(0.0);
     match parts.first().copied().unwrap_or("") {
+        "stats" => {
+            stats.0 = Some(parts.get(1).copied().unwrap_or("stats").to_string());
+            capture.busy_until = now + 0.1;
+        }
         "shot" => {
             let name = parts.get(1).copied().unwrap_or("shot");
             commands.spawn(Screenshot::primary_window()).observe(save_to_disk(capture.dir.join(format!("{name}.png"))));
@@ -280,4 +287,35 @@ fn autopilot(
         },
         other => warn!("[Capture] Unknown step {other}"),
     }
+}
+
+/// A `stats` step's label, logged on the next Update.
+#[derive(Resource, Default)]
+struct StatsRequest(Option<String>);
+
+/// Logs the smoothed FPS, entity, camera, UI node, mesh and light counts, and the most common entity names.
+#[allow(clippy::too_many_arguments)]
+fn log_stats(
+    mut request: ResMut<StatsRequest>, diagnostics: Res<bevy::diagnostic::DiagnosticsStore>, entities: Query<Entity>, cameras: Query<&Camera>,
+    nodes: Query<(), With<Node>>, meshes: Query<(), With<Mesh3d>>, points: Query<(), With<PointLight>>, spots: Query<(), With<SpotLight>>,
+    suns: Query<(), With<DirectionalLight>>, names: Query<&Name>,
+) {
+    let Some(label) = request.0.take() else { return };
+    let fps = diagnostics.get(&bevy::diagnostic::FrameTimeDiagnosticsPlugin::FPS).and_then(|d| d.smoothed()).unwrap_or(0.0);
+    let mut by_name: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    for name in &names {
+        let key: String = name.as_str().split(|c: char| c.is_whitespace() || c == ':').next().unwrap_or("").to_string();
+        *by_name.entry(key).or_default() += 1;
+    }
+    let mut top: Vec<(String, usize)> = by_name.into_iter().collect();
+    top.sort_by(|a, b| b.1.cmp(&a.1));
+    top.truncate(12);
+    info!("[Stats] {label}: {fps:.0} FPS, {} entities, {} cameras ({} active), {} UI nodes, {} meshes, lights {} point {} spot {} directional; names {:?}",
+        entities.iter().count(), cameras.iter().count(), cameras.iter().filter(|c| c.is_active).count(), nodes.iter().count(), meshes.iter().count(),
+        points.iter().count(), spots.iter().count(), suns.iter().count(), top);
+    // Per-pass GPU (and render CPU) time from RenderDiagnosticsPlugin, the costliest first.
+    let mut passes: Vec<(String, f64)> = diagnostics.iter().filter(|d| d.path().as_str().contains("elapsed_gpu")).filter_map(|d| d.smoothed().map(|v| (d.path().as_str().to_string(), v))).collect();
+    passes.sort_by(|a, b| b.1.total_cmp(&a.1));
+    passes.truncate(15);
+    info!("[Stats] {label} gpu ms: {passes:?}");
 }
